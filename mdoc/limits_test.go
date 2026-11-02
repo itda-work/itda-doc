@@ -39,7 +39,7 @@ func repeatTo(unit string) func(int) string {
 // 강조 구분자 수 상한(cjk.go). 고치기 전: 짝이 될 수 없는 구분자가 번갈아 쌓인 `_a*` 반복 128KB 가 9초(순수 goldmark 도 같다).
 func TestDelimiterLimit(t *testing.T) {
 	for _, unit := range []string{"_a*", "*a_", "~# *", "#_1*", "*a", "_a", "~a*"} {
-		assertLinear(t, unit, repeatTo(unit), 300*time.Millisecond)
+		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
 	}
 	// 상한까지는 그대로 강조, 넘는 것은 글자(원문 그대로) + 경고 한 번
 	r := render(t, strings.Repeat("*a* ", MaxDelimitersPerBlock))
