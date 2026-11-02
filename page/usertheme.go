@@ -96,7 +96,7 @@ func readThemeTree(root *os.Root, name string) (map[string][]byte, error) {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%s: 보통 파일이 아님", rel)
 		}
-		if _, ok := ThemeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
+		if _, ok := themeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
 			return fmt.Errorf("%s: 테마에 둘 수 없는 파일(css·json·md·svg·png·jpg·webp·woff2 만)", rel)
 		}
 		if len(out) >= maxThemeFiles {

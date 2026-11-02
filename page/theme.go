@@ -410,10 +410,17 @@ func readThemeFile(fsys fs.FS, dir string) (*themeFile, error) {
 
 // 테마 폴더에 둘 수 있는 파일. 스크립트·HTML·실행 파일은 담지 못한다. 크기 상한은 테마를 고르는 순간 창이
 // 굳지 않게(사용자 테마는 메모리에 읽어 둔다 — usertheme.go) 한다. 한글 글꼴 woff2 한 굵기가 1~3MB 다.
-var ThemeFileTypes = map[string]string{
+var themeFileTypes = map[string]string{
 	".css": "text/css; charset=utf-8", ".json": "application/json", ".md": "text/markdown; charset=utf-8",
 	".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
 	".woff2": "font/woff2",
+}
+
+// ThemeFileType 은 테마 폴더에 둘 수 있는 확장자 ext(점 포함, 소문자 — 부르는 쪽이 strings.ToLower(path.Ext(p)) 로 맞춘다)의
+// content-type 이다. 허용 목록(themeFileTypes)에 없으면 ok 가 거짓이다 — 목록 자체는 밖에서 바꿀 수 없다(리뷰 1회차 [4]).
+func ThemeFileType(ext string) (ctype string, ok bool) {
+	ctype, ok = themeFileTypes[ext]
+	return ctype, ok
 }
 
 const (
@@ -447,7 +454,7 @@ func checkThemeFiles(fsys fs.FS, dir string) error {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%s: 보통 파일이 아님(링크 등)", rel)
 		}
-		if _, ok := ThemeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
+		if _, ok := themeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
 			return fmt.Errorf("%s: 테마에 둘 수 없는 파일(css·json·md·svg·png·jpg·webp·woff2 만)", rel)
 		}
 		info, err := d.Info()
