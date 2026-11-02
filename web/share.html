@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- 문서 창 공유의 보기 화면(#339 ①·②·③·④, 표 복사 #349, 코드 복사 단추 #413). 같은 네트워크의 브라우저가 연다 — Wails 바인딩이 없다. Go(share_http.go)가 {{BASE}} 를
+     /s/<토큰> 으로 채우고 콘텐츠 보안 정책은 응답 머리로 단다(shareCSP — 원격 그림 늘 끔). -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Itda Hyve Docs</title>
+<link rel="stylesheet" href="{{BASE}}/_/base.css">
+<link rel="stylesheet" href="{{BASE}}/_/app.css">
+<link rel="stylesheet" href="{{BASE}}/_/share.css">
+<link rel="stylesheet" id="theme-css">
+<script src="{{BASE}}/_/pager.js"></script>
+<script src="{{BASE}}/_/slides.js"></script>
+<script src="{{BASE}}/_/tablecopy.js"></script>
+<script src="{{BASE}}/_/codecopy.js"></script>
+<script src="{{BASE}}/_/codelines.js"></script>
+<script src="{{BASE}}/_/tablesort.js"></script>
+<script src="{{BASE}}/_/share.js" defer></script>
+</head>
+<body class="share-view paper-a4" data-base="{{BASE}}">
+<!-- 아이콘은 문서 창(index.html)의 Lucide 심볼을 그대로 옮겼다(ISC — 저작권 고지는 index.html) -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-sidebar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M10 4v16"/></symbol>
+  <symbol id="i-csv" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 12h8v6H8zM8 15h8M12 12v6"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5"/></symbol>
+</svg>
+<header class="bar share-bar">
+  <button class="ibtn" id="btn-toc" title="목차 보기·숨기기" aria-label="목차" aria-controls="sidebar" aria-expanded="false" hidden><svg class="ic" aria-hidden="true"><use href="#i-sidebar"/></svg></button>
+  <div class="doc-name"><span id="doc-title">문서를 받는 중…</span></div>
+  <div class="spacer"></div>
+  <!-- 발표자 노트(#344): 공유한 사람이 「노트 함께 보이기」 를 켜 노트가 온 슬라이드 보기에서만 보인다(share.js paintNotesSwitch) -->
+  <div class="group notes-switch" id="notes-switch" role="group" aria-label="발표자 노트" hidden>
+    <span class="notes-k">노트</span>
+    <button class="gbtn" data-notes="off" title="노트 끔">끔</button>
+    <button class="gbtn" data-notes="right" title="노트를 슬라이드 오른쪽에(좁은 화면에서는 아래에)">오른쪽</button>
+    <button class="gbtn" data-notes="below" title="노트를 슬라이드 아래에">아래</button>
+    <span class="note-fs" role="group" aria-label="노트 글자 크기 — 이 화면에서만">
+      <button class="gbtn" data-note-font="-1" title="노트 글자 작게" aria-label="노트 글자 작게">A−</button>
+      <span class="note-fs-val" id="note-fs-val" title="노트 글자 크기(px)">14</span>
+      <button class="gbtn" data-note-font="1" title="노트 글자 크게" aria-label="노트 글자 크게">A+</button>
+    </span>
+  </div>
+  <div class="group" id="look-switch" role="group" aria-label="보기 꼴" hidden>
+    <button class="gbtn" data-look="doc" title="쪽 — A4 로 나눠 보기">쪽</button>
+    <button class="gbtn" data-look="flow" title="이어보기 — 쪽 나눔 없이">이어보기</button>
+  </div>
+</header>
+<div class="main">
+  <aside id="sidebar" class="sidebar" aria-label="목차" hidden>
+    <div class="side-title">목차</div>
+    <nav id="side-toc"></nav>
+  </aside>
+  <div id="toc-back" class="toc-back" hidden></div>
+  <div id="viewer" class="viewer">
+    <div id="pages-box" class="pages-box"><div id="pages" class="pages"></div></div>
+    <div id="ended" class="share-ended" hidden>
+      <div class="share-ended-card">
+        <h2 id="ended-title">공유가 끝났습니다</h2>
+        <p id="ended-msg">공유한 사람이 공유를 중단했거나 시간이 지났습니다. 다시 보려면 새 주소를 받으세요.</p>
+      </div>
+    </div>
+    <p id="load-err" class="share-err" hidden></p>
+  </div>
+  <button type="button" id="follow-back" class="follow-back" hidden>발표자 위치로</button>
+</div>
+<div class="menu" id="table-ctx" role="menu" aria-label="표 복사" hidden>
+  <button type="button" data-table-copy="tsv" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg><span>표 복사</span></button>
+  <button type="button" data-table-copy="csv" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-csv"/></svg><span>CSV로 복사</span></button>
+  <button type="button" data-table-copy="md" role="menuitem"><svg class="ic" aria-hidden="true"><use href="#i-code"/></svg><span>Markdown으로 복사</span></button>
+</div>
+<div class="toast" id="toast" hidden></div>
+<div id="stage" class="stage pages" aria-hidden="true"></div>
+</body>
+</html>

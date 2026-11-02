@@ -1,0 +1,74 @@
+/* 모노: 흑백, 격식. 표지 없이 가운데 제목 블록 → 수신·참조 줄 → 본문 → 발신 명의 → 결재란. */
+
+
+/* 제목 블록: 기관명(크게, 자간) → 굵은 두 줄 → 제목(가운데) → 수신·경유·참조 줄 */
+.title-block { text-align: center; margin: 2mm 0 10pt; }
+.title-org { font-size: 19pt; font-weight: 800; color: var(--ink); letter-spacing: 0.35em; padding-bottom: 6pt;
+  border-bottom: 2.4pt double var(--ink); margin-bottom: 12pt; text-indent: 0.35em; }
+.page-body .title-block .title { font-size: 15pt; font-weight: 700; letter-spacing: 0.04em; margin: 0 0 12pt; }
+.title-block .subtitle { margin-top: -6pt; }
+.page-body .title-meta { text-align: left; grid-template-columns: 18mm 1fr; column-gap: 3mm; row-gap: 2pt; font-size: 11pt;
+  border-top: 0.75pt solid var(--ink); border-bottom: 0.75pt solid var(--ink); padding: 6pt 2mm; margin: 0; }
+.page-body .title-meta dt { color: var(--ink); font-weight: 700; letter-spacing: 0.5em; }
+.page-body .title-meta dd { color: var(--ink); }
+
+/* 본문 제목은 번호와 함께 왼쪽, 장식 없음 */
+.page-body h1, .page-body h2, .page-body h3 { color: var(--ink); }
+.page-body h1 { margin-top: 12pt; }
+
+/* 번호 목록의 기호는 굵게. 단계별 기호(1. → 가. → 1) …)는 theme.json 의 list-style 로 base.css 가 그린다(#141) */
+.page-body ol li::marker { font-weight: 600; }
+
+/* 정의 목록(본문 안의 붙임 줄 등) */
+.page-body dl { column-gap: 5mm; }
+.page-body dt { letter-spacing: 0.2em; }
+
+/* 알림은 흑백 상자로 */
+.markdown-alert { border: 0.75pt solid var(--ink); border-left-width: 3pt; border-radius: 0; }
+.markdown-alert-title { color: var(--ink); }
+
+/* 가운데 "아 래" */
+.center strong { letter-spacing: 0.6em; }
+
+/* 표: 검은 실선 격자 */
+.page-body th, .page-body td { border: 0.6pt solid var(--ink); }
+.page-body tr > :first-child { border-left: 0.6pt solid var(--ink); }
+.page-body tr > :last-child { border-right: 0.6pt solid var(--ink); }
+
+/* 발신 명의: 가운데 크게, 자간 넓게 */
+.signature { text-align: center; font-size: 17pt; font-weight: 800; letter-spacing: 0.32em; margin: 18pt 0 8pt; text-indent: 0.32em; }
+
+/* 결재란: 오른쪽, 위 칸은 직위, 아래 칸은 서명 */
+.approval { margin-top: 14pt; }
+.page-body .approval table { border-top: none; }
+.page-body .approval th { background: #efefef; font-size: 9pt; letter-spacing: 0.1em; }
+.page-body .approval td { height: 18mm; min-width: 22mm; }
+
+/* 바닥글: 문서번호·쪽·시행일, 위에 실선 */
+.page-footer { color: var(--ink); font-size: 8pt; }
+.page-header .slot.right { color: var(--ink); font-weight: 700; border: 0.75pt solid var(--ink); padding: 0 5pt; justify-self: end; }
+
+/* ---- 슬라이드: 흑백·격식. 제목 아래 두 줄, 제목 슬라이드는 가운데(기관명 자간 + 두 줄 + 제목), 구역은 위아래 선 사이 가운데. */
+.slide-deco::before { display: none; }
+.slide-title { color: var(--ink); padding-bottom: 9pt; border-bottom: 3.5pt double var(--ink); }
+.slide-title .header-section-number { color: var(--ink); }
+.slide-foot { color: var(--ink); border-top: 0.75pt solid var(--ink); padding-top: 7pt; bottom: 14pt; }
+.slide-cover { align-items: center; text-align: center; padding: 64pt 96pt 56pt; }
+.sc-top { justify-content: center; font-size: calc(25pt * var(--slide-scale)); font-weight: 800; color: var(--ink); letter-spacing: 0.35em; text-indent: 0.35em;
+  border-bottom: 4pt double var(--ink); padding-bottom: 12pt; align-self: stretch; }
+.sc-logo { height: 30pt; }
+.sc-class { position: absolute; right: 64pt; top: 30pt; color: var(--ink); letter-spacing: 0; text-indent: 0; font-size: 11pt; }
+.page-body .sc-title { color: var(--ink); font-size: calc(40pt * var(--slide-scale)); font-weight: 700; letter-spacing: 0.04em; max-width: none; }
+.page-body .sc-sub { color: var(--ink); }
+.sc-meta { justify-content: center; color: var(--ink); border-top: 0.75pt solid var(--ink); border-bottom: 0.75pt solid var(--ink); padding: 9pt 24pt; }
+.page-body.k-section .slide-section { text-align: center; border-top: 1.2pt solid var(--ink); border-bottom: 1.2pt solid var(--ink); padding: 26pt 0 28pt; }
+.page-body.k-section:not(.bare) .slide-section { padding: 12pt 0 14pt; margin-bottom: 20pt; }
+.page-body .ss-num { color: var(--ink); font-size: calc(30pt * var(--slide-scale)); font-weight: 700; margin-bottom: 6pt; }
+.page-body .ss-num::after { content: "."; }
+.page-body .ss-title { font-weight: 700; letter-spacing: 0.06em; }
+
+/* ---- 차트: 막대 + 선(line="계열")의 선은 글자색으로. 계열 색 3·5·7번(#c4c4c4·#a6a6a6·#d9d9d9)은 막대·조각의 면으로는 구분되지만
+   2.4px 선과 점으로는 흰 종이 위 대비가 3:1 에 못 미쳐 인쇄에서 묻힌다. 열 차례와 상관없이 선 계열만 진하게 — 막대와는 모양(선·점)과
+   종이색 테두리(.line.halo)로 가린다. 토큰을 바꾸지 않으므로 다른 차트의 색은 그대로다. */
+.chart-svg path.line.cl { stroke: var(--chart-text); }
+.chart-svg circle.dot.cl, .chart-svg .sw.cl { fill: var(--chart-text); }

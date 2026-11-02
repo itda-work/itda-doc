@@ -1,0 +1,63 @@
+/* 문서 창 공유의 화면(#339 ①). 보기 화면은 app.css(틀)·base.css(문서) 위에 이것을 더하고, 입장 화면은 이것만 쓴다. */
+
+/* ---- 보기 화면 */
+.share-view .share-bar { --wails-draggable: none; }
+.share-view #doc-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 60vw; }
+.share-view .viewer { -webkit-overflow-scrolling: touch; }
+.share-ended { position: absolute; inset: 0; display: flex; padding: 24px; }
+.share-ended-card { margin: auto; max-width: 420px; text-align: center; background: var(--ui-panel); border: 1px solid var(--ui-line);
+  border-radius: 12px; padding: 28px 24px; box-shadow: var(--ui-shadow); }
+.share-ended-card h2 { font-size: 18px; margin: 0 0 10px; }
+.share-ended-card p { margin: 0; line-height: 1.6; color: var(--ui-muted); }
+/* ③ 발표자 따라가기: 따라가는 슬라이드의 가벼운 테두리, 풀렸을 때 아래쪽 가운데의 「발표자 위치로」 */
+.share-view .page.following { outline: 3px solid color-mix(in srgb, #2f6fed 55%, transparent); outline-offset: 4px; }
+/* 내용 위치 따라가기(⑧): 발표자가 읽는 블록(쪽 나눔이 쪼갠 조각마다) — 옅은 배경. 쪽 본문은 overflow: clip 이라 바깥 테두리는 잘려 보이지 않는다(실측) */
+@media screen { .share-view .page-body [data-n].following { background-color: color-mix(in srgb, #2f6fed 8%, transparent); border-radius: 2px; } } /* 화면에서만 — 보는 브라우저로 인쇄하면 강조 배경이 남지 않게(fix1) */
+.follow-back { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 20;
+  font: inherit; font-size: 15px; font-weight: 600; padding: 10px 18px; border: 0; border-radius: 999px; background: #2f6fed; color: #fff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer; white-space: nowrap; }
+.follow-back[hidden] { display: none; }
+/* 발표자 노트 컨트롤(#344) — 틀은 app.css 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
+.share-view .notes-switch[hidden] { display: none !important; }
+.share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
+@media (max-width: 600px) {
+  .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
+}
+.share-err { margin: 24px auto; max-width: 480px; text-align: center; color: #d64545; }
+/* ④ 목차: 틀은 app.css 의 .sidebar·#side-toc·body.no-toc 를 그대로 쓴다. 좁은 화면(toc-drawer — share.js 가 폭으로 단다)은 본문 위에
+   겹치는 서랍과 바깥 가림막 */
+.share-view #btn-toc[hidden], .share-view .sidebar[hidden], .toc-back[hidden] { display: none; }
+.share-view .main { position: relative; }
+.share-view #side-toc a.on { font-weight: 600; }
+body.toc-drawer .sidebar { position: absolute; top: 0; bottom: 0; left: 0; z-index: 16; width: min(300px, 84vw); box-shadow: 4px 0 18px rgba(0, 0, 0, .22); }
+.toc-back { position: absolute; inset: 0; z-index: 15; background: rgba(0, 0, 0, .28); }
+body.toc-drawer #side-toc a { padding: 8px 8px; font-size: 14px; }
+@media (max-width: 600px) {
+  .share-view .bar { padding: 0 8px; }
+  .share-view .pages.flow-look { padding: 10px 6px 48px; }
+}
+
+/* ---- 입장 화면(app.css 없이 혼자 선다) */
+.share-entry {
+  --e-bg: #e6e8ec; --e-panel: #ffffff; --e-line: #dfe2e7; --e-text: #1d2330; --e-muted: #69717f; --e-accent: #2f6fed; --e-accent-fg: #fff;
+  color-scheme: light;
+  margin: 0; min-height: 100vh; display: flex; padding: 16px; box-sizing: border-box; background: var(--e-bg); color: var(--e-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif; font-size: 15px;
+}
+@media (prefers-color-scheme: dark) {
+  .share-entry { --e-bg: #24272d; --e-panel: #1b1e23; --e-line: #30353d; --e-text: #e6e9ee; --e-muted: #98a1ae; --e-accent: #4b86f5; --e-accent-fg: #0d1117; color-scheme: dark; }
+}
+.share-entry * { box-sizing: border-box; }
+.entry-card { margin: auto; width: 100%; max-width: 380px; background: var(--e-panel); border: 1px solid var(--e-line); border-radius: 14px; padding: 26px 22px 22px; }
+.entry-card h1 { font-size: 19px; margin: 0 0 8px; }
+.entry-lead { margin: 0 0 16px; color: var(--e-muted); line-height: 1.55; font-size: 14px; }
+.entry-msg { margin: 0 0 14px; padding: 9px 12px; border-radius: 8px; background: color-mix(in srgb, #d64545 12%, var(--e-panel)); color: #d64545; font-size: 14px; }
+.entry-row { display: block; margin: 0 0 14px; }
+.entry-row > span { display: block; font-size: 13px; color: var(--e-muted); margin-bottom: 6px; }
+.entry-row em { font-style: normal; font-size: 12px; }
+.entry-row input { width: 100%; font: inherit; font-size: 17px; padding: 10px 12px; border: 1px solid var(--e-line); border-radius: 9px; background: var(--e-panel); color: var(--e-text); }
+.entry-row input[name="code"] { letter-spacing: .2em; font-variant-numeric: tabular-nums; }
+.entry-row input:focus { outline: 2px solid color-mix(in srgb, var(--e-accent) 50%, transparent); outline-offset: 0; }
+.entry-go { width: 100%; font: inherit; font-size: 16px; font-weight: 600; padding: 11px; border: 0; border-radius: 9px; background: var(--e-accent); color: var(--e-accent-fg); cursor: pointer; }
+/* 표 복사 메뉴(#376): 마우스로 열면 첫 항목에 포커스만 두고 테두리는 메뉴 안에서 키를 누를 때부터(share.js tableMenu) */
+#table-ctx.by-mouse button:focus { outline: none; }

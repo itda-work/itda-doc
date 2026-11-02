@@ -1,0 +1,12 @@
+/* 에이크미: 바탕은 클래식(classic). 색은 --accent 하나로 바뀌므로 CSS 는 자기 어휘만 정한다. */
+
+/* :::confidential — 배포 제한 띠. 문서에 ":::confidential … :::" 로 쓴다(다른 테마에서는 그냥 문단으로 보인다) */
+.confidential { border: 1.2pt solid var(--accent); border-left-width: 6pt; padding: 6pt 11pt; margin: 10pt 0;
+  color: var(--accent); font-weight: 700; font-size: 9.5pt; letter-spacing: 0.02em; }
+.confidential::before { content: "배포 제한"; display: inline-block; background: var(--accent); color: #fff; font-size: 8pt;
+  letter-spacing: 0.25em; padding: 1pt 5pt 1pt 7pt; margin-right: 7pt; vertical-align: 1pt; }
+.confidential > :last-child { margin-bottom: 0; }
+.confidential > p { display: inline; }
+
+/* 표지 로고를 조금 크게 */
+.cover-logo { max-height: 13mm; }

@@ -1,0 +1,3 @@
+meta: {Present:false Title: Subtitle: Author:[] Date: Lang: TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme: Cover:false DocNo: Version: Classification: Organization: ListStyle: Slides:<nil> Code:<nil> Extra:[]}
+toc-placed: false
+toc: h1 #차트-golden--종류마다-하나 [] 차트 golden — 종류마다 하나
