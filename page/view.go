@@ -40,7 +40,7 @@ type View struct {
 	Lang         string                 `json:"lang"`
 	HTML         string                 `json:"html"`
 	EditorTokens []mdoc.EditorCodeBlock `json:"editor_tokens,omitempty"`
-	editorTokens []mdoc.EditorCodeBlock // renderView 내부 결과; App.Render에서만 공개
+	editorTokens []mdoc.EditorCodeBlock // renderView 내부 결과; App.Render에서만 공개(EditorCodeBlocks)
 	Header       Slots                  `json:"header"`
 	Footer       Slots                  `json:"footer"`
 	H1Break      bool                   `json:"h1_break"`
@@ -73,6 +73,9 @@ type View struct {
 	Info  map[string]string `json:"info"`
 	Error string            `json:"error,omitempty"`
 }
+
+// EditorCodeBlocks 는 렌더가 낸 편집기 코드 블록 토큰이다 — json 에 실리지 않는 값이라 앱이 필요할 때 EditorTokens 로 옮긴다.
+func (v View) EditorCodeBlocks() []mdoc.EditorCodeBlock { return v.editorTokens }
 
 // SlideView 는 화면이 슬라이드를 나눌 때 쓰는 값이다(설계 1.12·5장).
 type SlideView struct {

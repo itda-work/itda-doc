@@ -96,7 +96,7 @@ func readThemeTree(root *os.Root, name string) (map[string][]byte, error) {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%s: 보통 파일이 아님", rel)
 		}
-		if _, ok := themeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
+		if _, ok := ThemeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
 			return fmt.Errorf("%s: 테마에 둘 수 없는 파일(css·json·md·svg·png·jpg·webp·woff2 만)", rel)
 		}
 		if len(out) >= maxThemeFiles {
@@ -118,7 +118,7 @@ func readThemeTree(root *os.Root, name string) (map[string][]byte, error) {
 
 // readRootFile 은 root 안의 보통 파일 하나를 limit 바이트까지 읽는다. FIFO 로 막히지 않게 O_NONBLOCK 으로 연다.
 func readRootFile(root *os.Root, p string, limit int64) ([]byte, error) {
-	f, err := root.OpenFile(filepath.FromSlash(p), os.O_RDONLY|openFlags, 0)
+	f, err := root.OpenFile(filepath.FromSlash(p), os.O_RDONLY|OpenFlags, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +143,9 @@ func readRootFile(root *os.Root, p string, limit int64) ([]byte, error) {
 	return b, nil
 }
 
-// userThemesStamp 는 테마 폴더의 지문이다(이름·크기·수정 시각·종류). 바뀌면 다시 읽는다. fsnotify 없이(새 의존성
+// UserThemesStamp 는 테마 폴더의 지문이다(이름·크기·수정 시각·종류). 바뀌면 다시 읽는다. fsnotify 없이(새 의존성
 // 없음) 1초마다 본다 — 테마 폴더는 작아서(파일 수십 개) 훑는 값이 싸다. 너무 크면 앞부분만 본다.
-func userThemesStamp(dir string) string {
+func UserThemesStamp(dir string) string {
 	h := fnv.New64a()
 	n := 0
 	_ = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
@@ -207,7 +207,7 @@ func themeIDFromName(name string) (string, error) {
 		dash = false
 	}
 	id := strings.Trim(b.String(), "-_")
-	if !validThemeName(id) {
+	if !ValidThemeName(id) {
 		return "", fmt.Errorf("테마 이름 %q 는 글자 또는 숫자로 시작하고 40자를 넘지 않아야 한다", name)
 	}
 	return id, nil
@@ -225,9 +225,9 @@ type createdTheme struct {
 
 const maxLogo = 2 << 20
 
-// createUserTheme 은 dir(사용자 테마 폴더) 안에 새 테마 폴더를 만든다. 있는 폴더는 덮어쓰지 않는다(이름이 같으면
+// CreateUserTheme 은 dir(사용자 테마 폴더) 안에 새 테마 폴더를 만든다. 있는 폴더는 덮어쓰지 않는다(이름이 같으면
 // 실패). 쓰는 곳은 dir 안뿐이다 — os.Root 로 열어 링크·.. 로 벗어나지 못한다. 만든 테마의 이름을 돌려준다.
-func createUserTheme(dir string, ts *Themes, req NewTheme, logoPath string) (string, error) {
+func CreateUserTheme(dir string, ts *Themes, req NewTheme, logoPath string) (string, error) {
 	if dir == "" {
 		return "", errors.New("사용자 테마 폴더가 정해지지 않았다")
 	}
@@ -288,7 +288,7 @@ func createUserTheme(dir string, ts *Themes, req NewTheme, logoPath string) (str
 		if logoPath == "" {
 			return "", errors.New("로고 파일을 먼저 골라라")
 		}
-		b, ext, err := readLogo(logoPath)
+		b, ext, err := ReadLogo(logoPath)
 		if err != nil {
 			return "", err
 		}
@@ -353,8 +353,8 @@ func createUserTheme(dir string, ts *Themes, req NewTheme, logoPath string) (str
 	return id, nil
 }
 
-// readLogo 는 대화상자에서 고른 로고를 읽는다: 그림 확장자, 링크가 아닌 보통 파일, 2MB 까지.
-func readLogo(p string) ([]byte, string, error) {
+// ReadLogo 는 대화상자에서 고른 로고를 읽는다: 그림 확장자, 링크가 아닌 보통 파일, 2MB 까지.
+func ReadLogo(p string) ([]byte, string, error) {
 	ext := strings.ToLower(filepath.Ext(p))
 	if ext == ".jpeg" {
 		ext = ".jpg"
@@ -372,7 +372,7 @@ func readLogo(p string) ([]byte, string, error) {
 	if st.Size() > maxLogo {
 		return nil, "", fmt.Errorf("로고가 너무 크다(%dMB 까지)", maxLogo>>20)
 	}
-	f, err := os.OpenFile(p, os.O_RDONLY|openFlags, 0)
+	f, err := os.OpenFile(p, os.O_RDONLY|OpenFlags, 0)
 	if err != nil {
 		return nil, "", err
 	}

@@ -188,7 +188,8 @@ var (
 	metaKeyRe = regexp.MustCompile(`^[\p{L}\p{N}_-]{1,40}$`)
 )
 
-func validThemeName(n string) bool {
+// ValidThemeName 은 테마 이름으로 쓸 수 있는 글자인지다(40자까지, themeNameRe).
+func ValidThemeName(n string) bool {
 	return utf8.RuneCountInString(n) <= 40 && themeNameRe.MatchString(n)
 }
 
@@ -349,7 +350,7 @@ func readThemeDir(fsys fs.FS, user bool) (map[string]*themeEntry, map[string]str
 }
 
 func readThemeFile(fsys fs.FS, dir string) (*themeFile, error) {
-	if !validThemeName(dir) {
+	if !ValidThemeName(dir) {
 		return nil, fmt.Errorf("폴더 이름 %q 는 소문자 영문·숫자·한글·-·_ 로 40자까지만 쓴다", dir)
 	}
 	if err := checkThemeFiles(fsys, dir); err != nil {
@@ -409,7 +410,7 @@ func readThemeFile(fsys fs.FS, dir string) (*themeFile, error) {
 
 // 테마 폴더에 둘 수 있는 파일. 스크립트·HTML·실행 파일은 담지 못한다. 크기 상한은 테마를 고르는 순간 창이
 // 굳지 않게(사용자 테마는 메모리에 읽어 둔다 — usertheme.go) 한다. 한글 글꼴 woff2 한 굵기가 1~3MB 다.
-var themeFileTypes = map[string]string{
+var ThemeFileTypes = map[string]string{
 	".css": "text/css; charset=utf-8", ".json": "application/json", ".md": "text/markdown; charset=utf-8",
 	".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
 	".woff2": "font/woff2",
@@ -446,7 +447,7 @@ func checkThemeFiles(fsys fs.FS, dir string) error {
 		if !d.Type().IsRegular() {
 			return fmt.Errorf("%s: 보통 파일이 아님(링크 등)", rel)
 		}
-		if _, ok := themeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
+		if _, ok := ThemeFileTypes[strings.ToLower(path.Ext(p))]; !ok {
 			return fmt.Errorf("%s: 테마에 둘 수 없는 파일(css·json·md·svg·png·jpg·webp·woff2 만)", rel)
 		}
 		info, err := d.Info()
@@ -612,7 +613,7 @@ func resolveTheme(entries map[string]*themeEntry, broken map[string]string, name
 			if err != nil || d.IsDir() || hiddenPath(p) {
 				return nil
 			}
-			t.files[themeURL(name, p)] = themeAsset{fsys: sub, path: p}
+			t.files[ThemeURL(name, p)] = themeAsset{fsys: sub, path: p}
 			return nil
 		})
 	}
@@ -621,7 +622,7 @@ func resolveTheme(entries map[string]*themeEntry, broken map[string]string, name
 		if err != nil {
 			return nil, fmt.Errorf("logo: %w", err)
 		}
-		u := themeURL(name, p)
+		u := ThemeURL(name, p)
 		if _, ok := t.files[u]; !ok {
 			return nil, fmt.Errorf("logo %q 가 assets 에 없음", tf.Logo)
 		}
@@ -665,7 +666,8 @@ func applySlots(dst *[3]string, s *slotsFile) {
 	}
 }
 
-func themeURL(theme, p string) string { return "/_theme/" + theme + "/" + p }
+// ThemeURL 은 테마 파일(theme 의 p)을 내주는 앱 주소다.
+func ThemeURL(theme, p string) string { return "/_theme/" + theme + "/" + p }
 
 func withRev(u string, rev int64) string {
 	if rev == 0 {
@@ -745,7 +747,7 @@ func (ts *Themes) List() []ThemeInfo {
 //
 // css 는 엔진에 맞춘 꼴이다(compat.go): @scope 를 모르는 엔진(옛 WebKit)이면 가두지 않고 낸다. 그 꼴은 내장 테마만
 // 받는다 — 사용자 테마는 그 엔진에서 아예 쓰지 않는다(App.themeSet). 상대 색 판정은 CSS 의 @supports 가 한다.
-func (t *Theme) StyleSheet(css cssMode) string {
+func (t *Theme) StyleSheet(css CSSMode) string {
 	var b strings.Builder
 	b.WriteString("/* 테마 ")
 	b.WriteString(t.Name)
@@ -755,7 +757,7 @@ func (t *Theme) StyleSheet(css cssMode) string {
 	if len(t.Derived) > 0 {
 		// 상대 색을 채널 calc() 까지 아는 엔진에서만 덮는다(Safari 18+·Chromium 119+). 모르는 엔진은 위의 정적 값을 쓴다.
 		cond := relColorSupports
-		if css.fakeNoRelColor {
+		if css.FakeNoRelColor {
 			cond = fakeFalseSupports
 		}
 		b.WriteString("@supports ")
@@ -765,7 +767,7 @@ func (t *Theme) StyleSheet(css cssMode) string {
 		b.WriteString("}\n}\n")
 	}
 	b.WriteString(t.Fonts)
-	if css.unscoped && !t.User {
+	if css.Unscoped && !t.User {
 		b.WriteString(t.CSS)
 	} else {
 		b.WriteString("@scope (.page) {\n")
@@ -784,6 +786,12 @@ func writeDecls(b *strings.Builder, kvs [][2]string) {
 		b.WriteString(kv[1])
 		b.WriteString(";\n")
 	}
+}
+
+// HasFile 은 u(/_theme/<이름>/… 주소)가 이 테마의 파일인지다 — 다른 테마의 파일은 거짓이다.
+func (t *Theme) HasFile(u string) bool {
+	_, ok := t.files[u]
+	return ok
 }
 
 // Asset 은 테마 파일 하나를 찾는다. u 는 /_theme/<이름>/assets/… 주소다(물음표 뒤는 뺀 것).

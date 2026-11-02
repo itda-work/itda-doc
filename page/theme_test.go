@@ -45,7 +45,7 @@ func TestBuiltinThemes(t *testing.T) {
 		if !strings.Contains(all, "{page} / {pages}") {
 			t.Errorf("%s: 머리글·바닥글에 {page} / {pages} 가 없음", i.Name)
 		}
-		if css := th.StyleSheet(cssMode{}); !strings.Contains(css, "--page-margin-top:") {
+		if css := th.StyleSheet(CSSMode{}); !strings.Contains(css, "--page-margin-top:") {
 			t.Errorf("%s: 여백 토큰이 없음", i.Name)
 		}
 	}
@@ -148,7 +148,7 @@ func TestThemeExtends(t *testing.T) {
 		t.Fatal(err)
 	}
 	acme, _ := ts.Get("acme")
-	css := acme.StyleSheet(cssMode{})
+	css := acme.StyleSheet(CSSMode{})
 	for _, want := range []string{"--accent: #c8102e;", "--ink: #222;", "--page-margin-top: 20mm;",
 		`url("/_theme/base/assets/bg.png")`, ".cover-title { color: var(--accent); }"} {
 		if !strings.Contains(css, want) {
@@ -216,7 +216,7 @@ func TestNoNumericFontFeatures(t *testing.T) {
 	sheets := map[string]string{"base.css": string(base)}
 	for _, i := range ts.List() {
 		th, _ := ts.Get(i.Name)
-		sheets[i.Name] = th.StyleSheet(cssMode{})
+		sheets[i.Name] = th.StyleSheet(CSSMode{})
 	}
 	comment := regexp.MustCompile(`(?s)/\*.*?\*/`)
 	for name, css := range sheets {
@@ -330,32 +330,32 @@ var nestAtRuleName = []string{"media", "supports", "scope", "layer", "container"
 // @묶음은 atName 이 뽑은 이름(소문자)으로 식별한다 — " @media\nprint"·"@MEDIA"·"@supports(…" 같은
 // 표기 변형을 ASCII 공백 자르기로는 못 얻는다(리뷰 4회차 [1]). 이 검사는 내장 테마·base.css 에서 흔히
 // 쓰는 꼴의 회귀를 잡는다(완전한 CSS 해석기가 아니다 — 거짓 실패를 감수한 허용 목록).
-func slideCSSRules(css string) ([]cssBlock, error) {
-	return slideCSSRulesInner(stripCSSComments(css))
+func slideCSSRules(css string) ([]CSSBlock, error) {
+	return slideCSSRulesInner(StripCSSComments(css))
 }
 
-func slideCSSRulesInner(css string) ([]cssBlock, error) {
-	bs, err := splitCSSBlocks(css)
+func slideCSSRulesInner(css string) ([]CSSBlock, error) {
+	bs, err := SplitCSSBlocks(css)
 	if err != nil {
 		return nil, err
 	}
-	var out []cssBlock
+	var out []CSSBlock
 	for _, b := range bs {
-		if b.statement {
+		if b.Statement {
 			continue
 		}
-		pre := strings.TrimSpace(b.prelude)
+		pre := strings.TrimSpace(b.Prelude)
 		if strings.HasPrefix(pre, "@") {
-			name := strings.ToLower(atName(pre))
+			name := strings.ToLower(AtName(pre))
 			if slices.Contains(nestAtRuleName, name) {
-				inner, err := slideCSSRulesInner(b.body)
+				inner, err := slideCSSRulesInner(b.Body)
 				if err != nil {
 					return nil, err
 				}
 				out = append(out, inner...)
 				continue
 			}
-			if hasRuleBlocks(b.body) { // 안에 규칙 블록이 있는데 지원하지 않는 묶음 — 실패
+			if hasRuleBlocks(b.Body) { // 안에 규칙 블록이 있는데 지원하지 않는 묶음 — 실패
 				return nil, fmt.Errorf("지원하지 않는 @묶음 @%s", name)
 			}
 		}
@@ -366,12 +366,12 @@ func slideCSSRulesInner(css string) ([]cssBlock, error) {
 
 // hasRuleBlocks 는 css 안에 리프가 아닌 규칙 블록이 하나라도 있는지(@font-face 같은 리프 선언과 갈라).
 func hasRuleBlocks(css string) bool {
-	bs, err := splitCSSBlocks(css)
+	bs, err := SplitCSSBlocks(css)
 	if err != nil {
 		return true // 못 가르는 것도 규칙이 있는 것으로 본다 — 조용히 통과시키지 않는다
 	}
 	for _, b := range bs {
-		if !b.statement {
+		if !b.Statement {
 			return true
 		}
 	}
@@ -459,12 +459,12 @@ func slideFontSizeOK(v string) bool {
 }
 
 // slideGuardRuleErr 은 규칙 하나의 검사 결과(없으면 ""). font 단축 속성은 슬라이드 규칙에서 금지한다.
-func slideGuardRuleErr(r cssBlock) string {
-	for _, piece := range slideSelectorPieces(r.prelude) {
+func slideGuardRuleErr(r CSSBlock) string {
+	for _, piece := range slideSelectorPieces(r.Prelude) {
 		if !slideGuardChecked(piece) {
 			continue
 		}
-		for decl := range strings.SplitSeq(r.body, ";") {
+		for decl := range strings.SplitSeq(r.Body, ";") {
 			k, v, ok := strings.Cut(decl, ":")
 			if !ok {
 				continue
@@ -512,14 +512,14 @@ func TestSlideFontSizeScaleGuard(t *testing.T) {
 		n := 0
 		for _, r := range rules {
 			if msg := slideGuardRuleErr(r); msg != "" {
-				at := strings.Index(css, strings.TrimSpace(strings.Split(r.prelude, ",")[0])) // 원본 줄 근사
+				at := strings.Index(css, strings.TrimSpace(strings.Split(r.Prelude, ",")[0])) // 원본 줄 근사
 				line := 1
 				if at >= 0 {
 					line += strings.Count(css[:at], "\n")
 				}
 				t.Errorf("%s:%d %s", path, line, msg)
 			}
-			if slices.ContainsFunc(slideSelectorPieces(r.prelude), slideGuardChecked) {
+			if slices.ContainsFunc(slideSelectorPieces(r.Prelude), slideGuardChecked) {
 				n++
 			}
 		}

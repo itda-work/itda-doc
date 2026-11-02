@@ -12,14 +12,14 @@ import (
 )
 
 // FIFO 로 바뀐 폴더 메타 파일을 열 때 기다리지 않는다(Unix 의 비차단 열기 — 리뷰 2회차 [4] 반례 이전).
-// writer 가 붙지 않은 FIFO 를 readFolderMeta 에 주면 열기가 200ms 안에 "정규 파일이 아님"으로 돌아온다.
+// writer 가 붙지 않은 FIFO 를 ReadFolderMeta 에 주면 열기가 200ms 안에 "정규 파일이 아님"으로 돌아온다.
 func TestFolderMetaFIFOOpen(t *testing.T) {
 	fifo := filepath.Join(t.TempDir(), "fifo")
 	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	done := make(chan mdoc.FolderMeta, 1)
-	go func() { done <- readFolderMeta("_metadata.yml", fifo) }()
+	go func() { done <- ReadFolderMeta("_metadata.yml", fifo) }()
 	select {
 	case f := <-done:
 		if f.Err == "" {

@@ -50,16 +50,16 @@ func TestStyleSheetModes(t *testing.T) {
 		t.Fatal(err)
 	}
 	classic, _ := ts.Get("classic")
-	css := classic.StyleSheet(cssMode{})
+	css := classic.StyleSheet(CSSMode{})
 	sup := strings.Index(css, "@supports "+relColorSupports+" {\n:root {\n  --accent-2: oklch(from")
 	root := strings.Index(css, "--accent-2: #4d6da2;")
 	if root < 0 || sup < root || !strings.Contains(css, "@scope (.page) {") {
 		t.Fatalf("정적 값 → @supports 파생 → @scope 순이어야 함\n%s", css[:min(len(css), 1500)])
 	}
-	if c := classic.StyleSheet(cssMode{fakeNoRelColor: true}); !strings.Contains(c, "@supports "+fakeFalseSupports) || strings.Contains(c, relColorSupports) {
+	if c := classic.StyleSheet(CSSMode{FakeNoRelColor: true}); !strings.Contains(c, "@supports "+fakeFalseSupports) || strings.Contains(c, relColorSupports) {
 		t.Error("상대 색 끄기 흉내가 조건을 바꾸지 않음")
 	}
-	un := classic.StyleSheet(cssMode{unscoped: true})
+	un := classic.StyleSheet(CSSMode{Unscoped: true})
 	if strings.Contains(un, "@scope") || !strings.Contains(un, "/* ---- classic ---- */") {
 		t.Error("@scope 를 모르는 엔진에서 내장 테마는 가두지 않고 내야 함")
 	}
@@ -67,11 +67,11 @@ func TestStyleSheetModes(t *testing.T) {
 		t.Error("꼴이 같음")
 	}
 	acme, _ := ts.Get("acme")
-	if c := acme.StyleSheet(cssMode{unscoped: true}); !strings.Contains(c, "@scope (.page) {") {
+	if c := acme.StyleSheet(CSSMode{Unscoped: true}); !strings.Contains(c, "@scope (.page) {") {
 		t.Error("사용자 테마는 어떤 꼴로도 가두지 않은 CSS 로 내지 않는다")
 	}
 	// acme 는 --accent 만 준다 → 물려받은 파생 식이 지원 엔진에서 붉은 계열을 만든다(정적 값은 남색 그대로)
-	if c := acme.StyleSheet(cssMode{}); !strings.Contains(c, "--accent-soft: #ebf0f9;") || !strings.Contains(c, "--accent-soft: oklch(from var(--accent)") {
+	if c := acme.StyleSheet(CSSMode{}); !strings.Contains(c, "--accent-soft: #ebf0f9;") || !strings.Contains(c, "--accent-soft: oklch(from var(--accent)") {
 		t.Error("회사 테마가 바탕의 정적 값·파생 식을 함께 물려받아야 함")
 	}
 }
@@ -107,7 +107,7 @@ func TestWithoutUserThemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	old := ts.withoutUser(noScopeReason)
+	old := ts.WithoutUser(NoScopeReason)
 	if _, ok := old.Get("acme"); ok {
 		t.Error("옛 엔진에서 사용자 테마를 고를 수 있음")
 	}
@@ -141,7 +141,7 @@ func TestCreatedThemeHasStaticDerived(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		id, err := createUserTheme(dir, ts, NewTheme{Name: "c-" + base, Base: base, Accent: "#c8102e"}, "")
+		id, err := CreateUserTheme(dir, ts, NewTheme{Name: "c-" + base, Base: base, Accent: "#c8102e"}, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -176,11 +176,11 @@ func TestCreatedThemeHasStaticDerived(t *testing.T) {
 
 // 옛 WebKit 흉내 변수는 macOS 에서만 뜻이 있다(Windows 는 WebView2 — Chromium).
 func TestOldWebKitEnvOnlyOnMac(t *testing.T) {
-	if o := parseOldWebKit("darwin", "scope,relcolor"); !o.noScope || !o.noRelColor {
+	if o := parseOldWebKit("darwin", "scope,relcolor"); !o.NoScope || !o.NoRelColor {
 		t.Errorf("macOS: %+v", o)
 	}
 	for _, goos := range []string{"windows", "linux"} {
-		if o := parseOldWebKit(goos, "all"); o.noScope || o.noRelColor {
+		if o := parseOldWebKit(goos, "all"); o.NoScope || o.NoRelColor {
 			t.Errorf("%s 에서 흉내가 켜졌다: %+v", goos, o)
 		}
 	}
