@@ -29,6 +29,8 @@ jobs:
         env:
           ITDA_DOC_STRICT: "1"
         run: go test ./...
+      - name: 시간 시험 수열(임시 — 러너 값 받기, 되돌림 커밋으로 지운다)
+        run: go test -count=1 -v -run 'TestQuoteDepthLimit|TestLinkCloserLimit|TestMathPropLinear|TestNestingLinear' ./mdoc/
       - name: wasm 빌드(컴파일만)
         env:
           GOOS: js
