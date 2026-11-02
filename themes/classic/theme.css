@@ -60,7 +60,8 @@ nav.toc > ul > li > a { color: var(--accent); }
 /* 구역 슬라이드 */
 .slide-deco.k-section::before { top: 0; bottom: 0; right: auto; width: 24%; height: auto; }
 .slide-deco.k-section::after { left: 24%; top: 0; width: 7pt; height: 100%; }
-.slide-deco.k-section ~ .page-body { left: calc(24% + 60pt); }
+/* 띠는 장식 상자 폭의 24%. 왼쪽 패널 장은 장식 상자가 패널 폭(--slide-deco-x)만큼 좁아지므로 쪽 폭 기준 %에서 그 24% 를 뺀다(itda-work/itda-hyve#581) */
+.slide-deco.k-section ~ .page-body { left: calc(24% - var(--slide-deco-x, 0%) * 0.24 + 60pt); }
 .page-body .ss-num { color: var(--accent-3); font-size: calc(92pt * var(--slide-scale)); letter-spacing: -0.04em; margin-bottom: 4pt; }
 .page-body .ss-title { color: var(--accent); }
 

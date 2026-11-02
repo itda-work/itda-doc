@@ -877,7 +877,13 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .page.slide.split-1-3 { --panel-w: 25%; }
 .page.slide.split-2-1 { --panel-w: 66.6667%; }
 .page.slide.split-3-1 { --panel-w: 75%; }
-.page.slide.panel-left > :is(.page-body, .slide-head, .slide-foot) { left: calc(var(--panel-w) + var(--panel-gap)); }
+.page.slide.panel-left > :is(.slide-head, .slide-foot) { left: calc(var(--panel-w) + var(--panel-gap)); }
+/* 왼쪽 패널 장의 본문은 left 를 덮지 않고 margin-left 로 민다(itda-work/itda-hyve#581) — 테마가 본문 left 를 정하면(구역 장 장식 옆으로 미는
+   .slide-deco.k-section ~ .page-body 등) 그 값이 그대로 남고, 패널 폭과 「바깥 여백 → 패널 간격」 차만 더해진다. 테마가 안 정하면
+   left 는 --slide-pad-x 라 결과는 패널 폭 + --panel-gap 으로 머리·바닥과 같다. --slide-deco-x 는 장식 상자(.slide-deco)의 왼쪽
+   끝(패널 폭)이다 — 장식 상자 폭의 %로 그리는 테마 장식(classic 의 24% 띠)은 본문 left 의 %(쪽 폭 기준)에서 이 몫을 빼 맞춘다 */
+.page.slide.panel-left { --slide-deco-x: var(--panel-w); }
+.page.slide.panel-left > .page-body { margin-left: calc(var(--panel-w) + var(--panel-gap) - var(--slide-pad-x)); }
 .page.slide.panel-right > :is(.page-body, .slide-head, .slide-foot) { right: calc(var(--panel-w) + var(--panel-gap)); }
 .page.slide.panel-left > .slide-deco { left: var(--panel-w); }
 .page.slide.panel-right > .slide-deco { right: var(--panel-w); }
