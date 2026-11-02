@@ -182,7 +182,7 @@ func checkFontFace(body string) (string, error) {
 	return " " + strings.Join(out, "; ") + "; ", nil
 }
 
-// CSSBlock 은 맨 위의 규칙 하나다: prelude { body } 또는 prelude; (statement).
+// CSSBlock 은 맨 위의 규칙 하나다: Prelude { Body } 또는 Prelude; (Statement).
 type CSSBlock struct {
 	Prelude, Body string
 	Statement     bool

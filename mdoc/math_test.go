@@ -224,7 +224,7 @@ func TestMathScanTime(t *testing.T) {
 					t.Errorf("%d 바이트: 원문 글자가 남지 않음", len(src))
 				}
 			}
-			// 크기가 두 배가 될 때마다 비용(CPU 시간, timingtest)이 세 배(+10ms)를 넘지 않는다 — 이차 시간이면 네 배다
+			// 크기 셋이라 쌍마다 판정한다(timingtest judge): 크기가 두 배가 될 때마다 비용(CPU 시간)이 세 배(+10ms)를 넘지 않는다 — 이차 시간이면 네 배다
 			timingtest.AssertDoubling(t, name, sizes, renderWork(t, gen),
 				timingtest.Doubling{Reps: 1, Slack: 10 * time.Millisecond, Limit: 500 * time.Millisecond})
 		})

@@ -320,14 +320,14 @@ var slideScaleFixedSel = []string{".sc-class", ".slide-foot", ".sf-num", ".sf-le
 // slideSelMark — 슬라이드에만 있는 요소 표식. 이 조각의 font-size 는 배율과 곱해져야 한다.
 var slideSelMark = []string{".sc-", ".ss-", ".slide-", ".page.slide"}
 
-// nestAtRuleName — 안으로 들어가는 @묶음 이름(atName 이 뽑은 것을 소문자로). 안에 규칙을 담는 @묶음 중
+// nestAtRuleName — 안으로 들어가는 @묶음 이름(AtName 이 뽑은 것을 소문자로). 안에 규칙을 담는 @묶음 중
 // 이 목록에 없는 이름은 파싱 실패로 본다(조용히 건너뛰지 않는다 — 리뷰 4회차 [1]). 리프 @규칙
 // (@font-face·@counter-style 등)는 이 목록과 무관하게 선언 블록으로 검사한다.
 var nestAtRuleName = []string{"media", "supports", "scope", "layer", "container", "keyframes"}
 
-// slideCSSRules 는 리프 규칙(선언 블록)만 남긴다. 주석은 문자열을 보존하는 stripCSSComments 로 지우고
-// themecss splitCSSBlocks 로 가른다(content:"{" 같은 문자열은 splitCSSBlocks 가 이미 건너뛴다).
-// @묶음은 atName 이 뽑은 이름(소문자)으로 식별한다 — " @media\nprint"·"@MEDIA"·"@supports(…" 같은
+// slideCSSRules 는 리프 규칙(선언 블록)만 남긴다. 주석은 문자열을 보존하는 StripCSSComments 로 지우고
+// themecss SplitCSSBlocks 로 가른다(content:"{" 같은 문자열은 SplitCSSBlocks 가 이미 건너뛴다).
+// @묶음은 AtName 이 뽑은 이름(소문자)으로 식별한다 — " @media\nprint"·"@MEDIA"·"@supports(…" 같은
 // 표기 변형을 ASCII 공백 자르기로는 못 얻는다(리뷰 4회차 [1]). 이 검사는 내장 테마·base.css 에서 흔히
 // 쓰는 꼴의 회귀를 잡는다(완전한 CSS 해석기가 아니다 — 거짓 실패를 감수한 허용 목록).
 func slideCSSRules(css string) ([]CSSBlock, error) {
@@ -621,7 +621,7 @@ func TestSlideGuardRuleForms(t *testing.T) {
 		".slide-title .slide-cont { font-size: 0.55em; }",      // em
 		".result { font-size: 9.6pt; }",                        // 본문 서식 — 약속 밖
 		":where(.page.slide .page-body ul ul) { font-size: 0.88em; }",
-		// at-rule 이름 변형(리뷰 4회차 [1]) — atName 이 뽑은 이름(소문자)으로 식별한다
+		// at-rule 이름 변형(리뷰 4회차 [1]) — AtName 이 뽑은 이름(소문자)으로 식별한다
 		"@MEDIA print { .ss-num { font-size: calc(44pt * var(--slide-scale)); } }",
 		"@media\nprint { .ss-num { font-size: calc(44pt * var(--slide-scale)); } }",
 		"@supports(display: grid) { .sc-title { font-size: calc(40pt * var(--slide-scale)); } }",

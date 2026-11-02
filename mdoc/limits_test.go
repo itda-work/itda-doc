@@ -12,7 +12,8 @@ import (
 	"github.com/yuin/goldmark/extension"
 )
 
-// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~512KB) 렌더해 512KB 의 비용이 64KB 의 27배(3³, +3×5ms)를 넘지 않는지 본다(이차면 64배).
+// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~512KB) 렌더해 512KB 의 비용이 64KB 의 27배(3³, +3×5ms)를 넘지 않고 연속한 두 쌍이
+// 모두 세 배(+5ms)를 넘지 않는지 본다(timingtest judge — 이차면 64배).
 // 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
 func assertLinear(t *testing.T, name string, gen func(size int) string, limit time.Duration) {
 	t.Helper()
@@ -39,6 +40,7 @@ func repeatTo(unit string) func(int) string {
 // 강조 구분자 수 상한(cjk.go). 고치기 전: 짝이 될 수 없는 구분자가 번갈아 쌓인 `_a*` 반복 128KB 가 9초(순수 goldmark 도 같다).
 func TestDelimiterLimit(t *testing.T) {
 	for _, unit := range []string{"_a*", "*a_", "~# *", "#_1*", "*a", "_a", "~a*"} {
+		// 상한 600ms: 러너 값 `_a*` 318ms·`~a*` 305ms(512KB, run 41482219991).
 		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
 	}
 	// 상한까지는 그대로 강조, 넘는 것은 글자(원문 그대로) + 경고 한 번
