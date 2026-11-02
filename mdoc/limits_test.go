@@ -12,11 +12,11 @@ import (
 	"github.com/yuin/goldmark/extension"
 )
 
-// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~256KB) 렌더해 두 배마다 비용이 세 배(+5ms)를 넘지 않는지 본다(이차면 네 배).
-// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 그 쌍을 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
+// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~512KB) 렌더해 512KB 의 비용이 64KB 의 27배(3³, +3×5ms)를 넘지 않는지 본다(이차면 64배).
+// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
 func assertLinear(t *testing.T, name string, gen func(size int) string, limit time.Duration) {
 	t.Helper()
-	timingtest.AssertDoubling(t, name, []int{64_000, 128_000, 256_000}, renderWork(t, gen),
+	timingtest.AssertDoubling(t, name, []int{64_000, 128_000, 256_000, 512_000}, renderWork(t, gen),
 		timingtest.Doubling{Reps: 2, Slack: 5 * time.Millisecond, Limit: limit})
 }
 
@@ -112,7 +112,8 @@ func TestHeadingIDsLinear(t *testing.T) {
 // 링크 닫기 시도 상한(linkclose.go). 고치기 전: `[a](` 반복 128KB 5초 — 링크 파서가 ]( 마다 주소를 줄 끝까지 읽었다.
 func TestLinkCloserLimit(t *testing.T) {
 	for _, unit := range []string{"[a](", "[a]", "![a](", "[", "]("} {
-		assertLinear(t, unit, repeatTo(unit), 300*time.Millisecond)
+		// 상한 600ms: 512KB 가 선형으로 256KB 의 두 배다 — `[a](`·`![a](` 512KB 가 Mac 에서 340ms 안팎(256KB 170ms)이라 300ms 를 넘는다.
+		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
 	}
 	r := render(t, strings.Repeat("[x](#u) ", MaxLinkClosersPerBlock+50))
 	if n := strings.Count(r.HTML, `<a href="#u">x</a>`); n != MaxLinkClosersPerBlock {

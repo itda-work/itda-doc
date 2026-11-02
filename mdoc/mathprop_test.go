@@ -139,7 +139,7 @@ func TestMathPropLinear(t *testing.T) {
 		}
 	}
 	for _, f := range fams {
-		timingtest.AssertDoubling(t, f.name, []int{64_000, 128_000, 256_000}, renderWork(t, f.gen),
+		timingtest.AssertDoubling(t, f.name, []int{64_000, 128_000, 256_000, 512_000}, renderWork(t, f.gen),
 			timingtest.Doubling{Reps: 2, Slack: 5 * time.Millisecond})
 	}
 }
