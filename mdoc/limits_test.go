@@ -102,7 +102,8 @@ func TestNestingLimit(t *testing.T) {
 
 // 같은 제목이 많아도 id 를 붙이는 시간은 선형이다(고치기 전: 같은 제목 16000개 4.4초 — 겹칠 때마다 -1 부터 다시 찾았다).
 func TestHeadingIDsLinear(t *testing.T) {
-	assertLinear(t, "같은 제목", repeatTo("# 제목\n"), 300*time.Millisecond)
+	// 상한 600ms: 512KB 가 GitHub 러너에서 410ms(256KB 179ms — 선형).
+	assertLinear(t, "같은 제목", repeatTo("# 제목\n"), 600*time.Millisecond)
 	r := render(t, "# a\n# a\n# a-1\n# a\n# a {#a-3}\n# a\n")
 	for _, id := range []string{`id="a"`, `id="a-1"`, `id="a-1-1"`, `id="a-2"`, `id="a-3"`, `id="a-4"`} {
 		contains(t, r.HTML, id)
