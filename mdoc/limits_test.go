@@ -113,8 +113,9 @@ func TestHeadingIDsLinear(t *testing.T) {
 // 링크 닫기 시도 상한(linkclose.go). 고치기 전: `[a](` 반복 128KB 5초 — 링크 파서가 ]( 마다 주소를 줄 끝까지 읽었다.
 func TestLinkCloserLimit(t *testing.T) {
 	for _, unit := range []string{"[a](", "[a]", "![a](", "[", "]("} {
-		// 상한 600ms: 512KB 가 선형으로 256KB 의 두 배다 — `[a](`·`![a](` 512KB 가 Mac 에서 340ms 안팎(256KB 170ms)이라 300ms 를 넘는다.
-		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
+		// 상한 1s: 옛 상한 300ms(256KB)는 Mac 의 `[a](` 256KB 170ms 에 1.76배 여유였다. GitHub 러너는 Mac 의 약 2배이고
+		// 512KB 는 그 두 배라 같은 여유면 약 1.05s — 러너에서 `[a](` 512KB 594ms.
+		assertLinear(t, unit, repeatTo(unit), time.Second)
 	}
 	r := render(t, strings.Repeat("[x](#u) ", MaxLinkClosersPerBlock+50))
 	if n := strings.Count(r.HTML, `<a href="#u">x</a>`); n != MaxLinkClosersPerBlock {
