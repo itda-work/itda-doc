@@ -1,0 +1,10 @@
+meta: {Present:true Title:2026년 4분기 사업 계획 Subtitle:영업본부 Author:[홍길동 김철수] Date:2026-10-02 Lang:ko TOC:true TOCDepth:2 NumberSections:true PaperSize:a4 Theme:classic Cover:true DocNo:기획-2026-041 Version:1.2 Classification:대외비 Organization:잇다워크 ListStyle: Slides:<nil> Code:<nil> Extra:[{Key:검토자 Value:이영희 List:[]}]}
+toc-placed: true
+toc: h1 #배경 [1] 배경
+  toc: h2 #market [1.1] 시장 현황
+toc: h1 #실행-계획 [2] 실행 계획
+  toc: h2 #일정 [2.1] 일정
+toc: h1 #맺음 [3] 맺음
+warning: 69 raw-html 렌더하지 않은 HTML: <span style="color:red">
+warning: 69 raw-html 렌더하지 않은 HTML: </span>
+warning: 97 remote-image 불러오지 않은 원격 이미지: https://example.com/logo.png

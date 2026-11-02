@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: gofmt
+        run: |
+          fmt=$(gofmt -l .)
+          if [ -n "$fmt" ]; then echo "gofmt 필요:"; echo "$fmt"; exit 1; fi
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        env:
+          ITDA_DOC_STRICT: "1"
+        run: go test ./...
+      - name: wasm 빌드(컴파일만)
+        env:
+          GOOS: js
+          GOARCH: wasm
+        run: go build ./mdoc/ ./page/ ./texmath/

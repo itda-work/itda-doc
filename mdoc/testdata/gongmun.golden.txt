@@ -1,0 +1,4 @@
+meta: {Present:true Title:사내 정보보호 교육 실시 알림 Subtitle: Author:[] Date: Lang:ko TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme:mono Cover:false DocNo:총무-2026-118 Version: Classification: Organization:잇다워크 ListStyle: Slides:<nil> Code:<nil> Extra:[{Key:수신 Value:각 부서장 List:[]} {Key:참조 Value:인사팀, 정보보호팀 List:[인사팀 정보보호팀]} {Key:시행일 Value:2026-10-05 List:[]}]}
+toc-placed: false
+warning: 57 raw-html 렌더하지 않은 HTML: <script>alert("공문에 스크립트")</script>
+warning: 59 unsafe-url 막은 링크 주소: javascript:alert(1)

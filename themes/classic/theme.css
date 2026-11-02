@@ -1,0 +1,71 @@
+/* 클래식: 남색 한 가지로 위계를 만든다. 장식은 선 몇 줄뿐이다.
+   색은 모두 --accent 에서 나온다(--accent-2 제목 번호, --accent-3 옅은 띠 — theme.json). 회사 테마가 --accent 만 바꿔도 어울린다. */
+
+/* 표지 — 흰 바탕, 왼쪽 위 굵은 남색 띠, 제목은 쪽 가운데보다 조금 위. 문서 정보는 아래 표로. */
+.cover { padding: 0 24mm 26mm 26mm; }
+.cover::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 9mm; background: var(--accent); }
+.cover::after { content: ""; position: absolute; left: 26mm; top: 9mm; width: 34mm; height: 2.2mm; background: var(--accent-3); }
+.cover-top { margin-top: 30mm; font-size: 11pt; color: var(--accent); font-weight: 600; letter-spacing: 0.02em; }
+.cover-main { margin-top: 58mm; border-left: 2.4mm solid var(--accent); padding-left: 8mm; }
+.page-body .cover-title { font-size: 30pt; color: var(--accent); letter-spacing: -0.02em; line-height: 1.22; }
+.cover-subtitle { font-size: 14pt; color: #475467; margin-top: 10pt; }
+.page-body .cover-meta { width: 100%; grid-template-columns: 34mm 1fr; row-gap: 0; border-top: 1.2pt solid var(--accent); border-bottom: 0.6pt solid var(--rule); font-size: 10pt; }
+.page-body .cover-meta dt, .page-body .cover-meta dd { padding: 5pt 0; border-bottom: 0.5pt solid #e4e8ef; }
+.page-body .cover-meta dt { color: var(--muted); padding-left: 2mm; }
+.page-body .cover-meta .meta-row:last-child dt, .page-body .cover-meta .meta-row:last-child dd { border-bottom: none; }
+.page-body .cover-meta .meta-row[data-key="classification"] dd { color: #b42318; font-weight: 700; }
+.cover-bottom { display: flex; justify-content: space-between; margin-top: 10mm; font-size: 10.5pt; color: var(--muted); }
+.cover-bottom .cover-org { font-weight: 700; color: var(--accent); font-size: 12pt; }
+.cover-classification { position: absolute; right: 24mm; top: 20mm; color: #b42318; }
+
+/* 머리글: 가는 선 위에 조직(왼쪽)·제목(오른쪽). 바닥글: 보안 등급·쪽·문서번호 */
+.page-header { color: #7a8597; }
+.page-header .slot.left { color: var(--accent); font-weight: 600; }
+.page-footer { color: #7a8597; }
+.page-footer .slot.left { color: #b42318; font-weight: 600; }
+.page-footer .slot.center { color: var(--ink); font-weight: 600; letter-spacing: 0.04em; }
+
+/* 제목: h1 은 번호 + 아래 굵은 선, h2 는 왼쪽 짧은 막대, h3 는 □ 기호(개조식) */
+.page-body h1 { padding-bottom: 5pt; border-bottom: 1.6pt solid var(--accent); letter-spacing: -0.01em; }
+.page-body h1 .header-section-number { color: var(--accent); }
+.page-body h2 { padding-left: 9pt; position: relative; }
+.page-body h2::before { content: ""; position: absolute; left: 0; top: 0.28em; bottom: 0.28em; width: 3pt; background: var(--accent); border-radius: 1pt; }
+.page-body h2 .header-section-number { color: var(--accent-2); }
+.page-body h3 .header-section-number { color: var(--accent-2); }
+.page-body h3:not(:has(.header-section-number))::before { content: "□"; margin-right: 0.35em; color: var(--accent); font-weight: 400; }
+
+/* 목차 쪽 */
+.toc-title { border-bottom: 1.6pt solid var(--accent); padding-bottom: 5pt; letter-spacing: 0.3em; }
+nav.toc > ul > li > a { color: var(--accent); }
+
+/* 요약문·상자 */
+.lead { border-radius: 0 3pt 3pt 0; padding: 8pt 12pt; }
+
+/* ---- 슬라이드: 표지의 남색 띠·옅은 막대를 그대로 가져온다. 제목은 남색에 왼쪽 막대(본문 h2 와 같은 말투), 구역은 왼쪽 남색 면에 큰 번호. */
+.slide-deco::before { left: 0; right: 0; width: auto; height: 7pt; }
+.slide-deco::after { content: ""; position: absolute; left: var(--slide-pad-x); top: 7pt; width: 72pt; height: 3pt; background: var(--accent-3); }
+.slide-title { color: var(--accent); padding-left: 16pt; position: relative; }
+.slide-title::before { content: ""; position: absolute; left: 0; top: 0.16em; bottom: 0.16em; width: 5.5pt; background: var(--accent); border-radius: 1.5pt; }
+.slide-title .header-section-number { color: var(--accent-2); }
+.sf-num { color: var(--accent); }
+.page-body.k-content h2, .page-body.k-content h3 { color: var(--accent); } /* 슬라이드 본문의 소제목만(A4 는 그대로) */
+/* 제목 슬라이드: 위 굵은 띠 + 옅은 막대, 왼쪽 굵은 선의 제목, 아래 문서 정보 줄 */
+.slide-deco.k-title::before { height: 24pt; }
+.slide-deco.k-title::after { top: 24pt; left: 86pt; width: 120pt; height: 7pt; }
+.slide-cover { padding: 74pt 80pt 50pt 86pt; }
+.sc-top { color: var(--accent); font-weight: 700; }
+.sc-main { border-left: 9pt solid var(--accent); padding: 6pt 0 6pt 28pt; }
+.page-body .sc-title { color: var(--accent); }
+.sc-meta { border-top: 1.5pt solid var(--accent); padding-top: 12pt; color: #475467; }
+/* 구역 슬라이드 */
+.slide-deco.k-section::before { top: 0; bottom: 0; right: auto; width: 24%; height: auto; }
+.slide-deco.k-section::after { left: 24%; top: 0; width: 7pt; height: 100%; }
+.slide-deco.k-section ~ .page-body { left: calc(24% + 60pt); }
+.page-body .ss-num { color: var(--accent-3); font-size: calc(92pt * var(--slide-scale)); letter-spacing: -0.04em; margin-bottom: 4pt; }
+.page-body .ss-title { color: var(--accent); }
+
+/* ---- 이어보기: 표지는 맨 위 제목 영역 — 위 띠·옅은 막대·제목의 왼쪽 굵은 선을 그대로 두고 높이만 내용만큼.
+   막대와 보안 등급은 본문 글줄에 맞춘다(쪽 상자 너비의 7.5% — base.css 의 이어보기 여백) */
+.page-body.flow-view .cover { padding-top: 20mm; }
+.page-body.flow-view .cover::after { left: clamp(16px, 7.5%, 15mm); }
+.page-body.flow-view .cover-classification { position: static; }

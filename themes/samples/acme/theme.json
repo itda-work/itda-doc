@@ -1,0 +1,14 @@
+{
+  "title": "에이크미",
+  "description": "견본 회사 테마 — 클래식을 바탕으로 강조색·로고·조직 이름과 자기 어휘(confidential) 하나만 더했다",
+  "extends": "classic",
+  "aliases": ["에이크미"],
+  "tokens": {
+    "--accent": "#b3122e"
+  },
+  "logo": "assets/logo.svg",
+  "defaults": {
+    "organization": "에이크미 주식회사"
+  },
+  "footer": { "left": "{classification}", "center": "{page} / {pages}", "right": "에이크미 주식회사" }
+}

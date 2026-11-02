@@ -1,0 +1,13 @@
+meta: {Present:true Title:수식 견본 — 재무 지표와 통계 Subtitle:$…$ 와 $$…$$ (설계 1.10) Author:[] Date:2026-10-13 Lang:ko TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme:classic Cover:false DocNo:수식-2026-01 Version: Classification: Organization:잇다워크 주식회사 ListStyle: Slides:<nil> Code:<nil> Extra:[]}
+toc-placed: false
+toc: h1 #지표의-정의 [] 지표의 정의
+  toc: h2 #근의-공식과-행렬 [] 근의 공식과 행렬
+  toc: h2 #정렬과-경우-나누기 [] 정렬과 경우 나누기
+  toc: h2 #표-안의-수식 [] 표 안의 수식
+  toc: h2 #긴-문단쪽-경계에서-수식이-나뉘지-않는다 [] 긴 문단(쪽 경계에서 수식이 나뉘지 않는다)
+toc: h1 #통계 [] 통계
+  toc: h2 #그리지-못한-수식 [] 그리지 못한 수식
+toc: h1 #부록-블록-수식-여러-개 [] 부록: 블록 수식 여러 개
+warning: 99 math 수식을 그리지 않고 원문 그대로 둠: 쓰지 않는 명령 \color — 색은 테마가 정한다
+warning: 99 math 수식을 그리지 않고 원문 그대로 둠: 쓰지 않는 명령 \Huge — 글자 크기는 테마가 정한다
+warning: 99 math 수식을 그리지 않고 원문 그대로 둠: 지원하지 않는 명령 \foo

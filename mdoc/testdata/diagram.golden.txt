@@ -1,0 +1,33 @@
+meta: {Present:true Title:그림 견본 — 업무 흐름도 Subtitle:mermaid 흐름도 (설계 1.10) Author:[] Date:2026-10-13 Lang:ko TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme:classic Cover:false DocNo:그림-2026-01 Version: Classification: Organization:잇다워크 주식회사 ListStyle: Slides:<nil> Code:<nil> Extra:[]}
+toc-placed: false
+toc: h1 #결재-흐름 [] 결재 흐름
+  toc: h2 #시스템-구성 [] 시스템 구성
+  toc: h2 #분기-일정 [] 분기 일정
+toc: h1 #모양과-화살표 [] 모양과 화살표
+  toc: h2 #아래에서-위로오른쪽에서-왼쪽으로 [] 아래에서 위로·오른쪽에서 왼쪽으로
+toc: h1 #그리지-않는-것 [] 그리지 않는 것
+toc: h1 #긴-흐름 [] 긴 흐름
+toc: h1 #간트-차트 [] 간트 차트
+toc: h1 #타임라인 [] 타임라인
+  toc: h2 #사건-여럿과-이어-쓰기 [] 사건 여럿과 이어 쓰기
+toc: h1 #순서도 [] 순서도
+  toc: h2 #묶음과-무리 [] 묶음과 무리
+  toc: h2 #그리지-않는-것-1 [] 그리지 않는 것
+  toc: h2 #er-다이어그램 [] ER 다이어그램
+  toc: h2 #상태도 [] 상태도
+  toc: h2 #클래스도 [] 클래스도
+warning: 117 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: mermaid 의 pie 그림은 아직 그리지 않음(flowchart·graph 만)
+warning: 124 diagram mermaid 그림: 설정 지시(%%{…}%%)는 쓰지 않음 — 색·글꼴은 테마가 정한다
+warning: 127 diagram mermaid 그림: style 줄은 쓰지 않음 — 색·선은 테마가 정한다
+warning: 128 diagram mermaid 그림: click 줄(링크·스크립트)은 쓰지 않음
+warning: 182 diagram mermaid 그림: todayMarker 는 쓰지 않음 — 오늘 선을 그리지 않는다(기록 문서의 그림은 날짜에 의존하지 않는다)
+warning: 183 diagram mermaid 그림: topAxis 는 쓰지 않음 — 눈금은 아래에 그린다
+warning: 192 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: vert 태그(세로 표식)는 아직 그리지 않음
+warning: 302 diagram mermaid 그림: 링크 메뉴(link)는 내지 않는다 — 그림에서 링크를 걸지 않는다
+warning: 304 diagram mermaid 그림: rect 의 색은 쓰지 않음 — 색은 테마가 정한다
+warning: 313 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: 반쪽 화살표(-|\ · -|/ · /|- … 16종)는 이 판이 그리지 않는다 — 고전 10종(-> --> ->> -->> <<->> <<-->> -x --x -) --))만 그린다
+warning: 351 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: 낱말 기수·관계(one or more·zero or many·to·1+ …)는 이 판이 그리지 않는다 — 기호(|o || }o }| o| o{ |{)로 쓴다(A one or more B : y)
+warning: 384 diagram mermaid 그림: classDef 줄은 쓰지 않음 — 색·선은 테마가 정한다
+warning: 392 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: 메모(note)는 이 판이 그리지 않는다
+warning: 427 diagram mermaid 그림: classDef 줄은 쓰지 않음 — 색·선은 테마가 정한다
+warning: 435 diagram mermaid 그림을 그리지 않고 원문 그대로 둠: 멤버의 제네릭 ~…~ 꼴을 받지 않음 — 이름 글자 바로 뒤에서 ~ 로 열고, 닫는 ~ 뒤는 빈칸·쉼표·~·끝이며, 짝이 맞고 원본 parseGenericTypes 가 같은 짝으로 읽는 꼴만 그린다(`List~int~`·`Map~K, V~`·`Array~Array~T~~`)(+쌍 a~T~ b~U~)
