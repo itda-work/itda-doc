@@ -311,20 +311,68 @@ func TestMathDelimiterRules(t *testing.T) {
 
 // 리뷰 R2: TeX 주석(% 부터 줄 끝) 안의 명령·괄호는 스캐너 상태를 바꾸지 않는다 — 다음 줄의 닫는 $$ 를 놓치지 않는다.
 // 주석 안의 $ 는 여전히 구분자다(Pandoc 은 TeX 주석을 모른다). \% 는 글자 %.
+// 주석이 같은 줄 뒤의 글을 지우는 예(pct)는 그 수식에 주석 경고 하나만 낸다(#180) — 다른 경고는 없다.
 func TestMathComment(t *testing.T) {
-	for _, c := range []struct{ src, want, not string }{
-		{"$$\nx % \\text{\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error"},
-		{"$$\nx % {\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error"},
-		{"$$\n\\text{a % }\nb}\n$$\n뒤", `<p data-line="5">뒤</p>`, "math-error"},
-		{"$$\nx % \\text{ $$\n뒤", `<p data-line="3">뒤</p>`, "math-error"}, // 주석 안의 $$ 로 닫는다
-		{"앞 $x % \\text{\n+y$ 뒤", `<math><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow></math> 뒤`, "math-error"},
-		{"앞 $x % } { \\text{$ 뒤", `앞 <math><mi>x</mi></math> 뒤`, "math-error"},
-		{"$$\n50\\% \\text{a $$ b}\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error"}, // \% 는 주석이 아니다 — \text 가 $$ 를 가린다
-		{"$50\\%$ 와 $x$", `<mn>50</mn><mi>%</mi>`, "math-error"},
+	for _, c := range []struct {
+		src, want, not string
+		pct            bool
+	}{
+		{"$$\nx % \\text{\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error", true},
+		{"$$\nx % {\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error", true},
+		{"$$\n\\text{a % }\nb}\n$$\n뒤", `<p data-line="5">뒤</p>`, "math-error", true},
+		{"$$\nx % \\text{ $$\n뒤", `<p data-line="3">뒤</p>`, "math-error", true}, // 주석 안의 $$ 로 닫는다
+		{"앞 $x % \\text{\n+y$ 뒤", `<math><mrow><mi>x</mi><mo>+</mo><mi>y</mi></mrow></math> 뒤`, "math-error", true},
+		{"앞 $x % } { \\text{$ 뒤", `앞 <math><mi>x</mi></math> 뒤`, "math-error", true},
+		{"$$\n50\\% \\text{a $$ b}\n$$\n뒤", `<p data-line="4">뒤</p>`, "math-error", false}, // \% 는 주석이 아니다 — \text 가 $$ 를 가린다
+		{"$50\\%$ 와 $x$", `<mn>50</mn><mi>%</mi>`, "math-error", false},
 	} {
 		r := render(t, c.src)
-		if !strings.Contains(r.HTML, "<math") || !strings.Contains(r.HTML, c.want) || strings.Contains(r.HTML, c.not) || len(r.Warnings) > 0 {
+		want := 0
+		if c.pct {
+			want = 1
+		}
+		if !strings.Contains(r.HTML, "<math") || !strings.Contains(r.HTML, c.want) || strings.Contains(r.HTML, c.not) || len(r.Warnings) != want ||
+			(want == 1 && (r.Warnings[0].Code != WarnMath || !strings.Contains(r.Warnings[0].Message, "TeX 주석"))) {
 			t.Errorf("%q\n%s\n%+v", c.src, r.HTML, r.Warnings)
+		}
+	}
+}
+
+// #180: 이스케이프하지 않은 % 가 보일 글을 지우면(숫자 뒤의 %, 같은 줄 앞뒤에 글이 있는 %) 수식은 그대로 그리고 math 경고를 낸다.
+// 줄 머리의 주석 줄·줄 끝에 홀로 남은 %·\% 는 경고하지 않는다. 경고 줄은 그 수식이 시작한 줄이다.
+func TestMathPercentWarning(t *testing.T) {
+	for _, c := range []struct {
+		src  string
+		line int
+		lost string // 경고 메시지에 실린 사라진 글. "" 이면 경고 없음
+	}{
+		{"이익률 $50%$ 이다", 1, "「%」"},
+		{"앞\n\n$x = 3%$ 와 $y$", 3, "「%」"},
+		{"$50 %$", 0, ""}, // 숫자 바로 뒤가 아니고 뒤에 글도 없다
+		{"$a % b$", 1, "「% b」"},
+		{"$10\\text{원} + 5%$", 1, "「%」"},
+		{"$50\\%$", 0, ""},
+		{"```math\na \\\\% b\n```", 1, "「% b」"}, // \\ 뒤의 % 는 주석이다
+		{"$$\n% 설명 줄\nx^2\n$$", 0, ""},
+		{"$$\nx^2 %\n$$", 0, ""},
+		{"$$\nx^2 % 제곱\n$$", 1, "「% 제곱」"},
+		{"$$\na \\\\\nb = 5%\n$$", 1, "「%」"},
+		{"```math\n0.5% + x\n```", 1, "「% + x」"},
+		{"$a % 아주아주아주아주아주아주아주아주 긴 주석$", 1, "「% 아주아주아주아주아주아주아주아주 긴…」"},
+	} {
+		r := render(t, c.src)
+		if !strings.Contains(r.HTML, "<math") {
+			t.Errorf("%q: 수식을 그리지 않음\n%s", c.src, r.HTML)
+		}
+		if c.lost == "" {
+			if len(r.Warnings) > 0 {
+				t.Errorf("%q: 경고가 없어야\n%+v", c.src, r.Warnings)
+			}
+			continue
+		}
+		if len(r.Warnings) != 1 || r.Warnings[0].Code != WarnMath || r.Warnings[0].Line != c.line ||
+			!strings.Contains(r.Warnings[0].Message, c.lost) || !strings.Contains(r.Warnings[0].Message, `\%`) {
+			t.Errorf("%q: 경고 = %+v (줄 %d, %s 기대)", c.src, r.Warnings, c.line, c.lost)
 		}
 	}
 }

@@ -67,6 +67,7 @@ nav.toc .toc-section-number { color: var(--accent); font-weight: 800; }
 .page-body.bare .ss-num { color: #fff; font-size: calc(96pt * var(--slide-scale)); }
 .page-body.bare .ss-title { color: #fff; }
 .page-body.k-section:not(.bare) .ss-title::after { content: ""; display: block; width: 54pt; height: 3.5pt; background: var(--accent); margin-top: 14pt; }
+.slide-bg.fill ~ .page-body { --lead-bg: var(--paper); } /* 배경 그림 스크림 위(#569) — 바탕 투명 요약문의 먹색 글이 묻힌다, 종이색 판 */
 
 /* ---- 이어보기: 표지는 맨 위의 강조색 띠(조직·흰 큰 제목) + 경계의 검은 띠, 그 아래 흰 바탕에 제출 정보.
    쪽의 "위 3/5" 는 높이가 없으면 뜻이 없어 색 면을 위 두 칸에 직접 깐다. 좌우는 본문 글줄에 맞춘다(쪽 상자 너비의 7.5%) */

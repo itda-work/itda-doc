@@ -37,6 +37,8 @@ type Table struct {
 	Prefix     string `json:"prefix"`
 	// Notes 는 읽으며 바꿔 보인 것(머리 행보다 긴 행 — 열을 늘림)이다.
 	Notes []string `json:"notes"`
+	// Tabs 는 GFM 표가 아니라 탭으로 나뉜 줄들을 읽은 것인지다(TabTable·TabBlockAt, #579) — 화면은 그 줄 범위를 표로 바꾸며 앞뒤 빈 줄을 보충한다.
+	Tabs bool `json:"tabs"`
 }
 
 var alignNames = map[extast.Alignment]string{extast.AlignLeft: "left", extast.AlignCenter: "center", extast.AlignRight: "right"}

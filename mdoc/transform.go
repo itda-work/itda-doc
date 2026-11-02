@@ -61,6 +61,8 @@ func (st *state) transform(doc *ast.Document) {
 			if n.Name == "chart" {
 				charts = append(charts, n)
 			}
+		case *ast.List:
+			olDigits(n)
 		}
 		return ast.WalkContinue, nil
 	})
@@ -483,16 +485,17 @@ func (st *state) alert(q *ast.Blockquote) {
 type imageInfo struct {
 	kind  urlKind
 	width string
-	// 슬라이드 그림 배치(#550): place 는 "" · "fit" · "left" · "right", fill 은 .fill(분할 패널을 cover 로), split 은 그림:글 비율
-	// (splitRatios 의 값, ""이면 1:1). noAlt 는 alt 가 Deckset 배치 키워드였다는 것 — 대체 글 대신 배치 지시라 alt 를 비운다.
+	// 슬라이드 그림 배치(#550·#569): place 는 "" · "fit" · "left" · "right" · "full"(배경), fill 은 .fill(분할 패널·배경을 cover 로),
+	// split 은 그림:글 비율(splitRatios 의 값, ""이면 1:1). noAlt 는 alt 가 Deckset 배치 키워드였다는 것 — 대체 글 대신 배치 지시라
+	// alt 를 비운다.
 	place string
 	fill  bool
 	split string
 	noAlt bool
 }
 
-// imagePlaceClasses 는 이미지 속성으로 받는 배치 클래스다(#550). 그 밖의 클래스·id 는 경고하고 버린다.
-var imagePlaceClasses = map[string]bool{"fit": true, "fill": true, "left": true, "right": true}
+// imagePlaceClasses 는 이미지 속성으로 받는 배치 클래스다(#550, .full 은 #569). 그 밖의 클래스·id 는 경고하고 버린다.
+var imagePlaceClasses = map[string]bool{"fit": true, "fill": true, "left": true, "right": true, "full": true}
 
 // splitRatios 는 split= 으로 받는 그림:글 비율이다(#550).
 var splitRatios = map[string]bool{"1:1": true, "1:2": true, "1:3": true, "2:1": true, "3:1": true}
@@ -501,8 +504,8 @@ var splitRatios = map[string]bool{"1:1": true, "1:2": true, "1:3": true, "2:1": 
 var decksetWordRe = regexp.MustCompile(`^(?:left|right|fit|inline|filtered|original|[0-9]+%)$`)
 
 // decksetAlt 는 alt 글자가 Deckset 지시(낱말만)인지 보고 배치를 정한다. ok 가 거짓이면 지시가 아니다(보통 대체 글).
-// 받는 꼴: left·right → 분할 패널 cover, left fit·right fit(차례 무관) → 분할 패널 contain, inline → 보통 그림.
-// 그 밖의 지시 낱말 조합(fit 단독·filtered·original·N% 등)은 known 이 거짓 — 경고하고 보통 그림으로 둔다.
+// 받는 꼴: left·right → 분할 패널 cover, left fit·right fit(차례 무관) → 분할 패널 contain, fit 단독 → 배경 contain(.full, #569),
+// inline → 보통 그림. 그 밖의 지시 낱말 조합(filtered·original·N% 등)은 known 이 거짓 — 경고하고 보통 그림으로 둔다.
 func decksetAlt(alt string) (place string, fill, known, ok bool) {
 	words := strings.Fields(alt)
 	if len(words) == 0 {
@@ -521,6 +524,8 @@ func decksetAlt(alt string) (place string, fill, known, ok bool) {
 		return "left", false, true, true
 	case "fit right":
 		return "right", false, true, true
+	case "fit":
+		return "full", false, true, true
 	case "inline":
 		return "", false, true, true
 	}
@@ -546,7 +551,7 @@ func (st *state) image(img *ast.Image) {
 			if known {
 				info.place, info.fill = place, fill
 			} else {
-				st.warn(line, WarnBadAttribute, fmt.Sprintf("Deckset 그림 지시 %q 는 받지 않아 보통 그림으로 둠(받는 것: left·right·left fit·right fit·inline)", alt))
+				st.warn(line, WarnBadAttribute, fmt.Sprintf("Deckset 그림 지시 %q 는 받지 않아 보통 그림으로 둠(받는 것: left·right·left fit·right fit·fit·inline)", alt))
 			}
 		}
 	}
@@ -601,22 +606,24 @@ func (st *state) image(img *ast.Image) {
 		}
 	}
 	if unknown {
-		st.warn(line, WarnBadAttribute, "이미지 속성은 width·split 과 클래스 .fit·.fill·.left·.right 만 받아 나머지는 버림")
+		st.warn(line, WarnBadAttribute, "이미지 속성은 width·split 과 클래스 .fit·.fill·.left·.right·.full 만 받아 나머지는 버림")
 	}
 	cutFront(img.Parent(), t, start+end+1)
 }
 
-// imagePlace 는 이미지 속성의 배치 클래스·split 을 읽는다(#550). 배치 클래스(.fit·.left·.right)가 있으면 Deckset alt 지시를
-// 통째로 덮는다(.fill 도 속성에 적힌 것만). 배치 클래스 없이 .fill 만 있으면 alt 지시의 분할 그림에 더한다. .left 와 .right 를 함께 적으면 먼저 적힌 쪽, .left·.right 가 있으면 .fit 은 겹친 뜻이라 경고 없이 버린다.
-// .fill·split 은 분할 그림(.left·.right)에만 뜻이 있어 그 밖에서는 경고하고 버린다. split 이 받는 비율이 아니면 경고하고 1:1.
+// imagePlace 는 이미지 속성의 배치 클래스·split 을 읽는다(#550·#569). 배치 클래스(.fit·.left·.right·.full)가 있으면 Deckset alt
+// 지시를 통째로 덮는다(.fill 도 속성에 적힌 것만). 배치 클래스 없이 .fill 만 있으면 alt 지시의 분할·배경 그림에 더한다. .left·.right·
+// .full 을 둘 이상 적으면 먼저 적힌 쪽 + 경고, 그 셋 가운데 하나가 있으면 .fit 은 겹친 뜻이라 경고 없이 버린다.
+// .fill 은 분할 그림(.left·.right)과 배경(.full)에만, split 은 분할 그림에만 뜻이 있어 그 밖에서는 경고하고 버린다. split 이 받는
+// 비율이 아니면 경고하고 1:1.
 func (st *state) imagePlace(line int, info *imageInfo, a attrs) {
 	side := ""
 	for _, c := range a.Classes {
-		if c == "left" || c == "right" {
+		if c == "left" || c == "right" || c == "full" {
 			if side == "" {
 				side = c
 			} else if c != side {
-				st.warn(line, WarnBadAttribute, "이미지 배치 .left 와 .right 는 하나만 — 먼저 적은 ."+side+" 를 씀")
+				st.warn(line, WarnBadAttribute, "이미지 배치 .left·.right·.full 은 하나만 — 먼저 적은 ."+side+" 를 씀")
 			}
 		}
 	}
@@ -624,13 +631,13 @@ func (st *state) imagePlace(line int, info *imageInfo, a attrs) {
 		info.place, info.fill = side, a.has("fill")
 	} else if a.has("fit") {
 		info.place, info.fill = "fit", false
-	} else if a.has("fill") && (info.place == "left" || info.place == "right") {
+	} else if a.has("fill") && (info.place == "left" || info.place == "right" || info.place == "full") {
 		info.fill = true
 	}
 	split, hasSplit := a.get("split")
 	isSide := info.place == "left" || info.place == "right"
-	if a.has("fill") && !isSide {
-		st.warn(line, WarnBadAttribute, "이미지 .fill 은 .left·.right 와 함께만 받아 버림")
+	if a.has("fill") && !isSide && info.place != "full" {
+		st.warn(line, WarnBadAttribute, "이미지 .fill 은 .left·.right·.full 과 함께만 받아 버림")
 	}
 	if !hasSplit {
 		return
@@ -645,11 +652,14 @@ func (st *state) imagePlace(line int, info *imageInfo, a attrs) {
 	}
 }
 
-// slideSplits 는 분할 그림(.left·.right)의 패널 여부를 정한다(#550 — 판정은 여기서만 하고 slides.js 는 표시된 블록만 옮긴다).
-//  1. 패널 후보는 맨 위 블록이 그 그림 하나뿐인 것 — 그림 하나뿐인 그림(Figure, 캡션은 함께)과 그림 하나만 감싼 링크 하나뿐인
-//     문단(panelImage). 그 밖(목록·인용·다단·상자·글과 섞인 문단·제목·노트·각주 안)의 분할 그림은 경고하고 제자리 .fit 으로 둔다.
-//  2. 후보는 슬라이드당 하나 — 두 번째부터 경고하고 .fit. 첫 후보의 맨 위 블록에 data-slide-panel 을 단다(slides.js takePanel 이
-//     그 블록을 패널로 옮긴다).
+// slideSplits 는 분할 그림(.left·.right)의 패널 여부와 배경 그림(.full, #569)의 배경 여부, 가로 배치(fit-row, #569)를 정한다
+// (#550 — 판정은 여기서만 하고 slides.js 는 표시된 블록만 옮긴다).
+//  0. 가로 배치: 맨 위 문단이 .fit 그림 2장 이상만으로 되어 있으면 class fit-row 를 단다(fitRow). 아래 1·2 에서 .fit 으로 바뀌기 전의
+//     배치로 본다 — 분할·배경 그림이 섞인 문단은 가로 배치가 아니다(경고).
+//  1. 패널·배경 후보는 맨 위 블록이 그 그림 하나뿐인 것 — 그림 하나뿐인 그림(Figure, 캡션은 함께)과 그림 하나만 감싼 링크 하나뿐인
+//     문단(slotImage). 그 밖(목록·인용·다단·상자·글과 섞인 문단·제목·노트·각주 안)의 분할·배경 그림은 경고하고 제자리 .fit 으로 둔다.
+//  2. 그림 자리(패널 또는 배경)는 슬라이드당 하나 — 먼저 적은 후보가 자리를 갖고, 두 번째부터는 종류와 상관없이 경고하고 .fit.
+//     자리를 가진 후보의 맨 위 블록에 data-slide-panel(분할) 또는 data-slide-bg(배경)를 단다(slides.js takeSlot 이 그 블록을 옮긴다).
 //
 // 슬라이드는 slides.js groups 가 렌더된 맨 위 블록을 보는 분기를 같은 차례로 옮겨 가른다(lvl 은 frontmatter slides.level, 없으면
 // slideLevel — 화면이 받는 값과 같다): 목차 자리(TOCNav)·class notes 블록은 건너뛰고, 쪽 나눔·가로줄·class page-break 블록
@@ -660,9 +670,14 @@ func (st *state) slideSplits(doc ast.Node) {
 	if st.meta.Slides != nil && st.meta.Slides.Level > 0 {
 		lvl = st.meta.Slides.Level
 	}
+	for c := doc.FirstChild(); c != nil; c = c.NextSibling() {
+		if p, ok := c.(*ast.Paragraph); ok {
+			st.fitRow(p)
+		}
+	}
 	cands := map[*ast.Image]bool{}
 	for c := doc.FirstChild(); c != nil; c = c.NextSibling() {
-		if img := st.panelImage(c); img != nil {
+		if img := st.slotImage(c); img != nil {
 			cands[img] = true
 		}
 	}
@@ -672,14 +687,18 @@ func (st *state) slideSplits(doc ast.Node) {
 		info.place, info.fill, info.split = "fit", false, ""
 	}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
-		if img, ok := n.(*ast.Image); ok && entering {
-			if info := st.images[img]; info != nil && (info.place == "left" || info.place == "right") && !cands[img] {
+		if img, ok := n.(*ast.Image); ok && entering && !cands[img] {
+			switch info := st.images[img]; {
+			case info == nil:
+			case info.place == "left" || info.place == "right":
 				toFit(img, "분할 그림(.left·.right)은 그림 하나뿐인 줄에서만 패널 — 이 그림은 제자리 .fit 으로 둠")
+			case info.place == "full":
+				toFit(img, "배경 그림(.full)은 그림 하나뿐인 줄에서만 배경 — 이 그림은 제자리 .fit 으로 둠")
 			}
 		}
 		return ast.WalkContinue, nil
 	})
-	seen := false
+	seen := "" // 이 슬라이드의 그림 자리를 가진 종류 — "" · "panel" · "bg"
 	for c := doc.FirstChild(); c != nil; c = c.NextSibling() {
 		cls := st.topClasses(c)
 		_, isFootnotes := c.(*extast.FootnoteList)
@@ -687,25 +706,73 @@ func (st *state) slideSplits(doc ast.Node) {
 		switch {
 		case isTOC(c), slices.Contains(cls, "notes"):
 		case isBreak(c), slices.Contains(cls, "page-break"), isHeading && lvl > 0 && h.Level <= lvl, isFootnotes, slices.Contains(cls, "footnotes"):
-			seen = false // 각주는 제 슬라이드 — 안에 후보가 없고 뒤는 새 슬라이드다
+			seen = "" // 각주는 제 슬라이드 — 안에 후보가 없고 뒤는 새 슬라이드다
 		default:
-			img := st.panelImage(c)
+			img := st.slotImage(c)
 			if img == nil {
 				continue
 			}
-			if seen {
-				toFit(img, "분할 그림(.left·.right)은 슬라이드당 하나 — 이 그림은 .fit 으로 둠")
-				continue
+			kind, attr := "panel", "data-slide-panel"
+			if st.images[img].place == "full" {
+				kind, attr = "bg", "data-slide-bg"
 			}
-			c.SetAttributeString("data-slide-panel", []byte("1"))
-			seen = true
+			switch {
+			case seen == "panel" && kind == "panel":
+				toFit(img, "분할 그림(.left·.right)은 슬라이드당 하나 — 이 그림은 .fit 으로 둠")
+			case seen == "bg" && kind == "bg":
+				toFit(img, "배경 그림(.full)은 슬라이드당 하나 — 이 그림은 .fit 으로 둠")
+			case seen != "":
+				toFit(img, "분할 그림과 배경 그림은 합쳐 슬라이드당 하나 — 먼저 적은 쪽을 쓰고 이 그림은 .fit 으로 둠")
+			default:
+				c.SetAttributeString(attr, []byte("1"))
+				seen = kind
+			}
 		}
 	}
 }
 
-// panelImage 는 맨 위 블록 c 가 분할 그림 하나뿐이면 그 그림을, 아니면 nil 을 돌려준다(#550): 그림(Figure)의 자식이 이미지 하나
-// (+ Figure: 캡션)이거나, 문단의 내용이 링크 하나이고 그 링크의 내용이 이미지 하나인 것. 빈 글자(속성을 떼고 남은 공백)는 세지 않는다.
-func (st *state) panelImage(c ast.Node) *ast.Image {
+// fitRow 는 맨 위 문단 p 가 .fit 그림 2장 이상만으로 되어 있으면(그림 하나만 감싼 링크도 그림 한 장, 사이에는 빈 글자·줄바꿈만)
+// class fit-row 를 단다(#569 — slides.js·pager.js 가 같은 높이로 가로에 늘어놓는다. 문서에는 규칙이 없어 지금과 같은 문단이다).
+// .fit 그림이 2장 이상인데 다른 것(글·서식·다른 배치의 그림·.fit 아닌 그림)이 섞였으면 경고하고 그대로 둔다(각 그림은 제자리 .fit).
+func (st *state) fitRow(p *ast.Paragraph) {
+	isFit := func(n ast.Node) bool {
+		img, ok := n.(*ast.Image)
+		return ok && st.images[img] != nil && st.images[img].place == "fit"
+	}
+	fits := 0
+	_ = ast.Walk(p, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if entering && isFit(n) {
+			fits++
+		}
+		return ast.WalkContinue, nil
+	})
+	if fits < 2 {
+		return
+	}
+	pure := true
+	for k := p.FirstChild(); k != nil && pure; k = k.NextSibling() {
+		switch k := k.(type) {
+		case *ast.Text:
+			pure = len(bytes.TrimSpace(k.Segment.Value(st.src))) == 0
+		case *ast.Image:
+			pure = isFit(k)
+		case *ast.Link:
+			pure = isFit(st.soleChild(k))
+		default:
+			pure = false
+		}
+	}
+	if !pure {
+		st.warn(st.lines.line(p.Pos()), WarnBadAttribute, "가로 배치는 .fit 그림만 든 문단만 — 글·다른 그림이 섞여 각 그림을 제자리 .fit 으로 둠")
+		return
+	}
+	p.SetAttributeString("class", []byte("fit-row"))
+}
+
+// slotImage 는 맨 위 블록 c 가 분할 그림(.left·.right)이나 배경 그림(.full) 하나뿐이면 그 그림을, 아니면 nil 을 돌려준다(#550·#569):
+// 그림(Figure)의 자식이 이미지 하나(+ Figure: 캡션)이거나, 문단의 내용이 링크 하나이고 그 링크의 내용이 이미지 하나인 것. 빈 글자
+// (속성을 떼고 남은 공백)는 세지 않는다.
+func (st *state) slotImage(c ast.Node) *ast.Image {
 	var img *ast.Image
 	switch c := c.(type) {
 	case *Figure:
@@ -729,7 +796,7 @@ func (st *state) panelImage(c ast.Node) *ast.Image {
 	if img == nil {
 		return nil
 	}
-	if info := st.images[img]; info == nil || (info.place != "left" && info.place != "right") {
+	if info := st.images[img]; info == nil || (info.place != "left" && info.place != "right" && info.place != "full") {
 		return nil
 	}
 	return img
@@ -748,6 +815,34 @@ func (st *state) soleChild(n ast.Node) ast.Node {
 		one = k
 	}
 	return one
+}
+
+// olDigits 는 번호 목록(<ol>)에 가장 큰 번호의 자릿수 class(ol-d2 … ol-d9)를 단다(#575). 가장 큰 번호 = 시작 번호 + 항목 수 − 1.
+// 번호(::marker)는 목록 바깥 들여쓰기 칸에 그려지고 쪽 본문 상자가 그 밖을 잘라 내므로, base.css 가 이 class 에서만 들여쓰기를
+// 자릿수만큼 넓힌다. 한 자리(9 이하)는 class 가 없어 모양이 그대로다. 아홉 자리 이상은 ol-d9 하나다(goldmark 의 시작 번호는
+// 아홉 자리까지). 글머리 목록은 대상이 아니다. 중첩 목록은 목록마다 따로 센다. 쪽을 넘어 나뉜 뒷조각(pager.js splitList)은
+// 원래 목록을 얕게 복제해 class 가 그대로 남는다 — 뒷조각의 번호도 같은 가장 큰 번호 이하다.
+func olDigits(l *ast.List) {
+	if !l.IsOrdered() {
+		return
+	}
+	n := 0
+	for c := l.FirstChild(); c != nil; c = c.NextSibling() {
+		if _, ok := c.(*ast.ListItem); ok {
+			n++
+		}
+	}
+	d := len(strconv.Itoa(max(l.Start+n-1, 0)))
+	if d < 2 {
+		return
+	}
+	cls := "ol-d" + strconv.Itoa(min(d, 9))
+	if v, ok := l.AttributeString("class"); ok {
+		if b, ok := v.([]byte); ok && len(b) > 0 {
+			cls = string(b) + " " + cls
+		}
+	}
+	l.SetAttributeString("class", []byte(cls))
 }
 
 func isTOC(n ast.Node) bool { _, ok := n.(*TOCNav); return ok }

@@ -16,7 +16,8 @@ import (
 )
 
 // 수식 구분자 찾기의 리뷰 재현(R1~R3)을 한곳에 모은다. 각 사례는 그 라운드의 리뷰가 적은 입력 그대로이고,
-// want 는 결과 HTML 에 있어야 할 조각, not 은 없어야 할 조각, warns 는 경고 수다.
+// want 는 결과 HTML 에 있어야 할 조각, not 은 없어야 할 조각, warns 는 경고 수다. R2·R3 의 주석 사례는 주석이 같은 줄 뒤의 글을
+// 지우므로 주석 경고(percentLoss) 하나를 낸다(#180) — 구분자 판정(want·not)은 그대로다.
 func TestMathReviewRepros(t *testing.T) {
 	cases := []struct {
 		round, src string
@@ -34,16 +35,16 @@ func TestMathReviewRepros(t *testing.T) {
 		// R1 P2: 짝수 역슬래시 뒤 닫는 $$
 		{"R1", "$$\na\\\\$$\n뒤", []string{`<div class="math-display" data-line="1">`, `<p data-line="3">뒤</p>`}, nil, 0},
 		// R2 P2: 주석 안 \text{ 가 닫는 $$ 를 가림
-		{"R2", "$$\nx % \\text{\n$$\n뒤", []string{`<mi>x</mi>`, `<p data-line="4">뒤</p>`}, []string{"math-error"}, 0},
-		{"R2", "$$\n\\text{a % }\nb}\n$$\n뒤", []string{"<mtext>a\u00a0b</mtext>", `<p data-line="5">뒤</p>`}, []string{"math-error"}, 0},
-		{"R2", "앞 $x % \\text{\n+y$ 뒤", []string{"<mi>x</mi><mo>+</mo><mi>y</mi>"}, []string{"math-error"}, 0},
+		{"R2", "$$\nx % \\text{\n$$\n뒤", []string{`<mi>x</mi>`, `<p data-line="4">뒤</p>`}, []string{"math-error"}, 1},
+		{"R2", "$$\n\\text{a % }\nb}\n$$\n뒤", []string{"<mtext>a\u00a0b</mtext>", `<p data-line="5">뒤</p>`}, []string{"math-error"}, 1},
+		{"R2", "앞 $x % \\text{\n+y$ 뒤", []string{"<mi>x</mi><mo>+</mo><mi>y</mi>"}, []string{"math-error"}, 1},
 		// R2 P2: 닫힌 긴 수식은 원문 + 길이 경고(안의 *·_ 는 강조가 아님)
 		{"R2", "$" + strings.Repeat("x", 4020) + `\text{*강조*}$`, []string{`\text{*강조*}$</span>`}, []string{"<em>"}, 1},
 		// R3 P2: 열린 \text 안의 주석 속 $ 는 글자
-		{"R3", "$\\text{a % $literal\nb}$", []string{"<math><mtext>a\u00a0b</mtext></math>"}, []string{"math-error"}, 0},
-		{"R3", "$$\n\\text{a % $$\nb}\n$$\n뒤", []string{"<mtext>a\u00a0b</mtext>", `<p data-line="5">뒤</p>`}, []string{"math-error"}, 0},
-		{"R3", "$\\text{한%foo\n글}$", []string{"<mtext>한글</mtext>"}, []string{"math-error"}, 0},
-		{"R3", "$x %foo \\text{\n+y$", []string{"<mi>x</mi><mo>+</mo><mi>y</mi>"}, []string{"math-error"}, 0},
+		{"R3", "$\\text{a % $literal\nb}$", []string{"<math><mtext>a\u00a0b</mtext></math>"}, []string{"math-error"}, 1},
+		{"R3", "$$\n\\text{a % $$\nb}\n$$\n뒤", []string{"<mtext>a\u00a0b</mtext>", `<p data-line="5">뒤</p>`}, []string{"math-error"}, 1},
+		{"R3", "$\\text{한%foo\n글}$", []string{"<mtext>한글</mtext>"}, []string{"math-error"}, 1},
+		{"R3", "$x %foo \\text{\n+y$", []string{"<mi>x</mi><mo>+</mo><mi>y</mi>"}, []string{"math-error"}, 1},
 	}
 	for _, c := range cases {
 		r := render(t, c.src)

@@ -224,6 +224,10 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--slide-code-size` | 슬라이드의 코드 글자 | `14pt` |
 | `--slide-lead-size` | 슬라이드의 요약문(lead) 글자 | `27pt` |
 | `--slide-bg` | 슬라이드 바탕 | `var(--paper)` |
+| `--slide-scrim` | 배경 그림 `{.full .fill}` 위에 덮는 스크림 바탕(#569) — 글이 읽히게 그림을 어둡게. 색 하나로 둔다(반투명 `linear-gradient` 는 슬라이드 PDF 에서 불투명 검정으로 찍힌다 — 2026-11-02 macOS 슬라이드 PDF 실측) | `rgba(0, 0, 0, 0.4)` |
+| `--slide-scrim-shade` | 스크림의 위·아래를 더 어둡게 하는 안쪽 그림자(`box-shadow` 값, 없애려면 `none`) | `inset 0 -260px 220px -60px rgba(0, 0, 0, 0.6), inset 0 160px 140px -60px rgba(0, 0, 0, 0.35)` |
+| `--slide-scrim-ink` | 스크림 위 바탕 없는 글 색 — 슬라이드 제목, 본문 맨 위(`.page-body` 직접 자식) 제목·문단·목록·정의 목록·구역 제목과 그 안의 굵은 글·링크. 인용·알림·상자·표·코드는 맨 위든 목록 항목 안이든 테마 색 그대로(목록 안 블록은 base.css 가 `--ink` 로 되돌린다 — 특이도 0,1,0 이라 테마가 정한 글자 색이 이김) — 그래서 그 블록은 바탕이 있어야 한다: 맨 위·목록 안 표는 base.css 가 종이색 판을 깔고(테마 바탕이 이김), `--box-bg`·`--lead-bg` 가 투명인 테마는 `.slide-bg.fill ~ .page-body { --box-bg: …; --lead-bg: … }` 로 덮는다(내장 compact·mono·bold) | `#ffffff` |
+| `--slide-scrim-muted` | 스크림 위 바닥글·「(계속)」·캡션, 맨 위 목록의 기호·맨 위 글 링크 밑줄 색 | `rgba(255, 255, 255, 0.82)` |
 | `--caption-size` | 그림·표 캡션 크기 | `9pt` |
 | `--caption-color` | 캡션 색 | `var(--muted)` |
 | `--figure-label` | 그림 번호 앞 글자(CSS 글자열) | `"그림"` |
@@ -288,7 +292,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `plain` | 둘 다 끔 | 테마 기본을 끄고 보통 목록(• ◦ ▪ / 1. 2.) |
 
 - **단계**는 같은 종류 목록의 중첩 깊이다(`ul ul`·`ol ol ol`). 사다리보다 깊으면 마지막 단계를 되풀이한다. 두 값은 서로 다른 목록에 걸리므로 함께 켤 수 있다(`[gaejosik, gongmun]`). 문서의 값은 테마 기본을 통째로 바꾼다.
-- **들여쓰기**는 단계마다 같은 폭(`--list-indent`, 공문은 `--list-indent-gongmun`)이고 기호는 그 여백 안에서 글자 머리에 붙어 선다(`::marker`). 줄이 넘치면 기호 뒤 글자 머리에 맞춰 들어간다(내어쓰기).
+- **들여쓰기**는 단계마다 같은 폭(`--list-indent`, 공문은 `--list-indent-gongmun`)이고 기호는 그 여백 안에서 글자 머리에 붙어 선다(`::marker`). 줄이 넘치면 기호 뒤 글자 머리에 맞춰 들어간다(내어쓰기). 가장 큰 번호(시작 번호 + 항목 수 − 1)가 두 자리 이상인 순서 목록은 `<ol class="ol-d2">`…`ol-d9`(아홉 자리 이상은 `ol-d9`)이고, 그 목록만 들여쓰기를 `max(들여쓰기 토큰, 자릿수 × 0.66em + 0.6em)`(공문 사다리는 `+ 1.1em`)으로 넓혀 번호 앞자리가 쪽 본문 밖으로 나가 잘리지 않게 한다(#575 — `web/base.css`, `mdoc/transform.go` `olDigits`). 한 자리 목록에는 class 가 없어 위 폭 그대로다. 각주 목록도 각주가 열 개 이상이면 같은 class 를 달고(`mdoc/render.go` `footnoteList`) 기본 1.4em 을 같은 공식(`+ 0.6em`)으로 넓힌다. 본문 목록 규칙은 특이도 0 이라 테마가 순서 목록의 들여쓰기나 기호 꼴(`--list-ol-N`)을 바꾸면 테마가 이긴다 — 그때 10번 이상 번호가 잘리지 않는지는 테마가 맡는다.
 - **번호**는 목록의 시작 번호(`3.` 으로 시작하면 `다.`)와 쪽을 넘어 이어지는 조각의 번호를 따른다. 가나다는 행정업무운영 편람대로 `가`\~`하` 다음 `거`\~`허`(28)이고 넘으면 숫자(`29.`), 원문자는 `①`\~`⑳` 다음 `(21)`\~`(50)`, `㉮`\~`㉻` 다음 `(거)`\~`(허)` 이고 그 너머는 숫자.
 - 내장 테마 중 **`mono`(모노)만 기본으로 둘 다 켠다** — 흑백 격식 꼴이 주로 담는 공공 문서는 개조식 보고(`□ ○`)와 공문 항목 번호(`1. 가.`)가 거의 늘 쓰이고, 공문 항목 구분은 규정(행정업무운영 편람)이다. `classic`·`bold`·`compact`·`spine` 은 보통 목록이 기본이고, 개조식으로 쓸 문서가 `list-style: gaejosik` 으로 고른다.
 - **회사 테마**는 토큰으로 기호를 바꾼다: `"--list-ul-4": "\"▸ \""`(P02 꼴), `"--list-ol-1": "upper-roman"`. 꼴 이름은 CSS 기본 꼴(`decimal`·`upper-roman`·`hangul`…)이나 위의 `hyve-…` 다(`theme.css` 에는 `@counter-style` 을 둘 수 없다). 기호 글자는 Pretendard 에 있는 것이 좋다 — `□ ○ · ① … ⑳` 은 있고 `㉮ … ㉻` 는 없어 시스템 글꼴(macOS Apple SD Gothic Neo, Windows 맑은 고딕)로 그린다.
@@ -299,7 +303,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 ### 차트·슬라이드·이어보기
 
 - **차트**(`:::chart`): `<figure class="chart chart-<종류>">` 안의 `<svg class="chart-svg t-<종류>">`. 색은 클래스 `s1`…`s8` 이 토큰 `--chart-1…8` 로 칠한다 — 테마는 토큰만 주면 된다(1번은 강조색이 좋다. 이웃한 색끼리 색약에도 구분되게). 글자는 `--chart-text`·`--chart-muted`, 선은 `--chart-grid`·`--chart-axis`. SVG 안 요소의 클래스: 막대 `col`(음수 `neg`)·쌓은 조각 `seg`·선 `line`·점 `dot`·면 `area`·원 조각 `slice`·값 `val`(색 면 위는 `val in`)·눈금 `tick`·항목 `cat`·범례 `legend`/`sw`/`lg`. 움직임은 앱이 하므로 테마가 `@keyframes` 를 둘 필요가 없다(둘 수도 없다).
-- **슬라이드**: 같은 쪽 상자(`.page`)가 슬라이드가 된다(1280×720 — 인쇄 960×540pt, 4:3 은 960×720). 테마 CSS 는 쪽 상자 자신을 고르지 못하므로 슬라이드 종류는 안쪽 요소의 클래스로 고른다: `k-title`(제목)·`k-section`(구역 — 뒤에 내용이 없으면 `bare` 도)·`k-content`(내용)·`k-single`(그림·차트·표·요약문 하나). 구조:
+- **슬라이드**: 같은 쪽 상자(`.page`)가 슬라이드가 된다(1280×720 — 인쇄 960×540pt, 4:3 은 960×720). 테마 CSS 는 쪽 상자 자신을 고르지 못하므로 슬라이드 종류는 안쪽 요소의 클래스로 고른다: `k-title`(제목)·`k-section`(구역 — 뒤에 내용이 없고 배경 그림 장이 아니면 `bare` 도)·`k-content`(내용)·`k-single`(그림·차트·표·요약문 하나). 구조:
 
   ```
   .page.slide
@@ -309,6 +313,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
                              구역 슬라이드는 .slide-section(.ss-num — 번호가 없는 문서는 구역 차례 — · .ss-title)
     .slide-foot.k-…          아래(.sf-logo·.sf-text 조직·.sf-num 번호)
   ```
+
+  배경 그림 장(`{.full}`·`{.full .fill}`, #569)은 쪽의 첫 자식이 `.slide-bg`(cover 면 `.slide-bg.fill`)이고 **`.slide-deco` 가 없다**(`web/slides.js`) — `.slide-deco.k-section ~ .page-body` 같은 형제 선택자는 배경 장에 걸리지 않는다. 또 배경 장은 본문이 없는 구역 장이라도 **`bare` 가 아니다** — `bare` 는 장식 면 위 큰 제목을 뜻하므로 장식 없는 배경 장에는 붙이지 않는다(spine 「제 n 장」 꼬리표 같은 `bare` 전용 모양은 배경 장에 나오지 않는다). 스크림 위 모양은 `.slide-bg.fill ~ …` 로 고른다(내장 mono·spine 의 `.ss-num` 예, spine 은 번호 목록 원도).
 
   크기·여백은 `--slide-*` 토큰이다. 슬라이드에서는 문서의 `--text-size`·`--h1-size`… 대신 `--slide-text-size`·`--slide-title-size` 에서 나온 값이 쓰인다. `--slide-scale`(기본 0.9)이 모든 `--slide-*-size` 글자에 곱해진다 — 테마가 이 토큰들을 덮어도 배율은 그대로 얹힌다. 슬라이드 전용 선택자(표지 `.sc-*`·구역 `.ss-*`·슬라이드 머리 `.slide-*`)의 `font-size` 는 `calc(Npt * var(--slide-scale))`·`calc(var(--slide-…-size) * 수 * var(--slide-scale))`·em·%·inherit 꼴만 쓴다(`font` 단축 속성은 금지) — 시험(`TestSlideFontSizeScaleGuard`, page/theme_test.go)이 이 허용 꼴만 통과시키고 다른 꼴(고정 pt·rem·var 참조 등)은 실패시킨다 — 내장 테마·base.css 에서 흔히 쓰는 꼴의 회귀를 잡는 검사다(완전한 CSS 해석기는 아니다). 관리 표시(선택자가 정확히 `.sc-class`·`.slide-foot`·`.sf-num`·`.sf-left`·`.sf-logo`)만 고정 크기를 쓸 수 있다. 본문 서식(`spine` 의 결과 상자·절차 번호처럼 쪽 문서와 함께 쓰는 것)의 고정 크기는 슬라이드에서도 그대로다. 내장 테마의 `theme.css` 끝에 슬라이드 절이 있다 — 표지의 띠·면, 장 머리의 꼴을 슬라이드로 옮긴 예다.
 - **이어보기**: 쪽 나눔 없이 보는 꼴이다. 같은 쪽 상자 하나(`.page.page-flow`)에 문서 흐름이 통째로 들어가고 높이는 내용만큼이다 — 테마에게는 "아주 긴 쪽 하나" 라 같은 선택자가 그대로 맞는다. 머리글·바닥글은 없다. 표지(`cover: true`)는 종이 한 장이 아니라 맨 위의 제목 영역이 되고, 이어보기 전용 모양은 본문 상자의 클래스 **`.page-body.flow-view`** 로 고른다(예: `.page-body.flow-view .cover { … }`). 내장 `classic`·`bold`·`spine` 의 `theme.css` 끝에 그 예가 있다. 회사 테마는 바탕 테마의 것을 물려받는다. 출력(PDF·인쇄)은 이어보기에서도 쪽으로 나오므로 이어보기 모양은 화면에만 쓰인다.

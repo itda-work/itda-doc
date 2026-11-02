@@ -186,7 +186,42 @@ func (st *state) math(tex string, display bool, line int) (string, bool) {
 		st.warn(line, WarnMath, "수식을 그리지 않고 원문 그대로 둠: "+err.Error())
 		return "", false
 	}
+	if lost := percentLoss(tex); lost != "" {
+		st.warn(line, WarnMath, fmt.Sprintf("수식 안의 「%s」(%% 부터 줄 끝)는 TeX 주석이라 그리지 않음 — 퍼센트 기호면 \\%%", lost))
+	}
 	return out, true
+}
+
+// percentLoss 는 TeX 주석(이스케이프하지 않은 %)이 보일 글을 조용히 지우는 첫 자리를 돌려준다(#180). 없으면 "".
+// 그런 자리는 둘이다: 숫자 바로 뒤의 %(「50%」 — 퍼센트로 쓴 것이다. 그리면 % 가 사라진다), 그리고 같은 줄에서 앞뒤로 글이 있는
+// %(「a % b」 — 뒤의 글이 사라진다). 줄 머리(공백 뒤)부터 시작하는 주석 줄과 줄 끝에 홀로 남은 % 는 일부러 쓴 주석으로 보고 둔다.
+// 이스케이프는 texScanner 와 같다 — \ 는 다음 글자와 짝이라 \% 는 글자이고 \\% 의 % 는 주석이다.
+// 돌려주는 값은 % 부터 그 줄 끝까지(앞뒤 공백을 뗌, 길면 줄임)다.
+func percentLoss(tex string) string {
+	for _, line := range strings.Split(tex, "\n") {
+		for i := 0; i < len(line); i++ {
+			switch line[i] {
+			case '\\':
+				i++ // 짝 글자를 건너뛴다
+				continue
+			case '%':
+			default:
+				continue
+			}
+			before := strings.TrimSpace(line[:i])
+			rest := strings.TrimSpace(line[i+1:])
+			afterDigit := i > 0 && line[i-1] >= '0' && line[i-1] <= '9'
+			if afterDigit || (before != "" && rest != "") {
+				lost := strings.TrimSpace(line[i:])
+				if r := []rune(lost); len(r) > 20 {
+					lost = string(r[:20]) + "…"
+				}
+				return lost
+			}
+			break // 이 줄의 나머지는 주석이다
+		}
+	}
+	return ""
 }
 
 func (r *htmlRenderer) mathInline(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
