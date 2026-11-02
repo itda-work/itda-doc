@@ -77,7 +77,7 @@ func AssertDoubling(t testing.TB, name string, sizes []int, prepare func(size in
 		works[i] = prepare(size)
 		ds[i] = Best(o.Reps, works[i])
 	}
-	for r := 0; r < Retries && len(judge(ds, o)) > 0; r++ {
+	for r := 0; r < Retries && len(judge(ds, sizes, o)) > 0; r++ {
 		before := append([]time.Duration(nil), ds...)
 		for i := range ds { // 모든 크기를 같은 때에 잰다(작은 쪽부터)
 			ds[i] = min(ds[i], Cost(works[i]))
@@ -85,16 +85,16 @@ func AssertDoubling(t testing.TB, name string, sizes []int, prepare func(size in
 		t.Logf("%s: 다시 잼(%d) %v → %v", name, r+1, before, ds)
 	}
 	t.Logf("%s: %v (크기 %v)", name, ds, sizes)
-	for _, why := range judge(ds, o) {
+	for _, why := range judge(ds, sizes, o) {
 		t.Errorf("%s: %s", name, why)
 	}
 }
 
-// judge 는 잰 수열 ds(크기가 두 배씩)의 실패 사유들이다 — 비면 통과.
+// judge 는 잰 수열 ds(크기 sizes 가 두 배씩, ds 와 같은 길이)의 실패 사유들이다 — 비면 통과. 사유에는 차례 번호 대신 실제 크기를 적는다.
 //   - 크기 셋 이하: 쌍마다 ds[i] ≤ 3 × ds[i-1] + Slack.
 //   - 크기 넷 이상: (i) ds[n-1] ≤ 3^(n-1) × ds[0] + (n-1) × Slack, (ii) 3 × 앞 값 + Slack 을 넘는 쌍이 연달아 둘 있지 않다.
 //   - 모든 n: Limit > 0 이면 각 크기 ≤ Limit.
-func judge(ds []time.Duration, o Doubling) []string {
+func judge(ds []time.Duration, sizes []int, o Doubling) []string {
 	var out []string
 	n := len(ds)
 	pairBad := func(i int) bool { return ds[i] > 3*ds[i-1]+o.Slack }
@@ -102,7 +102,7 @@ func judge(ds []time.Duration, o Doubling) []string {
 	case n >= 2 && n <= 3:
 		for i := 1; i < n; i++ {
 			if pairBad(i) {
-				out = append(out, fmt.Sprintf("크기 %d → %d 번째에 비용 %v → %v, 상한 %v(3배 + %v) (이차?)", i-1, i, ds[i-1], ds[i], 3*ds[i-1]+o.Slack, o.Slack))
+				out = append(out, fmt.Sprintf("크기 %d → %d 에 비용 %v → %v, 상한 %v(3배 + %v) (이차?)", sizes[i-1], sizes[i], ds[i-1], ds[i], 3*ds[i-1]+o.Slack, o.Slack))
 			}
 		}
 	case n >= 4:
@@ -112,18 +112,18 @@ func judge(ds []time.Duration, o Doubling) []string {
 		}
 		b += time.Duration(n-1) * o.Slack
 		if ds[n-1] > b {
-			out = append(out, fmt.Sprintf("수열 전체(두 배 %d 번)에 비용 %v → %v, 상한 %v(3^%d 배 + %d×%v) (이차?)", n-1, ds[0], ds[n-1], b, n-1, n-1, o.Slack))
+			out = append(out, fmt.Sprintf("수열 전체(크기 %d → %d)에 비용 %v → %v, 상한 %v(3^%d 배 + %d×%v) (이차?)", sizes[0], sizes[n-1], ds[0], ds[n-1], b, n-1, n-1, o.Slack))
 		}
 		for i := 2; i < n; i++ {
 			if pairBad(i-1) && pairBad(i) {
-				out = append(out, fmt.Sprintf("연속한 두 쌍(%d→%d→%d 번째)이 모두 3배 + %v 를 넘음: %v → %v → %v (이차?)", i-2, i-1, i, o.Slack, ds[i-2], ds[i-1], ds[i]))
+				out = append(out, fmt.Sprintf("연속한 두 쌍(크기 %d→%d→%d)이 모두 3배 + %v 를 넘음: %v → %v → %v (이차?)", sizes[i-2], sizes[i-1], sizes[i], o.Slack, ds[i-2], ds[i-1], ds[i]))
 			}
 		}
 	}
 	if o.Limit > 0 {
 		for i, d := range ds {
 			if d > o.Limit {
-				out = append(out, fmt.Sprintf("%d 번째 크기에 %v (상한 %v)", i, d, o.Limit))
+				out = append(out, fmt.Sprintf("크기 %d 에 %v (상한 %v)", sizes[i], d, o.Limit))
 			}
 		}
 	}
