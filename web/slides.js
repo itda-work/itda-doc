@@ -6,7 +6,9 @@
 //   - 가로줄(---)·쪽 나눔 → 그 자리에서 새 슬라이드(제목 없이)
 //   - 넘치면 쪽 나눔기(pager.js)가 나눠 같은 제목 + "(계속 k/n)" 슬라이드로 잇는다 — 잘리는 슬라이드가 없다
 //   - 그림·차트·표·요약문 하나만 있는 슬라이드는 그것을 크게(k-single)
-//   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, #550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takePanel)
+//   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, #550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takeSlot)
+//   - 배경 그림(mdoc 이 배경으로 표시한 맨 위 블록 — data-slide-bg, #569)은 묶음의 배경으로 빼 슬라이드 전체(제목 띠 포함)를 채운다(takeSlot)
+//   - .fit 그림만 든 문단(mdoc 이 class fit-row 를 단 맨 위 문단, #569)은 같은 높이로 가로에 늘어놓는다(rowCaptions·pager.js placeFit)
 // 목차(nav.toc)는 슬라이드에 넣지 않는다. :::notes 는 슬라이드에서 빼 발표자 노트로 모은다(슬라이드·PDF 에는 안 보인다 —
 // 미리보기의 노트 칸·발표 N 칸만 쓴다, #344). 노트는 원문에서 놓인 자리의 장에 붙는다(groups·notePage, #518).
 // 차례로 나타내기: ". . ."(div.pause) 뒤의 블록, :::incremental(또는 slides.incremental 이면 모든 목록, :::nonincremental 안은 빼고)의
@@ -61,8 +63,13 @@
       }
       (cur || open("content", null)).blocks.push(el);
     }
-    // 분할 그림(#550)을 패널로 뺀다 — mdoc 이 표시한 맨 위 블록만. 의미 있는 블록 하나 판정보다 먼저(빼고 남은 것으로 본다)
-    for (const g of out) if (g.kind !== "title") g.panel = takePanel(g);
+    // 분할 그림(#550)·배경 그림(#569)을 패널·배경으로 뺀다 — mdoc 이 표시한 맨 위 블록만. 의미 있는 블록 하나 판정보다 먼저(빼고 남은 것으로 본다)
+    for (const g of out) {
+      if (g.kind === "title") continue;
+      const s = takeSlot(g);
+      g.panel = s && s.kind === "panel" ? s : null;
+      g.bg = s && s.kind === "bg" ? s : null;
+    }
     // 내용 슬라이드 가운데 의미 있는 블록이 하나(그림·차트·표·요약문)뿐인 것
     for (const g of out) {
       if (g.kind !== "content") continue;
@@ -70,7 +77,7 @@
       if (real.length === 1 && SINGLE(real[0])) g.kind = "single";
     }
     // 걸러지는 묶음의 노트를 이웃 남는 묶음으로 옮기고 거른다 — 앞 묶음 마지막 장, 앞 묶음이 없으면 다음 묶음 첫 장
-    const kept = g => g.kind === "title" || g.kind === "section" || g.title || g.panel || g.blocks.some(b => !b.matches(".pause"));
+    const kept = g => g.kind === "title" || g.kind === "section" || g.title || g.panel || g.bg || g.blocks.some(b => !b.matches(".pause"));
     const res = [];
     let carry = [];
     for (const g of out) {
@@ -87,30 +94,35 @@
     return res;
   }
 
-  // ---- 분할 그림(#550). 판정은 mdoc(transform.go slideSplits)이 한다: 맨 위 블록이 분할 그림 하나뿐인 줄(그림 figure, 그림 하나만 감싼
-  // 링크 문단)이면 그 블록에 data-slide-panel 을 달고(슬라이드당 하나), 그 밖의 자리는 제자리 .fit 으로 바꿔 낸다. 그림 배치는 img 의
-  // class(img-left·img-right·img-fill·img-fit)와 data-split 이다. 슬라이드에서만 뜻이 있고 문서(A4·이어보기)에는 규칙이 없어 보통 그림이다.
+  // ---- 분할 그림(#550)·배경 그림(#569). 판정은 mdoc(transform.go slideSplits)이 한다: 맨 위 블록이 분할(.left·.right)·배경(.full)
+  // 그림 하나뿐인 줄(그림 figure, 그림 하나만 감싼 링크 문단)이면 그 블록에 data-slide-panel·data-slide-bg 를 달고(둘을 합쳐 슬라이드당
+  // 하나 — 먼저 적은 쪽), 그 밖의 자리는 제자리 .fit 으로 바꿔 낸다. 그림 배치는 img 의 class(img-left·img-right·img-full·img-fill·
+  // img-fit)와 data-split 이다. 슬라이드에서만 뜻이 있고 문서(A4·이어보기)에는 규칙이 없어 보통 그림이다.
   const SPLITS = new Set(["1:1", "1:2", "1:3", "2:1", "3:1"]);
-  // takePanel 은 묶음 g 의 맨 위 블록 가운데 data-slide-panel 이 달린 첫 블록을 그대로, 통째로 떼어 패널 정보 { block, side, split } 로
-  // 돌려준다(없으면 null). 블록을 다시 짜지 않는다 — 통째로 옮기므로 블록 안의 무엇도 잃지 않는다. 블록은 mdoc(panelImage)이 고른
-  // 단독 그림 figure(Figure: 캡션이 있으면 캡션의 글·각주 참조 등도 함께) 또는 그림 하나를 감싼 링크 문단(막은 링크면 링크 없이 그림만)이다. 자리·cover·비율은 블록 안 img 의 class·data-split 에서 읽기만 한다.
+  const SLOT = b => b.hasAttribute && (b.hasAttribute("data-slide-panel") || b.hasAttribute("data-slide-bg"));
+  // takeSlot 은 묶음 g 의 맨 위 블록 가운데 data-slide-panel·data-slide-bg 가 달린 첫 블록을 그대로, 통째로 떼어 돌려준다(없으면 null):
+  // 분할이면 { kind: "panel", block, side, split }, 배경이면 { kind: "bg", block, fill }. 블록을 다시 짜지 않는다 — 통째로 옮기므로
+  // 블록 안의 무엇도 잃지 않는다. 블록은 mdoc(slotImage)이 고른 단독 그림 figure(Figure: 캡션이 있으면 캡션의 글·각주 참조 등도 함께)
+  // 또는 그림 하나를 감싼 링크 문단(막은 링크면 링크 없이 그림만)이다. 자리·cover·비율은 블록 안 img 의 class·data-split 에서 읽기만 한다.
   // mdoc 이 이미 슬라이드당 하나로 줄여 내지만, 표시가 둘 이상이면 두 번째부터 표시를 떼고 그림을 .fit 으로 둔다(화면 묶음 규칙으로 한 번 더).
-  function takePanel(g) {
-    const marked = g.blocks.filter(b => b.hasAttribute && b.hasAttribute("data-slide-panel"));
+  function takeSlot(g) {
+    const marked = g.blocks.filter(SLOT);
     for (const b of marked.slice(1)) {
       b.removeAttribute("data-slide-panel");
+      b.removeAttribute("data-slide-bg");
       const im = b.querySelector("img");
-      if (im) { im.classList.remove("img-left", "img-right", "img-fill"); im.removeAttribute("data-split"); im.classList.add("img-fit"); }
+      if (im) { im.classList.remove("img-left", "img-right", "img-full", "img-fill"); im.removeAttribute("data-split"); im.classList.add("img-fit"); }
     }
     const block = marked[0];
     if (!block) return null;
+    block.remove();
+    g.blocks = g.blocks.filter(b => b !== block);
     const im = block.querySelector("img");
+    if (block.hasAttribute("data-slide-bg")) return { kind: "bg", block, fill: !!im && im.classList.contains("img-fill") };
     const side = im && im.classList.contains("img-left") ? "left" : "right";
     const sp = im && im.getAttribute("data-split");
     const split = SPLITS.has(sp) ? sp : "1:1";
-    block.remove();
-    g.blocks = g.blocks.filter(b => b !== block);
-    return { block, side, split };
+    return { kind: "panel", block, side, split };
   }
 
   // notePage 는 노트 하나가 붙을 장(묶음 안 순번, 0부터)이다(#518). at·line 은 노트의 자리(groups 의 at, 노트 요소의 data-line),
@@ -182,6 +194,22 @@
     return e;
   }
 
+  // rowCaptions 는 가로 배치 문단(mdoc 이 class fit-row 를 단 맨 위 문단, #569)의 그림마다 그 아래 캡션 자리(span.fr-cap)를 단다 — 글은
+  // 그림의 title(mdoc 이 글자로 낸 값, textContent 로만 넣는다), 없으면 빈 자리(그림과 캡션이 같은 칸에 짝지어 놓이게). 그림(또는 그림을
+  // 감싼 링크) 바로 뒤에 더하기만 하고 블록을 다시 짜지 않는다. base.css 가 문단을 그림 줄·캡션 줄 두 줄의 격자로 놓고, 높이는 pager.js
+  // placeFit 이 건다. 캡션이 하나도 없으면 캡션 자리를 달지 않는다.
+  function rowCaptions(f) {
+    for (const p of f.querySelectorAll(":scope > p.fit-row")) {
+      const items = [...p.children].filter(c => c.matches("img.img-fit, a"));
+      if (!items.some(c => (c.matches("img") ? c : c.querySelector("img") || {}).title)) continue;
+      p.classList.add("fr-has-cap");
+      for (const c of items) {
+        const im = c.matches("img") ? c : c.querySelector("img");
+        c.after(el("span", "fr-cap", (im && im.title) || ""));
+      }
+    }
+  }
+
   // markFigures 는 쪽을 나누기 전 슬라이드 본문의 그림에 슬라이드 전용 class 를 단다(#550 — base.css 가 .page.slide 안에서만 고른다):
   //   no-cap  캡션(figcaption) 없는 사진 그림(img 하나) — 높이 상한이 본문 높이(캡션 자리 60px 를 남기지 않는다)
   //   fig-fit .fit 그림 하나뿐인 figure — 맨 위 블록이면 쪽 나눔기가 남은 높이를 채운다(pager.js placeFit), 다단 칸·목록 안이면 CSS 만
@@ -197,10 +225,12 @@
     }
   }
 
-  // panelBox 는 분할 그림 패널(.slide-panel) 하나다(#550). 첫 장은 표시된 블록을 그대로, 넘쳐 생긴 장은 그 블록의 사본(cloneNode, id 없이)을
-  // 담는다. 크기·자리는 base.css 가 쪽 class(panel-left·panel-right·split-*)로 정한다 — style 을 걸지 않는다.
-  function panelBox(p, copy) {
-    const box = el("div", "slide-panel");
+  // slotBox 는 분할 그림 패널(.slide-panel, #550)·배경(.slide-bg, #569) 하나다. 첫 장은 표시된 블록을 그대로, 넘쳐 생긴 장은 그 블록의
+  // 사본(cloneNode, id 없이)을 담는다. 크기·자리는 base.css 가 쪽 class(panel-left·panel-right·split-*·has-bg·bg-fill)로 정한다 — style 을
+  // 걸지 않는다.
+  function slotBox(p, copy) {
+    // 배경 cover 는 상자에도 fill 을 단다 — 테마 CSS 는 @scope (.page) 안이라 쪽 자신의 bg-fill 을 고르지 못하고 형제(.slide-bg.fill ~ …)로 고른다
+    const box = el("div", p.kind === "bg" ? "slide-bg" + (p.fill ? " fill" : "") : "slide-panel");
     const blk = copy ? p.block.cloneNode(true) : p.block;
     if (copy) for (const x of [blk, ...blk.querySelectorAll("[id]")]) x.removeAttribute("id");
     box.appendChild(blk);
@@ -306,11 +336,13 @@
         // 하나만 있는 슬라이드의 그 블록은 크게 — 쪽을 나누기 전에 붙여야 잰 크기와 그린 크기가 같다(뒤에 붙였더니 표가 넘쳐 잘렸다)
         if (g.kind === "single") for (const b of g.blocks) if (!b.matches(".pause")) b.classList.add("slide-only");
         markFigures(f);
+        rowCaptions(f);
         sub.appendChild(f);
         // 분할 그림이 있는 묶음(#550)은 쪽 class 로 글 영역을 반대쪽으로 좁힌다(base.css has-panel·panel-*·split-*) — 쪽을 나누기 전에
         // 걸어야 글 영역 폭으로 잰다(머리 높이 재기 probe 도 같은 class). 패널 자체는 나눈 뒤 장마다 붙인다(넘친 장도 반복).
         const cls = "slide k-" + g.kind + (g.title && g.kind !== "section" ? " has-head" : "") +
-          (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "");
+          (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
+          (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
         // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
         // 넘친 장의 머리에는 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(#482). 묶음의 쪽마다 같은 높이를 써야
         // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
@@ -365,7 +397,8 @@
             hd.appendChild(headClone(g.title, i > 0 && { k: i + 1, n: pages.length }));
             pg.insertBefore(hd, pg.firstChild);
           }
-          if (g.panel) pg.appendChild(panelBox(g.panel, i > 0));
+          if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));
+          if (g.bg) pg.insertBefore(slotBox(g.bg, i > 0), pg.firstChild); // 배경은 쪽의 첫 자식 — 머리·본문·바닥이 그 위에 그려진다
         });
       }
       const made = [...sub.querySelectorAll(":scope > .page")];
@@ -390,10 +423,14 @@
       pg.dataset.steps = String(kind === "title" ? 0 : steps(body, o.incremental));
       pg.dataset.slide = String(i + 1);
       pg.dataset.page = String(i + 1);
-      if (kind === "section" && body.children.length === 1) { body.classList.add("bare"); pg.classList.add("bare"); }
+      // 맨 구역 장(bare — 테마가 장식 면 위에 큰 제목을 놓는다)은 배경 그림 장이 아닐 때만. 배경 장에는 장식이 없어(아래) 그 모양을 쓰지 않는다(#569)
+      const hasBg = !!pg.querySelector(":scope > .slide-bg");
+      if (kind === "section" && body.children.length === 1 && !hasBg) { body.classList.add("bare"); pg.classList.add("bare"); }
       for (const x of [pg.querySelector(".page-header"), pg.querySelector(".page-footer")]) if (x) x.remove();
-      const deco = el("div", "slide-deco k-" + kind + (pg.classList.contains("bare") ? " bare" : ""));
-      pg.insertBefore(deco, pg.firstChild);
+      // 배경 그림 장(#569)에는 장식을 넣지 않는다 — 넓게 칠하는 장식이 그림을 가리고, DOM 에 두면 테마의 형제 선택자
+      // (.slide-deco.k-section ~ .page-body 들여쓰기 등)가 보이지 않는 장식 폭만큼 본문을 민다. 종류 class(k-*)는 그대로 단다.
+      if (!hasBg)
+        pg.insertBefore(el("div", "slide-deco k-" + kind + (pg.classList.contains("bare") ? " bare" : "")), pg.firstChild);
       body.classList.add("k-" + kind);
       const head = pg.querySelector(".slide-head");
       if (head) head.classList.add("k-" + kind);

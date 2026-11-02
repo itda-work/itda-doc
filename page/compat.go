@@ -22,10 +22,10 @@ import (
 //     우선순위를 바꾸지 않으니 모양이 같다), 사용자 테마는 그 엔진에서 쓰지 않는다 — 가두지 못하는 남의 CSS 는 받지 않는다.
 //     가두지 않은 꼴을 낼지는 Go 가 테마가 내장인지 보고 정한다. 화면은 그것을 고를 수 없다.
 
-// cssMode 는 엔진에 맞춘 테마 CSS 의 꼴이다.
-type cssMode struct {
-	unscoped       bool // @scope 를 모르는 엔진: 내장 테마를 가두지 않고 낸다
-	fakeNoRelColor bool // 시험: 상대 색을 모르는 엔진처럼 파생 토큰을 끈다
+// CSSMode 는 엔진에 맞춘 테마 CSS 의 꼴이다.
+type CSSMode struct {
+	Unscoped       bool // @scope 를 모르는 엔진: 내장 테마를 가두지 않고 낸다
+	FakeNoRelColor bool // 시험: 상대 색을 모르는 엔진처럼 파생 토큰을 끈다
 }
 
 const (
@@ -38,34 +38,36 @@ const (
 // 제품 동작에는 이 변수를 줄 때만 영향이 있다.
 const oldWebKitEnv = "ITDA_HYVE_DOCVIEW_OLD_WEBKIT"
 
-type oldWebKit struct{ noScope, noRelColor bool }
+// OldWebKit 은 흉내 내는 옛 WebKit 의 모자란 기능이다(NoScope: @scope 없음, NoRelColor: 상대 색 없음).
+type OldWebKit struct{ NoScope, NoRelColor bool }
 
-func fakeOldWebKit() oldWebKit { return parseOldWebKit(runtime.GOOS, os.Getenv(oldWebKitEnv)) }
+// FakeOldWebKit 은 이 실행의 옛 WebKit 흉내 값이다(oldWebKitEnv).
+func FakeOldWebKit() OldWebKit { return parseOldWebKit(runtime.GOOS, os.Getenv(oldWebKitEnv)) }
 
 // parseOldWebKit 은 흉내 변수를 읽는다. 옛 WebKit 은 macOS 의 일이다 — Windows(WebView2, Chromium)에서는 뜻이 없어 무시한다.
-func parseOldWebKit(goos, env string) oldWebKit {
-	var o oldWebKit
+func parseOldWebKit(goos, env string) OldWebKit {
+	var o OldWebKit
 	if goos != "darwin" {
 		return o
 	}
 	for f := range strings.SplitSeq(env, ",") {
 		switch strings.TrimSpace(f) {
 		case "scope":
-			o.noScope = true
+			o.NoScope = true
 		case "relcolor":
-			o.noRelColor = true
+			o.NoRelColor = true
 		case "all":
-			o.noScope, o.noRelColor = true, true
+			o.NoScope, o.NoRelColor = true, true
 		}
 	}
 	return o
 }
 
-// noScopeReason 은 @scope 를 모르는 엔진에서 사용자 테마를 쓰지 않는 까닭이다(목록에 보인다).
-const noScopeReason = "이 macOS 의 WebKit 이 오래돼(@scope 없음) 회사 테마를 쓸 수 없음 — macOS 또는 Safari 를 올리면 된다(Safari 17.4 이상)"
+// NoScopeReason 은 @scope 를 모르는 엔진에서 사용자 테마를 쓰지 않는 까닭이다(목록에 보인다).
+const NoScopeReason = "이 macOS 의 WebKit 이 오래돼(@scope 없음) 회사 테마를 쓸 수 없음 — macOS 또는 Safari 를 올리면 된다(Safari 17.4 이상)"
 
-// withoutUser 는 사용자 테마를 모두 "쓸 수 없음" 으로 돌린 묶음이다(@scope 를 모르는 엔진). 내장 테마는 그대로다.
-func (ts *Themes) withoutUser(why string) *Themes {
+// WithoutUser 는 사용자 테마를 모두 "쓸 수 없음" 으로 돌린 묶음이다(@scope 를 모르는 엔진). 내장 테마는 그대로다.
+func (ts *Themes) WithoutUser(why string) *Themes {
 	out := &Themes{byName: map[string]*Theme{}, alias: map[string]string{}, broken: map[string]string{}, Rev: ts.Rev}
 	maps.Copy(out.broken, ts.broken)
 	for _, n := range ts.order {

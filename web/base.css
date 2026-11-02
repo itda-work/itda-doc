@@ -146,6 +146,12 @@
   --slide-code-size: 14pt;
   --slide-lead-size: 27pt;
   --slide-bg: var(--paper);
+  /* 배경 그림 .full .fill 의 스크림(#569) — 바탕 색 + 위·아래를 더 어둡게 하는 안쪽 그림자. 반투명 linear-gradient 는 슬라이드 PDF(WKWebView
+     createPDF)에서 불투명 검정으로 찍혀(2026-11-02 실측) 그라데이션 대신 그림자로 아래쪽 어두운 그라데이션을 낸다 */
+  --slide-scrim: rgba(0, 0, 0, 0.4);
+  --slide-scrim-shade: inset 0 -260px 220px -60px rgba(0, 0, 0, 0.6), inset 0 160px 140px -60px rgba(0, 0, 0, 0.35);
+  --slide-scrim-ink: #ffffff;
+  --slide-scrim-muted: rgba(255, 255, 255, 0.82);
 
   --caption-size: 9pt;
   --caption-color: var(--muted);
@@ -714,6 +720,13 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .footnotes { font-size: 8.8pt; color: var(--quote-ink); margin-top: 14pt; }
 .footnotes hr { width: 30%; margin: 0 0 6pt; }
 .footnotes ol { padding-left: 1.4em; }
+/* 각주 번호 자릿수 맞춤(#575): 각주가 열 개 이상이면 mdoc(render.go footnoteList)이 <ol> 에 ol-d2…ol-d9 를 단다. 「10. 」부터는
+   1.4em 칸을 넘어 앞자리가 잘리므로 아래 본문 순서 목록과 같은 폭(자릿수 × 0.66em + 0.6em)으로 넓힌다. 특이도는 :where 로 위 .footnotes ol
+   과 같게(0,1,1) 두어 뒤에 있는 이쪽이 이기고, 테마(@scope)의 .footnotes ol 에는 진다. 아홉 개 이하는 class 가 없어 1.4em 그대로다 */
+.footnotes ol:where(.ol-d2) { padding-left: 1.92em; } .footnotes ol:where(.ol-d3) { padding-left: 2.58em; }
+.footnotes ol:where(.ol-d4) { padding-left: 3.24em; } .footnotes ol:where(.ol-d5) { padding-left: 3.9em; }
+.footnotes ol:where(.ol-d6) { padding-left: 4.56em; } .footnotes ol:where(.ol-d7) { padding-left: 5.22em; }
+.footnotes ol:where(.ol-d8) { padding-left: 5.88em; } .footnotes ol:where(.ol-d9) { padding-left: 6.54em; }
 .footnote-ref { font-size: 0.75em; vertical-align: super; line-height: 0; }
 .footnote-backref { display: none; }
 
@@ -814,6 +827,26 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .sf-num { font-weight: 600; letter-spacing: 0.04em; }
 :where(.page.slide .page-body > ul, .page.slide .page-body > ol) { padding-left: 1.3em; }
 :where(body.list-gongmun .page.slide .page-body > ol:not(.footnotes ol)) { padding-left: var(--list-indent-gongmun); }
+/* 번호 자릿수 맞춤 들여쓰기(#575). 번호(::marker)는 바깥 들여쓰기 칸에 그려지고 .page-body 가 그 밖을 잘라(overflow: clip) 칸보다
+   넓은 번호는 앞자리가 잘렸다(실측: 슬라이드 1.3em 은 두 자리, A4 1.6em 은 세 자리부터 — A4 두 자리도 넓은 숫자 「99. 」는 계산상
+   약 1.76em 이라 넘쳐 ol-d2 부터 넓힌다). mdoc 이 가장 큰 번호가 두 자리 이상인 <ol> 에만
+   ol-d2…ol-d9 를 달고(internal/mdoc/transform.go olDigits — 아홉 자리 이상은 ol-d9), 여기서 그 목록의 들여쓰기를
+   max(원래 들여쓰기 토큰, 번호 칸 폭)으로 넓힌다. 한 자리 목록은 class 가 없어 위 규칙 그대로다.
+   번호 칸 폭 = 자릿수 × 0.66em(Pretendard 굵은 꼴 숫자 폭 상한) + 뒤 글자 몫 — 「N. 」 0.6em, 공문 사다리는 「(N) 」 꼴까지 1.1em.
+   위 슬라이드 맨 위 목록 규칙(1.3em)보다 뒤에 두어 A4·슬라이드에 같은 폭을 건다(두 자리 이상 폭은 --list-indent 기본 1.6em 보다
+   넓어 슬라이드 기준 1.3em 과 결과가 같다). :where 라 특이도 0 — 목록을 제 모양으로 그리는 테마(spine 의 원 번호 등)가 이긴다 */
+:where(.page-body ol.ol-d2) { padding-left: max(var(--list-indent), 1.92em); } :where(.page-body ol.ol-d3) { padding-left: max(var(--list-indent), 2.58em); }
+:where(.page-body ol.ol-d4) { padding-left: max(var(--list-indent), 3.24em); } :where(.page-body ol.ol-d5) { padding-left: max(var(--list-indent), 3.9em); }
+:where(.page-body ol.ol-d6) { padding-left: max(var(--list-indent), 4.56em); } :where(.page-body ol.ol-d7) { padding-left: max(var(--list-indent), 5.22em); }
+:where(.page-body ol.ol-d8) { padding-left: max(var(--list-indent), 5.88em); } :where(.page-body ol.ol-d9) { padding-left: max(var(--list-indent), 6.54em); }
+:where(body.list-gongmun .page-body ol.ol-d2:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 2.42em); }
+:where(body.list-gongmun .page-body ol.ol-d3:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 3.08em); }
+:where(body.list-gongmun .page-body ol.ol-d4:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 3.74em); }
+:where(body.list-gongmun .page-body ol.ol-d5:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 4.4em); }
+:where(body.list-gongmun .page-body ol.ol-d6:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 5.06em); }
+:where(body.list-gongmun .page-body ol.ol-d7:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 5.72em); }
+:where(body.list-gongmun .page-body ol.ol-d8:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 6.38em); }
+:where(body.list-gongmun .page-body ol.ol-d9:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 7.04em); }
 .page.slide .page-body li { margin: 6pt 0; }
 /* 하위 목록(#430): 단계마다 작게·촘촘하게 — 2단계 0.88em·항목 간격 3pt, 3·4단계 0.92em(바로 위 단계 기준)·2pt, 5단계부터는 더
    줄이지 않는다(하한 = 바깥 목록 글자의 0.88×0.92×0.92 ≈ 0.74). em 이라 표·각주 안의 목록도 그 글자에 비례하고 들여쓰기(em)도
@@ -858,6 +891,48 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .page.slide > .slide-panel img { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; /* 블록을 고치지 않고 옮긴다 — width 속성(CSP 가 막는 style)이 남아도 패널 폭 */ max-width: none; max-height: none; object-fit: contain; }
 .page.slide > .slide-panel img.img-fill { object-fit: cover; }
 .page.slide > .slide-panel figcaption { flex: none; padding: 6pt 12pt 8pt; font-size: calc(13pt * var(--slide-scale)); color: var(--muted); text-align: center; line-height: 1.4; }
+/* 배경 그림(#569): mdoc 이 표시한(data-slide-bg) 맨 위 블록을 쪽의 첫 자식 .slide-bg 로 통째로 옮겨 슬라이드 전체(제목 띠 포함)를 채운다.
+   머리·본문·바닥은 DOM 차례로 그 위에 그려진다. 배경 장에는 테마 장식(.slide-deco)을 넣지 않는다(slides.js).
+   .full 은 비율 유지(contain — 남는 자리는 슬라이드 바탕), .full .fill 은 cover(잘림) + 스크림(--slide-scrim)·밝은 글(--slide-scrim-ink·
+   --slide-scrim-muted). 캡션(Figure:·title)은 바닥글 위 오른쪽에 작게 */
+.page.slide > .slide-bg { position: absolute; inset: 0; z-index: 0; display: flex; flex-direction: column; overflow: hidden; }
+.page.slide > .slide-bg > * { flex: 1 1 0; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.page.slide > .slide-bg > * > a { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.page.slide > .slide-bg img { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; max-width: none; max-height: none; object-fit: contain; }
+.page.slide > .slide-bg img.img-fill { object-fit: cover; }
+.page.slide > .slide-bg figcaption { position: absolute; z-index: 1; right: var(--slide-pad-x); bottom: calc(var(--slide-pad-bottom) - 14pt); max-width: 50%; margin: 0;
+  font-size: calc(11pt * var(--slide-scale)); color: var(--muted); text-align: right; line-height: 1.3; }
+.page.slide.bg-fill > .slide-bg::after { content: ""; position: absolute; inset: 0; background: var(--slide-scrim); box-shadow: var(--slide-scrim-shade); pointer-events: none; }
+/* 스크림 위 밝은 글은 바탕 없는 글에만(#569 리뷰 2회차 결정): 쪽 머리 제목과 본문의 맨 위 글 블록(.page-body 의 직접 자식 제목·문단·목록·
+   정의 목록·구역 제목)과 그 안의 굵은 글·링크·목록 기호. 인용·알림·상자(.box·.lead)·표·코드처럼 제 바탕이 있는 블록은 고르지 않아 테마 색 그대로다
+   (.page-body 전체에 상속시키지 않는다 — 밝은 바탕 상자 안에서 흰 글이 된다) */
+.page.slide.bg-fill > .slide-head .slide-title,
+.page.slide.bg-fill > .page-body > :is(p, ul, ol, dl, h1, h2, h3, h4, h5, h6, .slide-section),
+.page.slide.bg-fill > .page-body > :is(p, ul, ol, dl, h1, h2, h3, h4, h5, h6, .slide-section) :is(strong, a, .ss-title):not(:is(pre, table, blockquote, .markdown-alert, .box, .lead) *) { color: var(--slide-scrim-ink); }
+/* 맨 위 목록·정의 목록 항목 안에 든 바탕 있는 블록(코드 상자·표·인용·알림·상자)은 항목의 밝은 글을 물려받지 않게 테마 글자 색으로 되돌린다.
+   특이도 0,1,0 이라 테마·base 가 그 블록에 정한 글자 색(.page-body blockquote 의 --quote-ink 등)이 이긴다 */
+:where(.page.slide.bg-fill > .page-body > :is(ul, ol, dl)) :is(pre, table, blockquote, .markdown-alert, .box, .lead) { color: var(--ink); }
+/* 링크 밑줄·목록 기호(테마 --link·--accent 는 어두운 그림 위에서 묻힌다) */
+.page.slide.bg-fill > .page-body > :is(p, ul, ol, dl, h1, h2, h3, h4, h5, h6) a:not(:is(pre, table, blockquote, .markdown-alert, .box, .lead) *) { text-decoration-color: var(--slide-scrim-muted); }
+.page.slide.bg-fill > .page-body > :is(ul, ol) li::marker { color: var(--slide-scrim-muted); }
+/* 밝아진 글 블록 안의 인라인 코드는 제 밝은 바탕(--code-bg)이 있다 — 테마 글자 색으로 되돌린다(특이도 0,0,3 이라 테마가 .page-body code 처럼 정한 색이 있으면 그쪽이 이긴다. 코드 상자 안 code 는 빼 pre 의 글자 색 — 목록 안이면 위 되돌림의 --ink — 을 물려받는다) */
+:where(.page.slide.bg-fill > .page-body > :is(p, ul, ol, dl, h1, h2, h3, h4, h5, h6)) code:not(pre code) { color: var(--ink); }
+/* 테마 색으로 남는 표(맨 위·목록 항목 안)는 읽히는 바탕 위에 — 바탕 없는 행(줄무늬 사이)이 스크림 위 먹색이 되지 않게 종이색 판을 깐다. 특이도 0 이라 테마가 표에
+   바탕을 정하면 그쪽이 이기고, 머리 칸·줄무늬 행은 칸 바탕이라 그 위에 그대로 그려진다. 바탕 토큰이 투명인 상자(.box·.lead)는 그 테마 CSS 가
+   스크림 장 범위로 토큰을 덮는다(compact·mono·bold) */
+:where(.page.slide.bg-fill > .page-body > table, .page.slide.bg-fill > .page-body > :is(ul, ol, dl) table) { background: var(--paper); }
+.page.slide.bg-fill > .slide-head .slide-cont, .page.slide.bg-fill > .slide-foot, .page.slide.bg-fill > .slide-foot :is(.sf-num, .sf-text),
+.page.slide.bg-fill > .slide-bg figcaption { color: var(--slide-scrim-muted); }
+.page.slide.bg-fill > .slide-head .slide-title, .page.slide.bg-fill > .slide-foot { border-color: var(--slide-scrim-muted); } /* 테마가 먹색으로 그은 제목 밑줄·바닥 줄(mono) */
+/* 가로 배치(#569): mdoc 이 class fit-row 를 단 맨 위 문단(.fit 그림 2장 이상만)을 그림 줄·캡션 줄 격자로 놓는다 — 그림 하나가 한 칸,
+   캡션(slides.js rowCaptions 의 span.fr-cap)은 그 아래. 그림 높이·너비는 pager.js sizeRow 가 건다(아래 높이는 나누기 전 잴 때의 자리) */
+.page.slide .page-body > p.fit-row { display: grid; grid-auto-flow: column; grid-template-rows: auto; justify-content: center; align-items: end;
+  column-gap: 14pt; row-gap: 4pt; margin: 6pt 0; line-height: 0; }
+.page.slide .page-body > p.fit-row.fr-has-cap { grid-template-rows: auto auto; align-items: start; }
+.page.slide .page-body > p.fit-row > br { display: none; }
+.page.slide .page-body > p.fit-row > a { display: block; line-height: 0; }
+.page.slide .page-body > p.fit-row img.img-fit { display: block; width: auto; height: calc(var(--body-h, 200mm) * 0.3); max-width: none; max-height: none; object-fit: contain; }
+.page.slide .page-body > p.fit-row > .fr-cap { display: block; contain: inline-size; font-size: calc(13pt * var(--slide-scale)); color: var(--caption-color); text-align: center; line-height: 1.3; }
 .page.slide .footnotes { font-size: calc(13pt * var(--slide-scale)); }
 .page.slide .page-body > :is(ul, ol) > li::marker { color: var(--accent); }
 

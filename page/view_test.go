@@ -169,7 +169,7 @@ func hasCode(v View, code string) bool {
 func TestEditorTokensOnlyInAppRender(t *testing.T) {
 	src := []byte("```go\nfmt.Println(\"hello\")\n```\n")
 	v := renderView(src, "/a/b.md", "", builtin(t), "", false)
-	if len(v.editorTokens) != 1 || len(v.EditorTokens) != 0 {
+	if len(v.EditorCodeBlocks()) != 1 || len(v.EditorTokens) != 0 {
 		t.Fatalf("View 토큰 경계: %+v", v)
 	}
 	data, err := json.Marshal(v)

@@ -657,7 +657,8 @@ func TestNestingLinear(t *testing.T) {
 		// 닫는 줄을 안쪽에 넘기는 길(#139): 목록 안 컨테이너를 닫는 줄, 안쪽까지 닿지 못해 넘긴 컨테이너가 받는 줄, 목록 안 펜스 코드
 		":::a\n- :::b\n  :::\n", ":::a\n- :::b\n  x\n:::\n", ":::a\n> - ```\n>   :::\n", "1. :::a\n   - :::b\n     :::\n",
 	} {
-		assertLinear(t, unit, repeatTo(unit), 300*time.Millisecond)
+		// 상한 600ms: `- :::box` 류 512KB 가 GitHub 러너에서 340~410ms(256KB 150~200ms — 선형).
+		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
 	}
 	// 64겹 바로 아래(깊이를 꽉 채운 큰 문서 — 보통 렌더)도 선형이다
 	full := func(head, unit string) func(int) string {
@@ -671,7 +672,8 @@ func TestNestingLinear(t *testing.T) {
 		if r := render(t, gen(64_000)); isRaw(r) {
 			t.Fatalf("%s: 64겹인데 안전 모드", name)
 		}
-		assertLinear(t, name, gen, 300*time.Millisecond)
+		// 상한 600ms: 「64겹 ::: 안 본문」 512KB 가 GitHub 러너에서 460ms.
+		assertLinear(t, name, gen, 600*time.Millisecond)
 	}
 	// 앞에 무엇이 오든 깊은 ::: 는 안전 모드다(#126 R6 의 접두들 — 실제로 연 겹만 센다)
 	for _, pre := range []string{"", "> ```\n\n", "    ```\n\n", "```\n```\n\n", "$$\n$$\n\n", "<div>\n\n", "> :::box\n\n", "- a\n\n  ```\n\n"} {

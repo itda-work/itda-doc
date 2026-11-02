@@ -155,7 +155,7 @@ func TestUserThemeFolder(t *testing.T) {
 			t.Error("내줄 때 디스크를 다시 읽음")
 		}
 	}
-	if userThemesStamp(dir) == userThemesStamp(filepath.Join(dir, "none")) {
+	if UserThemesStamp(dir) == UserThemesStamp(filepath.Join(dir, "none")) {
 		t.Error("지문이 폴더를 구별하지 못함")
 	}
 }
@@ -163,11 +163,11 @@ func TestUserThemeFolder(t *testing.T) {
 // 폴더가 바뀌면 지문이 바뀐다(감시가 다시 읽는 근거).
 func TestUserThemesStamp(t *testing.T) {
 	dir := t.TempDir()
-	s0 := userThemesStamp(dir)
+	s0 := UserThemesStamp(dir)
 	writeTree(t, dir, map[string]string{"a/theme.json": `{}`})
-	s1 := userThemesStamp(dir)
+	s1 := UserThemesStamp(dir)
 	writeTree(t, dir, map[string]string{"a/theme.css": `.page-body h1 { color: red }`})
-	s2 := userThemesStamp(dir)
+	s2 := UserThemesStamp(dir)
 	if s0 == s1 || s1 == s2 {
 		t.Errorf("지문이 바뀌지 않음: %s %s %s", s0, s1, s2)
 	}
@@ -176,7 +176,7 @@ func TestUserThemesStamp(t *testing.T) {
 	// 그래서 바뀌지 않는 폴더를 연달아 잰 두 지문이 (잠깐 뒤에는) 같은지를 본다.
 	same := false
 	for range 50 {
-		if s := userThemesStamp(dir); userThemesStamp(dir) == s {
+		if s := UserThemesStamp(dir); UserThemesStamp(dir) == s {
 			same = true
 			break
 		}
@@ -203,7 +203,7 @@ func TestThemeCSSConfinement(t *testing.T) {
 		t.Fatal(err)
 	}
 	th, _ := ts.Get("x")
-	css := th.StyleSheet(cssMode{})
+	css := th.StyleSheet(CSSMode{})
 	scope := strings.Index(css, "@scope (.page) {")
 	font := strings.Index(css, "@font-face")
 	if scope < 0 || font < 0 || font > scope || !strings.HasSuffix(strings.TrimSpace(css), "}") {
@@ -306,7 +306,7 @@ func TestBuiltinThemesAreScoped(t *testing.T) {
 	ts := builtin(t)
 	for _, i := range ts.List() {
 		th, _ := ts.Get(i.Name)
-		css := th.StyleSheet(cssMode{})
+		css := th.StyleSheet(CSSMode{})
 		if !strings.Contains(css, "@scope (.page) {\n/* ---- ") {
 			t.Errorf("%s: 테마 CSS 가 @scope 안에 있지 않음", i.Name)
 		}
@@ -335,7 +335,7 @@ func TestCreateUserTheme(t *testing.T) {
 	logo := filepath.Join(parent, "logo.svg")
 	_ = os.WriteFile(logo, []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), 0o644)
 	req := NewTheme{Name: "ACME 보고서", Base: "classic", Accent: "#C8102E", Organization: "에이크미 주식회사", Logo: true}
-	id, err := createUserTheme(dir, ts, req, logo)
+	id, err := CreateUserTheme(dir, ts, req, logo)
 	if err != nil || id != "acme-보고서" {
 		t.Fatalf("만들기: %q %v", id, err)
 	}
@@ -351,7 +351,7 @@ func TestCreateUserTheme(t *testing.T) {
 	if th.Title != "ACME 보고서" || th.Extends != "classic" || th.Defaults["organization"] != "에이크미 주식회사" || th.LogoURL == "" {
 		t.Errorf("만든 테마: %+v", th)
 	}
-	if !strings.Contains(th.StyleSheet(cssMode{}), "--accent: #c8102e;") {
+	if !strings.Contains(th.StyleSheet(CSSMode{}), "--accent: #c8102e;") {
 		t.Error("강조색 토큰이 없음")
 	}
 	// 조직 이름은 문서에 organization 이 없을 때 표지·머리글에 쓰인다(글자로)
@@ -363,7 +363,7 @@ func TestCreateUserTheme(t *testing.T) {
 	}
 	// 같은 이름 다시 → 덮어쓰지 않는다
 	before, _ := os.ReadFile(filepath.Join(dir, id, "theme.json"))
-	if _, err := createUserTheme(dir, ts, NewTheme{Name: "acme 보고서", Base: "mono", Accent: "#000000"}, ""); err == nil {
+	if _, err := CreateUserTheme(dir, ts, NewTheme{Name: "acme 보고서", Base: "mono", Accent: "#000000"}, ""); err == nil {
 		t.Error("있는 테마를 덮어씀")
 	}
 	if after, _ := os.ReadFile(filepath.Join(dir, id, "theme.json")); string(after) != string(before) {
@@ -371,7 +371,7 @@ func TestCreateUserTheme(t *testing.T) {
 	}
 	// 디스크에는 있지만 아직 읽지 않은 폴더도 덮어쓰지 않는다(경쟁)
 	_ = os.MkdirAll(filepath.Join(dir, "race"), 0o755)
-	if _, err := createUserTheme(dir, ts, NewTheme{Name: "race", Base: "classic", Accent: "#000000"}, ""); err == nil || !strings.Contains(err.Error(), "덮어쓰지") {
+	if _, err := CreateUserTheme(dir, ts, NewTheme{Name: "race", Base: "classic", Accent: "#000000"}, ""); err == nil || !strings.Contains(err.Error(), "덮어쓰지") {
 		t.Errorf("있는 폴더: %v", err)
 	}
 	cases := map[string]NewTheme{
@@ -387,11 +387,11 @@ func TestCreateUserTheme(t *testing.T) {
 		"폴더 탈출":   {Name: "../escape", Base: "classic", Accent: "#000000"},
 	}
 	for name, c := range cases {
-		if _, err := createUserTheme(dir, ts, c, ""); err == nil {
+		if _, err := CreateUserTheme(dir, ts, c, ""); err == nil {
 			t.Errorf("%s: 거부해야 함", name)
 		}
 	}
-	if _, err := createUserTheme("", ts, NewTheme{Name: "z", Base: "classic", Accent: "#000000"}, ""); err == nil {
+	if _, err := CreateUserTheme("", ts, NewTheme{Name: "z", Base: "classic", Accent: "#000000"}, ""); err == nil {
 		t.Error("폴더 없이 만듦")
 	}
 	// 쓴 곳은 사용자 테마 폴더 안뿐이다
@@ -408,20 +408,20 @@ func TestCreateUserTheme(t *testing.T) {
 	// 로고: 그림이 아닌 것·링크·너무 큰 것은 받지 않는다
 	txt := filepath.Join(parent, "a.txt")
 	_ = os.WriteFile(txt, []byte("x"), 0o644)
-	if _, _, err := readLogo(txt); err == nil {
+	if _, _, err := ReadLogo(txt); err == nil {
 		t.Error("그림이 아닌 로고를 받음")
 	}
 	huge := filepath.Join(parent, "huge.png")
 	hf, _ := os.Create(huge)
 	_ = hf.Truncate(maxLogo + 1)
 	hf.Close()
-	if _, _, err := readLogo(huge); err == nil {
+	if _, _, err := ReadLogo(huge); err == nil {
 		t.Error("너무 큰 로고를 받음")
 	}
 	if runtime.GOOS != "windows" {
 		ln := filepath.Join(parent, "ln.svg")
 		_ = os.Symlink(logo, ln)
-		if _, _, err := readLogo(ln); err == nil {
+		if _, _, err := ReadLogo(ln); err == nil {
 			t.Error("링크인 로고를 받음")
 		}
 	}
@@ -445,7 +445,7 @@ func TestSampleCompanyTheme(t *testing.T) {
 	if th.Extends != "classic" || th.LogoURL == "" || th.Defaults["organization"] == "" || th.Template == "" || th.Fonts != "" {
 		t.Errorf("견본 acme: %+v", th)
 	}
-	css := th.StyleSheet(cssMode{})
+	css := th.StyleSheet(CSSMode{})
 	if i := strings.Index(css, "@scope (.page) {"); i < 0 || !strings.Contains(css[i:], ".confidential {") {
 		t.Errorf("자기 어휘 confidential 이 @scope 안에 없음\n%s", css)
 	}

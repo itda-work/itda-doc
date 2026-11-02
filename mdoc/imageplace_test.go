@@ -27,6 +27,12 @@ func TestImagePlace(t *testing.T) {
 		{"left fit", "![](a.png){.fit .left}\n", []string{`class="img-left"`}, []string{"img-fit"}, 0},
 		{"모르는 클래스", "![](a.png){.fit .big}\n", []string{`class="img-fit"`}, []string{"big"}, 1},
 		{"모르는 키", "![](a.png){width=10% height=20%}\n", []string{`style="width:10%"`}, []string{"height", "class="}, 1},
+		{"full", "![](a.png){.full}\n", []string{`class="img-full"`}, []string{"img-fill"}, 0},
+		{"full fill", "![](a.png){.full .fill}\n", []string{`class="img-full img-fill"`}, nil, 0},
+		{"full fit", "![](a.png){.fit .full}\n", []string{`class="img-full"`}, []string{"img-fit"}, 0},
+		{"full left 는 먼저 적은 쪽", "![](a.png){.full .left}\n", []string{`class="img-full"`}, []string{"img-left"}, 1},
+		{"full split", "![](a.png){.full split=1:2}\n", []string{`class="img-full"`}, []string{"data-split"}, 1},
+		{"속성 full 이 alt 지시를 덮음", "![left](a.png){.full}\n", []string{`alt="" class="img-full"`}, []string{"img-fill", "img-left"}, 0},
 		{"id", "![](a.png){#x .left}\n", []string{`class="img-left"`}, []string{`id="x"`}, 1},
 		{"width 만은 그대로", "![](a.png){width=40%}\n", []string{`<img src="a.png" alt="" style="width:40%">`}, nil, 0},
 		// Deckset alt 지시 — alt 전체가 지시 낱말일 때만, alt 는 비운다
@@ -35,7 +41,10 @@ func TestImagePlace(t *testing.T) {
 		{"deckset left fit", "![left fit](a.png)\n", []string{`alt="" class="img-left"`}, []string{"img-fill"}, 0},
 		{"deckset fit right", "![fit right](a.png)\n", []string{`alt="" class="img-right"`}, nil, 0},
 		{"deckset inline", "![inline](a.png)\n", []string{`<img src="a.png" alt="">`}, []string{"class="}, 0},
-		{"deckset fit 단독", "![fit](a.png)\n", []string{`<img src="a.png" alt="">`}, []string{"class="}, 1},
+		{"deckset fit 단독은 배경(#569)", "![fit](a.png)\n", []string{`<img src="a.png" alt="" class="img-full">`}, nil, 0},
+		{"deckset 대문자 Fit 은 대체 글", "![Fit](a.png)\n", []string{`alt="Fit"`}, []string{"class=", "data-slide-bg"}, 0},
+		{"deckset fit + fill 속성", "![fit](a.png){.fill}\n", []string{`alt="" class="img-full img-fill"`}, nil, 0},
+		{"deckset fit filtered", "![fit filtered](a.png)\n", []string{`<img src="a.png" alt="">`}, []string{"class="}, 1},
 		{"deckset filtered", "![left filtered](a.png)\n", []string{`<img src="a.png" alt="">`}, []string{"class="}, 1},
 		{"deckset 50%", "![50%](a.png)\n", []string{`<img src="a.png" alt="">`}, nil, 1},
 		{"보통 alt", "![left side](a.png)\n", []string{`alt="left side"`}, []string{"class="}, 0},
@@ -137,6 +146,76 @@ func TestImagePlacePerSlide(t *testing.T) {
 	for _, w := range []string{`type="checkbox"`, `checked`, `<a href="https://example.com"><img src="a.png" alt="" class="img-fit"></a>`, "검토 완료 설명"} {
 		if !strings.Contains(r.HTML, w) {
 			t.Errorf("체크박스 입력: %q 없음\n%s", w, r.HTML)
+		}
+	}
+}
+
+// 배경 그림(.full, #569)의 판정: 분할 패널과 같은 「단독 줄만」 규칙이고, 그림 자리(패널·배경)는 합쳐 슬라이드당 하나 — 먼저 적은 쪽.
+// 가로 배치(fit-row)는 맨 위 문단이 .fit 그림 2장 이상(링크로 감싼 그림 포함)만으로 되어 있을 때다.
+func TestSlideBackgroundAndRow(t *testing.T) {
+	const notSole, second, mixed, row = "그림 하나뿐인 줄에서만 배경", "배경 그림(.full)은 슬라이드당 하나", "합쳐 슬라이드당 하나", "가로 배치는"
+	cases := []struct {
+		name, src     string
+		bgs, panels   int
+		rows          int
+		warns         []string // 배치 경고 조각(차례대로)
+		fits          int      // 결과의 img-fit 수
+		want, notWant []string
+	}{
+		{"그림 문단", "## 가\n\n![](a.png){.full}\n\n- 글\n", 1, 0, 0, nil, 0, []string{`<figure data-slide-bg="1" data-line="3">`}, nil},
+		{"cover", "## 가\n\n![](a.png){.full .fill}\n", 1, 0, 0, nil, 0, []string{`class="img-full img-fill"`}, nil},
+		{"Deckset fit", "## 가\n\n![fit](a.png)\n", 1, 0, 0, nil, 0, []string{`alt="" class="img-full"`}, nil},
+		{"대문자 Fit 은 보통 그림", "## 가\n\n![Fit](a.png)\n", 0, 0, 0, nil, 0, []string{`alt="Fit"`}, []string{"img-full"}},
+		{"캡션 문단과 함께", "## 가\n\n![](a.png){.full}\n\nFigure: 캡션\n", 1, 0, 0, nil, 0, []string{"<figcaption>캡션</figcaption>"}, nil},
+		{"링크 문단", "## 가\n\n[![](a.png){.full}](https://example.com)\n", 1, 0, 0, nil, 0, []string{`<p data-slide-bg="1" data-line="3"><a href="https://example.com">`}, nil},
+		{"제목 없는 장(가로줄 뒤)", "## 가\n\n글\n\n---\n\n![](a.png){.full}\n", 1, 0, 0, nil, 0, nil, nil},
+		{"둘째 배경", "## 가\n\n![](a.png){.full}\n\n![](b.png){.full .fill}\n", 1, 0, 0, []string{second}, 1, nil, nil},
+		{"다른 슬라이드", "## 가\n\n![](a.png){.full}\n\n## 나\n\n![](b.png){.full}\n", 2, 0, 0, nil, 0, nil, nil},
+		{"분할 뒤 배경", "## 가\n\n![](a.png){.left}\n\n![](b.png){.full}\n", 0, 1, 0, []string{mixed}, 1, nil, nil},
+		{"배경 뒤 분할", "## 가\n\n![](a.png){.full}\n\n![](b.png){.right}\n", 1, 0, 0, []string{mixed}, 1, nil, nil},
+		{"목록 안", "## 가\n\n- ![](a.png){.full}\n", 0, 0, 0, []string{notSole}, 1, nil, nil},
+		{"글과 섞인 문단", "## 가\n\n글 ![](a.png){.full}\n", 0, 0, 0, []string{notSole}, 1, nil, nil},
+		{"다단 칸 안", "## 가\n\n::::columns\n:::column\n![](a.png){.full}\n:::\n::::\n", 0, 0, 0, []string{notSole}, 1, nil, nil},
+		{"노트 안", "## 가\n\n:::notes\n![](n.png){.full}\n:::\n\n![](a.png){.full}\n", 1, 0, 0, []string{notSole}, 1, nil, nil},
+		{"각주 안", "## 가\n\n글[^1]\n\n[^1]: ![](b.png){.full}\n", 0, 0, 0, []string{notSole}, 1, nil, nil},
+		// 가로 배치
+		{"가로 둘", "## 가\n\n![](a.png){.fit} ![](b.png){.fit}\n", 0, 0, 1, nil, 2, []string{`<p class="fit-row" data-line="3">`}, nil},
+		{"가로 셋 줄바꿈·링크·캡션", "## 가\n\n![](a.png \"가\"){.fit}\n[![](b.png){.fit}](https://example.com)\n![](c.png \"다\"){.fit}\n", 0, 0, 1, nil, 3, []string{`title="가"`, `<a href="https://example.com"><img src="b.png" alt="" class="img-fit"></a>`}, nil},
+		{"가로 강제 줄바꿈", "## 가\n\n![](a.png){.fit}  \n![](b.png){.fit}\n", 0, 0, 1, nil, 2, nil, nil},
+		{"Deckset 은 가로 아님(배경 둘)", "## 가\n\n![fit](a.png) ![fit](b.png)\n", 0, 0, 0, []string{notSole, notSole}, 2, nil, []string{"fit-row"}},
+		{"글이 섞임", "## 가\n\n![](a.png){.fit} 글 ![](b.png){.fit}\n", 0, 0, 0, []string{row}, 2, nil, []string{"fit-row"}},
+		{"보통 그림이 섞임", "## 가\n\n![](a.png){.fit} ![](b.png){.fit} ![](c.png)\n", 0, 0, 0, []string{row}, 2, nil, []string{"fit-row"}},
+		{"분할 그림이 섞임", "## 가\n\n![](a.png){.fit} ![](b.png){.fit} ![](c.png){.left}\n", 0, 0, 0, []string{row, "그림 하나뿐인 줄에서만 패널"}, 3, nil, []string{"fit-row"}},
+		{"배경 그림이 섞임", "## 가\n\n![](a.png){.fit} ![](b.png){.fit} ![](c.png){.full}\n", 0, 0, 0, []string{row, notSole}, 3, nil, []string{"fit-row"}},
+		{"링크에 글", "## 가\n\n![](a.png){.fit} [![](b.png){.fit} 설명](https://example.com)\n", 0, 0, 0, []string{row}, 2, nil, []string{"fit-row"}},
+		{"한 장은 가로 아님", "## 가\n\n[![](a.png){.fit}](https://example.com) 글\n", 0, 0, 0, nil, 1, nil, []string{"fit-row"}},
+		{"다단 칸 안은 가로 아님", "## 가\n\n::::columns\n:::column\n![](a.png){.fit} ![](b.png){.fit}\n:::\n::::\n", 0, 0, 0, nil, 2, nil, []string{"fit-row"}},
+		{"가로 + 배경 한 장", "## 가\n\n![](bg.png){.full .fill}\n\n![](a.png){.fit} ![](b.png){.fit}\n", 1, 0, 1, nil, 2, nil, nil},
+	}
+	for _, c := range cases {
+		r := render(t, c.src)
+		var ws []Warning
+		for _, w := range r.Warnings {
+			if w.Code == WarnBadAttribute {
+				ws = append(ws, w)
+			}
+		}
+		bgs := strings.Count(r.HTML, `data-slide-bg="1"`)
+		panels := strings.Count(r.HTML, `data-slide-panel="1"`)
+		rows := strings.Count(r.HTML, `class="fit-row"`)
+		fits := strings.Count(r.HTML, `class="img-fit"`)
+		ok := bgs == c.bgs && panels == c.panels && rows == c.rows && fits == c.fits && len(ws) == len(c.warns)
+		for i := 0; ok && i < len(c.warns); i++ {
+			ok = strings.Contains(ws[i].Message, c.warns[i])
+		}
+		for _, w := range c.want {
+			ok = ok && strings.Contains(r.HTML, w)
+		}
+		for _, w := range c.notWant {
+			ok = ok && !strings.Contains(r.HTML, w)
+		}
+		if !ok {
+			t.Errorf("%s: 배경 %d·패널 %d·가로 %d·fit %d, 기대 %d·%d·%d·%d, 경고 %q\n%s %+v", c.name, bgs, panels, rows, fits, c.bgs, c.panels, c.rows, c.fits, c.warns, r.HTML, r.Warnings)
 		}
 	}
 }

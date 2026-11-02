@@ -12,11 +12,12 @@ import (
 	"github.com/yuin/goldmark/extension"
 )
 
-// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~256KB) 렌더해 두 배마다 비용이 세 배(+5ms)를 넘지 않는지 본다(이차면 네 배).
-// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 그 쌍을 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
+// assertLinear 는 gen(size) 를 크기 두 배씩(64KB~512KB) 렌더해 512KB 의 비용이 64KB 의 27배(3³, +3×5ms)를 넘지 않고 연속한 두 쌍이
+// 모두 세 배(+5ms)를 넘지 않는지 본다(timingtest judge — 이차면 64배).
+// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
 func assertLinear(t *testing.T, name string, gen func(size int) string, limit time.Duration) {
 	t.Helper()
-	timingtest.AssertDoubling(t, name, []int{64_000, 128_000, 256_000}, renderWork(t, gen),
+	timingtest.AssertDoubling(t, name, []int{64_000, 128_000, 256_000, 512_000}, renderWork(t, gen),
 		timingtest.Doubling{Reps: 2, Slack: 5 * time.Millisecond, Limit: limit})
 }
 
@@ -39,7 +40,8 @@ func repeatTo(unit string) func(int) string {
 // 강조 구분자 수 상한(cjk.go). 고치기 전: 짝이 될 수 없는 구분자가 번갈아 쌓인 `_a*` 반복 128KB 가 9초(순수 goldmark 도 같다).
 func TestDelimiterLimit(t *testing.T) {
 	for _, unit := range []string{"_a*", "*a_", "~# *", "#_1*", "*a", "_a", "~a*"} {
-		assertLinear(t, unit, repeatTo(unit), 300*time.Millisecond)
+		// 상한 600ms: 러너 값 `_a*` 318ms·`~a*` 305ms(512KB, run 41482219991).
+		assertLinear(t, unit, repeatTo(unit), 600*time.Millisecond)
 	}
 	// 상한까지는 그대로 강조, 넘는 것은 글자(원문 그대로) + 경고 한 번
 	r := render(t, strings.Repeat("*a* ", MaxDelimitersPerBlock))
@@ -102,7 +104,8 @@ func TestNestingLimit(t *testing.T) {
 
 // 같은 제목이 많아도 id 를 붙이는 시간은 선형이다(고치기 전: 같은 제목 16000개 4.4초 — 겹칠 때마다 -1 부터 다시 찾았다).
 func TestHeadingIDsLinear(t *testing.T) {
-	assertLinear(t, "같은 제목", repeatTo("# 제목\n"), 300*time.Millisecond)
+	// 상한 600ms: 512KB 가 GitHub 러너에서 410ms(256KB 179ms — 선형).
+	assertLinear(t, "같은 제목", repeatTo("# 제목\n"), 600*time.Millisecond)
 	r := render(t, "# a\n# a\n# a-1\n# a\n# a {#a-3}\n# a\n")
 	for _, id := range []string{`id="a"`, `id="a-1"`, `id="a-1-1"`, `id="a-2"`, `id="a-3"`, `id="a-4"`} {
 		contains(t, r.HTML, id)
@@ -112,7 +115,9 @@ func TestHeadingIDsLinear(t *testing.T) {
 // 링크 닫기 시도 상한(linkclose.go). 고치기 전: `[a](` 반복 128KB 5초 — 링크 파서가 ]( 마다 주소를 줄 끝까지 읽었다.
 func TestLinkCloserLimit(t *testing.T) {
 	for _, unit := range []string{"[a](", "[a]", "![a](", "[", "]("} {
-		assertLinear(t, unit, repeatTo(unit), 300*time.Millisecond)
+		// 상한 1s: 옛 상한 300ms(256KB)는 Mac 의 `[a](` 256KB 170ms 에 1.76배 여유였다. GitHub 러너는 Mac 의 약 2배이고
+		// 512KB 는 그 두 배라 같은 여유면 약 1.05s — 러너에서 `[a](` 512KB 594ms.
+		assertLinear(t, unit, repeatTo(unit), time.Second)
 	}
 	r := render(t, strings.Repeat("[x](#u) ", MaxLinkClosersPerBlock+50))
 	if n := strings.Count(r.HTML, `<a href="#u">x</a>`); n != MaxLinkClosersPerBlock {

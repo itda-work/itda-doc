@@ -30,7 +30,7 @@ func homeSandbox(t *testing.T) (home, docs string) {
 
 func writeMeta(t *testing.T, dir, text string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, folderMetaName), []byte(text), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, FolderMetaName), []byte(text), 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -109,20 +109,20 @@ func TestFolderMetaStop(t *testing.T) {
 		{`C:\docs`, false},
 	}
 	for _, c := range cases {
-		if got := folderMetaStop(c.dir); got != c.want {
-			t.Errorf("folderMetaStop(%q)=%v, 기대 %v", c.dir, got, c.want)
+		if got := FolderMetaStop(c.dir); got != c.want {
+			t.Errorf("FolderMetaStop(%q)=%v, 기대 %v", c.dir, got, c.want)
 		}
 	}
 }
 
 // 렌더는 폴더 파일을 매번 다시 읽는다(내용 캐시가 없다) — 같은 크기·같은 수정 시각으로 내용을 덮어써도
-// 다음 렌더가 새 값을 쓴다. 감시(folderMetaStamp)만 이 변경을 못 본다(아래 시험).
+// 다음 렌더가 새 값을 쓴다. 감시(FolderMetaStamp)만 이 변경을 못 본다(아래 시험).
 func TestFindFolderMetasRereadsContent(t *testing.T) {
 	_, docs := homeSandbox(t)
 	writeMeta(t, docs, "theme: classic\n")
 	doc := filepath.Join(docs, "c.md")
 	writeMetaDoc(t, doc, "# c\n")
-	p := filepath.Join(docs, folderMetaName)
+	p := filepath.Join(docs, FolderMetaName)
 	st, err := os.Stat(p)
 	if err != nil {
 		t.Fatal(err)
@@ -216,28 +216,28 @@ func TestCheckFolderMeta(t *testing.T) {
 	}
 }
 
-// folderMetaStamp 는 폴더 파일의 수정 시각·크기·목록 변화를 잡는다(감시·공유의 기준 — 문서 자신의
+// FolderMetaStamp 는 폴더 파일의 수정 시각·크기·목록 변화를 잡는다(감시·공유의 기준 — 문서 자신의
 // 감시 Doc.Changed 와 같은 방식). 같은 크기·같은 수정 시각으로 덮어쓴 내용 변경은 못 본다(렌더는
 // 다시 읽어 반영한다 — TestFindFolderMetasRereadsContent).
 func TestFolderMetaStamp(t *testing.T) {
 	_, docs := homeSandbox(t)
 	doc := filepath.Join(docs, "c.md")
 	writeMetaDoc(t, doc, "# c\n")
-	if st := folderMetaStamp(doc); st != "" {
+	if st := FolderMetaStamp(doc); st != "" {
 		t.Fatalf("파일이 없는데 %q", st)
 	}
 	writeMeta(t, docs, "theme: classic\n")
-	st1 := folderMetaStamp(doc)
+	st1 := FolderMetaStamp(doc)
 	if st1 == "" {
 		t.Fatal("새로 생긴 파일을 못 잡음")
 	}
 	time.Sleep(2 * time.Millisecond) // 같은 크기로 다시 써도 수정 시각이 오른다
 	writeMeta(t, docs, "theme: bold\n")
-	if st2 := folderMetaStamp(doc); st2 == st1 {
+	if st2 := FolderMetaStamp(doc); st2 == st1 {
 		t.Error("수정 변화를 못 잡음")
 	}
 	writeMeta(t, filepath.Dir(docs), "toc: true\n") // 위 폴더에 새로 생기는 파일도 목록 변화로 잡는다
-	if st3 := folderMetaStamp(doc); !strings.Contains(st3, "/x|") || !strings.Contains(st3, "/x/y|") {
+	if st3 := FolderMetaStamp(doc); !strings.Contains(st3, "/x|") || !strings.Contains(st3, "/x/y|") {
 		t.Errorf("두 폴더가 다 기준에 없음: %q", st3)
 	}
 	// 한계(문서 자신의 감시와 같다): 같은 크기·같은 수정 시각으로 덮어쓴 내용 변경은 stamp 가 잡지
@@ -248,15 +248,15 @@ func TestFolderMetaStamp(t *testing.T) {
 // 읽기 상한: 64KB 는 읽고 64KB+1 은 거부한다. 폴더(디렉터리)도 거부(리뷰 2회차 반례 이전).
 func TestFolderMetaReadBound(t *testing.T) {
 	_, docs := homeSandbox(t)
-	p := filepath.Join(docs, folderMetaName)
-	for _, n := range []int{maxFolderMetaBytes, maxFolderMetaBytes + 1} {
+	p := filepath.Join(docs, FolderMetaName)
+	for _, n := range []int{MaxFolderMetaBytes, MaxFolderMetaBytes + 1} {
 		writeMeta(t, docs, strings.Repeat("#", n))
-		f := readFolderMeta("_metadata.yml", p)
-		if (f.Err != "") != (n > maxFolderMetaBytes) {
+		f := ReadFolderMeta("_metadata.yml", p)
+		if (f.Err != "") != (n > MaxFolderMetaBytes) {
 			t.Fatalf("size=%d err=%q", n, f.Err)
 		}
 	}
-	if f := readFolderMeta("directory", docs); f.Err == "" {
+	if f := ReadFolderMeta("directory", docs); f.Err == "" {
 		t.Fatal("폴더를 받아들임")
 	}
 }

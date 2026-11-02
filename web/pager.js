@@ -454,7 +454,11 @@
   //   2. 아니면 본문 아래까지 전부가 MIN 이상이면 그만큼(뒤 블록은 다음 장 — 「(계속)」)
   //   3. 아니면 빈 쪽이 아닐 때 false — 부르는 쪽이 새 쪽에서 다시 놓는다. 빈 쪽이면 남은 높이(최소 80px)로 놓는다
   // 높이는 쪽 상자 안 px 이라 쪽이 보기 영역·출력 상자로 옮겨져도 그대로다(쪽 크기는 슬라이드 크기로 고정).
+  // 가로 배치 문단(p.fit-row, #569 — mdoc 이 .fit 그림만 든 맨 위 문단에 단다)도 같은 규칙으로 높이 h 를 고르고, figure 높이 대신
+  // sizeRow 가 그림들을 같은 높이로 맞춘다(문단 높이는 그림 줄 + 캡션 줄 — 폭이 모자라면 h 보다 낮다).
   function placeFit(fig, queue, empty) {
+    const row = fig.tagName === "P";
+    const apply = row ? hh => sizeRow(fig, hh) : hh => { fig.style.height = hh + "px"; };
     fig.classList.add("fit-sized");
     fig.style.height = "0px";
     body.appendChild(fig);
@@ -474,11 +478,40 @@
     }
     const MIN = bodyHeight * 0.3;
     let h = room - reserve >= MIN ? room - reserve : room >= MIN ? room : empty ? Math.max(80, room) : 0;
-    if (!h) { body.removeChild(fig); fig.classList.remove("fit-sized"); fig.style.height = ""; return false; }
+    if (!h) {
+      body.removeChild(fig); fig.classList.remove("fit-sized"); fig.style.height = "";
+      if (row) for (const im of rowImages(fig)) { im.style.width = ""; im.style.height = ""; }
+      return false;
+    }
+    if (row) fig.style.height = "";
     h = Math.floor(h);
-    fig.style.height = h + "px";
-    while (!fits() && h > 80) { h -= 2; fig.style.height = h + "px"; } // 반올림·여백 겹침으로 넘치면 조금씩 줄인다
+    apply(h);
+    while (!fits() && h > 80) { h -= 2; apply(h); } // 반올림·여백 겹침으로 넘치면 조금씩 줄인다
     return true;
+  }
+
+  // rowImages 는 가로 배치 문단의 그림이다 — 문단의 직접 자식 img(막은 링크는 링크 없이 그림만 남는다)와 그림 하나를 감싼 링크의 img.
+  function rowImages(p) { return [...p.querySelectorAll(":scope > img, :scope > a > img")]; }
+
+  // sizeRow 는 가로 배치 문단 p 의 그림들을 같은 높이 H 로 맞춘다(#569). 너비는 그림마다 H × 원래 비율(naturalWidth/naturalHeight)이다 —
+  // 비율을 못 읽은 그림(아직 안 읽힘·깨짐)은 너비를 비워 두어(CSS width: auto) 나중에 읽히면 제 비율로 서고, 폭 계산에만 4:3 으로 친다. H 는 문단 높이 h 에서 캡션 줄(slides.js rowCaptions 가 단 span.fr-cap 가운데 가장 높은 것 + 줄 사이)을 뺀
+  // 높이와, 문단 폭에서 그림 사이 틈을 빼고 비율 합으로 나눈 높이 가운데 작은 쪽이다 — 그래서 그림 줄은 본문 폭 안이다. 캡션은
+  // 그림 폭으로 줄이 바뀌므로 그림을 맞춘 뒤 한 번 더 재어 맞춘다. 크기는 CSSOM(style 속성 아님 — CSP 와 무관)으로 건다.
+  function sizeRow(p, h) {
+    const imgs = rowImages(p);
+    const cs = getComputedStyle(p);
+    const gap = parseFloat(cs.columnGap) || 0, rgap = parseFloat(cs.rowGap) || 0;
+    const known = imgs.map(im => im.naturalWidth > 0 && im.naturalHeight > 0);
+    const ratios = imgs.map((im, i) => known[i] ? im.naturalWidth / im.naturalHeight : 4 / 3);
+    const sum = ratios.reduce((a, r) => a + r, 0) || 1;
+    const wMax = Math.max(1, p.clientWidth - gap * Math.max(0, imgs.length - 1));
+    const caps = [...p.querySelectorAll(":scope > .fr-cap")];
+    const capH = () => caps.length ? Math.max(...caps.map(c => c.getBoundingClientRect().height)) + rgap : 0;
+    const set = H => imgs.forEach((im, i) => { im.style.height = H + "px"; im.style.width = known[i] ? Math.floor(H * ratios[i]) + "px" : ""; });
+    let H = Math.max(1, Math.floor(Math.min(h - capH(), wMax / sum)));
+    set(H);
+    if (caps.length) { H = Math.max(1, Math.floor(Math.min(h - capH(), wMax / sum))); set(H); }
+    return H;
   }
 
   function measureHeight(node) {
@@ -512,7 +545,7 @@
       // 장(h1) 앞에서 새 쪽(테마 설정). 쪽이 1/3 도 안 찼으면(요약문 한 덩이 등) 나누지 않는다 — 거의 빈 쪽이 생긴다.
       // 테마가 "always" 면(spine) 그래도 나눈다 — 장은 늘 새 쪽에서 시작한다.
       if (opts.h1Break && n.tagName === "H1" && !empty && !onlyBreakables() && (opts.h1Always || usedHeight() > bodyHeight * 0.35)) { queue.unshift(n); newPage(false); continue; }
-      if (opts.fitFill && n.tagName === "FIGURE" && n.classList.contains("fig-fit")) {
+      if (opts.fitFill && (n.tagName === "FIGURE" && n.classList.contains("fig-fit") || n.tagName === "P" && n.classList.contains("fit-row"))) {
         if (placeFit(n, queue, empty)) continue;
         queue.unshift(...carryHeadings(), n); newPage(false); continue;
       }

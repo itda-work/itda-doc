@@ -57,7 +57,7 @@ func TestGuideThemes(t *testing.T) {
 			t.Errorf("%s 의 별칭: 안내서 %v, theme.json %v", info.Name, got, want)
 		}
 	}
-	if pickTheme(ts, "", "").Name != "classic" || !strings.Contains(g, "없으면 `classic` 다") {
+	if PickTheme(ts, "", "").Name != "classic" || !strings.Contains(g, "없으면 `classic` 다") {
 		t.Error("기본 테마가 classic 가 아니거나 안내서에 적힌 것과 다름")
 	}
 }

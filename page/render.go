@@ -50,7 +50,7 @@ func renderViewOpts(src []byte, path string, ts *Themes, themeOverride string, o
 	}
 	v.editorTokens = r.EditorTokens
 	v.FolderMeta = r.FolderMeta
-	t := pickTheme(ts, r.Meta.Theme, themeOverride)
+	t := PickTheme(ts, r.Meta.Theme, themeOverride)
 	if _, ok := ts.Get(r.Meta.Theme); ok {
 		dt, _ := ts.Get(r.Meta.Theme)
 		v.DocTheme = dt.Name
@@ -106,8 +106,8 @@ func docThemeFrom(src []byte, applied []string, folder []mdoc.FolderMeta) string
 	return keys["theme"].FromRel
 }
 
-// pickTheme 은 화면에서 고른 테마 → 문서의 theme: → classic 순으로 고른다.
-func pickTheme(ts *Themes, docTheme, override string) *Theme {
+// PickTheme 은 화면에서 고른 테마 → 문서의 theme: → classic 순으로 고른다.
+func PickTheme(ts *Themes, docTheme, override string) *Theme {
 	for _, n := range []string{override, docTheme, "classic"} {
 		if n == "" {
 			continue
@@ -123,8 +123,8 @@ func pickTheme(ts *Themes, docTheme, override string) *Theme {
 }
 
 // ThemeStyleSheet 는 엔진을 가리지 않는 기본 꼴(@scope 로 가두고 상대 색은 @supports 로 덮는 것)의 테마 CSS 다 —
-// StyleSheet(cssMode{}) 와 같다. cssMode 를 밖에서 만들 수 없어 패키지 밖(CLI)이 쓰는 입구로 둔다.
-func (t *Theme) ThemeStyleSheet() string { return t.StyleSheet(cssMode{}) }
+// StyleSheet(CSSMode{}) 와 같다. 패키지 밖(CLI)이 쓰는 짧은 입구다.
+func (t *Theme) ThemeStyleSheet() string { return t.StyleSheet(CSSMode{}) }
 
 // FindFolderMetas 는 문서(docPath)에 얹힐 폴더 기본값 파일(`_metadata.yml`)을 먼 폴더 → 가까운 폴더 순으로 돌려준다 —
 // mdoc.Options.FolderMeta 에 그대로 넘긴다. RenderView·Check 가 쓰는 것과 같다(findFolderMetas). docPath 가 비면 nil.

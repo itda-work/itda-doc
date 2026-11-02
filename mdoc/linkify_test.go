@@ -54,7 +54,8 @@ func TestLinkifyGuardSame(t *testing.T) {
 
 // linkify 가 이메일 글자만으로 된 긴 줄에서 이차 시간이 되지 않는다(고치기 전 `a_b` 반복 112KB 0.55초, 448KB 수 초).
 // URL 접두사만 맞고 URL 이 아닌 꼴(www.1_ — 리뷰 R2: 0.35 → 1.19 → 4.35초)과 접두사 뒤에 "." + 글자가 있어
-// 자리마다 정규식을 도는 꼴(www.a_)도. 크기가 두 배가 될 때마다 비용(CPU 시간, timingtest)이 세 배(+10ms)를 넘지 않는다(이차면 네 배).
+// 자리마다 정규식을 도는 꼴(www.a_)도. 크기 셋이라 쌍마다 판정한다(timingtest judge) — 크기가 두 배가 될 때마다 비용(CPU 시간)이
+// 세 배(+10ms)를 넘지 않는다(이차면 네 배).
 func TestLinkifyLinear(t *testing.T) {
 	for _, unit := range []string{"a_b", "a*b", "a~b", "a(b", "a_b.", "$a+b", "a_b@", "www.1_", "www.1*", "www.a_", "http://1_", "http://a.b_", "ftp:1~"} {
 		gen := func(size int) string { return strings.Repeat(unit, size/len(unit)) }

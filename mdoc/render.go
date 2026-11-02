@@ -379,7 +379,19 @@ func (r *htmlRenderer) footnoteList(w util.BufWriter, src []byte, node ast.Node,
 	html.RenderAttributes(w, node, html.GlobalAttributeFilter)
 	_ = w.WriteByte('>')
 	if !empty {
-		_, _ = w.WriteString("\n<hr>\n<ol>\n")
+		_, _ = w.WriteString("\n<hr>\n<ol")
+		// 각주 번호도 본문 순서 목록처럼 자릿수 class 를 단다(#575 — transform.go olDigits 와 같은 규칙, 각주는 1 부터 차례다).
+		// 각주 수가 아홉 이하면 class 가 없어 모양이 그대로다. 들여쓰기는 base.css .footnotes ol.ol-dN
+		n := 0
+		for c := node.FirstChild(); c != nil; c = c.NextSibling() {
+			if _, ok := c.(*extast.Footnote); ok {
+				n++
+			}
+		}
+		if d := len(strconv.Itoa(n)); d >= 2 {
+			attr(w, "class", "ol-d"+strconv.Itoa(min(d, 9)))
+		}
+		_, _ = w.WriteString(">\n")
 	}
 	return ast.WalkContinue, nil
 }
