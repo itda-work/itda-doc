@@ -100,6 +100,7 @@ number-sections: true
 <!-- fm-keys:end -->
 
 - 표에 없는 키도 버리지 않고 순서대로 테마에 넘긴다. `mono` 테마의 `수신`·`참조`·`시행일` 처럼 테마가 표지·머리글에 쓰는 값이다.
+- 표에 없는 키가 표의 키와 아주 가까우면(`slide` → `slides`, `toc_depth` → `toc-depth`) `frontmatter-typo` 경고를 낸다. 값은 위처럼 테마에 넘기고 그림도 같다. 한글 등 ASCII 밖 글자가 든 키는 견주지 않는다. `slides:`·`code:` 안 모르는 키는 `frontmatter-value` 경고 문구에 「… 의 오타?」를 붙인다.
 - 아는 키의 값 꼴이 틀리면 그 키만 무시하고 `frontmatter-value` 경고를 낸다. YAML 이 깨졌으면 블록 전체를 본문으로 그리고 `frontmatter-invalid` 경고를 낸다.
 - `version: 1.10` 처럼 숫자로 읽히는 값도 이 앱은 적은 글자 그대로 쓴다. 다른 YAML 도구에서 숫자(`1.1`)로 바뀌지 않게 따옴표를 권한다.
 
@@ -414,6 +415,7 @@ Deckset 에서 가져온 덱은 고치지 않아도 된다 — 펜스 바로 앞
 | `raw-html` | 그리지 않은 HTML | 마크다운으로 바꾼다(8장 예외 태그 말고는 그려지지 않는다) |
 | `frontmatter-invalid` | YAML 이 깨져 frontmatter 를 본문으로 그림 | 콜론 뒤 공백, 따옴표 짝, 들여쓰기를 고친다 |
 | `frontmatter-value` | 아는 키의 값 꼴이 틀려 무시함 | 2장 표의 값 꼴로 |
+| `frontmatter-typo` | 2장 표에 없는 키가 표의 키와 아주 가까움(대소문자·`_`·`-` 차이나 한두 글자 차이) — 오타일 수 있음, 값은 모르는 키로 테마에 넘김 | 오타면 메시지가 말하는 키 이름으로 고친다. 일부러 쓴 자유 키면 그대로 둬도 동작은 같다 |
 | `unsafe-url` | 막은 링크·이미지 주소 | `http(s)`·`mailto`·`tel`·상대 주소로 |
 | `remote-image` | 불러오지 않은 원격 이미지 | 그림 파일을 문서 폴더에 두고 상대 경로로(또는 문서 창에서 원격 그림 켜기) |
 | `bad-attribute` | 알아보지 못한 `{…}` 속성 | `{#id .class key=value}` 꼴로, 길이는 6장의 꼴로 |

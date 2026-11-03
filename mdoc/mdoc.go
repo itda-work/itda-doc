@@ -88,6 +88,7 @@ const (
 	WarnRawHTML            = "raw-html"             // 렌더하지 않은 HTML
 	WarnFrontmatterInvalid = "frontmatter-invalid"  // YAML 이 깨져 본문으로 렌더함
 	WarnFrontmatterValue   = "frontmatter-value"    // 아는 키의 값 형식이 틀려 무시함
+	WarnFrontmatterTypo    = "frontmatter-typo"     // 아는 키와 아주 가까운 모르는 키 — 오타일 수 있음, 값은 Extra 에 그대로(typo.go, itda-doc#14)
 	WarnUnsafeURL          = "unsafe-url"           // 막은 링크·이미지 주소
 	WarnRemoteImage        = "remote-image"         // 불러오지 않은 원격 이미지
 	WarnBadAttribute       = "bad-attribute"        // 알아보지 못한 {…} 속성
