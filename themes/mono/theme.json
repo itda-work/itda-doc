@@ -3,6 +3,7 @@
   "title": "모노",
   "description": "흑백, 표지 없이 가운데 제목 블록, 수신·참조 줄, 결재란, 발신 명의, 개조식·공문 목록 기호",
   "aliases": ["모노"],
+  "group": "basic",
   "cover": "never",
   "toc-break": false,
   "h1-break": false,

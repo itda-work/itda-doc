@@ -76,6 +76,9 @@ func TestBuiltinThemeProblemsCatches(t *testing.T) {
 			p := "classic/theme.css"
 			m[p] = &fstest.MapFile{Data: append(m[p].Data, "\n.sc-title { font-size: 12pt }\n"...)}
 		}, ".sc-title { font-size: 12pt }"},
+		{"어휘 밖 group", func(t *testing.T, m fstest.MapFS) {
+			editFile(t, m, "classic/theme.json", `"group": "basic"`, `"group": "fun"`)
+		}, `group "fun" 는 모르는 묶음`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

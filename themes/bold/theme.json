@@ -3,6 +3,7 @@
   "title": "볼드",
   "description": "강조색 면 표지, 큰 장 번호, 장 앞 쪽 나눔(쪽이 35% 넘게 찼을 때), 넉넉한 여백, 돋보이는 요약문·상자",
   "aliases": ["볼드"],
+  "group": "basic",
   "cover": "auto",
   "toc-break": true,
   "h1-break": true,

@@ -147,6 +147,9 @@ func TestThemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if strings.Contains(out, "경고: ") {
+		t.Errorf("경고가 없어야 할 목록에 경고가 있음:\n%s", out)
+	}
 	for _, n := range []string{"bold", "classic", "compact", "mono", "spine"} {
 		if !strings.Contains(out, n+"\t내장\t") {
 			t.Errorf("내장 테마 %s 가 없음:\n%s", n, out)
@@ -159,5 +162,31 @@ func TestThemes(t *testing.T) {
 		if strings.Contains(out, n) {
 			t.Errorf("브랜드 테마 %s 가 목록에 있음", n)
 		}
+	}
+}
+
+// themes 는 어휘 밖 group 을 가진 테마 줄 끝에 경고를 붙인다 — 테마는 쓸 수 있는 채로(itda-doc#24).
+func TestThemesGroupWarning(t *testing.T) {
+	dir := t.TempDir()
+	for name, js := range map[string]string{
+		"fun":  `{"title":"재미","extends":"classic","group":"Vivid"}`,
+		"good": `{"title":"좋음","extends":"classic","group":"vivid"}`,
+	} {
+		if err := os.MkdirAll(dir+"/"+name, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dir+"/"+name+"/theme.json", []byte(js), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	out, err := runCLI(t, "themes", "-themes", dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "fun\t사용자\t재미\t경고: group \"Vivid\" 는 모르는 묶음") {
+		t.Errorf("fun 줄에 group 경고가 없음:\n%s", out)
+	}
+	if !strings.Contains(out, "good\t사용자\t좋음\n") {
+		t.Errorf("good 줄이 경고 없이 나오지 않음:\n%s", out)
 	}
 }
