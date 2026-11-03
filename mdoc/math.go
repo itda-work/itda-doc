@@ -230,6 +230,7 @@ func (r *htmlRenderer) mathInline(w util.BufWriter, src []byte, node ast.Node, e
 	}
 	n := node.(*MathInline)
 	if out, ok := r.st.math(n.Tex, n.Display, n.Line); ok {
+		r.st.mathOut[n] = out
 		_, _ = w.WriteString(out)
 	} else {
 		_, _ = w.WriteString(`<span class="math-error">`)
@@ -247,6 +248,7 @@ func (r *htmlRenderer) mathBlock(w util.BufWriter, src []byte, node ast.Node, en
 	line := r.st.lines.line(n.Pos())
 	if n.closed {
 		if out, ok := r.st.math(n.tex(src), true, line); ok {
+			r.st.mathOut[n] = out
 			r.mathDiv(w, n, out)
 			return ast.WalkSkipChildren, nil
 		}

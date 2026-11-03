@@ -34,6 +34,10 @@ type state struct {
 	highlightBytes int                          // 이번 렌더에서 구문 강조한 코드 원문 바이트 합
 	mathCount      int                          // 그린(그리려 한) 수식 수 — MaxMathPerDoc
 	mathDone       map[ast.Node]bool            // 블록 수식으로 그린 ```math 코드 블록
+	// 그린 수식의 MathML(MathInline·MathBlock·```math 코드 블록 → 결과)과 그린 그림(```mermaid → SVG·캡션) — HTML 에는 쓰지 않고
+	// 문서 모델(doc.go Doc.Math·Doc.Diagram)이 내준다
+	mathOut     map[ast.Node]string
+	diagramPics map[ast.Node]DiagramPic
 	// 펜스 바로 앞 Deckset 줄 강조 지시어(codehl.go) — 펜스 info 의 {…} 가 이긴다
 	codeHL map[*ast.FencedCodeBlock]codeHLDirective
 	// 그린(그리려 한) mermaid 그림 수 — MaxDiagramsPerDoc, 그림으로 그린 ```mermaid 코드 블록
@@ -67,6 +71,8 @@ func newState(src []byte, meta Meta, opts Options) *state {
 		brBlocks:    map[*ast.HTMLBlock]string{},
 		fenceCloses: map[*ast.FencedCodeBlock]int{},
 		mathDone:    map[ast.Node]bool{},
+		mathOut:     map[ast.Node]string{},
+		diagramPics: map[ast.Node]DiagramPic{},
 		codeHL:      map[*ast.FencedCodeBlock]codeHLDirective{},
 		diagramDone: map[ast.Node]bool{},
 		mathBudget:  map[ast.Node]int{},

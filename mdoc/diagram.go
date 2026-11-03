@@ -95,6 +95,7 @@ func (st *state) diagram(fc *ast.FencedCodeBlock, src []byte) (string, bool) {
 	for _, is := range out.res.Issues {
 		st.warn(at(is.Line), WarnDiagram, "mermaid 그림: "+is.Msg)
 	}
+	st.diagramPics[fc] = DiagramPic{SVG: out.res.SVG, Caption: out.res.Caption}
 	var w strings.Builder
 	w.WriteString(out.res.SVG)
 	if out.res.Caption != "" {

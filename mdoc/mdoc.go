@@ -98,11 +98,24 @@ const (
 
 // Render 는 마크다운 원문을 렌더한다. 오류는 내부 렌더 실패뿐이다 — 문법 문제는 Warnings 로 알린다.
 func Render(src []byte, opts Options) (Result, error) {
-	return renderLimit(src, opts, MaxNestingDepth)
+	d, err := parseLimit(src, opts, MaxNestingDepth)
+	if err != nil {
+		return Result{}, err
+	}
+	return d.Result, nil
 }
 
 // renderLimit 은 블록 중첩 상한 limit 으로 렌더한다(시험은 상한 없이 견준다).
 func renderLimit(src []byte, opts Options, limit int) (Result, error) {
+	d, err := parseLimit(src, opts, limit)
+	if err != nil {
+		return Result{}, err
+	}
+	return d.Result, nil
+}
+
+// parseLimit 은 Parse 의 몸이다 — 파싱·변환 뒤 HTML 까지 그려 Result 를 채우고, 변환된 AST 와 그리며 정한 노드 정보를 함께 쥔다(doc.go).
+func parseLimit(src []byte, opts Options, limit int) (*Doc, error) {
 	src = normalize(src)
 	meta, body, warns, folder := parseFrontmatter(src, opts.FolderMeta)
 	st := newState(body, meta, opts)
@@ -120,7 +133,7 @@ func renderLimit(src []byte, opts Options, limit int) (Result, error) {
 			r = renderRaw(meta, body, warns, over, frontmatterLines(src, meta))
 		}
 		r.FolderMeta = folder
-		return r, nil
+		return &Doc{Result: r, body: body, rawSkip: frontmatterLines(src, meta), withheld: opts.DropNotes}, nil
 	}
 	st.transform(doc.(*ast.Document))
 	if _, end, ok := splitFrontmatter(src); ok && meta.Present {
@@ -136,11 +149,11 @@ func renderLimit(src []byte, opts Options, limit int) (Result, error) {
 
 	var buf bytes.Buffer
 	if err := st.md.Renderer().Render(&buf, body, doc); err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
 	sort.SliceStable(st.warns, func(i, j int) bool { return st.warns[i].Line < st.warns[j].Line })
-	return Result{
+	return &Doc{Result: Result{
 		Meta:         meta,
 		EditorTokens: st.editorTokens,
 		HTML:         buf.String(),
@@ -149,7 +162,7 @@ func renderLimit(src []byte, opts Options, limit int) (Result, error) {
 		Warnings:     st.warns,
 		SlideLevel:   slideLevel(doc),
 		FolderMeta:   folder,
-	}, nil
+	}, root: doc.(*ast.Document), body: body, st: st}, nil
 }
 
 // normalize 는 BOM 을 떼고 줄 끝을 \n 하나로 맞춘다. 줄 수는 바뀌지 않는다 — data-line 이 원문 줄을 가리켜야 한다.
