@@ -9,7 +9,7 @@ import (
 
 // 그리기. 쓰는 요소·속성은 흐름도와 같은 허용 목록이다(svg·g·rect·path·line·text·tspan·title —
 // mdoc/security_test.go 가 고정한다). style·이벤트·url()·href·id 없음. 색·선은 클래스 → 테마 토큰(--diagram-*, base.css).
-// 클래스는 모두 gt- 접두사(app.css 의 .bar 같은 앱 규칙과 충돌하지 않게 — 수정 1회차):
+// 클래스는 모두 gt- 접두사(호스트 앱 창 틀 CSS 의 .bar 같은 앱 규칙과 충돌하지 않게 — 수정 1회차):
 //
 //	gt-band·gt-excl                 구역 띠·제외 날짜 띠          gt-grid·gt-axis   눈금 격자선·축 선
 //	gt-alab·gt-sname                축 라벨·구역 이름              gt-bar(+gt-done·gt-active·gt-crit)·gt-ms   막대·마일스톤 마름모

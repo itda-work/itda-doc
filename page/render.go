@@ -34,7 +34,7 @@ func renderView(src []byte, path, imgPrefix string, ts *Themes, themeOverride st
 // renderViewOpts 는 renderView 와 같되 렌더 옵션을 통째로 받는다 — 공유 화면이 발표자 노트를 뺄 때(opts.DropNotes, share_http.go renderShare).
 // path 가 있으면 문서 위 폴더의 `_metadata.yml` 을 읽어 frontmatter 기본값으로 넘긴다(itda-hyve#474 — 모든 렌더
 // 입구가 이 함수를 지나므로 미리보기·발표·PDF·공유·고침 요청·md_check 가 같은 합친 값을 쓴다). 파일 읽기는
-// 이쪽(docview)에서, 합치기는 mdoc 이 한다. 호출자가 opts.FolderMeta 를 이미 쥐고 들어오면 그 값을 그대로
+// 이쪽(page — 호스트 앱이 부르는 입구)에서, 합치기는 mdoc 이 한다. 호출자가 opts.FolderMeta 를 이미 쥐고 들어오면 그 값을 그대로
 // 쓴다(폴더 설정 편집 화면 itda-hyve#474 ② 의 미리보기 — 디스크 대신 폼이 만들 내용으로 렌더한다).
 func renderViewOpts(src []byte, path string, ts *Themes, themeOverride string, opts mdoc.Options) View {
 	allowRemote := opts.AllowRemoteImages

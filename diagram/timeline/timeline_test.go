@@ -715,7 +715,7 @@ func mustSVG(t *testing.T, src string) string {
 	return svg
 }
 
-// 클래스 충돌(간트 수정 1회차와 같은 검사를 timeline 에) — 타임라인 SVG 의 클래스는 모두 tl- 접두사를 단다. app.css 의
+// 클래스 충돌(간트 수정 1회차와 같은 검사를 timeline 에) — 타임라인 SVG 의 클래스는 모두 tl- 접두사를 단다. 호스트 앱 창 틀 CSS 의
 // 일반 이름 규칙이 SVG 기하 속성에 걸리는 충돌을 막는다. .tl- 선택자는 base.css 의 .diagram-svg 아래에만 있어야 한다.
 func TestClassCollisions(t *testing.T) {
 	svg, _ := drawn(t, "timeline\ntitle 제목\nsection 구역\n2016 : 설립 : 이전\n2018 : 투자\n2020 : 매출")

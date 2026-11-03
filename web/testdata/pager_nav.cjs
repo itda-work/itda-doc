@@ -6,10 +6,10 @@ const fs = require("fs");
 const vm = require("vm");
 
 const ctx = { console };
-ctx.window = ctx; // pager.js 는 window.HyvePager 에 내보낸다
+ctx.window = ctx; // pager.js 는 window.ItdaPager(옛 이름 HyvePager 도 같은 객체)에 내보낸다
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(process.argv[2], "utf8"), ctx);
-const P = ctx.window.HyvePager;
+const P = ctx.window.ItdaPager;
 
 let cases = 0, failed = 0;
 function ok(name, cond, detail) { cases++; if (!cond) { failed++; console.log("실패 " + name + " — " + JSON.stringify(detail)); } else console.log("통과 " + name); }

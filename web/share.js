@@ -28,20 +28,25 @@
 // 이어보기는 보기 영역 높이 − 40px 만큼(pager.js pageNav — 문서 창 보기 모드와 같은 규칙). 키로 넘기면 따라가기가 이 화면에서 잠시 풀린다(keyHandler).
 // 발표자 노트(itda-hyve#344 결정 7): 호스트가 공유의 「발표자 노트 함께 보이기」 를 켰을 때만 view.json 에 노트가 온다(꺼져 있으면 서버가 뺀다).
 // 노트가 온 슬라이드 보기에서만 「노트: 끔 | 오른쪽 | 아래」(기본 아래 — 폰)와 글자 A−/A+ 를 보인다. 노트 칸은 문서 창 미리보기와 같은
-// 부품이다(slides.js placeNotes·app.css .slide-note). 쪽·이어보기에는 노트가 없다. 고른 배치·글자 크기는 이 브라우저의 localStorage 에만
+// 부품이다(slides.js placeNotes·호스트 앱 창 틀 CSS 의 .slide-note). 쪽·이어보기에는 노트가 없다. 고른 배치·글자 크기는 이 브라우저의 localStorage 에만
 // 둔다(못 쓰면 메모리 — notePrefs). 발표 슬라이드를 따라가는 중 노트가 아래면 그 슬라이드를 위에 붙여 아래 노트까지 보이게 한다(followSpot).
-// 확장(itda-hyve#617): share.js 보다 먼저 실행되는 스크립트가 window.HyveShareExt(api) 를 두면, 시작할 때 한 번 불러 화면 부품(api — 아래
+// 확장(itda-hyve#617): share.js 보다 먼저 실행되는 스크립트가 window.ItdaShareExt(api)(옛 이름 window.HyveShareExt 도 본다) 를 두면, 시작할 때 한 번 불러 화면 부품(api — 아래
 // 「확장을 시작한다」 절)을 넘기고 돌려받은 훅을 그리기 길에서 부른다 — flow(흐름 — 나누기 전, numberBlocks 뒤)·drawn(새 본문을 다 그린 뒤)·tick(목차
 // 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
 // 시작이나 훅이 던지면 콘솔에만 남기고 확장 없이처럼 이어 간다.
 // 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
+// 앱 이름(itda-hyve#625): 탭 제목 접미 「 — <앱 이름>」 은 모듈에 박지 않는다 — 서버가 share.html 의 <meta name="application-name"> 자리를
+// 채우면 그 이름을 붙이고, 비우거나 채우지 않으면(자리 글자 그대로) 접미 없이 문서 제목만 쓴다(appName·docTitle).
+// 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
+// ItdaTableSort·ItdaCodeCopy·ItdaCodeLines)로 찾고, 없으면 옛 이름 window.Hyve* 로 물러선다(hostPart·extInit — 둘 다 pick). 이 파일은 window.ItdaShare 로
+// 내보내고 옛 이름 window.HyveShare 도 같은 객체다.
 (function () {
   "use strict";
 
   const NARROW = 768;
   const PX_PER_MM = 96 / 25.4;
 
-  // lookFor 는 그릴 보기 꼴이다(app.js 의 이름 — "doc" 쪽·"flow" 이어보기·"slides").
+  // lookFor 는 그릴 보기 꼴이다(호스트 앱과 같은 이름 — "doc" 쪽·"flow" 이어보기·"slides").
   // chosen 이 "slides" 면(발표자 따라가기가 바꿈) 슬라이드다. 쪽 따라가기는 chosen 을 "doc" 으로 바꾼다.
   function lookFor(v, width, chosen) {
     if (v && v.slides && v.slides.present) return "slides";
@@ -531,7 +536,7 @@
   // 아니면 "center".
   function followSpot(layout, noteShown) { return layout === "below" && noteShown ? "top" : "center"; }
 
-  // keyHandler 는 보는 화면의 keydown 이다(⑨). deps: pager(HyvePager — navKey·typingTarget)·fol·jumper·closeDrawer()·ended()·turn(dir).
+  // keyHandler 는 보는 화면의 keydown 이다(⑨). deps: pager(ItdaPager — navKey·typingTarget)·fol·jumper·closeDrawer()·ended()·turn(dir).
   // Esc 는 목차 서랍을 닫는다(전과 같다). 입력란에 포커스가 있으면 나머지는 건드리지 않는다. 쪽 넘김 키(navKey — ←/→·PageUp/PageDown·
   // Space/Shift+Space·Home/End)면 브라우저 굴림을 막고 ③ 규칙대로 이 화면의 따라가기를 먼저 풀고(jumper.clear·fol.moved) turn(dir) 로
   // 넘긴다(공유가 끝난 화면은 넘기지 않는다). 단추·링크에 포커스가 있을 때의 Space 는 그것을 누르는 키라 넘기지도, 따라가기를 풀지도
@@ -615,7 +620,7 @@
   }
 
   // tableCopyClick 은 표 메뉴 항목(복사 단추)의 click 이다(itda-hyve#349·itda-hyve#376). deps: tables()(고른 표 조각 — 닫으면 버린다)·close()(메뉴 닫기 —
-  // 포커스가 메뉴 안이면 연 자리로 돌려준다)·copy(kind, tables)(HyveTableCopy.copy — http 면 이 안에서 바로 execCopy 가 돌고, 그 임시
+  // 포커스가 메뉴 안이면 연 자리로 돌려준다)·copy(kind, tables)(ItdaTableCopy.copy — http 면 이 안에서 바로 execCopy 가 돌고, 그 임시
   // textarea 가 가져간 포커스는 tablecopy.js 가 돌려준다)·toast(글). 닫기를 먼저 한다 — 복사가 먼저면 포커스가 textarea 로 가 있어
   // close 가 「메뉴 안」을 못 알아본다. 복사가 끝난 뒤(비동기)에는 포커스를 건드리지 않는다 — 그 사이 사용자가 옮긴 자리를 빼앗지 않게.
   function tableCopyClick(deps) {
@@ -629,24 +634,42 @@
     };
   }
 
-  window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
+  // appName 은 <meta name="application-name"> 의 값에서 고른 앱 이름이다 — 비었거나 서버가 채우지 않은 자리 글자({{…}})면 "".
+  function appName(raw) {
+    const s = String(raw == null ? "" : raw).trim();
+    return /^\{\{.*\}\}$/.test(s) ? "" : s;
+  }
+
+  // docTitle 은 탭 제목이다 — 앱 이름이 있으면 「<name> — <app>」, 없으면 name 그대로.
+  function docTitle(name, app) { return app ? name + " — " + app : name; }
+  // pick 은 호스트가 둔 전역 하나다 — 정식 이름 w["Itda" + name] 을 먼저, 없으면 옛 이름 w["Hyve" + name](호환용 별칭)을 본다. 둘 다 없으면 undefined.
+  function pick(w, name) { return w["Itda" + name] || w["Hyve" + name]; }
+
+  // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
+  window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot,
-    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick };
+    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick };
   if (typeof document === "undefined" || !document.body || !document.body.dataset.base) return;
 
   // ---- 화면
 
   const $ = id => document.getElementById(id);
   const base = document.body.dataset.base;
+  // 호스트 부품은 정식 이름 window.Itda* 를 먼저, 없으면 옛 이름 window.Hyve* 를 본다(머리 주석 「호스트 부품」).
+  const hostPart = name => pick(window, name);
+  const TableCopy = hostPart("TableCopy"), TableSort = hostPart("TableSort"), CodeCopy = hostPart("CodeCopy"), CodeLines = hostPart("CodeLines");
+  const appMeta = document.querySelector('meta[name="application-name"]');
+  const app = appName(appMeta && appMeta.getAttribute("content"));
+  if (app) document.title = app; // 문서를 받기 전의 탭 제목 — 앱 이름이 없으면 share.html 의 title 그대로
   const state = { view: null, look: "", chosen: "", themeFailed: false, ratio: "16:9", landscape: false, ended: false, rendering: null, again: false,
     // 발표자 노트(itda-hyve#344): 받은 view 의 슬라이드마다 노트(slideNotes — 원문 자리의 장, slides.js build itda-hyve#518)·노트가 하나라도 있는지(hasNotes)·지금 그린 배치(notesLayout)
     slideNotes: [], hasNotes: false, notesLayout: "off",
     // 지금 화면에 걸린 표 정렬 지정(itda-hyve#349 2단계 — 이 화면만). 없으면 null
     tableSort: null };
   const NOTE_W = 320, NOTE_GAP = 20, NOTE_NARROW = 520;
-  const np = notePrefs(() => window.localStorage, window.HyveSlides.NOTE_FONTS);
+  const np = notePrefs(() => window.localStorage, window.ItdaSlides.NOTE_FONTS);
 
-  // ext 는 확장이 돌려준 훅이다(시작할 때 window.HyveShareExt 가 돌려준 것 — 그 전에는 비어 있다). 훅이 던지면 콘솔에만 남기고 그리기 길을 이어 간다 — 확장 탓에
+  // ext 는 확장이 돌려준 훅이다(시작할 때 window.ItdaShareExt — 옛 이름 HyveShareExt — 가 돌려준 것 — 그 전에는 비어 있다). 훅이 던지면 콘솔에만 남기고 그리기 길을 이어 간다 — 확장 탓에
   // 본문이 안 붙거나 목차 강조가 멈추지 않게(itda-hyve#617 리뷰 3회차 [2]).
   let ext = {};
   const hook = (name, ...args) => {
@@ -705,11 +728,11 @@
     el.classList.toggle("flow-look", look === "flow");
     el.classList.toggle("r43", slides && state.ratio === "4:3");
     el.classList.toggle("r169", slides && state.ratio !== "4:3");
-    if (slides) { const [w, h] = window.HyveSlides.SIZE[state.ratio]; el.style.setProperty("--page-w", w + "px"); el.style.setProperty("--page-h", h + "px"); }
+    if (slides) { const [w, h] = window.ItdaSlides.SIZE[state.ratio]; el.style.setProperty("--page-w", w + "px"); el.style.setProperty("--page-h", h + "px"); }
     else { el.style.removeProperty("--page-w"); el.style.removeProperty("--page-h"); }
   }
 
-  // 쪽은 보기 영역 너비에 맞춰 그린 그림을 줄인다(app.js applyZoom 의 「너비 맞춤」 과 같은 길 — transform). 슬라이드는 너비와 높이를
+  // 쪽은 보기 영역 너비에 맞춰 그린 그림을 줄인다(호스트 앱의 「너비 맞춤」 과 같은 길 — transform). 슬라이드는 너비와 높이를
   // 모두 맞춰 축소한다(slideZoom — ⑥, 하한 0.2 에 걸리면 일부가 잘릴 수 있다). 이어보기는 너비가 화면을 따라 다시 흐르고 확대는 브라우저 것을 쓴다.
   function applyZoom() {
     const viewer = $("viewer"), pg = $("pages"), box = $("pages-box");
@@ -730,7 +753,7 @@
     pg.classList.toggle("notes-below", layout === "below");
     let w, z;
     if (state.look === "slides") {
-      const [sw, sh] = window.HyveSlides.SIZE[state.ratio];
+      const [sw, sh] = window.ItdaSlides.SIZE[state.ratio];
       w = sw;
       z = slideZoom(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter);
     } else {
@@ -754,7 +777,7 @@
     now: () => Date.now(), onClose: () => { ctxTables = null; } });
   function closeTableMenu() { tmenu.close(); ctxTables = null; }
 
-  // render 는 app.js render 의 보기 부분이다: 무대(화면 밖)에서 나눈 뒤 쪽을 한 번에 바꾼다.
+  // render 는 호스트 앱 보기 그리기의 보기 부분이다: 무대(화면 밖)에서 나눈 뒤 쪽을 한 번에 바꾼다.
   // 공유가 끝나면(state.ended) 각 await 뒤·DOM 쓰기 전에 멈춘다 — 늦게 끝난 그리기가 「공유가 끝났습니다」 를 덮지 않게.
   // sort 는 표 정렬 지정(tablesort.js — 이 화면만, 서버·발표자에게 보내지 않는다)이다. 머리 칸을 누른 그리기(sortByHead)만 넘기고, 호스트
   // 갱신(version)·꼴 바꾸기·화면 폭 변경으로 다시 그리면 넘기지 않으므로 풀린다.
@@ -764,7 +787,7 @@
     if (state.ended) return;
     $("load-err").hidden = !v.error && !state.themeFailed;
     $("load-err").textContent = v.error || (state.themeFailed ? THEME_FAILED : "");
-    document.title = (v.title || "문서") + " — Itda Hyve Docs";
+    document.title = docTitle(v.title || "문서", app);
     $("doc-title").textContent = v.title || "";
     paintTOC(v);
     if (v.error) state.tableSort = null; // 본문을 비운다 — 아래 줄(시험이 글로 보는 자리)
@@ -790,7 +813,7 @@
     flow.className = "page-body doc-flow";
     stage.appendChild(flow);
     flow.innerHTML = v.html; // mdoc 이 만든 HTML(스크립트 없음). CSP 가 2차로 막는다
-    window.HyvePager.numberBlocks(flow); // 내용 앵커(⑧) — 호스트와 같은 규칙으로 나누기 전에
+    window.ItdaPager.numberBlocks(flow); // 내용 앵커(⑧) — 호스트와 같은 규칙으로 나누기 전에
     hook("flow", flow); // 확장: 나누기 전 흐름(쪽·슬라이드 나눔이 쪼개거나 옮기기 전)
     await imagesSettled(flow, 5000);
     if (state.ended) { stage.textContent = ""; return; }
@@ -800,22 +823,22 @@
     // 표 정렬(itda-hyve#349 2단계): 쪽·이어보기에서만, 나누기 전 흐름에(문서 창과 같다 — 쪽 나눔이 정렬된 표 전체를 다시 나눈다)
     let sorted = null;
     if (state.look !== "slides") {
-      window.HyveTableSort.mark(flow);
-      if (sort && window.HyveTableSort.apply(flow, sort)) sorted = sort;
+      TableSort.mark(flow);
+      if (sort && TableSort.apply(flow, sort)) sorted = sort;
     }
-    // 코드 줄 번호(itda-hyve#435 — codelines.js): 쪽 나눔·슬라이드 나눔 전에 감싼다(문서 창 app.js 와 같은 자리).
+    // 코드 줄 번호(itda-hyve#435 — 호스트 부품 CodeLines): 쪽 나눔·슬라이드 나눔 전에 감싼다(호스트 앱 창과 같은 자리).
     // frontmatter code.line-numbers: false 면 줄 강조(itda-hyve#479 data-hl)·단 나누기(itda-hyve#487 data-cols) 블록만 번호 없이 감싼다. 스크립트가 404 여도(허용 목록 누락 — 리뷰 R1) 렌더는 깨지 않는다.
-    if (window.HyveCodeLines) window.HyveCodeLines.wrap(flow, { numbers: (v.code || {}).line_numbers !== false });
+    if (CodeLines) CodeLines.wrap(flow, { numbers: (v.code || {}).line_numbers !== false });
     if (state.look === "slides") {
       const org = (flow.querySelector(".cover-org, .title-org") || {}).textContent || "";
-      const r = window.HyveSlides.build(flow, target, { ratio: state.ratio, level: sv.level, incremental: sv.incremental, fontScale: sv.font_scale, logo: v.logo, footer: org.trim(), info: v.info });
+      const r = window.ItdaSlides.build(flow, target, { ratio: state.ratio, level: sv.level, incremental: sv.incremental, fontScale: sv.font_scale, logo: v.logo, footer: org.trim(), info: v.info });
       // 노트는 호스트가 「노트 함께 보이기」 를 켰을 때만 온다 — 오지 않았으면 컨트롤을 숨기고 칸도 없다
       state.slideNotes = r.notes || [];
       state.hasNotes = state.slideNotes.some(Boolean);
       placeSlideNotes(target);
     } else if (state.look === "flow") {
       for (const x of flow.querySelectorAll(".pause, .notes")) x.remove();
-      window.HyvePager.adoptWidths(flow);
+      window.ItdaPager.adoptWidths(flow);
       const pg = document.createElement("div");
       pg.className = "page page-flow";
       const body = document.createElement("div");
@@ -824,9 +847,9 @@
       pg.appendChild(body);
       target.appendChild(pg);
     } else {
-      window.HyvePager.prepareTOC(flow);
+      window.ItdaPager.prepareTOC(flow);
       for (const x of flow.querySelectorAll(".pause, .notes")) x.remove();
-      window.HyvePager.paginate(flow, target, { header: v.header, footer: v.footer, h1Break: v.h1_break, h1Always: v.h1_always });
+      window.ItdaPager.paginate(flow, target, { header: v.header, footer: v.footer, h1Break: v.h1_break, h1Always: v.h1_always });
     }
     flow.remove();
     if (state.look !== "slides") { state.slideNotes = []; state.hasNotes = false; }
@@ -842,7 +865,7 @@
     pagesEl.replaceChildren(frag);
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     // 쪽·이어보기·슬라이드(발표 공유) 모두.
-    window.HyveCodeCopy.arm(pagesEl);
+    CodeCopy.arm(pagesEl);
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
     target.remove();
@@ -856,9 +879,9 @@
   // ---- 발표자 노트(itda-hyve#344)
 
   function placeSlideNotes(box) {
-    window.HyveSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off" });
+    window.ItdaSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off" });
   }
-  // applyNoteFont 는 고른 글자 크기를 문서 뿌리의 --note-fs 로 건다(0 이면 기본 14 — app.css .slide-note).
+  // applyNoteFont 는 고른 글자 크기를 문서 뿌리의 --note-fs 로 건다(0 이면 기본 14 — 호스트 앱 창 틀 CSS 의 .slide-note).
   function applyNoteFont() {
     const r = document.documentElement.style;
     if (np.font) r.setProperty("--note-fs", String(np.font)); else r.removeProperty("--note-fs");
@@ -885,7 +908,7 @@
     if (replace) {
       placeSlideNotes($("pages"));
       // 노트 칸을 다시 만들었으니 복사 단추(itda-hyve#413)도 다시 붙인다 — 노트 코드의 조각 범위는 그 노트 안(codecopy.js noteOf)
-      window.HyveCodeCopy.arm($("pages"));
+      CodeCopy.arm($("pages"));
     }
     applyZoom();
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac);
@@ -898,7 +921,7 @@
     relayoutNotes(true);
   }
   function stepNoteFont(dir) {
-    const px = window.HyveSlides.noteFontStep(np.font || 14, dir);
+    const px = window.ItdaSlides.noteFontStep(np.font || 14, dir);
     if (px === (np.font || 14)) return;
     np.setFont(px);
     applyNoteFont();
@@ -978,7 +1001,7 @@
   // 않는다 — 그리기가 끝나면 render 가 다시 부른다.
   //  - slide: 슬라이드 보기에서 i 번째 슬라이드를 보기 영역 가운데로.
   //  - pos: 보기 꼴 그대로. 슬라이드 보기면 블록 i 가 든 슬라이드를 가운데로, 쪽·이어보기면 블록 i 의 조각들(쪽 나눔이 쪼갠 것) 가운데
-  //    비율 frac 이 닿는 지점(fragAt)을 보기 영역 맨 위 + 1px(호스트의 기준선, app.js posSpot)에. 그 꼴에 없는 블록이면 가까운 앞 블록(pickBlock).
+  //    비율 frac 이 닿는 지점(fragAt)을 보기 영역 맨 위 + 1px(호스트의 기준선과 같다)에. 그 꼴에 없는 블록이면 가까운 앞 블록(pickBlock).
   function scrollToFollow(i, kind, frac) {
     const root = $("pages"), viewer = $("viewer"), vr = viewer.getBoundingClientRect();
     for (const x of root.querySelectorAll(".following")) x.classList.remove("following");
@@ -1096,7 +1119,7 @@
     $("load-err").hidden = true;
     hook("ended"); // 확장: 끝난 화면(자기 칸을 숨기고 끝난 카드의 자리를 채운다)
     $("ended").hidden = false;
-    document.title = $("ended-title").textContent + " — Itda Hyve Docs";
+    document.title = docTitle($("ended-title").textContent, app);
   }
 
   // pageTurn 은 쪽 넘김 키 한 번이다(⑨): 쪽(슬라이드)들의 자리를 scrollTop 좌표로 재어 pageNav 가 고른 자리로 굴린다.
@@ -1106,7 +1129,7 @@
       const r = pg.getBoundingClientRect();
       return { top: r.top - vt + viewer.scrollTop, height: r.height };
     });
-    viewer.scrollTop = window.HyvePager.pageNav(dir, state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
+    viewer.scrollTop = window.ItdaPager.pageNav(dir, state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
   }
 
   // jumpScroll 은 #제목 이동의 굴림이다: 슬라이드 보기면 그 제목이 든 슬라이드를 가운데로, 그 밖은 제목을 맨 위로.
@@ -1153,7 +1176,7 @@
   $("viewer").addEventListener("touchmove", () => { jumper.clear(); fol.moved(); }, { passive: true });
   $("viewer").addEventListener("mousedown", e => { if (e.target === $("viewer")) { jumper.clear(); fol.moved(); } });
   // 쪽 넘김 키(⑨ — keyHandler): 쪽·슬라이드·이어보기 규칙은 pager.js pageNav(문서 창 보기 모드와 같다)
-  document.addEventListener("keydown", keyHandler({ pager: window.HyvePager, fol, jumper, closeDrawer: () => closeTocDrawer(),
+  document.addEventListener("keydown", keyHandler({ pager: window.ItdaPager, fol, jumper, closeDrawer: () => closeTocDrawer(),
     ended: () => state.ended || !state.view, turn: dir => pageTurn(dir) }));
   $("follow-back").addEventListener("click", () => { jumper.resume(); scheduleTocOn(); });
 
@@ -1164,10 +1187,10 @@
   // 키로 contextmenu 를 이어 보내면(fromKey) 기본 메뉴만 막고 다시 열지 않는다.
   // openTableMenu 는 target 이 표 안이고 고른 글이 없으면 메뉴를 (x, y)에 열고 true 다. 아니면 메뉴를 닫고 false(브라우저 기본 메뉴).
   function openTableMenu(target, x, y, how) {
-    const table = window.HyveTableCopy.tableAt(target, $("pages"));
+    const table = TableCopy.tableAt(target, $("pages"));
     const sel = window.getSelection && String(window.getSelection() || "");
     if (!table || (sel && sel.trim())) { closeTableMenu(); return false; }
-    ctxTables = window.HyveTableCopy.pieces(table, $("pages"));
+    ctxTables = TableCopy.pieces(table, $("pages"));
     tmenu.open(x, y, how);
     return true;
   }
@@ -1184,20 +1207,20 @@
   });
   $("table-ctx").addEventListener("keydown", e => tmenu.key(e));
   const copyFromMenu = tableCopyClick({ tables: () => ctxTables, close: closeTableMenu, toast,
-    copy: (kind, tables) => window.HyveTableCopy.copy(kind, tables, $("pages")) });
+    copy: (kind, tables) => TableCopy.copy(kind, tables, $("pages")) });
   for (const b of document.querySelectorAll("[data-table-copy]")) b.addEventListener("click", () => { copyFromMenu(b.dataset.tableCopy); });
   // ---- 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 위임 클릭 하나를 문서(document)에 단다 — 본문을 다시 그려도 살아 있다.
   // 이 화면은 http(비보안 컨텍스트)라 navigator.clipboard 가 없다 — 누른 처리 안에서 바로 execCommand 로 쓴다(tablecopy.js write).
-  document.addEventListener("click", window.HyveCodeCopy.handler({ toast }));
+  document.addEventListener("click", CodeCopy.handler({ toast }));
   // ---- 표 열 정렬(itda-hyve#349 2단계 — tablesort.js): 머리 칸 왼쪽 클릭(키보드는 Enter·Space)으로 오름 → 내림 → 해제. 보는 사람 각자(이 화면의
   // 메모리에만 — 서버에 보내지 않는다). 슬라이드 보기에는 없다(표시를 달지 않는다). 다시 그린 뒤 누른 조각의 머리가 같은 높이에 남게 굴린다 —
   // 발표자를 따라가는 중이면 render 가 따라가는 자리로 굴리므로 굴리지 않는다(블록 번호 data-n 은 정렬과 상관없이 같다). 키보드로 눌렀으면
   // 따라가는 중에도 새 머리 칸에 포커스를 돌려준다(settle — preventScroll).
   async function sortByHead(th) {
     if (state.ended || !state.view || state.look === "slides" || state.rendering) return;
-    const S = window.HyveTableSort, pagesEl = $("pages"), viewer = $("viewer");
+    const S = TableSort, pagesEl = $("pages"), viewer = $("viewer");
     const spec = S.specFor(th), table = th.closest("table");
-    const k = Math.max(0, window.HyveTableCopy.pieces(table, pagesEl).indexOf(table));
+    const k = Math.max(0, TableCopy.pieces(table, pagesEl).indexOf(table));
     const off = table.getBoundingClientRect().top - viewer.getBoundingClientRect().top;
     const focused = document.activeElement === th;
     await draw(spec.dir ? spec : null);
@@ -1206,7 +1229,7 @@
   }
   $("pages").addEventListener("click", e => {
     if (e.button !== 0 || e.detail > 1 || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
-    const th = window.HyveTableSort.headAt(e.target, $("pages"));
+    const th = TableSort.headAt(e.target, $("pages"));
     if (!th) return;
     const sel = window.getSelection && window.getSelection();
     if (sel && !sel.isCollapsed && String(sel).trim()) return;
@@ -1238,9 +1261,10 @@
   paintTocPanel();
   // 확장(itda-hyve#617)을 시작한다 — 목차 폭을 정한 뒤·첫 그리기(sync.refresh) 전. 넘기는 것은 이 화면의 부품 그대로다(같은 객체 — 확장이
   // 읽는 state·toc 은 늘 지금 값). 확장이 던지면 확장 없이 계속한다.
-  if (typeof window.HyveShareExt === "function") {
+  const extInit = pick(window, "ShareExt");
+  if (typeof extInit === "function") {
     try {
-      ext = window.HyveShareExt({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast }) || {};
+      ext = extInit({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast }) || {};
     } catch (e) { ext = {}; console.error("share ext:", e); }
   }
   new ResizeObserver(() => {

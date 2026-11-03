@@ -327,7 +327,7 @@
       const sub = document.createElement("div");
       target.appendChild(sub);
       if (g.kind === "title") {
-        const r = window.HyvePager.paginate(document.createElement("div"), sub, { pageClass: "slide k-title" });
+        const r = window.ItdaPager.paginate(document.createElement("div"), sub, { pageClass: "slide k-title" });
         overflow += r.overflow;
         titleSlide(sub.querySelector(".page"), g.src, o);
       } else {
@@ -380,7 +380,7 @@
               const dry = document.createElement("div");
               dry.style.setProperty("--slide-head-h", h + "px");
               target.appendChild(dry);
-              window.HyvePager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
+              window.ItdaPager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
               const n = dry.querySelectorAll(":scope > .page").length;
               dry.remove();
               return n;
@@ -391,7 +391,7 @@
           probe.remove();
         }
         f.remove();
-        const r = window.HyvePager.paginate(f, sub, { pageClass: cls, fitFill: true });
+        const r = window.ItdaPager.paginate(f, sub, { pageClass: cls, fitFill: true });
         overflow += r.overflow;
         const pages = [...sub.querySelectorAll(":scope > .page")];
         pages.forEach((pg, i) => {
@@ -456,7 +456,7 @@
     return els.map(n => n.innerHTML).filter(h => h.trim() !== "").join("\n");
   }
 
-  // ---- 노트 칸(itda-hyve#344) — 문서 창의 슬라이드 미리보기(app.js)와 공유 보는 화면(share.js)이 함께 쓴다.
+  // ---- 노트 칸(itda-hyve#344) — 호스트 앱의 슬라이드 미리보기와 공유 보는 화면(share.js)이 함께 쓴다.
   // 노트 칸(aside.slide-note)은 슬라이드(.page) 밖의 형제라 슬라이드 수·발표 사본·쪽 넘김(.page 만 센다)에 섞이지 않는다.
 
   // placeNotes 는 box(무대의 target 또는 #pages) 안의 슬라이드마다 노트 칸을 붙인다. o = { notes[](build 의 값), on(붙일지),
@@ -494,5 +494,6 @@
     return below.length ? below[below.length - 1] : cur;
   }
 
-  window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, noteHTML, NOTE_FONTS, noteFontStep };
+  // 정식 이름은 window.ItdaSlides 다. window.HyveSlides 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
+  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, noteHTML, NOTE_FONTS, noteFontStep };
 })();

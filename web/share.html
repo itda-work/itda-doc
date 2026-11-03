@@ -4,11 +4,15 @@
 <meta charset="utf-8">
 <!-- 문서 창 공유의 보기 화면(itda-hyve#339 ①·②·③·④, 표 복사 itda-hyve#349, 코드 복사 단추 itda-hyve#413). 같은 네트워크의 브라우저가 연다 — Wails 바인딩이 없다. Go(share_http.go)가 {{BASE}} 를
      /s/<토큰> 으로 채우고 콘텐츠 보안 정책은 응답 머리로 단다(shareCSP — 원격 그림 늘 끔).
-     확장 자리(itda-hyve#617): 중괄호 둘로 싼 EXT_HEAD(share.js 앞 — 확장의 link·script, share.js 의 HyveShareExt)·EXT_BAR(머리 막대 끝)·
-     EXT_ENDED(끝난 카드 안)·EXT_SIDE(보기 영역 옆, .main 안) 를 서버가 채운다 — 확장이 없으면 빈 글로 바꾼다. 이 주석에는 자리 글자를 쓰지 않는다. -->
+     확장 자리(itda-hyve#617): 중괄호 둘로 싼 EXT_HEAD(share.js 앞 — 확장의 link·script, share.js 의 ItdaShareExt)·EXT_BAR(머리 막대 끝)·
+     EXT_ENDED(끝난 카드 안)·EXT_SIDE(보기 영역 옆, .main 안) 를 서버가 채운다 — 확장이 없으면 빈 글로 바꾼다. 이 주석에는 자리 글자를 쓰지 않는다.
+     앱 이름 자리(itda-hyve#625): 중괄호 둘로 싼 APP_NAME 을 서버가 앱 이름으로 채우면 share.js 가 탭 제목 끝에 「 — 앱 이름」 을 붙인다.
+     비우거나 채우지 않으면 접미 없이 문서 제목만 쓴다(share.js appName). title 은 문서를 받기 전의 탭 제목이다.
+     표 복사·코드 복사·코드 줄·표 정렬(tablecopy.js·codecopy.js·codelines.js·tablesort.js)과 창 틀 CSS(app.css)는 호스트 앱이 같은 자리(_/)에 내준다. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
-<title>Itda Hyve Docs</title>
+<meta name="application-name" content="{{APP_NAME}}">
+<title>문서</title>
 <link rel="stylesheet" href="{{BASE}}/_/base.css">
 <link rel="stylesheet" href="{{BASE}}/_/app.css">
 <link rel="stylesheet" href="{{BASE}}/_/share.css">

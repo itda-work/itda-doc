@@ -185,7 +185,7 @@ func TestRenderViewFolderMeta(t *testing.T) {
 	}
 }
 
-// md_check(docview.Check)도 경로가 있으면 폴더 값을 함께 검사한다(itda-hyve#474 — 문서 창과 같은 값).
+// 호스트 앱의 문서 검사(Check)도 경로가 있으면 폴더 값을 함께 검사한다(itda-hyve#474 — 문서 창과 같은 값).
 func TestCheckFolderMeta(t *testing.T) {
 	_, docs := homeSandbox(t)
 	writeMeta(t, docs, "theme: mono\ntoc: 안녕\n")

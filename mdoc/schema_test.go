@@ -120,7 +120,7 @@ func TestSchemaPerDocKeys(t *testing.T) {
 // enum·list-style 후보(Values)는 파서가 받는 표기다 — 넣으면 그 값이 Meta 에 들고 경고가 없다.
 // papersize a4 는 Meta 가 기본값(a4)과 명시를 구분하지 않아 MetaValues 가 「정하지 않음」으로
 // 빼므로 거기만 기대를 달리 한다(slides.ratio·transition 은 SlidesMeta 가 구분한다). list-style
-// 조합("gaejosik gongmun")은 파서가 목록 표기로 받는다 — YAML 쓰는 쪽이 그 표기로 쓴다(저장 규칙, docview).
+// 조합("gaejosik gongmun")은 파서가 목록 표기로 받는다 — YAML 쓰는 쪽이 그 표기로 쓴다(저장 규칙, 호스트 앱).
 func TestSchemaValuesParse(t *testing.T) {
 	for _, tc := range []struct {
 		path    string // 키 경로(그룹.키)

@@ -1,4 +1,4 @@
-/* 문서 창 공유의 화면(itda-hyve#339 ①). 보기 화면은 app.css(틀)·base.css(문서) 위에 이것을 더하고, 입장 화면은 이것만 쓴다. */
+/* 문서 창 공유의 화면(itda-hyve#339 ①). 보기 화면은 호스트 앱 창 틀 CSS(share.html 의 app.css — 틀)·base.css(문서) 위에 이것을 더하고, 입장 화면은 이것만 쓴다. */
 
 /* ---- 보기 화면 */
 .share-view .share-bar { --wails-draggable: none; }
@@ -17,14 +17,14 @@
   font: inherit; font-size: 15px; font-weight: 600; padding: 10px 18px; border: 0; border-radius: 999px; background: #2f6fed; color: #fff;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer; white-space: nowrap; }
 .follow-back[hidden] { display: none; }
-/* 발표자 노트 컨트롤(itda-hyve#344) — 틀은 app.css 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
+/* 발표자 노트 컨트롤(itda-hyve#344) — 틀은 호스트 앱 창 틀 CSS 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
 .share-view .notes-switch[hidden] { display: none !important; }
 .share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
 @media (max-width: 600px) {
   .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
 }
 .share-err { margin: 24px auto; max-width: 480px; text-align: center; color: #d64545; }
-/* ④ 목차: 틀은 app.css 의 .sidebar·#side-toc·body.no-toc 를 그대로 쓴다. 좁은 화면(toc-drawer — share.js 가 폭으로 단다)은 본문 위에
+/* ④ 목차: 틀은 호스트 앱 창 틀 CSS 의 .sidebar·#side-toc·body.no-toc 를 그대로 쓴다. 좁은 화면(toc-drawer — share.js 가 폭으로 단다)은 본문 위에
    겹치는 서랍과 바깥 가림막 */
 .share-view #btn-toc[hidden], .share-view .sidebar[hidden], .toc-back[hidden] { display: none; }
 .share-view .main { position: relative; }
@@ -37,7 +37,7 @@ body.toc-drawer #side-toc a { padding: 8px 8px; font-size: 14px; }
   .share-view .pages.flow-look { padding: 10px 6px 48px; }
 }
 
-/* ---- 입장 화면(app.css 없이 혼자 선다) */
+/* ---- 입장 화면(창 틀 CSS 없이 혼자 선다) */
 .share-entry {
   --e-bg: #e6e8ec; --e-panel: #ffffff; --e-line: #dfe2e7; --e-text: #1d2330; --e-muted: #69717f; --e-accent: #2f6fed; --e-accent-fg: #fff;
   color-scheme: light;

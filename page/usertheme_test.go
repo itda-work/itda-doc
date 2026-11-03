@@ -260,7 +260,7 @@ func TestThemeCSSConfinement(t *testing.T) {
 			t.Errorf("%s: 거부해야 함", name)
 		}
 	}
-	// 창 틀이 쓰는 토큰 이름(app.css 에서 모은 것)은 하나도 받지 않는다
+	// 창 틀이 쓰는 토큰 이름(ShellCSS 에서 모은 것)은 하나도 받지 않는다
 	for name := range reservedTokens() {
 		if err := checkToken(name, "red"); err == nil {
 			t.Errorf("창 틀 토큰 %s 를 받음", name)
@@ -274,7 +274,7 @@ func TestThemeCSSConfinement(t *testing.T) {
 }
 
 // 문서 층 글꼴 보호: base.css 의 --font-* 글꼴 이름과 CSS 일반 이름은 ShellCSS(창 틀)와 무관하게 막는다 — 사용자 테마의
-// @font-face 가 같은 이름으로 기본 글꼴을 몰래 바꾸지 못한다. 막는 이름 목록을 여기서 고정한다(원본 문서 창은 app.css 를 거쳐
+// @font-face 가 같은 이름으로 기본 글꼴을 몰래 바꾸지 못한다. 막는 이름 목록을 여기서 고정한다(처음 이 렌더러를 쓴 호스트 앱은 창 틀 CSS 를 거쳐
 // Apple SD Gothic Neo·Malgun Gothic·Menlo 를 막았다 — 그 위에 SF Mono·Consolas·STIX Two Math·Cambria Math 가 더 막힌다).
 func TestDocFontFamiliesReserved(t *testing.T) {
 	want := []string{"apple sd gothic neo", "cambria math", "consolas", "cursive", "emoji", "fangsong", "fantasy", "malgun gothic",

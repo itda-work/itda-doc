@@ -375,9 +375,9 @@ func shorten(s string) string {
 	return s
 }
 
-// ---- 창 틀이 쓰는 이름(app.css 에서 모은다 — 목록을 손으로 두면 창 틀을 고칠 때 어긋난다)
+// ---- 창 틀이 쓰는 이름(호스트 앱 창 틀 CSS 에서 모은다 — 목록을 손으로 두면 창 틀을 고칠 때 어긋난다)
 
-// ShellCSS 는 문서를 둘러싼 앱 창 틀의 CSS(문서 창이면 dist/app.css)를 돌려준다. 거기서 쓰는 토큰·글꼴 이름은 사용자 테마가
+// ShellCSS 는 문서를 둘러싼 앱 창 틀의 CSS(호스트 앱이 넣는다)를 돌려준다. 거기서 쓰는 토큰·글꼴 이름은 사용자 테마가
 // 쓰지 못한다. 기본은 창 틀이 없는 것(nil). 막는 이름은 reservedOnce 로 처음 한 번만 모으므로 앱은 첫 테마 검사 전에
 // 정해야 한다 — 그 뒤에 바꾸면 듣지 않는다. 창 틀과 무관하게 문서 층(web/base.css)의 --font-* 글꼴 이름과 CSS 일반 이름,
 // reservedTokenNames 는 늘 막는다(loadReserved).

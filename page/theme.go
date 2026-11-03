@@ -473,9 +473,9 @@ func checkThemeFiles(fsys fs.FS, dir string) error {
 	})
 }
 
-// 토큰 이름 중 창 틀이 쓰는 것과 용지 크기는 테마가 줄 수 없다. 토큰은 :root 변수라 창 틀(app.css 의 --ui-*,
+// 토큰 이름 중 창 틀이 쓰는 것과 용지 크기는 테마가 줄 수 없다. 토큰은 :root 변수라 호스트 앱 창 틀 CSS(ShellCSS)의 --ui-*,
 // Wails 가 읽는 --wails-draggable 등)에도 닿는다 — 그 이름을 막아 창 틀 색·끌기 영역을 바꾸지 못하게 한다.
-// app.css 가 쓰는 이름 전부(reservedTokens, themecss.go 가 내장 app.css 에서 모은다)도 막는다.
+// 창 틀 CSS 가 쓰는 이름 전부(reservedTokens, themecss.go 가 ShellCSS 에서 모은다)도 막는다.
 var reservedTokenPrefixes = []string{"--ui-", "--wails-"}
 
 var reservedTokenNames = map[string]bool{"--page-w": true, "--page-h": true, "--img-max-h": true, "--body-h": true}
@@ -749,7 +749,7 @@ func (ts *Themes) List() []ThemeInfo {
 //
 // 테마 CSS 는 @scope (.page) 안에 둔다 — 선택자가 쪽 상자 안의 요소에만 맞는다(WKWebView 실측: body·.bar·.page 자신을
 // 고르는 규칙이 아무것도 바꾸지 못했다). 쪽 상자는 contain: paint 라 position: fixed 로도 쪽 밖을 덮지 못하고,
-// 보기 영역은 isolation 으로 확인창·메뉴보다 위로 올라오지 못한다(base.css·app.css). @scope 는 선택자의 우선순위를
+// 보기 영역은 isolation 으로 확인창·메뉴보다 위로 올라오지 못한다(base.css·호스트 앱 창 틀 CSS). @scope 는 선택자의 우선순위를
 // 바꾸지 않아 가두기 전과 화면·PDF 가 같다(내장 3종 PDF 픽셀 비교 0).
 //
 // css 는 엔진에 맞춘 꼴이다(compat.go): @scope 를 모르는 엔진(옛 WebKit)이면 가두지 않고 낸다. 그 꼴은 내장 테마만
