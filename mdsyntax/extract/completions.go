@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Completion 은 문서 창 편집기의 자동 완성 후보 하나다(#434). 안내서의 표지 표에서 뽑는다 — 이름·뜻을 손으로 따로 적지 않는다.
+// Completion 은 문서 창 편집기의 자동 완성 후보 하나다(itda-hyve#434). 안내서의 표지 표에서 뽑는다 — 이름·뜻을 손으로 따로 적지 않는다.
 type Completion struct {
 	// Kind 는 후보가 뜨는 자리다: container(줄 첫머리 `:::` 다음), chart-attr(`:::chart{` 안), chart-type(`type=` 다음),
 	// alert(`> [!` 다음), fm-key(frontmatter 의 줄 첫머리).

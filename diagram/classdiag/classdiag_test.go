@@ -670,7 +670,7 @@ func TestSVGEscapeAndElements(t *testing.T) {
 	}
 }
 
-// TestEmptySTR 는 빈 따옴표·빈 값의 경계를 고정한다(#409 ④-3 리뷰 1회차 [1]). 원본 lexer 의 string 상태는 닫는 ["] 가
+// TestEmptySTR 는 빈 따옴표·빈 값의 경계를 고정한다(itda-hyve#409 ④-3 리뷰 1회차 [1]). 원본 lexer 의 string 상태는 닫는 ["] 가
 // [^"]*(STR)보다 먼저라(jison:60–62) "" 는 STR 토큰을 내지 않는다 — STR 을 요구하는 링크·콜백·click href·cssClass 줄은 원본
 // 문법 오류라 원문이다. " "·"x" 는 STR 이 있어 무시하고 그린다.
 func TestEmptySTR(t *testing.T) {

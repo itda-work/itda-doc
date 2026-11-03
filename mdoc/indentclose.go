@@ -7,7 +7,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 들여쓴 닫는 줄(#494 안 C). 닫는 `:::` 는 0~3칸 들여쓰기까지만 닫는 줄이다(container.go Continue 의 w >= 4) — 파싱 규칙은
+// 들여쓴 닫는 줄(itda-hyve#494 안 C). 닫는 `:::` 는 0~3칸 들여쓰기까지만 닫는 줄이다(container.go Continue 의 w >= 4) — 파싱 규칙은
 // 그대로 두고, 닫히지 않은 컨테이너가 바로 품은 글 블록(문단·목록의 글·들여쓴 코드)에 4칸 이상 들여쓴 콜론 줄이 있으면
 // 그 줄이 닫으려던 줄로 보고 알린다. 목록 바로 뒤에 빈 줄 없이 `:::` 를 쓰면 포매터(Prettier)가 그 줄을 목록 문단의
 // 이어지는 줄로 보고 들여써서 생긴다. 고칠 내용(Fix)은 데이터로만 싣는다 — 파일은 화면이 사용자의 확인을 받아 고친다.
@@ -115,7 +115,7 @@ func (st *state) indentedClose(n *Container) bool {
 	if heads > 0 {
 		msg += fmt.Sprintf("(뒤 제목 %d개가 그 안에 들어감)", heads)
 	}
-	// 의도한 들여쓴 코드·목록 글도 후보가 되므로 조건부로 안내한다(#494 리뷰 1회차)
+	// 의도한 들여쓴 코드·목록 글도 후보가 되므로 조건부로 안내한다(itda-hyve#494 리뷰 1회차)
 	fix := st.indentedCloseFix(n, line)
 	if fix != nil {
 		msg += ". 이 줄로 닫으려던 것이라면 「고치기」로 들여쓰기를 줄이고 앞에 빈 줄을 둔다"

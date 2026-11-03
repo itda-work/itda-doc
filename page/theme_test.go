@@ -51,7 +51,7 @@ func TestBuiltinThemes(t *testing.T) {
 
 // 테마는 모양일 뿐 문서의 목적을 정하지 않는다 — 같은 테마가 제안서·강의·사내 공지 어디에 쓰일지 모른다.
 // 그래서 내장 테마는 문서 종류를 나타내는 장식 글자(자기 이름·제목·별칭, 「PROPOSAL」·「회의록」 같은 종류 낱말)를
-// CSS 글자(content)나 머리글·바닥글의 고정 글자로 쪽·슬라이드에 찍지 않는다(#549). 구조 글자(「제 n 장」·「결과」)와
+// CSS 글자(content)나 머리글·바닥글의 고정 글자로 쪽·슬라이드에 찍지 않는다(itda-hyve#549). 구조 글자(「제 n 장」·「결과」)와
 // meta 이름표는 이 검사의 대상이 아니다.
 // themeContentStr 는 CSS content 의 문자열 값(큰·작은따옴표, 콜론 앞뒤 공백)을 잡는다.
 var themeContentStr = regexp.MustCompile(`content\s*:\s*((?:(?:"[^"]*"|'[^']*')\s*)+)`)
@@ -81,7 +81,7 @@ func TestBuiltinThemesNoPurposeText(t *testing.T) {
 	placeholder := regexp.MustCompile(`\{[^}]*\}`)
 	for _, i := range ts.List() {
 		th, _ := ts.Get(i.Name)
-		// 자기 이름·제목·별칭에 더해 문서 종류 낱말(옛 테마 이름 포함, #549)도 금지어로 본다
+		// 자기 이름·제목·별칭에 더해 문서 종류 낱말(옛 테마 이름 포함, itda-hyve#549)도 금지어로 본다
 		words := append([]string{th.Name, th.Title}, th.Aliases...)
 		words = append(words, "report", "proposal", "official", "minutes", "manual",
 			"보고서", "제안서", "공문", "기안", "회의록", "매뉴얼", "절차서")
@@ -104,7 +104,7 @@ func TestBuiltinThemesNoPurposeText(t *testing.T) {
 }
 
 // 기본 내장 다섯은 모양 이름(classic·bold·mono·compact·spine)과 한글 제목 별칭만 받는다. 옛 목적 이름과 그 별칭은
-// 받지 않는다(#549 — 숨은 별칭으로 남기지 않기로 함). 옛 이름을 적은 문서는 같은 이름의 사용자 테마가 없으면 모르는 테마처럼 기본 테마로 열린다.
+// 받지 않는다(itda-hyve#549 — 숨은 별칭으로 남기지 않기로 함). 옛 이름을 적은 문서는 같은 이름의 사용자 테마가 없으면 모르는 테마처럼 기본 테마로 열린다.
 func TestBuiltinThemesNoLegacyNames(t *testing.T) {
 	ts := builtin(t)
 	legacy := []string{"report", "proposal", "official", "minutes", "manual", "gongmun", "default",
@@ -259,7 +259,7 @@ func TestTokenTableMatchesBaseCSS(t *testing.T) {
 	for _, m := range regexp.MustCompile(`var\((--[a-z0-9-]+)`).FindAllStringSubmatch(css, -1) {
 		local := map[string]bool{"--c": true, "--d": true, "--panel-w": true, "--panel-gap": true, "--img-max-h": true, "--slide-head-h": true, "--body-h": true}
 		if _, ok := code[m[1]]; !ok && !local[m[1]] {
-			// --c·--d·--panel-w·--panel-gap 은 규칙 안의 지역 변수(알림 색·차트 항목 차례·분할 그림 패널 폭과 틈 #550),
+			// --c·--d·--panel-w·--panel-gap 은 규칙 안의 지역 변수(알림 색·차트 항목 차례·분할 그림 패널 폭과 틈 itda-hyve#550),
 			// --img-max-h·--slide-head-h·--body-h 는 화면(쪽 나눔기·슬라이드 나눔기)이 재어 거는 값
 			t.Errorf("base.css 가 쓰는 %s 에 기본값이 없음", m[1])
 		}
@@ -402,11 +402,11 @@ func TestSlideGuardRuleForms(t *testing.T) {
 		".slide-title .slide-cont { font-size: 0.55em; }",      // em
 		".result { font-size: 9.6pt; }",                        // 본문 서식 — 약속 밖
 		":where(.page.slide .page-body ul ul) { font-size: 0.88em; }",
-		// at-rule 이름 변형(리뷰 4회차 [1]) — AtName 이 뽑은 이름(소문자)으로 식별한다
+		// at-rule 이름 변형(리뷰 4회차 [1]) — atName 이 뽑은 이름(소문자)으로 식별한다
 		"@MEDIA print { .ss-num { font-size: calc(44pt * var(--slide-scale)); } }",
 		"@media\nprint { .ss-num { font-size: calc(44pt * var(--slide-scale)); } }",
 		"@supports(display: grid) { .sc-title { font-size: calc(40pt * var(--slide-scale)); } }",
-		"@keyframes hyve-x { from { opacity: 0; } }", // 안의 규칙은 슬라이드 표식이 없어 통과
+		"@keyframes demo-x { from { opacity: 0; } }", // 안의 규칙은 슬라이드 표식이 없어 통과
 	}
 	for _, css := range ok {
 		rules, err := slideCSSRules(css)

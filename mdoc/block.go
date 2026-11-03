@@ -10,10 +10,10 @@ import (
 	extast "github.com/yuin/goldmark/extension/ast"
 )
 
-// 자료 표 발행기(#365 ③ — internal/datareport)가 쓰는 읽기 전용 도우미. 렌더 경로는 쓰지 않는다 — 칸 이스케이프는 CSV 표(#115)
+// 앱의 자료 표 발행기(itda-hyve#365 ③)가 쓰는 읽기 전용 도우미. 렌더 경로는 쓰지 않는다 — 칸 이스케이프는 CSV 표(itda-hyve#115)
 // 와 발행기의 한 정본이고, 최상위 블록 범위는 표·:::chart 를 그 앞 기록 주석과 묶어 읽는 데 쓴다.
 
-// cellEscapes 는 칸에서 백슬래시로 막는 글자다. GFM 표 칸의 `|`, 강조·코드·링크·이미지·raw HTML·엔티티·취소선·수식(#116)·각주.
+// cellEscapes 는 칸에서 백슬래시로 막는 글자다. GFM 표 칸의 `|`, 강조·코드·링크·이미지·raw HTML·엔티티·취소선·수식(itda-hyve#116)·각주.
 // CommonMark 는 ASCII 문장부호 어느 것이든 앞에 \ 를 붙이면 그 글자 그대로다 — GitHub·VS Code 에서도 같다.
 const cellEscapes = "\\`*_[]<>!&~|$"
 
@@ -121,7 +121,7 @@ func ChartNumber(s, unit string) (v float64, ok bool) {
 func ChartMaxSeries() int { return chartMaxSeries }
 func ChartMaxSlices() int { return chartMaxSlices }
 
-// InsertSpot 은 커서 줄에 최상위 블록 하나(자료 표 — #365 ③ 조각 C)를 넣을 자리다. Line 은 넣을 줄이다 — 그 줄 머리에 넣는다
+// InsertSpot 은 커서 줄에 최상위 블록 하나(자료 표 — itda-hyve#365 ③ 조각 C)를 넣을 자리다. Line 은 넣을 줄이다 — 그 줄 머리에 넣는다
 // (줄 수 + 1 이면 문서 끝). Kind 는 넣지 못할 때 커서가 든 블록의 꼴이다: "list"(목록·정의 목록)·"quote"(인용·알림)·
 // "container"(::: 컨테이너 — 다단·차트 포함)·"footnote"(각주 정의 — 참조 여부·적은 자리와 무관)·"frontmatter"·"boundary"(넣어 보면 기존 글이 달리 읽히는 자리)·"complex"(중첩 상한을 넘어 읽지 못한 문서).
 type InsertSpot struct {

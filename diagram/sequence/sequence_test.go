@@ -99,7 +99,7 @@ func TestParseStatements(t *testing.T) {
 	if err != nil || c.Actors[0].Name != "밥" {
 		t.Errorf("별명 있는 다시 적기: %q %v", c.Actors[0].Name, err)
 	}
-	// 이름에 공백 — 원본은 「Alice Smith」로 읽지만 허용 꼴 밖이다(#208 허용 목록 — 표시 이름은 as 별명으로)
+	// 이름에 공백 — 원본은 「Alice Smith」로 읽지만 허용 꼴 밖이다(itda-hyve#208 허용 목록 — 표시 이름은 as 별명으로)
 	errAt(t, "sequenceDiagram\nparticipant Alice Smith\nA->>B: x", 2, "참여자 선언은")
 	c, _, err = Parse("sequenceDiagram\nparticipant AlS as Alice Smith\nAlS->>B: x")
 	if err != nil || c.Actors[0].Name != "Alice Smith" {
@@ -318,7 +318,7 @@ func TestParseStatements(t *testing.T) {
 	// 남은 # 은 원문 + 경고(원본 lexer 가 주석으로 버리는 자리 — timeline ② 와 같은 결정)
 	errAt(t, "sequenceDiagram\nA->>B: 메모 #1", 2, "# 부터는")
 	errAt(t, "sequenceDiagram\n# 메모\nA->>B: x", 2, "# 부터는")
-	// style/classDef 줄의 끝 ; 자르기(원본 전처리 — timeline ② TestReviewR3 와 같은 경계): ; 이 잘리며 남은 #35 는
+	// style/classDef 줄의 끝 ; 자르기(원본 전처리 — timeline ② TestReviewR3 와 같은 경계): ; 이 잘리며 남은 itda-hyve#35 는
 	// 엔티티꼴이 아니므로 이 판은 그 줄을 원문 + 경고로 돌린다(원본은 TXT 가 # 에서 잘라 앞부분만 그린다).
 	errAt(t, "sequenceDiagram\nA->>B: style:x#35;\nB->>A: 답", 2, "# 부터는")
 	errAt(t, "sequenceDiagram\nA->>B: classDef:y#ff0000;", 2, "# 부터는")
@@ -1278,7 +1278,7 @@ func TestReviewR1(t *testing.T) {
 			t.Errorf("autonumber 0 0: 0 은 세던 값(1, 2)\n%s", svg)
 		}
 	})
-	t.Run("참여자 표시 이름 엔티티·상한", func(t *testing.T) { // [3] → 이름의 엔티티는 허용 꼴 밖(#208 허용 목록), 별명은 라벨 경로
+	t.Run("참여자 표시 이름 엔티티·상한", func(t *testing.T) { // [3] → 이름의 엔티티는 허용 꼴 밖(itda-hyve#208 허용 목록), 별명은 라벨 경로
 		errAt(t, "sequenceDiagram\nparticipant A#35;\nA->>B: hi", 2, "참여자 선언은")
 		errAt(t, "sequenceDiagram\nA#35;->>B: hi", 2, "참여자 이름")
 		svg, _ := drawn(t, "sequenceDiagram\nparticipant A as A#35;\nA->>B: hi")
@@ -1294,7 +1294,7 @@ func TestReviewR1(t *testing.T) {
 			t.Errorf("box 이름이 여러 줄로 안 감김\n%s", svg)
 		}
 	})
-	t.Run("wrap 앞말 자리", func(t *testing.T) { // [5] → #208 결정으로 원문+경고로 좁힘(자리 목록은 그대로 검사)
+	t.Run("wrap 앞말 자리", func(t *testing.T) { // [5] → itda-hyve#208 결정으로 원문+경고로 좁힘(자리 목록은 그대로 검사)
 		for _, src := range []string{
 			"sequenceDiagram\nparticipant A as wrap: Alice",
 			"sequenceDiagram\nloop wrap: Retry\nA->>A: x\nend",
@@ -1309,7 +1309,7 @@ func TestReviewR1(t *testing.T) {
 			}
 		}
 	})
-	t.Run("box 색 transparent·애매 함수", func(t *testing.T) { // [6] → #208 결정으로 경계 축소(자세한 규칙은 TestReviewR2)
+	t.Run("box 색 transparent·애매 함수", func(t *testing.T) { // [6] → itda-hyve#208 결정으로 경계 축소(자세한 규칙은 TestReviewR2)
 		c, _, err := Parse("sequenceDiagram\nbox transparent Team\nparticipant A\nend\nA->>A: x")
 		if err != nil || c.Boxes[0].Name != "Team" {
 			t.Errorf("transparent 색: 이름 %q %v", c.Boxes[0].Name, err)
@@ -1356,7 +1356,7 @@ func renderLErr(src string) (*layout, string, error) {
 	return l, l.emit(), nil
 }
 
-// TestReviewR2 는 리뷰 2회차 발견 4건의 재현 시험이다(scratchpad result-sequence-r2.md — #208 접근 방식
+// TestReviewR2 는 리뷰 2회차 발견 4건의 재현 시험이다(scratchpad result-sequence-r2.md — itda-hyve#208 접근 방식
 // 결정으로 좁힌 뒤의 기대값).
 func TestReviewR2(t *testing.T) {
 	t.Run("wrap 앞말 이중 제거", func(t *testing.T) { // [1] → 앞말은 이제 원문+경고(B1)
@@ -1412,13 +1412,13 @@ func TestReviewR2(t *testing.T) {
 		errAt(t, "sequenceDiagram\nA->>loop: x", 2, "예약어")
 		errAt(t, "sequenceDiagram\nnote over end: x", 2, "예약어") // 대소문자 무시
 		errAt(t, "sequenceDiagram\nNote right of BOX: x", 2, "예약어")
-		// 선언(ID 상태)은 원본이 읽지만 허용 목록은 선언·참조 모두 막는다(단순화 — #208)
+		// 선언(ID 상태)은 원본이 읽지만 허용 목록은 선언·참조 모두 막는다(단순화 — itda-hyve#208)
 		errAt(t, "sequenceDiagram\nparticipant end\nparticipant A\nA->>A: x", 2, "예약어")
 		errAt(t, "sequenceDiagram\nparticipant A\nactivate end", 3, "예약어")
 	})
 }
 
-// TestReviewR3 은 리뷰 3회차 재현 4건이다(scratchpad result-sequence-r3.md) — #208 두 번째 접근 방식 결정(허용 목록
+// TestReviewR3 은 리뷰 3회차 재현 4건이다(scratchpad result-sequence-r3.md) — itda-hyve#208 두 번째 접근 방식 결정(허용 목록
 // 문법)으로 넷 모두 원문 + 줄 번호 경고가 된다.
 func TestReviewR3(t *testing.T) {
 	for _, tc := range []struct {
@@ -1555,7 +1555,7 @@ func TestReviewR6(t *testing.T) {
 	}
 }
 
-// ---- 독립 판정기(#208 두 번째 결정 — 허용 목록 문법). 시험 안에 허용 꼴을 따로 옮긴 정규식으로 수락 여부와 값을 구하고
+// ---- 독립 판정기(itda-hyve#208 두 번째 결정 — 허용 목록 문법). 시험 안에 허용 꼴을 따로 옮긴 정규식으로 수락 여부와 값을 구하고
 // Render(구조)와 전부 대조한다. 구현 코드·상수(정규식·색 목록·예약어)를 가져다 쓰지 않는다.
 
 const jID = `[\p{L}_][\p{L}\p{N}_]*`
@@ -2295,7 +2295,7 @@ func TestDirectiveLines(t *testing.T) {
 }
 
 // 줄 머리 %% 주석 — 원본 cleanupComments 처럼 accDescr { … } 블록 안에서도 지운다(설명에 넣지 않는다). 블록 밖 주석은 그대로
-// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — #409 ④-1 후속 리뷰 1회차 [2]).
+// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 func TestCommentLines(t *testing.T) {
 	const head, tail = "sequenceDiagram\n", "\nC->>D: y"
 	for _, c := range []struct{ src, desc string }{
@@ -2312,7 +2312,7 @@ func TestCommentLines(t *testing.T) {
 			t.Errorf("%q: 설명이 %q 가 아니거나 주석이 남음\n%s", c.src, c.desc, r.SVG)
 		}
 	}
-	// 블록 밖 맨 %% 는 원본 lexer 의 주석 규칙(jison:28)이 건너뛴다 — 경고 없이 그린다(#409 ④-1 후속 수정 2).
+	// 블록 밖 맨 %% 는 원본 lexer 의 주석 규칙(jison:28)이 건너뛴다 — 경고 없이 그린다(itda-hyve#409 ④-1 후속 수정 2).
 	for _, src := range []string{head + "%% 밖 주석" + tail, head + "%%" + tail, head + "  %%\r" + tail} {
 		if r, err := Render(src); err != nil || len(r.Issues) != 0 {
 			t.Errorf("%q 블록 밖 주석: %v %+v", src, err, r.Issues)

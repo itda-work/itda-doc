@@ -1,11 +1,11 @@
-// Package mdsyntax 는 문서 창 마크다운 문법의 단일본이다(#134).
+// Package mdsyntax 는 문서 창 마크다운 문법의 단일본이다(itda-hyve#134).
 //
 // 정본은 사람이 읽는 안내서(spec/*.md)다. 안내서의 `<!-- syntax:주제:begin -->` … `end` 구간을
 // extract.Build 가 모아 topics/<주제>.md 로 쓰고(go generate — gen/), 바이너리에 넣는다. 손으로 고치지 않는다:
 // TestBundleFresh 가 안내서에서 다시 만든 것과 넣은 것이 바이트까지 같은지 본다.
 // 같은 안내서의 표지 표(컨테이너·알림·frontmatter 키·차트 속성·차트 종류)는 문서 창 편집기의 자동 완성 후보가 된다
-// (completions.json — 같은 gen 이 쓰고 같은 시험이 묶는다, #434).
-// Claude 는 Itda Hyve 의 MCP md_syntax·CLI `md --syntax` 로 지금 실행 중인 판의 문법을 받는다 — 판과 Hash 가 함께 간다.
+// (completions.json — 같은 gen 이 쓰고 같은 시험이 묶는다, itda-hyve#434).
+// Claude 는 앱의 문법 도구(예: MCP md_syntax)나 `itda-doc syntax` 로 지금 실행 중인 판의 문법을 받는다 — 판과 Hash 가 함께 간다.
 package mdsyntax
 
 import (

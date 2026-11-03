@@ -12,7 +12,7 @@ import (
 
 // 원문을 한 번 훑는다 — 줄마다 아래 허용 꼴(양성 목록) 하나에 통째로 맞아야 그리고, 어느 꼴에도 맞지 않으면 그 자리에서
 // *Error(줄 번호)로 멈춘다(원문 길이에 선형). 허용 꼴은 mermaid@12.2.0 stateDiagram.jison 이 같은 뜻으로 읽는다고 이 판이
-// 확신할 수 있는 좁은 꼴만 모은 것이다(#208 「허용 목록 문법」 — er ④-1 과 같은 결정). 원본이 그리는 구석 꼴(메모·복합 상태를
+// 확신할 수 있는 좁은 꼴만 모은 것이다(itda-hyve#208 「허용 목록 문법」 — er ④-1 과 같은 결정). 원본이 그리는 구석 꼴(메모·복합 상태를
 // 끝점으로 쓰는 전이·중첩 복합 상태·동시 영역 --·[[fork]]·한 줄 여러 문장 …)은 원문 + 줄 번호 경고로 간다(의도된 축소).
 //
 //	한 줄에 문장 하나. 줄 머리 %% 는 주석(원본 전처리 cleanupComments 가 지운다 — 블록 안에서도), 글 없는 맨 %% 도 주석
@@ -28,7 +28,7 @@ import (
 //	무시      %%{…}%%(한 줄) · frontmatter 의 title 밖 키 · style · classDef · class · ::: · click · hide empty description
 //	라벨      설명·전이 라벨·복합 상태 설명 — labelOK(마크다운·HTML·lexer 가 다르게 읽는 글자 없음), 안쪽 빈칸은 한 칸씩, 200 자
 //
-// 원본 전처리(encodeEntities — 엔티티 `#…;` 를 내부 표식으로 지켜 준다)는 본문 줄마다 먼저 지나간다(공통 internal/diagram).
+// 원본 전처리(encodeEntities — 엔티티 `#…;` 를 내부 표식으로 지켜 준다)는 본문 줄마다 먼저 지나간다(공통 diagram).
 // 표식은 정책 B(entity.go restore)로만 한 번 되돌린다 — 공통 DecodeLabel 은 쓰지 않는다.
 
 // Parse 는 mermaid stateDiagram 원문을 읽는다. 그릴 수 없는 문법이면 *Error 다. issues 는 쓰지 않은 줄이다.
@@ -557,7 +557,7 @@ func (c *chart) eachText(f func(field, what, v string, line int) error) error {
 }
 
 // gate 는 출력 관문이다 — 내보낼 사용자 글자가 모두 diagram.XmlChars(SVG 쓰기 경로 Esc 와 Result.Caption)를 지나도 그대로인지
-// 보고, 바뀌는 값이 있으면 그 값이 나온 줄의 *Error 다(받은 글자 = 출력 글자 — 리뷰 3·4회차, #208 규칙으로 구조로 닫음).
+// 보고, 바뀌는 값이 있으면 그 값이 나온 줄의 *Error 다(받은 글자 = 출력 글자 — 리뷰 3·4회차, itda-hyve#208 규칙으로 구조로 닫음).
 func (c *chart) gate() error {
 	return c.eachText(func(_, what, v string, line int) error {
 		if msg := xmlProblem(v, what); msg != "" {

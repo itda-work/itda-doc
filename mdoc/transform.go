@@ -76,7 +76,7 @@ func (st *state) transform(doc *ast.Document) {
 	for _, p := range paras {
 		st.specialParagraph(p)
 	}
-	// 펜스 바로 앞 Deckset 줄 강조 지시어 문단은 펜스에 걸고 지운다(#479 — codehl.go). 아래 그림 판정은 지운 문단(부모 nil)을 건너뛴다
+	// 펜스 바로 앞 Deckset 줄 강조 지시어 문단은 펜스에 걸고 지운다(itda-hyve#479 — codehl.go). 아래 그림 판정은 지운 문단(부모 nil)을 건너뛴다
 	for _, fc := range fences {
 		st.codeHLDirectives(fc)
 	}
@@ -94,7 +94,7 @@ func (st *state) transform(doc *ast.Document) {
 			}
 		}
 	}
-	// 섞인 문단의 마지막 줄 이미지를 그림으로 떼는 것은 다음 문단이 Figure: 캡션일 때만이다(#466) —
+	// 섞인 문단의 마지막 줄 이미지를 그림으로 떼는 것은 다음 문단이 Figure: 캡션일 때만이다(itda-hyve#466) —
 	// Figure: 가 없는 섞인 문단(배지 줄 따위)은 그대로 둔다.
 	for _, p := range paras {
 		if p.Parent() != nil {
@@ -113,7 +113,7 @@ func (st *state) transform(doc *ast.Document) {
 		st.chart(c) // 표 캡션을 옮긴 뒤 — 캡션이 차트 캡션이 된다
 	}
 	st.processHeadings(headings)
-	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(#550)
+	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(itda-hyve#550)
 	for _, l := range links {
 		st.link(l)
 	}
@@ -123,7 +123,7 @@ func (st *state) transform(doc *ast.Document) {
 			c.SetAttributeString("data-line", []byte(strconv.Itoa(line)))
 		}
 	}
-	// 표마다(최상위·컨테이너·목록·인용 안) 머리 행의 원문 줄 — 미리보기에서 표 편집으로 가는 길(#355). 값은 TableAt 의 Start 와 같다
+	// 표마다(최상위·컨테이너·목록·인용 안) 머리 행의 원문 줄 — 미리보기에서 표 편집으로 가는 길(itda-hyve#355). 값은 TableAt 의 Start 와 같다
 	// (tableLine). 차트로 바뀐 표는 노드가 없어 붙지 않는다. goldmark 표 렌더러는 data- 속성을 필터와 상관없이 낸다.
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if t, ok := n.(*extast.Table); ok && entering {
@@ -137,7 +137,7 @@ func (st *state) transform(doc *ast.Document) {
 }
 
 // notes 는 발표자 노트 — 이름이나 클래스가 notes 인 컨테이너(render.go container 가 붙이는 class 와 같은 classes() 로 판정한다) —
-// 를 DropNotes 와 상관없이 늘 이름 notes 하나로 두고 다른 속성(class·id·data-*·너비)은 경고와 함께 버린다(#344 2단계 리뷰 5회차 —
+// 를 DropNotes 와 상관없이 늘 이름 notes 하나로 두고 다른 속성(class·id·data-*·너비)은 경고와 함께 버린다(itda-hyve#344 2단계 리뷰 5회차 —
 // {.notes .page-break} 가 호스트에서는 쪽 나눔, 공유에서는 노트라 묶음이 갈렸다). 노트는 노트일 뿐 쪽 나눔 같은 구조 표지를 겸하지
 // 않으므로, 렌더 결과의 노트 자리는 늘 `<div class="notes" data-line="N">` 이다. DropNotes 면 자식도 모두 떼어 빈 자리로 남긴다 —
 // 태그·속성이 호스트와 바이트 단위로 같으므로 맨 위 블록의 차례·종류·class 가 같고 slideLevel·쪽 나눔·slides.js 묶음이 노트 공개와
@@ -480,12 +480,12 @@ func (st *state) alert(q *ast.Blockquote) {
 	q.Parent().ReplaceChild(q.Parent(), q, a)
 }
 
-// ---- 이미지 width·슬라이드 배치·그림 (1.7, #550)
+// ---- 이미지 width·슬라이드 배치·그림 (1.7, itda-hyve#550)
 
 type imageInfo struct {
 	kind  urlKind
 	width string
-	// 슬라이드 그림 배치(#550·#569): place 는 "" · "fit" · "left" · "right" · "full"(배경), fill 은 .fill(분할 패널·배경을 cover 로),
+	// 슬라이드 그림 배치(itda-hyve#550·itda-hyve#569): place 는 "" · "fit" · "left" · "right" · "full"(배경), fill 은 .fill(분할 패널·배경을 cover 로),
 	// split 은 그림:글 비율(splitRatios 의 값, ""이면 1:1). noAlt 는 alt 가 Deckset 배치 키워드였다는 것 — 대체 글 대신 배치 지시라
 	// alt 를 비운다.
 	place string
@@ -494,17 +494,17 @@ type imageInfo struct {
 	noAlt bool
 }
 
-// imagePlaceClasses 는 이미지 속성으로 받는 배치 클래스다(#550, .full 은 #569). 그 밖의 클래스·id 는 경고하고 버린다.
+// imagePlaceClasses 는 이미지 속성으로 받는 배치 클래스다(itda-hyve#550, .full 은 itda-hyve#569). 그 밖의 클래스·id 는 경고하고 버린다.
 var imagePlaceClasses = map[string]bool{"fit": true, "fill": true, "left": true, "right": true, "full": true}
 
-// splitRatios 는 split= 으로 받는 그림:글 비율이다(#550).
+// splitRatios 는 split= 으로 받는 그림:글 비율이다(itda-hyve#550).
 var splitRatios = map[string]bool{"1:1": true, "1:2": true, "1:3": true, "2:1": true, "3:1": true}
 
-// decksetWordRe 는 Deckset 그림 지시 낱말이다(#550). alt 전체가 이 낱말로만 이루어졌을 때만 배치 지시로 읽는다.
+// decksetWordRe 는 Deckset 그림 지시 낱말이다(itda-hyve#550). alt 전체가 이 낱말로만 이루어졌을 때만 배치 지시로 읽는다.
 var decksetWordRe = regexp.MustCompile(`^(?:left|right|fit|inline|filtered|original|[0-9]+%)$`)
 
 // decksetAlt 는 alt 글자가 Deckset 지시(낱말만)인지 보고 배치를 정한다. ok 가 거짓이면 지시가 아니다(보통 대체 글).
-// 받는 꼴: left·right → 분할 패널 cover, left fit·right fit(차례 무관) → 분할 패널 contain, fit 단독 → 배경 contain(.full, #569),
+// 받는 꼴: left·right → 분할 패널 cover, left fit·right fit(차례 무관) → 분할 패널 contain, fit 단독 → 배경 contain(.full, itda-hyve#569),
 // inline → 보통 그림. 그 밖의 지시 낱말 조합(filtered·original·N% 등)은 known 이 거짓 — 경고하고 보통 그림으로 둔다.
 func decksetAlt(alt string) (place string, fill, known, ok bool) {
 	words := strings.Fields(alt)
@@ -544,7 +544,7 @@ func (st *state) image(img *ast.Image) {
 			st.warn(line, WarnRemoteImage, "불러오지 않은 원격 이미지: "+clip(string(img.Destination)))
 		}
 	}
-	// Deckset 호환(#550): alt 가 지시 낱말로만 이루어졌으면 배치 지시다. 아래 {…} 의 배치 클래스가 있으면 그쪽이 이긴다.
+	// Deckset 호환(itda-hyve#550): alt 가 지시 낱말로만 이루어졌으면 배치 지시다. 아래 {…} 의 배치 클래스가 있으면 그쪽이 이긴다.
 	if alt := plainText(img, st.src); alt != "" {
 		if place, fill, known, ok := decksetAlt(alt); ok {
 			info.noAlt = true
@@ -611,7 +611,7 @@ func (st *state) image(img *ast.Image) {
 	cutFront(img.Parent(), t, start+end+1)
 }
 
-// imagePlace 는 이미지 속성의 배치 클래스·split 을 읽는다(#550·#569). 배치 클래스(.fit·.left·.right·.full)가 있으면 Deckset alt
+// imagePlace 는 이미지 속성의 배치 클래스·split 을 읽는다(itda-hyve#550·itda-hyve#569). 배치 클래스(.fit·.left·.right·.full)가 있으면 Deckset alt
 // 지시를 통째로 덮는다(.fill 도 속성에 적힌 것만). 배치 클래스 없이 .fill 만 있으면 alt 지시의 분할·배경 그림에 더한다. .left·.right·
 // .full 을 둘 이상 적으면 먼저 적힌 쪽 + 경고, 그 셋 가운데 하나가 있으면 .fit 은 겹친 뜻이라 경고 없이 버린다.
 // .fill 은 분할 그림(.left·.right)과 배경(.full)에만, split 은 분할 그림에만 뜻이 있어 그 밖에서는 경고하고 버린다. split 이 받는
@@ -652,8 +652,8 @@ func (st *state) imagePlace(line int, info *imageInfo, a attrs) {
 	}
 }
 
-// slideSplits 는 분할 그림(.left·.right)의 패널 여부와 배경 그림(.full, #569)의 배경 여부, 가로 배치(fit-row, #569)를 정한다
-// (#550 — 판정은 여기서만 하고 slides.js 는 표시된 블록만 옮긴다).
+// slideSplits 는 분할 그림(.left·.right)의 패널 여부와 배경 그림(.full, itda-hyve#569)의 배경 여부, 가로 배치(fit-row, itda-hyve#569)를 정한다
+// (itda-hyve#550 — 판정은 여기서만 하고 slides.js 는 표시된 블록만 옮긴다).
 //  0. 가로 배치: 맨 위 문단이 .fit 그림 2장 이상만으로 되어 있으면 class fit-row 를 단다(fitRow). 아래 1·2 에서 .fit 으로 바뀌기 전의
 //     배치로 본다 — 분할·배경 그림이 섞인 문단은 가로 배치가 아니다(경고).
 //  1. 패널·배경 후보는 맨 위 블록이 그 그림 하나뿐인 것 — 그림 하나뿐인 그림(Figure, 캡션은 함께)과 그림 하나만 감싼 링크 하나뿐인
@@ -732,7 +732,7 @@ func (st *state) slideSplits(doc ast.Node) {
 }
 
 // fitRow 는 맨 위 문단 p 가 .fit 그림 2장 이상만으로 되어 있으면(그림 하나만 감싼 링크도 그림 한 장, 사이에는 빈 글자·줄바꿈만)
-// class fit-row 를 단다(#569 — slides.js·pager.js 가 같은 높이로 가로에 늘어놓는다. 문서에는 규칙이 없어 지금과 같은 문단이다).
+// class fit-row 를 단다(itda-hyve#569 — slides.js·pager.js 가 같은 높이로 가로에 늘어놓는다. 문서에는 규칙이 없어 지금과 같은 문단이다).
 // .fit 그림이 2장 이상인데 다른 것(글·서식·다른 배치의 그림·.fit 아닌 그림)이 섞였으면 경고하고 그대로 둔다(각 그림은 제자리 .fit).
 func (st *state) fitRow(p *ast.Paragraph) {
 	isFit := func(n ast.Node) bool {
@@ -769,7 +769,7 @@ func (st *state) fitRow(p *ast.Paragraph) {
 	p.SetAttributeString("class", []byte("fit-row"))
 }
 
-// slotImage 는 맨 위 블록 c 가 분할 그림(.left·.right)이나 배경 그림(.full) 하나뿐이면 그 그림을, 아니면 nil 을 돌려준다(#550·#569):
+// slotImage 는 맨 위 블록 c 가 분할 그림(.left·.right)이나 배경 그림(.full) 하나뿐이면 그 그림을, 아니면 nil 을 돌려준다(itda-hyve#550·itda-hyve#569):
 // 그림(Figure)의 자식이 이미지 하나(+ Figure: 캡션)이거나, 문단의 내용이 링크 하나이고 그 링크의 내용이 이미지 하나인 것. 빈 글자
 // (속성을 떼고 남은 공백)는 세지 않는다.
 func (st *state) slotImage(c ast.Node) *ast.Image {
@@ -817,7 +817,7 @@ func (st *state) soleChild(n ast.Node) ast.Node {
 	return one
 }
 
-// olDigits 는 번호 목록(<ol>)에 가장 큰 번호의 자릿수 class(ol-d2 … ol-d9)를 단다(#575). 가장 큰 번호 = 시작 번호 + 항목 수 − 1.
+// olDigits 는 번호 목록(<ol>)에 가장 큰 번호의 자릿수 class(ol-d2 … ol-d9)를 단다(itda-hyve#575). 가장 큰 번호 = 시작 번호 + 항목 수 − 1.
 // 번호(::marker)는 목록 바깥 들여쓰기 칸에 그려지고 쪽 본문 상자가 그 밖을 잘라 내므로, base.css 가 이 class 에서만 들여쓰기를
 // 자릿수만큼 넓힌다. 한 자리(9 이하)는 class 가 없어 모양이 그대로다. 아홉 자리 이상은 ol-d9 하나다(goldmark 의 시작 번호는
 // 아홉 자리까지). 글머리 목록은 대상이 아니다. 중첩 목록은 목록마다 따로 센다. 쪽을 넘어 나뉜 뒷조각(pager.js splitList)은
@@ -926,7 +926,7 @@ func (st *state) figure(p *ast.Paragraph) *Figure {
 	return f
 }
 
-// ---- 그림 캡션 문단 (1.7, #466)
+// ---- 그림 캡션 문단 (1.7, itda-hyve#466)
 
 var figureCaptionRe = regexp.MustCompile(`^[ \t]*(?:Figure:|figure:)[ \t]*`)
 

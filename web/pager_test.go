@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 쪽 나눔의 pre 줄 번호(#126 리뷰 R4): 코드 블록·mdoc 안전 모드의 원문 블록(.raw-source)을 거듭 나눠도 조각마다 data-line 이 그 조각의
+// 쪽 나눔의 pre 줄 번호(itda-hyve#126 리뷰 R4): 코드 블록·mdoc 안전 모드의 원문 블록(.raw-source)을 거듭 나눠도 조각마다 data-line 이 그 조각의
 // 첫 원문 줄이고(나눌 때마다 펜스 몫 1 이 쌓였다), 원문 블록은 조각에서도 줄마다 span[data-line] 이다. pager.js 의 splitPre 를 그대로 떼어
 // node 로 돌린다(testdata/pager_split.cjs). 실제 레이아웃은 selftest 가 본다.
 func TestPagerSplitPreLines(t *testing.T) {
@@ -60,7 +60,7 @@ func TestPagerPageBands(t *testing.T) {
 	}
 }
 
-// 쪽 넘김 키와 복사 단추(#413 리뷰 [2]): 단추(button — 코드 복사 단추 등)에 포커스가 있으면 Space 는 단추 누르기의 키다 —
+// 쪽 넘김 키와 복사 단추(itda-hyve#413 리뷰 [2]): 단추(button — 코드 복사 단추 등)에 포커스가 있으면 Space 는 단추 누르기의 키다 —
 // navKey 는 넘기지 않고, hostNavKey(문서 창 보기 모드)도 단추 위에서는 넘기지 않는다(HOST_BUSY 제외). pager.js 를 그대로
 // node 로 돌린다(testdata/pager_nav.cjs). 공유 보기 화면의 keyHandler 는 share_client_test.go(share_conn.cjs)가 본다.
 func TestPagerNavKeys(t *testing.T) {

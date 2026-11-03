@@ -72,4 +72,4 @@
 .page-body .ss-num { display: inline-flex; align-items: center; justify-content: center; width: 1.6em; height: 1.6em; border-radius: 50%;
   background: var(--accent); color: var(--accent-ink); font-size: calc(44pt * var(--slide-scale)); }
 .page-body .ss-title { color: var(--accent-dark); }
-.slide-bg.fill ~ .page-body { --box-bg: var(--paper); --lead-bg: var(--paper); } /* 배경 그림 스크림 위(#569) — 바탕 투명 상자·요약문의 먹색 글이 묻힌다, 종이색 판 */
+.slide-bg.fill ~ .page-body { --box-bg: var(--paper); --lead-bg: var(--paper); } /* 배경 그림 스크림 위(itda-hyve#569) — 바탕 투명 상자·요약문의 먹색 글이 묻힌다, 종이색 판 */

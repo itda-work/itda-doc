@@ -134,7 +134,7 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 				r.st.diagramDone[fc] = true
 				_, _ = w.WriteString(`<figure class="diagram"`)
 				dataAttrs(w, fc)
-				// 그림 자리(#475): 펜스 줄 ratio·width·height — 그림이 성공했을 때만 값과 경고를 낸다(diagramsize.go)
+				// 그림 자리(itda-hyve#475): 펜스 줄 ratio·width·height — 그림이 성공했을 때만 값과 경고를 낸다(diagramsize.go)
 				sz, swarns := parseDiagramSize(string(fenceInfo(fc, src)))
 				sz.attrs(w)
 				for _, msg := range swarns {
@@ -160,7 +160,7 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 		attr(w, "data-title", info.title) // 머리 띠 파일명 — 화면(base.css ::before)이 그리는 표식이다
 	}
 	if fc, ok := node.(*ast.FencedCodeBlock); ok {
-		// 단 나누기(#487): 펜스 줄 cols=2|3 — 화면(codelines.js·base.css)이 N단으로 흘린다(codecols.go)
+		// 단 나누기(itda-hyve#487): 펜스 줄 cols=2|3 — 화면(codelines.js·base.css)이 N단으로 흘린다(codecols.go)
 		cols, cwarns := parseCodeCols(string(fenceInfo(fc, src)))
 		if cols != 0 {
 			attr(w, "data-cols", strconv.Itoa(cols))
@@ -170,7 +170,7 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 		}
 	}
 	if hl := r.codeHL(node, info); hl != "" {
-		attr(w, "data-hl", hl) // 줄 강조(#479) — 화면(codelines.js)이 줄 span 에 hl 클래스를 단다
+		attr(w, "data-hl", hl) // 줄 강조(itda-hyve#479) — 화면(codelines.js)이 줄 span 에 hl 클래스를 단다
 	}
 	_, _ = w.WriteString("><code")
 	if lang != "" {
@@ -278,7 +278,7 @@ func (r *htmlRenderer) autoLink(w util.BufWriter, src []byte, node ast.Node, ent
 	return ast.WalkSkipChildren, nil
 }
 
-// classes 는 슬라이드 그림 배치(#550)의 class 다 — img-fit·img-left·img-right, 그리고 img-fill. 문서(A4·이어보기)에는 이 class 의
+// classes 는 슬라이드 그림 배치(itda-hyve#550)의 class 다 — img-fit·img-left·img-right, 그리고 img-fill. 문서(A4·이어보기)에는 이 class 의
 // 규칙이 없어 보통 그림이다(base.css 는 .page.slide 안에서만 고른다). style 은 여전히 width 에서만 나온다.
 func (info *imageInfo) classes() string {
 	if info.place == "" {
@@ -316,7 +316,7 @@ func (r *htmlRenderer) image(w util.BufWriter, src []byte, node ast.Node, enteri
 		_ = w.WriteByte('"')
 	}
 	if info.noAlt {
-		attr(w, "alt", "") // Deckset 배치 지시(#550) — 대체 글이 아니다
+		attr(w, "alt", "") // Deckset 배치 지시(itda-hyve#550) — 대체 글이 아니다
 	} else {
 		attr(w, "alt", plainText(n, src))
 	}
@@ -380,7 +380,7 @@ func (r *htmlRenderer) footnoteList(w util.BufWriter, src []byte, node ast.Node,
 	_ = w.WriteByte('>')
 	if !empty {
 		_, _ = w.WriteString("\n<hr>\n<ol")
-		// 각주 번호도 본문 순서 목록처럼 자릿수 class 를 단다(#575 — transform.go olDigits 와 같은 규칙, 각주는 1 부터 차례다).
+		// 각주 번호도 본문 순서 목록처럼 자릿수 class 를 단다(itda-hyve#575 — transform.go olDigits 와 같은 규칙, 각주는 1 부터 차례다).
 		// 각주 수가 아홉 이하면 class 가 없어 모양이 그대로다. 들여쓰기는 base.css .footnotes ol.ol-dN
 		n := 0
 		for c := node.FirstChild(); c != nil; c = c.NextSibling() {

@@ -32,13 +32,13 @@ type Meta struct {
 	Version        string
 	Classification string
 	Organization   string
-	// ListStyle 은 목록 기호 사다리다(#141, liststyle.go). "" 이면 테마 기본.
+	// ListStyle 은 목록 기호 사다리다(itda-hyve#141, liststyle.go). "" 이면 테마 기본.
 	ListStyle string
 
 	// Slides 는 frontmatter slides: 다(1.12). 있으면 문서 창이 슬라이드 미리보기로 연다. 없으면 nil.
 	Slides *SlidesMeta
 
-	// Code 는 frontmatter code: 다(#435 — 코드 블록 표시). 없으면 nil.
+	// Code 는 frontmatter code: 다(itda-hyve#435 — 코드 블록 표시). 없으면 nil.
 	Code *CodeMeta
 
 	// Extra 는 모르는 키다. 공문의 수신·참조·시행일처럼 테마가 표지·머리글에 쓴다.
@@ -55,7 +55,7 @@ type SlidesMeta struct {
 	FontScale float64 `json:"font_scale"`
 }
 
-// CodeMeta 는 코드 블록 표시 설정이다(#435). 모두 선택이고, nil 은 "정하지 않음" 이다(화면이 기본을 쓴다).
+// CodeMeta 는 코드 블록 표시 설정이다(itda-hyve#435). 모두 선택이고, nil 은 "정하지 않음" 이다(화면이 기본을 쓴다).
 type CodeMeta struct {
 	// LineNumbers 는 코드 블록 줄 번호다. nil 이면 정하지 않음(기본 켬), false 면 끔. &true 는 정하지 않음과 같은 결과다.
 	LineNumbers *bool `json:"line_numbers,omitempty"`
@@ -84,7 +84,7 @@ func defaultMeta() Meta {
 	return Meta{TOCDepth: 3, PaperSize: "a4"}
 }
 
-// parseFrontmatter 는 맨 앞의 --- 블록을 읽고 폴더 기본값(_metadata.yml)을 합친다(#474 — folder 는
+// parseFrontmatter 는 맨 앞의 --- 블록을 읽고 폴더 기본값(_metadata.yml)을 합친다(itda-hyve#474 — folder 는
 // 먼 폴더부터). 돌려주는 본문은 frontmatter 자리를 빈 줄로 채운 것이다 — 줄 번호가 원문과 같아야
 // data-line·경고가 맞는다. 넷째 값은 적용된 폴더 파일의 문서 기준 상대 경로다(가까운 것부터).
 // 폴더 파일이 적용될 때만 문서도 파일별 정리(tidyMetaNode)·파일 사이 합치기(mergeFolderInto)를 하고,
@@ -99,7 +99,7 @@ func parseFrontmatter(src []byte, folder []FolderMeta) (Meta, []byte, []Warning,
 
 // frontmatterCore 는 frontmatter 풀이의 하나뿐인 길이다: 폴더 합치기(mergeFolderMeta) → 문서 노드
 // 읽기 → (폴더가 적용된 경우) 정리·slides 판단·합치기 → fill. 렌더(parseFrontmatter)와 편집 화면
-// (ResolveFrontmatter, #474 ②)가 함께 부른다 — 별도 재구현이 어긋난 값을 내지 않게. 편집 화면용 키별
+// (ResolveFrontmatter, itda-hyve#474 ②)가 함께 부른다 — 별도 재구현이 어긋난 값을 내지 않게. 편집 화면용 키별
 // 풀(keys)도 여기서 낸다 — 출처는 srcs, 무시는 fill 경고의 Key(Warning.Key), 그룹 억제는 문서의 스칼라
 // false 로 본다.
 func frontmatterCore(src []byte, folder []FolderMeta) (Meta, map[string]FrontmatterKey, []byte, []Warning, []string, bool) {
@@ -163,7 +163,7 @@ func frontmatterCore(src []byte, folder []FolderMeta) (Meta, map[string]Frontmat
 			dropKey(merged, "slides") // 문서가 슬라이드 아님을 정했다 — 폴더 하위 값을 억제한다(suppressedGroups 도 참고)
 		}
 	} else {
-		if w, ok := folderSlidesUnused(merged, srcs); ok { // 버리는 폴더 slides 값을 알린다(#543)
+		if w, ok := folderSlidesUnused(merged, srcs); ok { // 버리는 폴더 slides 값을 알린다(itda-hyve#543)
 			warns = append(warns, w)
 		}
 		dropKey(merged, "slides")
@@ -175,7 +175,7 @@ func frontmatterCore(src []byte, folder []FolderMeta) (Meta, map[string]Frontmat
 	}
 	finalWarns := meta.fill(final, srcs)
 	collectKeys(keys, final, srcs, finalWarns, suppressedGroups(docNode))
-	// 경고 계약(#504, inherit.go 머리): 폴더 값 경고(Line 0)는 최종 값으로 쓰인 폴더 키에서만, 문서
+	// 경고 계약(itda-hyve#504, inherit.go 머리): 폴더 값 경고(Line 0)는 최종 값으로 쓰인 폴더 키에서만, 문서
 	// 경고는 문서 원본 노드를 폴더 없이 따로 풀어 — 폴더가 없을 때와 같은 경고(앞 값·적은 표기·줄)다.
 	// 최종 fill 의 문서 줄 경고는 이 원본 풀이의 부분집합이라 버린다(문서 노드는 같은 함수로 검사된다).
 	for _, w := range finalWarns {
@@ -218,7 +218,7 @@ func docGroupValue(n *yaml.Node, group string) *yaml.Node {
 	return nil
 }
 
-// collectKeys 는 풀이가 끝난 노드에서 편집 화면용 키별 풀을 채운다(#474 ②). 노드는 ① 이 fill 한
+// collectKeys 는 풀이가 끝난 노드에서 편집 화면용 키별 풀을 채운다(itda-hyve#474 ②). 노드는 ① 이 fill 한
 // 것과 같은 노드다(폴더가 적용되지 않았으면 정리 전 문서 노드). 무시된 값은 fill 경고의 Key 로
 // 가려내고, 억제 그룹의 하위 키는 문서가 정한 것(값 없음)으로 둔다.
 func collectKeys(keys map[string]FrontmatterKey, n *yaml.Node, srcs metaSrc, warns []Warning, suppressed map[string]bool) {
@@ -578,7 +578,7 @@ func parseSlides(v *yaml.Node, srcs metaSrc) (*SlidesMeta, []Warning) {
 	return sm, warns
 }
 
-// parseCode 는 code: 를 읽는다(#435). true(또는 빈 값)·매핑을 받고, false 는 line-numbers: false 와 같다(줄 번호 끔).
+// parseCode 는 code: 를 읽는다(itda-hyve#435). true(또는 빈 값)·매핑을 받고, false 는 line-numbers: false 와 같다(줄 번호 끔).
 // 틀린 값은 그 키만 버리고 경고한다(나머지 설정은 쓴다). srcs 는 폴더 출처다(fill 과 같다).
 func parseCode(v *yaml.Node, srcs metaSrc) (*CodeMeta, []Warning) {
 	var warns []Warning

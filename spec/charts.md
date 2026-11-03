@@ -1,7 +1,6 @@
 # 마크다운 차트 — 표를 차트로 그리는 안내서
 
-Itda Doc 문서에서 GFM 표를 차트로 그리는 사람을 위한 안내서다. 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 설계는 [DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 1.11,
-기능 목록은 [FEATURES.md](https://github.com/itda-work/itda-hyve/blob/main/FEATURES.md) 11장이다. 색을 바꾸는 쪽(테마)은 [문서 테마 안내서](themes.md)를 본다.
+Itda Doc 문서에서 GFM 표를 차트로 그리는 사람을 위한 안내서다. 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 색을 바꾸는 쪽(테마)은 [문서 테마 안내서](themes.md)를 본다.
 이 안내서의 예제는 모두 견본 [`spec/samples/charts-guide.md`](samples/charts-guide.md)에 그대로 들어 있고, 그림은 그 견본을 앱으로 렌더한 것이다(14장).
 
 <!-- syntax:charts:begin -->
@@ -78,7 +77,7 @@ Itda Doc 문서에서 GFM 표를 차트로 그리는 사람을 위한 안내서�
 | `bubble` | 버블 | 산점도 + 셋째 수치(원의 넓이) | 0.17.0 |
 <!-- chart-types:end -->
 
-**판**은 그 종류를 처음 그린 itda-hyve 판이다. 문서를 받는 사람의 판이 그보다 옛것이면 그 종류를 모른다.
+**판**은 그 종류를 처음 그린 Itda Hyve 판이다(렌더러가 이 저장소로 나오기 전의 판 번호). 문서를 받는 사람의 판이 그보다 옛것이면 그 종류를 모른다.
 **모르는 `type` 은 차트를 그리지 않고 표를 그대로 보이며 경고한다**(0.17.0 판부터 — 새 판에 생길 종류의 열을 옛 판이 막대로 잘못 그리지 않게).
 0.16.0 까지의 판은 모르는 `type` 을 경고와 함께 `bar` 로 그렸다.
 
@@ -634,10 +633,10 @@ GitHub·VS Code 미리보기·Obsidian 은 `:::chart` 를 모른다. 여는 줄�
 영구히 막은 것이 아니라 **지금** 없는 것이다. 색·글꼴 지정만은 설계상 두지 않는다(7장).
 차트 밖의 수식(`$…$`)과 mermaid 그림은 된다 — [수식 안내서](math.md)·[그림 안내서](diagrams.md).
 
-- 기준선 여러 개·선 계열 여러 개 — [#114](https://github.com/itda-work/itda-hyve/issues/114)(기준선 하나는 3.8, 막대 + 선 하나는 3.9, 보조 축 하나는 3.10)
+- 기준선 여러 개·선 계열 여러 개(기준선 하나는 3.8, 막대 + 선 하나는 3.9, 보조 축 하나는 3.10)
 - 산점도·버블의 점 집합 여러 개(색으로 가르기)·점 잇기·추세선·로그 축·기준선, 칸의 단위 꼬리 떼기(3.11·3.12)
 - 보조 축의 기준선, 보조 축과 기준선을 한 차트에, 오른쪽 축의 막대·면(`area`)·쌓은 막대, 오른쪽 축 계열 여러 개(3.10)
-- CSV 파일을 연결해 두고 출처에서 다시 읽기 — [#115](https://github.com/itda-work/itda-hyve/issues/115) 후속. 지금은 편집기의 **CSV 표** 넣기 도구로 표를 문서에 가져온다(차트 안내서 15장)
+- CSV 파일을 연결해 두고 출처에서 다시 읽기. 지금은 편집기의 **CSV 표** 넣기 도구로 표를 문서에 가져온다(차트 안내서 15장)
 - **시간 축**: `line`·`area` 의 항목은 같은 간격이다. 날짜가 불규칙해도(1일·2일·10일) 같은 간격으로 놓인다.
 - 지수 표기·통화 기호·공백 천 단위(4장).
 
@@ -646,38 +645,29 @@ GitHub·VS Code 미리보기·Obsidian 은 `:::chart` 를 모른다. 여는 줄�
 ## 13. 확인하는 법
 
 ```sh
-itda-hyve md spec/samples/charts-guide.md                                   # 창으로 보기 — 고치면 바로 다시 그린다
-itda-hyve md --theme classic --export-pdf /tmp/charts.pdf spec/samples/charts-guide.md   # 창 없이 PDF. stdout JSON 의 warnings
+itda-doc check spec/samples/charts-guide.md                                   # 경고가 있으면 "파일:줄: 코드 메시지", 종료 코드 1
+itda-doc render -page -theme classic spec/samples/charts-guide.md > charts.html   # 표지·테마 CSS 가 든 단일 HTML
 ```
 
 저장소에서는 테스트가 이 안내서와 코드를 맞춰 본다(`go test ./mdoc/ -run ChartGuide`): 3장의 종류 표와 5장의 상한 표(표지
 `chart-types`·`chart-limits` 안)가 코드의 상수와 같은지, 2장의 속성 표(표지 `chart-attrs`)가 코드가 받는 속성과 같은지, 예제 md 가 경고 없이(경고 예제는 표지 `warn="…"` 에 적은 원인마다 경고 하나씩만) 렌더되고 아홉 종류와 기준선·막대 + 선·보조 축이 모두 나오는지,
-예제가 견본에 그대로 들어 있는지, 문서 안의 상대 링크와 그림이 있는지. 15장(CSV)은 Itda Hyve 저장소의 `go test ./internal/docview/ -run CSVGuide` 가
-상한 표(표지 `csv-limits`)를 코드의 상수와, 예제 CSV 를 넣었을 때의 표를 실제 변환 결과와 맞춘다. `just docview-check` 는 견본 `charts-guide` 를 테마마다 PDF 로 뽑아 센다.
+예제가 견본에 그대로 들어 있는지, 문서 안의 상대 링크와 그림이 있는지. 15장(CSV 가져오기)은 편집기 기능이라 그 기능을 가진 앱의 시험이 상한 표(표지 `csv-limits`)와 예제를 맞춘다.
 
 ## 14. 그림 다시 만들기
 
-그림(`spec/images/charts-*.png`)은 실제 앱 렌더다. 예제를 고치면 견본 [`spec/samples/charts-guide.md`](samples/charts-guide.md)를 같이 고치고 다시 만든다.
-
-```sh
-just build
-scripts/chart-guide-images.sh ./itda-hyve
-```
+그림(`spec/images/charts-*.png`)은 실제 앱 렌더다(견본을 A4 PDF 로 뽑아 쪽마다 그림으로 자른 것). 예제를 고치면 견본 [`spec/samples/charts-guide.md`](samples/charts-guide.md)를 같이 고치고, 그림을 만든 앱(Itda Hyve)에서 다시 만든다.
 
 - 견본: `spec/samples/charts-guide.md` — 1쪽은 소개, 2쪽부터 한 쪽에 예제 하나(`<!-- pagebreak -->`). 테마 `classic`, A4.
-- 명령: `itda-hyve md --theme classic --export-pdf <임시>.pdf spec/samples/charts-guide.md`. `--export-pdf` 는 PNG 를 만들지 않고,
-  `--snapshot` 은 도구 막대가 든 창 사진이라 쓰지 않는다.
-- 변환: `pdftoppm -r 200 -png`(poppler) — 200dpi.
-- 자르기: ImageMagick 7 로 쪽 위 24mm(머리글)·아래 21mm(바닥글)를 잘라 내고 `-fuzz 1% -trim` 으로 흰 여백을 걷은 뒤 28px 테두리를 둔다.
+- 변환: 200dpi PNG, 쪽 위 24mm(머리글)·아래 21mm(바닥글)를 잘라 내고 흰 여백을 걷은 뒤 28px 테두리.
 - 쪽 차례 = 그림 이름: 2 `quick` · 3 `bar` · 4 `hbar` · 5 `stacked` · 6 `line` · 7 `area` · 8 `pie` · 9 `donut` · 10 `numbers` · 11 `ref` · 12 `combo` · 13 `axis2` · 14 `scatter` · 15 `bubble`.
-- 만든 판: itda-hyve 0.16.0 뒤의 개발 판(#114 단계 D, darwin/arm64), macOS WKWebView, 2026-10-13. `charts-scatter.png`·`charts-bubble.png` 를 더했고 다른 그림은 단계 C 판의 그림과 같은 모습이다.
+- 만든 판: Itda Hyve 0.16.0 뒤의 개발 판(darwin/arm64), macOS WKWebView, 2026-10-13. `charts-scatter.png`·`charts-bubble.png` 를 더했고 다른 그림은 단계 C 판의 그림과 같은 모습이다.
 - `charts-github.png`(9장)는 1장의 예제를 `gh api markdown`(GFM, 저장소 문맥)으로 렌더한 HTML 에 `github-markdown-css@5.8.1`(light)을 입혀
   헤드리스 Chrome(`--headless=new --force-device-scale-factor=2 --window-size=640,420`)으로 찍고 같은 방법으로 여백을 다듬었다. github.com 화면 자체의 사진은 아니다.
 
 ## 15. CSV 를 표로 가져오기
 
 엑셀·시스템에서 뽑은 CSV 를 손으로 옮겨 적지 않아도 된다. 편집 도구 막대의 **CSV 표** 를 누르면 파일을 고르는 창이 뜨고, 인코딩·구분자를
-미리 본 뒤 **커서 자리에 GFM 표**(또는 `:::chart` 로 감싼 표)가 들어간다(#115, 0.17.0 판부터). 결과는 보통의 표다 — 다른 뷰어에서도 표로 보이고,
+미리 본 뒤 **커서 자리에 GFM 표**(또는 `:::chart` 로 감싼 표)가 들어간다(0.17.0 판부터). 결과는 보통의 표다 — 다른 뷰어에서도 표로 보이고,
 파일 경로는 문서에 남지 않는다(문서가 CSV 를 읽으러 가지 않는다 — 표가 정본이다). 넣은 뒤 CSV 가 바뀌면 다시 가져온다(출처에서 자동으로 다시 읽기는 없다, 12장).
 
 <!-- csv-example -->

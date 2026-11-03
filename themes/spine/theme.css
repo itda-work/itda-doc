@@ -97,7 +97,7 @@ nav.toc > ul > li > a .toc-section-number { min-width: 14mm; color: var(--highli
 .page-body.bare .ss-num::before { content: "제 "; }
 .page-body.bare .ss-num::after { content: " 장"; }
 .page-body.bare .ss-title { color: #fff; }
-/* 배경 그림 스크림 위(#569) — 먹색 구역 번호·번호 목록 원이 묻힌다. 배경 장은 bare 가 아니라(slides.js) 「제 n 장」 꼬리표는 없다 */
+/* 배경 그림 스크림 위(itda-hyve#569) — 먹색 구역 번호·번호 목록 원이 묻힌다. 배경 장은 bare 가 아니라(slides.js) 「제 n 장」 꼬리표는 없다 */
 .slide-bg.fill ~ .page-body .ss-num { color: var(--slide-scrim-ink); }
 .slide-bg.fill ~ .page-body > ol > li::before { background: var(--slide-scrim-ink); color: var(--accent); }
 .slide-bg.fill ~ .page-body > ol > li::after { background: var(--slide-scrim-muted); }

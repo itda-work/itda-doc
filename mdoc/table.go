@@ -11,7 +11,7 @@ import (
 	extast "github.com/yuin/goldmark/extension/ast"
 )
 
-// 문서 창의 표 편집 그리드(#355). 원문의 GFM 표 하나를 칸 글(마크다운 원문 그대로)·열 정렬·캡션으로 읽고(TableAt),
+// 문서 창의 표 편집 그리드(itda-hyve#355). 원문의 GFM 표 하나를 칸 글(마크다운 원문 그대로)·열 정렬·캡션으로 읽고(TableAt),
 // 고친 것을 열 너비를 맞춘 표 원문으로 쓴다(FormatTable). 렌더와 같은 파서(컨테이너·CJK 확장)로 읽으므로
 // :::chart·:::approval·:::actions·목록·인용 안 표도 찾고, 칸 나누기(\| ·코드 스팬 안 |)가 렌더와 같다.
 
@@ -37,7 +37,7 @@ type Table struct {
 	Prefix     string `json:"prefix"`
 	// Notes 는 읽으며 바꿔 보인 것(머리 행보다 긴 행 — 열을 늘림)이다.
 	Notes []string `json:"notes"`
-	// Tabs 는 GFM 표가 아니라 탭으로 나뉜 줄들을 읽은 것인지다(TabTable·TabBlockAt, #579) — 화면은 그 줄 범위를 표로 바꾸며 앞뒤 빈 줄을 보충한다.
+	// Tabs 는 GFM 표가 아니라 탭으로 나뉜 줄들을 읽은 것인지다(TabTable·TabBlockAt, itda-hyve#579) — 화면은 그 줄 범위를 표로 바꾸며 앞뒤 빈 줄을 보충한다.
 	Tabs bool `json:"tabs"`
 }
 
@@ -90,7 +90,7 @@ func (st *state) readTable(t *extast.Table) Table {
 			tb.HeadPrefix = string(st.src[st.lines[tb.Start-1]:r.Pos()])
 			tb.Prefix = delimPrefix(st.lineBytes(tb.Start + 1))
 		case *extast.TableRow:
-			// goldmark 는 머리 행보다 많은 칸을 버린다 — 남는 칸은 줄을 같은 규칙으로 다시 나눠 살린다(#355 결정 5)
+			// goldmark 는 머리 행보다 많은 칸을 버린다 — 남는 칸은 줄을 같은 규칙으로 다시 나눠 살린다(itda-hyve#355 결정 5)
 			if extra := splitRow(st.src[r.Pos():st.lineEnd(r.Pos())]); len(extra) > len(cs) {
 				cs = append(cs, extra[len(cs):]...)
 				long++
@@ -117,7 +117,7 @@ func (st *state) readTable(t *extast.Table) Table {
 		v := first.Value(st.src)
 		if loc := captionRe.FindIndex(v); loc != nil {
 			tb.CaptionPrefix = strings.TrimSpace(string(v[:loc[1]]))
-			// 줄 종결자만 뗀다 — 줄 끝 공백 둘은 강제 줄바꿈(<br>)이라 지우면 렌더가 바뀐다(#355 리뷰 [2])
+			// 줄 종결자만 뗀다 — 줄 끝 공백 둘은 강제 줄바꿈(<br>)이라 지우면 렌더가 바뀐다(itda-hyve#355 리뷰 [2])
 			parts := []string{strings.TrimRight(string(v[loc[1]:]), "\r\n")}
 			for i := 1; i < p.Lines().Len(); i++ {
 				s := p.Lines().At(i)
@@ -210,7 +210,7 @@ func pad(s []string, n int) []string {
 // tableWidth 는 칸 글의 표시 폭이다. East Asian ambiguous(·, ①, ─ …)는 좁게(1) 센다 — 고정폭 편집기 글꼴이 대개 그렇다.
 var tableWidth = &runewidth.Condition{EastAsianWidth: false}
 
-// FormatCell 은 그리드 칸의 글을 표 칸 원문으로 바꾼다. 바꾸는 것은 셋뿐이다(#355 결정 3): 양끝 공백 제거, 칸 안 줄바꿈 → <br>,
+// FormatCell 은 그리드 칸의 글을 표 칸 원문으로 바꾼다. 바꾸는 것은 셋뿐이다(itda-hyve#355 결정 3): 양끝 공백 제거, 칸 안 줄바꿈 → <br>,
 // 앞 글자가 \ 가 아닌 | → \|. 다른 글자(**·[·< …)는 원문이므로 막지 않는다.
 func FormatCell(s string) string {
 	s = strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, "\r\n", "\n"), "\r", "\n"))
@@ -233,7 +233,7 @@ func FormatCell(s string) string {
 	return b.String()
 }
 
-// 표 쓰기 예산(#355 리뷰 [3]) — WriteTable 이 쓰기 전에 센다. 가장 긴 칸 폭으로 모든 행을 채우므로 칸 하나가 길고 행이 많으면
+// 표 쓰기 예산(itda-hyve#355 리뷰 [3]) — WriteTable 이 쓰기 전에 센다. 가장 긴 칸 폭으로 모든 행을 채우므로 칸 하나가 길고 행이 많으면
 // 맞춘 출력이 입력보다 훨씬 커진다. 시험이 작게 바꾼다.
 var (
 	tableMaxCells = 200_000 // 열 수 × (본문 행 + 머리 행)
@@ -292,7 +292,7 @@ func tableCols(t Table) int {
 	return cols
 }
 
-// TransposeTable 은 표를 전치한다(#468) — [Header, ...Rows] 행렬을 뒤집는다. 왼쪽 위 칸(Header[0])은 제자리다
+// TransposeTable 은 표를 전치한다(itda-hyve#468) — [Header, ...Rows] 행렬을 뒤집는다. 왼쪽 위 칸(Header[0])은 제자리다
 // (새 머리 행 = 옛 첫 열, 새 본문 행 = 옛 2열 이후). 열 정렬은 새 첫 열이 옛 첫 열의 정렬을 물려받고, 나머지 새 열은
 // 옛 2열 이후의 정렬이 모두 같으면 그 값, 아니면 없음("")이다. 캡션·접두·줄 범위는 그대로 — 화면은 그 표 줄만 바꿔 넣는다.
 func TransposeTable(t Table) Table {

@@ -16,7 +16,7 @@
 .page-body h1, .page-body h2, .page-body h3 { color: var(--ink); }
 .page-body h1 { margin-top: 12pt; }
 
-/* 번호 목록의 기호는 굵게. 단계별 기호(1. → 가. → 1) …)는 theme.json 의 list-style 로 base.css 가 그린다(#141) */
+/* 번호 목록의 기호는 굵게. 단계별 기호(1. → 가. → 1) …)는 theme.json 의 list-style 로 base.css 가 그린다(itda-hyve#141) */
 .page-body ol li::marker { font-weight: 600; }
 
 /* 정의 목록(본문 안의 붙임 줄 등) */
@@ -65,7 +65,7 @@
 .page-body.k-section:not(.bare) .slide-section { padding: 12pt 0 14pt; margin-bottom: 20pt; }
 .page-body .ss-num { color: var(--ink); font-size: calc(30pt * var(--slide-scale)); font-weight: 700; margin-bottom: 6pt; }
 .page-body .ss-num::after { content: "."; }
-.slide-bg.fill ~ .page-body .ss-num { color: var(--slide-scrim-ink); } /* 배경 그림 스크림 위(#569) — 먹색 번호·줄이 묻힌다 */
+.slide-bg.fill ~ .page-body .ss-num { color: var(--slide-scrim-ink); } /* 배경 그림 스크림 위(itda-hyve#569) — 먹색 번호·줄이 묻힌다 */
 .slide-bg.fill ~ .page-body.k-section .slide-section { border-color: var(--slide-scrim-muted); }
 .slide-bg.fill ~ .page-body { --box-bg: var(--paper); --lead-bg: var(--paper); } /* 스크림 위 상자·요약문은 바탕이 투명이라 먹색 글이 묻힌다 — 종이색 판 */
 .page-body .ss-title { font-weight: 700; letter-spacing: 0.06em; }

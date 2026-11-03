@@ -13,7 +13,7 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// 각주 정의의 원문 구간(#365 ③ 조각 C 접근 리뷰 ⓐ) — 넣을 자리 판정(InsertSpotAt)의 읽기 전용 파싱에만 붙인다. 렌더(Render)는 붙이지 않는다.
+// 각주 정의의 원문 구간(itda-hyve#365 ③ 조각 C 접근 리뷰 ⓐ) — 넣을 자리 판정(InsertSpotAt)의 읽기 전용 파싱에만 붙인다. 렌더(Render)는 붙이지 않는다.
 //
 // goldmark v1.8.6 의 각주 파서는 Close(extension/footnote.go 95)에서 정의를 원래 부모에서 떼어 문서 끝 목록으로 옮기고, AST 변환
 // (footnoteASTTransformer)이 참조되지 않거나 같은 이름에서 뽑히지 않은 정의를 지운다. 그래서 최종 AST 로는 정의의 원래 자리·소속을

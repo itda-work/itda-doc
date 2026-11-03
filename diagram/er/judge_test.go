@@ -12,7 +12,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 독립 판정기(#409 ④ 처음부터 — sequence ③ TestJudgeBoundaryProperties 꼴). 허용 꼴과 원본 lexer 의 함정을 이 파일 안에
+// 독립 판정기(itda-hyve#409 ④ 처음부터 — sequence ③ TestJudgeBoundaryProperties 꼴). 허용 꼴과 원본 lexer 의 함정을 이 파일 안에
 // 따로 옮겨 적은 손 스캐너로, 무작위 원문마다 받아들일지와 받아들이면 그 값(엔티티 차례·별칭, 속성 차례·타입·이름·키·설명,
 // 관계 양끝·기수 둘·식별 여부·역할, 방향, 접근성 값)을 스스로 구해 Parse 와 견준다. 구현의 정규식·상수·도우미(idOK·
 // labelOK·keywordPrefixes·reRel …)는 쓰지 않는다 — 공통 패키지의 전처리(EncodeEntities)도 쓰지 않고 따로 적는다.

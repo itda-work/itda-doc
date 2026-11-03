@@ -11,7 +11,7 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// 그림 자리 지정(#475): ```mermaid 펜스 줄의 ratio=W:H·width=N%·height=N% 으로 그림이 차지할 상자를 정한다.
+// 그림 자리 지정(itda-hyve#475): ```mermaid 펜스 줄의 ratio=W:H·width=N%·height=N% 으로 그림이 차지할 상자를 정한다.
 // 그림(SVG)은 상자 안에 비율을 지켜 최대한 크게·가운데 그린다(contain) — 배치를 다시 짜지는 않는다.
 // 다른 뷰어(GitHub 등)는 이 속성을 무시하고 그림을 그대로 그리므로 원문 호환은 지켜진다.
 //
@@ -27,7 +27,7 @@ type diagramSize struct {
 	width, height  int // width — 그림이 놓인 자리 너비의, height — 본문 높이의 백분율(10~100. 기준은 화면이 정한다)
 }
 
-// 크기 속성은 따옴표 없는 낱말만 받는다(#475 결정, 2026-10-31 — 리뷰 2회 연속 같은 종류 발견으로 단순화, #208).
+// 크기 속성은 따옴표 없는 낱말만 받는다(itda-hyve#475 결정, 2026-10-31 — 리뷰 2회 연속 같은 종류 발견으로 단순화, itda-hyve#208).
 // info string 을 낱말로 훑는데 낱말 경계는 맨 앞과 unicode.IsSpace 공백 뒤뿐이다:
 //   - 경계에서 ratio=·width=·height= 로 시작하는 낱말은 다음 공백까지 통째로 후보로 삼는다 — 값에 따옴표가
 //     든 낱말(ratio="16:9"·width=50%"junk")은 아래 엄격한 값 정규식에 걸려 경고 후 무시된다.

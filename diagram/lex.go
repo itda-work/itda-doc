@@ -5,8 +5,8 @@ import (
 	"unicode"
 )
 
-// 원본 lexer 와 Go 의 글자 판정이 갈리는 곳을 막는 도구 — 허용 목록 문법(#208 결정)을 쓰는 그림 종류가 함께 쓴다
-// (#409 ③ sequence 에서 처음 썼고 ④ er 가 함께 쓴다).
+// 원본 lexer 와 Go 의 글자 판정이 갈리는 곳을 막는 도구 — 허용 목록 문법(itda-hyve#208 결정)을 쓰는 그림 종류가 함께 쓴다
+// (itda-hyve#409 ③ sequence 에서 처음 썼고 ④ er 가 함께 쓴다).
 
 // OddSpace 는 줄에서 ASCII 밖 공백·서식 문자를 찾는다. 원본 JS 정규식 \s 는 ECMAScript WhiteSpace(U+0009·000B·000C·
 // 0020·00A0·FEFF·Zs 범주 — U+1680·2000–200A·202F·205F·3000)와 LineTerminator(U+000A·000D·2028·2029)이고, Go 의
@@ -36,7 +36,7 @@ func ASCIILower(s string) string {
 // DirectiveProblem 은 설정 지시 %%{…}%% 가 든 줄(앞뒤 공백을 지운 것)을 본다 — 돌려준 글이 비어 있지 않으면 그 줄을
 // 그리지 않는다(원문 + 줄 번호 경고). 원본 전처리 removeDirectives 는 줄 어디서든 지시만 지우고 나머지 글(지시 사이의 문장·
 // accTitle 값 …)을 그대로 읽는다. 이 판은 그 재현을 하지 않고, 줄 전체가 지시 하나(`%%{` 로 시작해 `}%%` 로 끝나고 그
-// 사이에 `%%` 가 다시 없음)인 줄만 무시하는 지시로 받는다(#409 ④ 리뷰 1회차 — 2026-10-30 축소 결정). inside 는 블록 안
+// 사이에 `%%` 가 다시 없음)인 줄만 무시하는 지시로 받는다(itda-hyve#409 ④ 리뷰 1회차 — 2026-10-30 축소 결정). inside 는 블록 안
 // (속성 블록·accDescr { … } 안)이라 지시 하나짜리 줄도 받지 않는 자리다. 지시가 없는 줄은 빈 글이다.
 func DirectiveProblem(t string, inside bool) string {
 	if !strings.Contains(t, "%%{") {

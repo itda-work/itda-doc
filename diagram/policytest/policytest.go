@@ -1,4 +1,4 @@
-// Package policytest 는 엔티티·공백 정책 B 와 출력 관문을 종류마다 같은 방법으로 시험하는 도구다(시험에서만 부른다 — #409 ④-2
+// Package policytest 는 엔티티·공백 정책 B 와 출력 관문을 종류마다 같은 방법으로 시험하는 도구다(시험에서만 부른다 — itda-hyve#409 ④-2
 // 후속). 기대값은 사람이 적은 표이고 구현의 함수·표(diagram.RestoreEntities·EntityNumOK·WrapLabel 따위)를 부르지 않는다. 결과는
 // 최종 SVG 를 실제 XML 파서(encoding/xml)로 읽어 본다. state 의 judge_test.go 표·도구를 옮긴 것이다(state 는 제 것을 그대로 쓴다).
 package policytest
@@ -456,7 +456,7 @@ func GateFields(each func(diagram.TextFunc) error) map[string]bool {
 }
 
 // OddSpacePolicy 는 실제 ASCII 밖 공백·서식 문자(OddSpaces)를 짧은 값·긴 값(줄바꿈되는 길이)·앞뒤에 둔 값으로 라벨·접근성 문맥에
-// 넣고, accDescr { … } 블록은 여러 줄 값의 줄 머리에도 넣어 모두 그 줄의 원문 + 경고인지 본다(#409 ④-2 후속 리뷰 1회차 [2]·[3] —
+// 넣고, accDescr { … } 블록은 여러 줄 값의 줄 머리에도 넣어 모두 그 줄의 원문 + 경고인지 본다(itda-hyve#409 ④-2 후속 리뷰 1회차 [2]·[3] —
 // 받으면 긴 라벨의 줄바꿈이 NBSP 를 빈칸으로 바꾸고, 블록의 줄 머리 정리가 원본 \n\s+ 와 갈린다).
 func OddSpacePolicy(t *testing.T, render Render, labels, accs []Ctx) {
 	t.Helper()
@@ -493,7 +493,7 @@ func OddSpaceLines(t *testing.T, render Render, ctxs []Ctx) {
 }
 
 // C1RowIDs 는 C1 제어 문자(U+0080~U+009F) 관찰 행의 식별자다 — diagrams-design.md 2장 「현재 동작 — 지원 약속 아님」
-// 표(c1-observe)의 첫 열과 1:1 이다(internal/diagram 의 TestC1ObserveTable 이 대조한다). 행마다 C1Policy 의 같은 이름 갈래가 돈다.
+// 표(c1-observe)의 첫 열과 1:1 이다(diagram 의 TestC1ObserveTable 이 대조한다). 행마다 C1Policy 의 같은 이름 갈래가 돈다.
 var C1RowIDs = []string{"C1-라벨", "C1-라벨-NEL", "C1-캡션-이스케이프", "C1-캡션-이스케이프-NEL", "C1-캡션-날글자", "C1-캡션-날글자-NEL", "C1-접근성", "C1-접근성-NEL"}
 
 // c1NEL 은 손으로 정한 예외다 — U+0085(NEL)는 C1 이면서 공백(White_Space)이라 다른 갈래를 탄다. 구현의 OddSpace 로 기대를 계산하지
@@ -501,7 +501,7 @@ var C1RowIDs = []string{"C1-라벨", "C1-라벨-NEL", "C1-캡션-이스케이프
 const c1NEL = 0x85
 
 // C1Policy 는 C1 제어 문자 32개 전부를 C1RowIDs 의 입력 경로마다 넣어 지금 동작을 본다. **지원 약속이 아닌 회귀 감지**다 — C1 이 든
-// 입력의 수락 여부와 표시 형태는 호환성 보장 대상이 아니다(2026-10-31 사용자 결정, #409 ④-2 후속). 결과가 바뀌면 의도한 변경인지
+// 입력의 수락 여부와 표시 형태는 호환성 보장 대상이 아니다(2026-10-31 사용자 결정, itda-hyve#409 ④-2 후속). 결과가 바뀌면 의도한 변경인지
 // 검토하고 DESIGN 표와 함께 고친다. labels 는 보이는 라벨 문맥, accs 는 접근성 값 문맥, body 는 캡션 뒤에 올 그림 원문이다.
 // 기대는 손으로 적었다.
 func C1Policy(t *testing.T, render Render, labels, accs []Ctx, body string) {

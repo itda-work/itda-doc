@@ -11,7 +11,7 @@ import (
 
 // 원문을 한 번 훑는다 — 줄마다 아래 허용 꼴(양성 목록) 하나에 통째로 맞아야 그리고, 어느 꼴에도 맞지 않으면 그 자리에서
 // *Error(줄 번호)로 멈춘다(원문 길이에 선형). 허용 꼴은 mermaid@12.2.0 parser/sequenceDiagram.jison 이 같은 뜻으로 읽는다고
-// 이 판이 확신할 수 있는 좁은 꼴만 모은 것이다(#208 두 번째 접근 방식 결정 — 2026-10-30 「허용 목록 문법」). 원본이
+// 이 판이 확신할 수 있는 좁은 꼴만 모은 것이다(itda-hyve#208 두 번째 접근 방식 결정 — 2026-10-30 「허용 목록 문법」). 원본이
 // 그리는 구석 꼴(공백·기호 든 참여자 이름, `;` 로 이은 여러 문장, 예약어 이름 …)은 원문 + 줄 번호 경고로 간다(의도된 축소).
 //
 //	한 줄에 문장 하나 — `;` 는 받지 않는다(원본 NEWLINE 토큰 jison:83). 줄 머리 %% 는 주석(jison:28)
@@ -29,7 +29,7 @@ import (
 //	라벨      `#`·`;`·`%%` 없음(엔티티 #…; 는 전처리가 지킨 뒤 판정), wrap:/nowrap: 시작 없음, 200 자
 //
 // 원본 전처리(encodeEntities — 엔티티 `#…;` 를 내부 표식으로 지켜 준다)는 본문 줄마다 먼저 지나간다(timeline ② 와 같은
-// 순서, 공통 internal/diagram).
+// 순서, 공통 diagram).
 
 // Parse 는 mermaid sequenceDiagram 원문을 읽는다. 그릴 수 없는 문법이면 *Error 다. issues 는 쓰지 않은 줄이다.
 func Parse(src string) (*chart, []Issue, error) {
@@ -126,10 +126,10 @@ func (p *parser) parse(src string) error {
 			return p.fail("%s", msg)
 		}
 		// 줄 머리 %% 주석 — 원본 전처리 cleanupComments(/^\s*%%(?!{)[^\n]+\n?/gm)가 lexer 상태와 관계없이(accDescr { … } 블록 안도)
-		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — #409 ④-1 후속 리뷰 1회차 [2]).
+		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 		// 뒤에 글이 없는 맨 %% 는 원본 전처리가 지우지 않는다. 블록 밖에서는 원본 lexer 의 주석 규칙(\%%(?!\{)[^\n]* —
 		// jison:28)이 건너뛰므로 이 판도 경고 없이 건너뛴다. accDescr { … } 블록 안에서는 원본이 설명 글로 넣는다 — 이 판은
-		// 그 줄을 그리지 않는다(보수적, #409 ④-1 후속 수정 2).
+		// 그 줄을 그리지 않는다(보수적, itda-hyve#409 ④-1 후속 수정 2).
 		// 여기 오는 %%{ 줄은 줄 전체가 지시 하나뿐이다(DirectiveProblem).
 		if strings.HasPrefix(t, "%%") {
 			if strings.HasPrefix(t, "%%{") {
@@ -641,7 +641,7 @@ ThreeDLightShadow ThreeDShadow Window WindowFrame WindowText`) { // transparent�
 }
 
 // stripBoxColor 는 box 줄의 색 경계를 원본 정규식 ^((?:rgba?|hsla?)\s*\(.*\)|\w*)(.*)$ (sequenceDb.ts:400)
-// 대로 나눈 뒤, 이 판이 확신할 수 있는 경우만 받는다(#208 결정 — 리뷰 2회차 [2]):
+// 대로 나눈 뒤, 이 판이 확신할 수 있는 경우만 받는다(itda-hyve#208 결정 — 리뷰 2회차 [2]):
 //
 //	① 후보가 빈 문자열(한글 이름 등 \w 밖으로 시작) → 이름 전체
 //	② 후보가 색(isColor) + 나머지가 공백이나 줄 끝으로 시작 → 색을 떼고(경고) 나머지가 이름
@@ -810,7 +810,7 @@ func (p *parser) reference(id string) error {
 }
 
 // label 은 라벨(별명·메시지·메모·조건·구획·box 이름·제목)을 읽는다 — wrap:/nowrap: 앞말(콜론 붙은 꼴 포함 — 원본
-// extractWrap 의 ^:?(?:no)?wrap:)으로 시작하면 그리지 않는다(#208 결정 — 원본과 같은 뜻으로 읽을 수 없다).
+// extractWrap 의 ^:?(?:no)?wrap:)으로 시작하면 그리지 않는다(itda-hyve#208 결정 — 원본과 같은 뜻으로 읽을 수 없다).
 // `#`·`;`·`%%` 는 statement 가 줄 단위로 먼저 막았다.
 func (p *parser) label(s, where string) (string, error) {
 	if reWrap.MatchString(asciiLower(strings.TrimSpace(s))) {

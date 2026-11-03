@@ -14,7 +14,7 @@ import (
 	"github.com/itda-work/itda-doc/internal/timingtest"
 )
 
-// 공통 배치 자체 시험(#409 ④-1 후속) — 흐름도·ER 을 거치지 않고 Layout 을 직접 부른다. 정답은 구현 상수·도우미가 아니라
+// 공통 배치 자체 시험(itda-hyve#409 ④-1 후속) — 흐름도·ER 을 거치지 않고 Layout 을 직접 부른다. 정답은 구현 상수·도우미가 아니라
 // 성질이다: 그림 안, 겹침 없음, 간선 끝이 테두리 위, 방향대로 나아감, 묶음이 구성원을 감쌈, 결정성, 상한, 시간.
 
 var dirs = []Dir{TB, BT, LR, RL}

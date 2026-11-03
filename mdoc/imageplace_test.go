@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 슬라이드 그림 배치(#550): 이미지 속성 .fit·.fill·.left·.right·split 과 Deckset alt 지시. 결과는 class·data-split 뿐이고
+// 슬라이드 그림 배치(itda-hyve#550): 이미지 속성 .fit·.fill·.left·.right·split 과 Deckset alt 지시. 결과는 class·data-split 뿐이고
 // style 은 여전히 width 에서만 나온다.
 func TestImagePlace(t *testing.T) {
 	cases := []struct {
@@ -76,7 +76,7 @@ func TestImagePlace(t *testing.T) {
 	}
 }
 
-// 분할 그림의 패널 판정(#550): 맨 위 블록이 그림 하나뿐인 줄(그림 문단·그림 하나만 감싼 링크 문단)만 패널 후보이고 슬라이드당 하나.
+// 분할 그림의 패널 판정(itda-hyve#550): 맨 위 블록이 그림 하나뿐인 줄(그림 문단·그림 하나만 감싼 링크 문단)만 패널 후보이고 슬라이드당 하나.
 // 그 밖의 자리는 경고하고 제자리 .fit. 슬라이드 경계는 slides.js groups 와 같다(selftest 11b-B4 ⑥ 이 화면 묶음으로 대조한다).
 func TestImagePlacePerSlide(t *testing.T) {
 	const notSole, second = "그림 하나뿐인 줄에서만", "슬라이드당 하나"
@@ -150,7 +150,7 @@ func TestImagePlacePerSlide(t *testing.T) {
 	}
 }
 
-// 배경 그림(.full, #569)의 판정: 분할 패널과 같은 「단독 줄만」 규칙이고, 그림 자리(패널·배경)는 합쳐 슬라이드당 하나 — 먼저 적은 쪽.
+// 배경 그림(.full, itda-hyve#569)의 판정: 분할 패널과 같은 「단독 줄만」 규칙이고, 그림 자리(패널·배경)는 합쳐 슬라이드당 하나 — 먼저 적은 쪽.
 // 가로 배치(fit-row)는 맨 위 문단이 .fit 그림 2장 이상(링크로 감싼 그림 포함)만으로 되어 있을 때다.
 func TestSlideBackgroundAndRow(t *testing.T) {
 	const notSole, second, mixed, row = "그림 하나뿐인 줄에서만 배경", "배경 그림(.full)은 슬라이드당 하나", "합쳐 슬라이드당 하나", "가로 배치는"

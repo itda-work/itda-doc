@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 블록 중첩 상한의 리뷰 가족(#116 R4~R6, #126 R1~R3)을 안전 모드의 계약으로 본다.
+// 블록 중첩 상한의 리뷰 가족(itda-hyve#116 R4~R6, itda-hyve#126 R1~R3)을 안전 모드의 계약으로 본다.
 //
 // 예전 계약 "상한은 깊은 부분의 넘는 표지만 글자로 바꾸고 깊은 부분 밖은 상한 없는 렌더와 바이트까지 같다" 는 파싱 중에 겹을 막던 방식의
 // 것이다. 그 방식은 막은 겹의 닫는 줄 짝·이어쓰기·안쪽 블록의 수명을 흉내 내야 했고 리뷰마다 새 어긋남이 나왔다. 지금은 문서를 쪼개지
@@ -63,7 +63,7 @@ func TestNestingReviewCases(t *testing.T) {
 }
 
 // 무작위: 보통 부분 A + 상한 근처(±)의 깊은 부분 D + 보통 부분 B(인용·목록·한 줄 섞음·컨테이너, 넘는 컨테이너를 닫자마자 다시 여는 줄 —
-// 리뷰 #126 R1).
+// 리뷰 itda-hyve#126 R1).
 func TestNestingRestUnchanged(t *testing.T) {
 	rng := rand.New(rand.NewSource(1167))
 	normal := []string{"글 ", "- 항목\n", "1. 번호\n", "> 인용\n", "\n", "**굵게** ", "`코드` ", ":::box\n안\n:::\n", "| a | b |\n|---|---|\n| 1 | 2 |\n", "## 제목\n", "    들여쓴 코드\n", "[링크](#a) ", "$x^2$ "}
@@ -95,7 +95,7 @@ func TestNestingRestUnchanged(t *testing.T) {
 				b.WriteString(strings.Repeat("  ", k) + "- 단계\n")
 			}
 			return b.String()
-		case 5: // 넘는 컨테이너를 닫자마자 다시 연다(리뷰 #126 R1)
+		case 5: // 넘는 컨테이너를 닫자마자 다시 연다(리뷰 itda-hyve#126 R1)
 			var b strings.Builder
 			b.WriteString(strings.Repeat(":::box\n", L))
 			for range 1 + rng.Intn(4) {
@@ -117,7 +117,7 @@ func TestNestingRestUnchanged(t *testing.T) {
 	}
 }
 
-// 리뷰 #126 R1·R2: 상한 근처에서 ::: 여는 줄·닫는 줄·본문과 안쪽 블록(HTML 블록 일곱 시작 조건, 펜스·닫히지 않은 펜스, 수식, 목록,
+// 리뷰 itda-hyve#126 R1·R2: 상한 근처에서 ::: 여는 줄·닫는 줄·본문과 안쪽 블록(HTML 블록 일곱 시작 조건, 펜스·닫히지 않은 펜스, 수식, 목록,
 // 인용, 표, 들여쓴 코드, 내용 없는 표지)이 엇갈린다. 본문 표식(K..)이 안전 모드에서도 남아야 한다.
 func TestNestingPhantomFamily(t *testing.T) {
 	rng := rand.New(rand.NewSource(1261))
@@ -147,7 +147,7 @@ func TestNestingPhantomFamily(t *testing.T) {
 	}
 }
 
-// 리뷰 #126 R2: 상한 근처의 인용·목록·각주 정의 줄과 그 다음 줄(이어쓰기일 수 있는 줄) — ::: 없이.
+// 리뷰 itda-hyve#126 R2: 상한 근처의 인용·목록·각주 정의 줄과 그 다음 줄(이어쓰기일 수 있는 줄) — ::: 없이.
 func TestNestingRefusedLineFamily(t *testing.T) {
 	rng := rand.New(rand.NewSource(1262))
 	prefixes := []string{"> ", "- ", "1. ", "> - ", "[^a]: "}
@@ -171,7 +171,7 @@ func TestNestingRefusedLineFamily(t *testing.T) {
 	}
 }
 
-// 리뷰 #126 R1·R2·R3 이 적은 입력 그대로(65겹 ::: 안에서 닫자마자 다시 열기, 안쪽 블록이 빈 줄로 끝나지 않는 HTML 블록).
+// 리뷰 itda-hyve#126 R1·R2·R3 이 적은 입력 그대로(65겹 ::: 안에서 닫자마자 다시 열기, 안쪽 블록이 빈 줄로 끝나지 않는 HTML 블록).
 func TestNestingPhantomReopen(t *testing.T) {
 	for _, in := range []string{"IN\n", "<!--\n", "<script>\n", "<![CDATA[\n", "<?pi\n", "<div>\n", "$$\n", "- a\n", "> q\n", "| a |\n|---|\n"} {
 		for _, extra := range []int{1, 2} {

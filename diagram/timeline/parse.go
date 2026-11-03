@@ -14,7 +14,7 @@ import (
 // 이름 `ﬂ°N¶ß` — 원본 표식 문자를 그대로 쓴다). 그래서 timeline lexer 의 시기 토큰이 # 을 제외해도 엔티티의 # 은
 // 주석으로 버려지지 않는다. 이 판도 같은 순서다: 전처리(본문 줄마다) → 시기의 남은 # 만 원문 + 경고 → 라벨을 만들 때
 // 표식을 엔티티 정책 B 로 한 번 글자로 되돌린다(공통 diagram.Label·AccSet — 받지 않는 엔티티는 원문 + 경고) — 되돌린 글자가
-// 문법 글자(: 등)여도 이미 문법을 지쳤으므로 다시 읽히지 않는다(원본과 같다). 재현 자체는 공통으로 올려 sequence(#409 ③) 와 함께 쓴다.
+// 문법 글자(: 등)여도 이미 문법을 지쳤으므로 다시 읽히지 않는다(원본과 같다). 재현 자체는 공통으로 올려 sequence(itda-hyve#409 ③) 와 함께 쓴다.
 
 var encodeEntities = diagram.EncodeEntities
 
@@ -113,7 +113,7 @@ func (p *parser) parse(src string) error {
 			return p.fail("줄 안에 CR·FF·VT 글자가 있음 — 이 판은 그 줄을 그리지 않는다")
 		}
 		// ASCII 밖 공백·서식 문자는 줄째 그리지 않는다(원본 JS \s 와 Go 의 공백 판정이 갈리는 갈래 — er·sequence·state 와 같다,
-		// #409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
+		// itda-hyve#409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
 		// 정리가 원본 \n\s+ 와 갈린다).
 		if r, ok := diagram.OddSpace(lines[i]); ok {
 			return p.fail("ASCII 밖 공백·서식 문자(U+%04X)가 있음 — 이 판은 그 줄을 그리지 않는다(일반 빈칸으로 바꿔 쓴다)", r)
@@ -126,15 +126,15 @@ func (p *parser) parse(src string) error {
 		}
 		// 설정 지시 — 줄 전체가 지시 하나인 줄(accDescr { … } 밖)만 무시하는 지시다. 그 밖에 %%{ 가 든 줄(지시 앞뒤·사이의
 		// 글, acc 값·사건 글·주석 안, accDescr 블록 안)은 원본 removeDirectives 가 지시만 지우고 남은 글을 읽는 갈래라
-		// 그리지 않는다(er·sequence 와 같은 공통 규칙 — #409 ④-1 후속). 엔티티 전처리 앞이다(원본도 지시를 먼저 지운다).
+		// 그리지 않는다(er·sequence 와 같은 공통 규칙 — itda-hyve#409 ④-1 후속). 엔티티 전처리 앞이다(원본도 지시를 먼저 지운다).
 		if msg := diagram.DirectiveProblem(t, p.inAcc); msg != "" {
 			return p.fail("%s", msg)
 		}
 		// 줄 머리 %% 주석 — 원본 전처리 cleanupComments(/^\s*%%(?!{)[^\n]+\n?/gm)가 lexer 상태와 관계없이(accDescr { … } 블록 안도)
-		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — #409 ④-1 후속 리뷰 1회차 [2]).
+		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 		// 뒤에 글이 없는 맨 %% 는 원본 전처리가 지우지 않는다. 블록 밖에서는 원본 lexer 의 주석 규칙(\%%(?!\{)[^\n]* —
 		// jison:14)이 건너뛰므로 이 판도 경고 없이 건너뛴다. accDescr { … } 블록 안에서는 원본이 설명 글로 넣는다 — 이 판은
-		// 그 줄을 그리지 않는다(보수적, #409 ④-1 후속 수정 2).
+		// 그 줄을 그리지 않는다(보수적, itda-hyve#409 ④-1 후속 수정 2).
 		// 여기 오는 %%{ 줄은 줄 전체가 지시 하나뿐이다(DirectiveProblem).
 		if strings.HasPrefix(t, "%%") {
 			if strings.HasPrefix(t, "%%{") {

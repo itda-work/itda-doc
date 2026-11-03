@@ -39,9 +39,9 @@
     bodyBottom = r.top + bd.clientHeight;
     bodyHeight = bd.clientHeight;
     // 한 쪽보다 큰 그림은 줄인다(캡션 자리를 남긴다). 쪽마다 같은 값이지만 용지 방향에 따라 다르다. 슬라이드의 캡션 없는 사진 그림·.fit
-    // 그림은 base.css 가 이 값 대신 --body-h 로 상한을 정한다(#550 — slides.js markFigures).
+    // 그림은 base.css 가 이 값 대신 --body-h 로 상한을 정한다(itda-hyve#550 — slides.js markFigures).
     root.style.setProperty("--img-max-h", Math.max(80, bodyHeight - 60) + "px");
-    // 그림 자리(#475)의 퍼센트 기준이 되는 본문 높이다. --img-max-h 는 임시 상자(root)에 걸어 쪽이 옮겨지면 사라지지만,
+    // 그림 자리(itda-hyve#475)의 퍼센트 기준이 되는 본문 높이다. --img-max-h 는 임시 상자(root)에 걸어 쪽이 옮겨지면 사라지지만,
     // 이것은 쪽마다 쪽 요소에 건다 — 쪽이 무대(#stage)에서 보기 영역·출력 상자로 옮겨져도 그림 상자의 크기가 바뀌지 않게.
     pg.style.setProperty("--body-h", bodyHeight + "px");
     return pg;
@@ -85,7 +85,7 @@
     sizeDiagrams(rootEl);
   }
 
-  // 그림 자리(#475): ```mermaid 펜스 줄의 ratio·width·height 를 mdoc 이 검사해 data-diagram-* 로 낸 값을
+  // 그림 자리(itda-hyve#475): ```mermaid 펜스 줄의 ratio·width·height 를 mdoc 이 검사해 data-diagram-* 로 낸 값을
   // 화면이 다시 검사해 상자로 건다(위 data-w 와 같은 CSP 선례 — mdoc 의 Go 시험이 값 규칙을 본다). 상자는 SVG
   // 요소 자체다: viewBox 의 기본 preserveAspectRatio(xMidYMid meet)가 상자 안에 비율을 지켜 최대한 크게·가운데
   // 그린다(contain — 상자보다 작은 그림도 커진다). 백분율·비율 계산은 CSS calc 로 늦게 풀린다 — 여기서는 본문
@@ -404,7 +404,7 @@
         if (fits()) return { head: node, tail: null };
         parent.removeChild(node);
       }
-      // mermaid 그림 figure(#475): 캡션이 캡션 자리 예약(60px)보다 길면 상자+캡션이 쪽보다 커진다 — 아래 자식
+      // mermaid 그림 figure(itda-hyve#475): 캡션이 캡션 자리 예약(60px)보다 길면 상자+캡션이 쪽보다 커진다 — 아래 자식
       // 분할로 넘기면 캡션만 다음 쪽에 홀로 남으므로, 상자를 줄여 캡션과 함께 한 쪽에 통째로 넣는다(위 img 와 같은 축소).
       if (node.tagName === "FIGURE" && node.classList.contains("diagram")) {
         const dsvg = node.querySelector(":scope > svg.diagram-svg");
@@ -421,10 +421,10 @@
           dsvg.style.maxHeight = maxH0; // 여기까지 못 맞추면 원래 상자(max-height)로 돌려놓고 아래 분할 경로로 간다
         }
       }
-      // 단 나눈 코드 블록(#487 — base.css pre.has-cols[data-cols]): 빈 쪽에서도 단 상태로 못 넣은 조각(줄 span 이 break-inside: avoid
+      // 단 나눈 코드 블록(itda-hyve#487 — base.css pre.has-cols[data-cols]): 빈 쪽에서도 단 상태로 못 넣은 조각(줄 span 이 break-inside: avoid
       // 라 단 너비에서 쪽보다 높은 원문 줄, splitPre 의 최소 줄 규칙 등)은 단을 끄고(data-cols → data-cols-off, CSS 가 안 걸려 cols
       // 없는 렌더) cols 없는 블록이 받는 처리 전체를 그대로 받는다 — fit(splitPre), 그다음 forceFit(split-forced 자식 분할, 그래도
-      // 안 되면 잘린 채 표시). 그래서 최상위 cols 블록은 cols 가 없을 때보다 더 잘리지 않는다(컨테이너 안 블록은 splitChildren 이 fit 만 불러 이 분기에 닿지 않는다 — #491). 앞조각(잘린 경우 포함)은 끈 상태 그대로,
+      // 안 되면 잘린 채 표시). 그래서 최상위 cols 블록은 cols 가 없을 때보다 더 잘리지 않는다(컨테이너 안 블록은 splitChildren 이 fit 만 불러 이 분기에 닿지 않는다 — itda-hyve#491). 앞조각(잘린 경우 포함)은 끈 상태 그대로,
       // 뒷조각만 data-cols 를 되돌려 다시 단으로 시작한다(또 못 넣으면 거기서 또 끈다). flow 는 렌더마다 HTML 에서 새로 만들어 원본에 안 샌다.
       if (node.tagName === "PRE" && node.hasAttribute("data-cols")) {
         const cols = node.getAttribute("data-cols");
@@ -447,14 +447,14 @@
     return { head: node, tail: null };
   }
 
-  // ---- .fit 그림(#550 — 슬라이드만: slides.js 가 opts.fitFill 과 figure.fig-fit 을 준다). 맨 위 블록의 .fit 그림은 놓이는 자리부터
+  // ---- .fit 그림(itda-hyve#550 — 슬라이드만: slides.js 가 opts.fitFill 과 figure.fig-fit 을 준다). 맨 위 블록의 .fit 그림은 놓이는 자리부터
   // 본문 아래까지의 높이를 그림 상자(figure)의 높이로 건다 — base.css 가 fit-sized figure 를 세로 flex 로 두어 img 가 캡션을 뺀 나머지를
   // 비율 유지(object-fit: contain)로 채운다. 높이는 이렇게 고른다(MIN = 본문 높이의 30%):
   //   1. 뒤에 남은 블록(이 묶음의 나머지 — slides.js 는 묶음마다 paginate 를 부른다)을 잰 높이만큼 남기고도 MIN 이상이면 그만큼
   //   2. 아니면 본문 아래까지 전부가 MIN 이상이면 그만큼(뒤 블록은 다음 장 — 「(계속)」)
   //   3. 아니면 빈 쪽이 아닐 때 false — 부르는 쪽이 새 쪽에서 다시 놓는다. 빈 쪽이면 남은 높이(최소 80px)로 놓는다
   // 높이는 쪽 상자 안 px 이라 쪽이 보기 영역·출력 상자로 옮겨져도 그대로다(쪽 크기는 슬라이드 크기로 고정).
-  // 가로 배치 문단(p.fit-row, #569 — mdoc 이 .fit 그림만 든 맨 위 문단에 단다)도 같은 규칙으로 높이 h 를 고르고, figure 높이 대신
+  // 가로 배치 문단(p.fit-row, itda-hyve#569 — mdoc 이 .fit 그림만 든 맨 위 문단에 단다)도 같은 규칙으로 높이 h 를 고르고, figure 높이 대신
   // sizeRow 가 그림들을 같은 높이로 맞춘다(문단 높이는 그림 줄 + 캡션 줄 — 폭이 모자라면 h 보다 낮다).
   function placeFit(fig, queue, empty) {
     const row = fig.tagName === "P";
@@ -493,7 +493,7 @@
   // rowImages 는 가로 배치 문단의 그림이다 — 문단의 직접 자식 img(막은 링크는 링크 없이 그림만 남는다)와 그림 하나를 감싼 링크의 img.
   function rowImages(p) { return [...p.querySelectorAll(":scope > img, :scope > a > img")]; }
 
-  // sizeRow 는 가로 배치 문단 p 의 그림들을 같은 높이 H 로 맞춘다(#569). 너비는 그림마다 H × 원래 비율(naturalWidth/naturalHeight)이다 —
+  // sizeRow 는 가로 배치 문단 p 의 그림들을 같은 높이 H 로 맞춘다(itda-hyve#569). 너비는 그림마다 H × 원래 비율(naturalWidth/naturalHeight)이다 —
   // 비율을 못 읽은 그림(아직 안 읽힘·깨짐)은 너비를 비워 두어(CSS width: auto) 나중에 읽히면 제 비율로 서고, 폭 계산에만 4:3 으로 친다. H 는 문단 높이 h 에서 캡션 줄(slides.js rowCaptions 가 단 span.fr-cap 가운데 가장 높은 것 + 줄 사이)을 뺀
   // 높이와, 문단 폭에서 그림 사이 틈을 빼고 비율 합으로 나눈 높이 가운데 작은 쪽이다 — 그래서 그림 줄은 본문 폭 안이다. 캡션은
   // 그림 폭으로 줄이 바뀌므로 그림을 맞춘 뒤 한 번 더 재어 맞춘다. 크기는 CSSOM(style 속성 아님 — CSP 와 무관)으로 건다.
@@ -641,7 +641,7 @@
     }
   }
 
-  // numberBlocks 는 나누기 전 문서 흐름의 최상위 블록마다 data-n(0부터)을 붙이고 그 수를 돌려준다(#346 ⑧ 내용 앵커). 호스트(app.js)와
+  // numberBlocks 는 나누기 전 문서 흐름의 최상위 블록마다 data-n(0부터)을 붙이고 그 수를 돌려준다(itda-hyve#346 ⑧ 내용 앵커). 호스트(app.js)와
   // 보는 화면(share.js)이 같은 view HTML 에 같은 규칙으로 붙이므로, 창 폭·배율·쪽 수·보기 꼴이 달라도 같은 번호는 같은 내용이다.
   // 쪽 나눔이 블록을 쪼개도 조각(shallow·cut 의 cloneNode)마다 같은 data-n 이 남고, 슬라이드 나눔(slides.js groups)은 같은 요소를 옮긴다.
   // 표지·제목 블록·목차·쪽 나눔 표시·발표 단계(.pause)·노트는 번호에서 뺀다(쪽·이어보기에 내용으로 그려지지 않는다).
@@ -655,7 +655,7 @@
     return n;
   }
 
-  // ---- 쪽 넘김 키(#346 ⑨) — 보는 화면(share.js)과 문서 창 보기 모드(app.js)가 같은 규칙을 쓴다.
+  // ---- 쪽 넘김 키(itda-hyve#346 ⑨) — 보는 화면(share.js)과 문서 창 보기 모드(app.js)가 같은 규칙을 쓴다.
 
   // navKey 는 쪽 넘김 키의 방향이다: →·PageDown 은 1, ←·PageUp 은 -1, Home 은 "first", End 는 "last", 그 밖은 "". space 면 Space 는 1,
   // Shift+Space 는 -1(보는 화면만 — 문서 창은 Space 를 브라우저 굴림 그대로 둔다). 단추·링크에 포커스가 있으면 Space 는 그것을 누르는 키라
@@ -758,7 +758,7 @@
     });
   }
 
-  // 현재 장 미리보기(#443): 커서 줄이 든 띠의 쪽 범위. bands 는 HyveEditor.displayBands 의 값({page, line} …), line 은 커서 줄,
+  // 현재 장 미리보기(itda-hyve#443): 커서 줄이 든 띠의 쪽 범위. bands 는 HyveEditor.displayBands 의 값({page, line} …), line 은 커서 줄,
   // pages 는 쪽 번호 목록(미리보기 쪽 순서 — app.js state.pages 의 data-page). 커서 줄 이하의 마지막 띠 k 를 찾아
   // 띠 k 의 쪽부터 띠 k+1 의 쪽 앞까지(띠 없는 이어진 쪽 — 「(계속)」 넘침 쪽 — 은 앞 띠에 딸린다)를 돌려준다:
   // {first, last}(pages 인덱스, 닫힌 구간). 커서가 첫 띠 앞(머리말·표지)이면 첫 띠 앞의 모든 쪽(표지·차례)인데 그런 쪽이 없으면

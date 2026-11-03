@@ -16,7 +16,7 @@ func BuiltinThemes() (*Themes, error) {
 	return LoadThemes(Builtin)
 }
 
-// ThemeSet 은 내장 테마와 사용자 테마 폴더(dir)를 함께 불러온다. md --theme-meta 가 이 결과를 내준다(#367).
+// ThemeSet 은 내장 테마와 사용자 테마 폴더(dir)를 함께 불러온다. md --theme-meta 가 이 결과를 내준다(itda-hyve#367).
 func ThemeSet(dir string) (*Themes, error) {
 	return loadThemeSet(dir)
 }

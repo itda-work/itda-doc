@@ -213,28 +213,28 @@ var chartAttacks = []string{
 	chartSrc("type=donut", "| a | b |\n|--|--|\n| [링크](javascript:alert(1)) | 1 |\n| ![x](https://evil.example/p.png) | 2 |"),
 	chartSrc("type=line", "| a | b |\n|--|--|\n| x | 1 |\n| y | 2 |\n\nTable: </figcaption><foreignObject><iframe src=x></iframe>"),
 	chartSrc("type=stacked", "| a | <style>*{}</style> | `code` |\n|--|--|--|\n| **굵게** | 1 | 2 |"),
-	// 기준선(#114): 라벨·값에 넣은 HTML·따옴표·url(
+	// 기준선(itda-hyve#114): 라벨·값에 넣은 HTML·따옴표·url(
 	chartSrc(`type=bar ref=1 ref-label="</text></svg><script>alert(1)</script>"`, twoSeries),
 	chartSrc(`type=hbar ref=1 ref-label="\" onmouseover=\"alert(1)"`, twoSeries),
 	chartSrc(`type=line ref="url(https://evil.example)" ref-label="<img src=x onerror=alert(1)>"`, twoSeries),
 	chartSrc(`type=stacked ref="\"><script>alert(1)</script>"`, twoSeries),
 	chartSrc(`type=area ref=-1 ref-label="javascript:alert(1)" unit="<style>"`, twoSeries),
-	// 모르는 type(#114): 표로 남는다 — 그 표도 안전해야 한다
+	// 모르는 type(itda-hyve#114): 표로 남는다 — 그 표도 안전해야 한다
 	chartSrc(`type="<script>alert(1)</script>" ref=1`, "| a | <img src=x onerror=alert(1)> |\n|--|--|\n| x | 1 |"),
-	// 혼합(#114 단계 B): 선 계열 이름·범례·점 title 에 넣은 HTML, 이름이 맞지 않아 표로 남을 때의 속성(data-line 과 겹치지 않음)
+	// 혼합(itda-hyve#114 단계 B): 선 계열 이름·범례·점 title 에 넣은 HTML, 이름이 맞지 않아 표로 남을 때의 속성(data-line 과 겹치지 않음)
 	chartSrc(`type=bar line="</text></svg><script>alert(1)</script>"`, "| a | b | </text></svg><script>alert(1)</script> |\n|--|--|--|\n| x | 1 | 2 |"),
 	chartSrc(`line="\" onmouseover=\"alert(1)"`, "| a | b | \" onmouseover=\"alert(1) |\n|--|--|--|\n| <img src=x onerror=alert(1)> | 1 | 2 |"),
 	chartSrc(`line="\"><script>alert(1)</script>"`, twoSeries),
 	chartSrc(`type=stacked line="2026" ref-label="<style>"`, "| a | <style>*{}</style> | 2026 |\n|--|--|--|\n| x | 1 | 2 |"),
 	chartSrc(`line="2026" ref=40 ref-label="</text><script>alert(1)</script>" unit="url(https://evil.example)"`, twoSeries),
-	// 보조 축(#114 단계 C): 오른쪽 축 계열 이름(범례 "(오른쪽 축)")·unit2(단위 줄·title)에 넣은 HTML, 받지 않는 조합의 표, unit2 만
+	// 보조 축(itda-hyve#114 단계 C): 오른쪽 축 계열 이름(범례 "(오른쪽 축)")·unit2(단위 줄·title)에 넣은 HTML, 받지 않는 조합의 표, unit2 만
 	chartSrc(`axis2="</text></svg><script>alert(1)</script>" unit2="\"><script>alert(1)</script>"`, "| a | b | </text></svg><script>alert(1)</script> |\n|--|--|--|\n| x | 1 | 2 |"),
 	chartSrc(`type=line axis2="\" onmouseover=\"alert(1)" unit2="url(https://evil.example)"`, "| a | b | \" onmouseover=\"alert(1) |\n|--|--|--|\n| <img src=x onerror=alert(1)> | 1 | 2 |"),
 	chartSrc(`axis2="2026" unit2="</text><script>alert(1)</script>" unit="<style>"`, twoSeries),
 	chartSrc(`type=stacked axis2="2026" unit2="<style>*{}</style>"`, twoSeries),
 	chartSrc(`unit2="<img src=x onerror=alert(1)>"`, twoSeries),
 	chartSrc(`axis2="2026" ref="\"><script>alert(1)</script>" line="\"><img src=x>"`, twoSeries),
-	// 산점도·버블(#114 단계 D): 점 라벨(라벨 글자·줄인 라벨의 title)·축 제목(열 머리글)·크기 범례 이름·점 title 에 넣은 HTML, 받지 않는 조합의 표
+	// 산점도·버블(itda-hyve#114 단계 D): 점 라벨(라벨 글자·줄인 라벨의 title)·축 제목(열 머리글)·크기 범례 이름·점 title 에 넣은 HTML, 받지 않는 조합의 표
 	chartSrc("type=scatter", "| a | </text></svg><script>alert(1)</script> | \" onmouseover=\"alert(1) |\n|--|--|--|\n| <img src=x onerror=alert(1)> | 1 | 2 |\n| javascript:alert(1) "+strings.Repeat("길게", 40)+" | 3 | 4 |"),
 	chartSrc("type=bubble", "| a | x | y | <style>*{}</style><svg onload=alert(1)> |\n|--|--|--|--|\n| </text><foreignObject><iframe src=x></iframe> | 1 | 2 | 3 |\n| url(https://evil.example) | 2 | 3 | 4 |\n\n: <script>alert(1)</script>"),
 	chartSrc(`type=scatter unit="\"><script>alert(1)</script>" ref="<img src=x>" ref-label="</text><script>x</script>"`, "| a | x | y |\n|--|--|--|\n| p | 1 | 2 |"),

@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 코드 블록 줄 강조(#479, codehl.go): 펜스 info string 의 {…} 낱말과 펜스 바로 앞 Deckset 지시어
+// 코드 블록 줄 강조(itda-hyve#479, codehl.go): 펜스 info string 의 {…} 낱말과 펜스 바로 앞 Deckset 지시어
 // [.code-highlight: …] 를 블록 줄 수에 맞춰 정규화해 pre data-hl 로 낸다. 강조는 속성값일 뿐 코드 글자에 들어가지 않는다.
 func TestCodeHLInfo(t *testing.T) {
 	cases := []struct {
@@ -202,7 +202,7 @@ func TestCodeHLNotInCode(t *testing.T) {
 	}
 }
 
-// 연속 지시어 수집은 문단 수에 선형이다(#479 리뷰 [3] — 앞 문단마다 모은 값 전체를 복사하면 누적 할당이 제곱으로
+// 연속 지시어 수집은 문단 수에 선형이다(itda-hyve#479 리뷰 [3] — 앞 문단마다 모은 값 전체를 복사하면 누적 할당이 제곱으로
 // 는다). 시간 대신 렌더 한 번의 누적 할당(TotalAlloc)을 2000·8000 문단에서 견준다 — 선형이면 약 4배, 제곱이면
 // 약 15배(리뷰 실측 37MB → 554MB)라 8배를 경계로 둔다.
 func TestCodeHLDirectivesLinear(t *testing.T) {
@@ -226,7 +226,7 @@ func TestCodeHLDirectivesLinear(t *testing.T) {
 	}
 }
 
-// 속성(#479 리뷰 2회차 — 접근 방식): 줄 강조 낱말을 떼어도 기존 가르기가 고르는 파일명은 바뀌지 않는다.
+// 속성(itda-hyve#479 리뷰 2회차 — 접근 방식): 줄 강조 낱말을 떼어도 기존 가르기가 고르는 파일명은 바뀌지 않는다.
 //   - P1: parseCodeInfo(s).title == parseCodeLangTitle(떼어 낸 나머지).title (떼어 낸 뒤 가르기와 이어져 있다)
 //   - P2: {…} 낱말이 맨 앞 낱말이 아니면 parseCodeInfo(s).title == parseCodeLangTitle(s).title (보호 구간 밖에서만 뗀다)
 //   - P3: s 의 { 가 모두 기존 가르기가 고른 파일명 안에 있으면 강조 없음 + title 그대로

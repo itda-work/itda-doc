@@ -19,7 +19,7 @@ import (
 // 테마(설계 3장). 테마는 폴더 하나다 — theme.json(이름·토큰·여백·머리글/바닥글·표지 메타 키) + 선택적 theme.css + assets/.
 // 테마는 스크립트도 HTML 틀도 담지 못한다. 표지·제목 블록·목차·머리글의 구조는 앱이 정하고, 테마는 CSS 로 모양만 바꾼다.
 //
-// 테마는 두 곳에서 온다: 바이너리에 든 내장 테마(themes/)와 사용자 테마 폴더(~/.itda/hyve/themes, usertheme.go).
+// 테마는 두 곳에서 온다: 바이너리에 든 내장 테마(themes/)와 사용자 테마 폴더(자리는 앱이 정한다, usertheme.go).
 // 둘은 같은 로더·같은 검사를 지난다 — 내장 테마도 남이 쓴 테마처럼 토큰 이름·값, 파일 확장자·크기, CSS 의 @import·
 // 원격 url()·창 틀을 노리는 선택자를 거부하고, CSS 는 쪽 상자 안에 가둔다(themecss.go).
 // 다른 점은 하나다: 내장 테마가 틀리면 창이 뜨지 않고(테스트로 고정된다), 사용자 테마가 틀리면 그 테마만 이유와 함께
@@ -53,7 +53,7 @@ type themeFile struct {
 	H1Break *breakSetting `json:"h1-break"`
 	// TOCBreak 는 목차 뒤에서 새 쪽을 연다.
 	TOCBreak *bool `json:"toc-break"`
-	// ListStyle 은 문서가 list-style 을 적지 않았을 때의 목록 기호 사다리다(#141, mdoc/liststyle.go).
+	// ListStyle 은 문서가 list-style 을 적지 않았을 때의 목록 기호 사다리다(itda-hyve#141, mdoc/liststyle.go).
 	// frontmatter 와 같은 값: "gaejosik"·"gongmun"·"plain" 또는 ["gaejosik", "gongmun"].
 	ListStyle *listStyleSetting `json:"list-style"`
 }
@@ -758,7 +758,7 @@ func (t *Theme) StyleSheet(css CSSMode) string {
 	var b strings.Builder
 	b.WriteString("/* 테마 ")
 	b.WriteString(t.Name)
-	b.WriteString(" — itda-hyve 가 theme.json·theme.css 에서 만든다 */\n:root {\n")
+	b.WriteString(" — itda-doc 이 theme.json·theme.css 에서 만든다 */\n:root {\n")
 	writeDecls(&b, t.Tokens)
 	b.WriteString("}\n")
 	if len(t.Derived) > 0 {

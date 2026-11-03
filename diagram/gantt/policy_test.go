@@ -77,7 +77,7 @@ func TestGateCoversAllText(t *testing.T) {
 }
 
 // TestPreprocessBoundary 는 작업 줄에서 원본의 줄 전체 전처리(style…:…#…; 끝 ; 자르기)·라벨 밖 엔티티가 이 판의 라벨 글만
-// 전처리와 갈리는 꼴을 원문으로 돌리는지 본다(#409 ④-2 후속 리뷰 1회차 [1] — 흐름도와 같은 검사). 기대는 손으로 적었다.
+// 전처리와 갈리는 꼴을 원문으로 돌리는지 본다(itda-hyve#409 ④-2 후속 리뷰 1회차 [1] — 흐름도와 같은 검사). 기대는 손으로 적었다.
 func TestPreprocessBoundary(t *testing.T) {
 	for _, src := range []string{
 		head + "style x : 2026-01-01, 1d #35;", // 원본 정규식이 콜론 뒤 #…; 까지 걸친다

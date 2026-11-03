@@ -106,7 +106,7 @@ func TestWithoutUserThemes(t *testing.T) {
 	if v.Theme != "classic" || len(v.Warnings) != 1 || !strings.Contains(v.Warnings[0].Message, "WebKit") {
 		t.Errorf("경고: %s %+v", v.Theme, v.Warnings)
 	}
-	// 앱 쪽(SetScopeSupport·CreateTheme·옛 WebKit 흉내)은 App 이 있는 Itda Hyve 의 문서 창 시험이 본다.
+	// 앱 쪽(엔진 판정 알림·테마 만들기 화면·옛 WebKit 흉내 연결)은 이 패키지를 쓰는 앱의 시험이 본다.
 }
 
 // 회사 테마 만들기는 바탕의 파생 색을 새 강조색으로 계산해 정적 값으로 적는다 — 옛 엔진에서도 색이 섞이지 않는다.

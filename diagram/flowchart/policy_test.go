@@ -78,7 +78,7 @@ func TestGateCoversAllText(t *testing.T) {
 }
 
 // TestPreprocessBoundary 는 원본의 줄 전체 전처리(encodeEntities 의 style…:…#…;·classDef…:…#…; 끝 ; 자르기)와 이 판의 라벨 글만
-// 전처리가 갈리는 줄을 원문으로 돌리는지 본다(#409 ④-2 후속 리뷰 1회차 [1] 재현). 쓰지 않는 style·classDef 줄 하나는 그대로
+// 전처리가 갈리는 줄을 원문으로 돌리는지 본다(itda-hyve#409 ④-2 후속 리뷰 1회차 [1] 재현). 쓰지 않는 style·classDef 줄 하나는 그대로
 // 무시하고 그린다. 기대는 손으로 적었다.
 func TestPreprocessBoundary(t *testing.T) {
 	for _, src := range []string{

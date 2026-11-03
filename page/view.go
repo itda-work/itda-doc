@@ -32,7 +32,7 @@ type View struct {
 	Theme    string `json:"theme"`
 	// DocTheme 은 문서가 frontmatter 로 고른 테마(없거나 모르면 "")다. 화면에서 테마를 바꿔도 이 값은 그대로다.
 	DocTheme string `json:"doc_theme"`
-	// DocThemeFrom 은 DocTheme 이 폴더 `_metadata.yml` 에서 왔을 때 그 파일의 문서 기준 상대 경로다(#504 — 테마 고르기가
+	// DocThemeFrom 은 DocTheme 이 폴더 `_metadata.yml` 에서 왔을 때 그 파일의 문서 기준 상대 경로다(itda-hyve#504 — 테마 고르기가
 	// 「(폴더 설정: …)」으로 출처를 보인다). 문서 자신이 theme: 을 정했거나 DocTheme 이 비면 "".
 	DocThemeFrom string                 `json:"doc_theme_from,omitempty"`
 	Themes       []ThemeInfo            `json:"themes"`
@@ -45,7 +45,7 @@ type View struct {
 	Footer       Slots                  `json:"footer"`
 	H1Break      bool                   `json:"h1_break"`
 	H1Always     bool                   `json:"h1_always"`
-	// ListStyle 은 목록 기호 사다리다(#141): "" · "gaejosik" · "gongmun" · "gaejosik gongmun". 화면이 body 의
+	// ListStyle 은 목록 기호 사다리다(itda-hyve#141): "" · "gaejosik" · "gongmun" · "gaejosik gongmun". 화면이 body 의
 	// list-<값> 클래스로 건다. 문서의 list-style, 없으면 테마의 것(plain 은 "").
 	ListStyle string `json:"list_style"`
 	// TOC 는 사이드바용 제목 트리다(toc 설정과 무관하게 늘 채운다).
@@ -62,10 +62,10 @@ type View struct {
 	ScopeOK bool `json:"scope_ok"`
 	// Slides 는 발표 설정이다(frontmatter slides: + 문서에서 정한 슬라이드 단계). 늘 채운다 — 화면은 "문서 | 슬라이드" 를 언제나 바꿀 수 있다.
 	Slides SlideView `json:"slides"`
-	// FolderMeta 는 이 문서에 적용된 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(#474 — 가까운 것부터).
+	// FolderMeta 는 이 문서에 적용된 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(itda-hyve#474 — 가까운 것부터).
 	// 화면이 「폴더 설정 적용됨」 표시를 낸다. 경로 없는 렌더(붙여넣은 원문 등)에는 비어 있다.
 	FolderMeta []string `json:"folder_meta,omitempty"`
-	// Code 는 코드 블록 표시 설정이다(frontmatter code: — #435 줄 번호). 늘 채운다 — 화면이 줄 번호를 감쌀지 결정한다.
+	// Code 는 코드 블록 표시 설정이다(frontmatter code: — itda-hyve#435 줄 번호). 늘 채운다 — 화면이 줄 번호를 감쌀지 결정한다.
 	Code CodeView `json:"code"`
 	// Logo 는 테마 로고의 앱 주소다(슬라이드 아래의 로고). 없으면 "".
 	Logo string `json:"logo"`
@@ -88,7 +88,7 @@ type SlideView struct {
 	FontScale float64 `json:"font_scale,omitempty"`
 }
 
-// CodeView 는 화면이 코드 블록을 어떻게 보이는지다(#435). LineNumbers 는 줄 번호다(기본 켬 — code.line-numbers: false 면 끔).
+// CodeView 는 화면이 코드 블록을 어떻게 보이는지다(itda-hyve#435). LineNumbers 는 줄 번호다(기본 켬 — code.line-numbers: false 면 끔).
 type CodeView struct {
 	LineNumbers bool `json:"line_numbers"`
 }
@@ -113,7 +113,7 @@ func slideView(r mdoc.Result) SlideView {
 	return sv
 }
 
-// codeView 는 frontmatter 로 코드 블록 표시를 채운다. line-numbers 를 정하지 않았거나 code: 가 없으면 켬이다(#435).
+// codeView 는 frontmatter 로 코드 블록 표시를 채운다. line-numbers 를 정하지 않았거나 code: 가 없으면 켬이다(itda-hyve#435).
 func codeView(r mdoc.Result) CodeView {
 	v := CodeView{LineNumbers: true}
 	if m := r.Meta.Code; m != nil && m.LineNumbers != nil {

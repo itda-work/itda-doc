@@ -6,11 +6,11 @@
 //   - 가로줄(---)·쪽 나눔 → 그 자리에서 새 슬라이드(제목 없이)
 //   - 넘치면 쪽 나눔기(pager.js)가 나눠 같은 제목 + "(계속 k/n)" 슬라이드로 잇는다 — 잘리는 슬라이드가 없다
 //   - 그림·차트·표·요약문 하나만 있는 슬라이드는 그것을 크게(k-single)
-//   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, #550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takeSlot)
-//   - 배경 그림(mdoc 이 배경으로 표시한 맨 위 블록 — data-slide-bg, #569)은 묶음의 배경으로 빼 슬라이드 전체(제목 띠 포함)를 채운다(takeSlot)
-//   - .fit 그림만 든 문단(mdoc 이 class fit-row 를 단 맨 위 문단, #569)은 같은 높이로 가로에 늘어놓는다(rowCaptions·pager.js placeFit)
+//   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, itda-hyve#550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takeSlot)
+//   - 배경 그림(mdoc 이 배경으로 표시한 맨 위 블록 — data-slide-bg, itda-hyve#569)은 묶음의 배경으로 빼 슬라이드 전체(제목 띠 포함)를 채운다(takeSlot)
+//   - .fit 그림만 든 문단(mdoc 이 class fit-row 를 단 맨 위 문단, itda-hyve#569)은 같은 높이로 가로에 늘어놓는다(rowCaptions·pager.js placeFit)
 // 목차(nav.toc)는 슬라이드에 넣지 않는다. :::notes 는 슬라이드에서 빼 발표자 노트로 모은다(슬라이드·PDF 에는 안 보인다 —
-// 미리보기의 노트 칸·발표 N 칸만 쓴다, #344). 노트는 원문에서 놓인 자리의 장에 붙는다(groups·notePage, #518).
+// 미리보기의 노트 칸·발표 N 칸만 쓴다, itda-hyve#344). 노트는 원문에서 놓인 자리의 장에 붙는다(groups·notePage, itda-hyve#518).
 // 차례로 나타내기: ". . ."(div.pause) 뒤의 블록, :::incremental(또는 slides.incremental 이면 모든 목록, :::nonincremental 안은 빼고)의
 // 목록 항목에 data-step(1, 2, …)을 단다. 미리보기·PDF 는 모두 보이고(정적), 발표(present.js)가 단계별로 보인다.
 (function () {
@@ -24,12 +24,12 @@
   function lang() { return (document.documentElement.lang || "ko").startsWith("ko"); }
 
   // groups 는 흐름의 맨 위 블록을 슬라이드 묶음으로 나눈다.
-  // 노트(:::notes)는 묶음의 notes 에 { el, at } 로 모은다(#518). at 은 build 가 노트를 붙일 장을 고르는 법이다(notePage):
+  // 노트(:::notes)는 묶음의 notes 에 { el, at } 로 모은다(itda-hyve#518). at 은 build 가 노트를 붙일 장을 고르는 법이다(notePage):
   //   "line" — 원문 자리(data-line)로: 노트 바로 앞 내용이 그려진 장. 묶음 안 노트는 모두 이것이다.
-  //   "first" — 묶음의 첫 장. 제목 슬라이드(표지·제목 블록) 바로 뒤의 노트(제목 슬라이드의 노트, #179)와, 앞 슬라이드가 없어 다음
+  //   "first" — 묶음의 첫 장. 제목 슬라이드(표지·제목 블록) 바로 뒤의 노트(제목 슬라이드의 노트, itda-hyve#179)와, 앞 슬라이드가 없어 다음
   //             슬라이드로 넘긴 노트.
   //   "last" — 묶음의 마지막 장. 걸러지는 묶음(제목도 의미 있는 블록도 없는 것 — 가로줄·쪽 나눔·각주 뒤에 노트와 멈춤 ". . ." 만
-  //            있고 곧 새 슬라이드나 문서 끝이 오는 것)의 노트는 앞의 남는 묶음 끝에 붙인다(#179 — 예전에는 묶음과 함께 버려졌다).
+  //            있고 곧 새 슬라이드나 문서 끝이 오는 것)의 노트는 앞의 남는 묶음 끝에 붙인다(itda-hyve#179 — 예전에는 묶음과 함께 버려졌다).
   // 가로줄 뒤 노트 다음에 내용이 이어지면 노트와 내용이 한 묶음이라 그 새 슬라이드의 노트다("line" — 노트가 첫 블록 앞이라 첫 장).
   // 묶음 notes 의 차례는 원문 차례다(앞 묶음으로 넘긴 "last" 는 뒤에, 다음 묶음으로 넘긴 "first" 는 앞에 붙인다).
   function groups(flow, lvl) {
@@ -63,7 +63,7 @@
       }
       (cur || open("content", null)).blocks.push(el);
     }
-    // 분할 그림(#550)·배경 그림(#569)을 패널·배경으로 뺀다 — mdoc 이 표시한 맨 위 블록만. 의미 있는 블록 하나 판정보다 먼저(빼고 남은 것으로 본다)
+    // 분할 그림(itda-hyve#550)·배경 그림(itda-hyve#569)을 패널·배경으로 뺀다 — mdoc 이 표시한 맨 위 블록만. 의미 있는 블록 하나 판정보다 먼저(빼고 남은 것으로 본다)
     for (const g of out) {
       if (g.kind === "title") continue;
       const s = takeSlot(g);
@@ -94,7 +94,7 @@
     return res;
   }
 
-  // ---- 분할 그림(#550)·배경 그림(#569). 판정은 mdoc(transform.go slideSplits)이 한다: 맨 위 블록이 분할(.left·.right)·배경(.full)
+  // ---- 분할 그림(itda-hyve#550)·배경 그림(itda-hyve#569). 판정은 mdoc(transform.go slideSplits)이 한다: 맨 위 블록이 분할(.left·.right)·배경(.full)
   // 그림 하나뿐인 줄(그림 figure, 그림 하나만 감싼 링크 문단)이면 그 블록에 data-slide-panel·data-slide-bg 를 달고(둘을 합쳐 슬라이드당
   // 하나 — 먼저 적은 쪽), 그 밖의 자리는 제자리 .fit 으로 바꿔 낸다. 그림 배치는 img 의 class(img-left·img-right·img-full·img-fill·
   // img-fit)와 data-split 이다. 슬라이드에서만 뜻이 있고 문서(A4·이어보기)에는 규칙이 없어 보통 그림이다.
@@ -125,7 +125,7 @@
     return { kind: "panel", block, side, split };
   }
 
-  // notePage 는 노트 하나가 붙을 장(묶음 안 순번, 0부터)이다(#518). at·line 은 노트의 자리(groups 의 at, 노트 요소의 data-line),
+  // notePage 는 노트 하나가 붙을 장(묶음 안 순번, 0부터)이다(itda-hyve#518). at·line 은 노트의 자리(groups 의 at, 노트 요소의 data-line),
   // starts[k] 는 묶음의 k 번째 장 본문(.page-body)에서 가장 앞선 data-line(없으면 Infinity)이다. 쪽 나눔기는 쪼갠 조각에도 data-line
   // 을 남기므로(pager.js — 문단·목록·표 뒷조각은 블록 첫 줄, 코드 뒷조각은 그 조각의 첫 줄) 「노트 줄보다 앞에서 시작하는 블록(조각)이
   // 있는 장」 가운데 마지막 장이 노트 바로 앞 내용이 그려진 장이다 — 두 장에 걸친 블록 뒤 노트는 끝 조각의 장. 그런 장이 없으면(노트가
@@ -147,10 +147,10 @@
   }
 
   // headClone 은 제목의 사본이다(번호 span 포함). id 는 첫 슬라이드에만 둔다(목차 링크가 한 곳을 가리키게).
-  // cont 는 넘쳐 생긴 장의 표지 — 없거나 false 면 표지 없음, { k, n } 이면 「(계속 k/n)」(영어 「(cont. k/n)」, #482).
+  // cont 는 넘쳐 생긴 장의 표지 — 없거나 false 면 표지 없음, { k, n } 이면 「(계속 k/n)」(영어 「(cont. k/n)」, itda-hyve#482).
   // k 는 그 묶음 안 순번(첫 장이 1), n 은 묶음의 장 수다. 표지 글자는 contLabel 하나에서 만든다.
   function contLabel(k, n) { return (lang() ? "(계속 " : "(cont. ") + k + "/" + n + ")"; }
-  // headHeight 는 넘치는 묶음의 머리 높이(--slide-head-h)를 고른다(#482). 재기·나누기는 넘겨받는 순수 함수다(selftest 가 주입해 본다).
+  // headHeight 는 넘치는 묶음의 머리 높이(--slide-head-h)를 고른다(itda-hyve#482). 재기·나누기는 넘겨받는 순수 함수다(selftest 가 주입해 본다).
   //   plain: 표지 없는 머리 높이. tagged(d): 순번·장 수가 d 자리인 표지를 단 머리 높이 — 「(계속 9…9/9…9)」(k 와 n 을 d 개의 9 로.
   //   숫자 폭이 글꼴마다 달라도 같은 자릿수 안에서 9 를 가장 넓은 쪽으로 친다 — 실제 표지는 k ≤ n 이고 자릿수가 같거나 작다).
   //   count(h): 머리 높이 h 로 나눴을 때의 장 수.
@@ -182,7 +182,7 @@
     t.innerHTML = h.innerHTML;
     if (h.id && !cont) t.id = h.id;
     if (h.dataset.line) t.dataset.line = h.dataset.line;
-    if (h.dataset.n && !cont) t.dataset.n = h.dataset.n; // 내용 앵커(#346) — 제목 블록은 첫 슬라이드의 머리로만 그려진다
+    if (h.dataset.n && !cont) t.dataset.n = h.dataset.n; // 내용 앵커(itda-hyve#346) — 제목 블록은 첫 슬라이드의 머리로만 그려진다
     if (cont) { const c = document.createElement("span"); c.className = "slide-cont"; c.textContent = contLabel(cont.k, cont.n); t.append(" ", c); }
     return t;
   }
@@ -194,7 +194,7 @@
     return e;
   }
 
-  // rowCaptions 는 가로 배치 문단(mdoc 이 class fit-row 를 단 맨 위 문단, #569)의 그림마다 그 아래 캡션 자리(span.fr-cap)를 단다 — 글은
+  // rowCaptions 는 가로 배치 문단(mdoc 이 class fit-row 를 단 맨 위 문단, itda-hyve#569)의 그림마다 그 아래 캡션 자리(span.fr-cap)를 단다 — 글은
   // 그림의 title(mdoc 이 글자로 낸 값, textContent 로만 넣는다), 없으면 빈 자리(그림과 캡션이 같은 칸에 짝지어 놓이게). 그림(또는 그림을
   // 감싼 링크) 바로 뒤에 더하기만 하고 블록을 다시 짜지 않는다. base.css 가 문단을 그림 줄·캡션 줄 두 줄의 격자로 놓고, 높이는 pager.js
   // placeFit 이 건다. 캡션이 하나도 없으면 캡션 자리를 달지 않는다.
@@ -210,7 +210,7 @@
     }
   }
 
-  // markFigures 는 쪽을 나누기 전 슬라이드 본문의 그림에 슬라이드 전용 class 를 단다(#550 — base.css 가 .page.slide 안에서만 고른다):
+  // markFigures 는 쪽을 나누기 전 슬라이드 본문의 그림에 슬라이드 전용 class 를 단다(itda-hyve#550 — base.css 가 .page.slide 안에서만 고른다):
   //   no-cap  캡션(figcaption) 없는 사진 그림(img 하나) — 높이 상한이 본문 높이(캡션 자리 60px 를 남기지 않는다)
   //   fig-fit .fit 그림 하나뿐인 figure — 맨 위 블록이면 쪽 나눔기가 남은 높이를 채운다(pager.js placeFit), 다단 칸·목록 안이면 CSS 만
   // .fit 그림의 width 는 쓰지 않는다(자리를 채우는 것이 뜻이다). 차트·mermaid 그림(figure.chart·diagram)은 제 규칙 그대로다.
@@ -225,7 +225,7 @@
     }
   }
 
-  // slotBox 는 분할 그림 패널(.slide-panel, #550)·배경(.slide-bg, #569) 하나다. 첫 장은 표시된 블록을 그대로, 넘쳐 생긴 장은 그 블록의
+  // slotBox 는 분할 그림 패널(.slide-panel, itda-hyve#550)·배경(.slide-bg, itda-hyve#569) 하나다. 첫 장은 표시된 블록을 그대로, 넘쳐 생긴 장은 그 블록의
   // 사본(cloneNode, id 없이)을 담는다. 크기·자리는 base.css 가 쪽 class(panel-left·panel-right·split-*·has-bg·bg-fill)로 정한다 — style 을
   // 걸지 않는다.
   function slotBox(p, copy) {
@@ -277,7 +277,7 @@
     for (const n of h.childNodes) if (!(n.nodeType === 1 && n.classList.contains("header-section-number"))) t.appendChild(n.cloneNode(true));
     if (h.id) t.id = h.id;
     if (h.dataset.line) t.dataset.line = h.dataset.line;
-    if (h.dataset.n) t.dataset.n = h.dataset.n; // 내용 앵커(#346) — 구역 제목은 사본으로만 그려진다
+    if (h.dataset.n) t.dataset.n = h.dataset.n; // 내용 앵커(itda-hyve#346) — 구역 제목은 사본으로만 그려진다
     head.appendChild(t);
     return head;
   }
@@ -304,7 +304,7 @@
 
   // build 는 flow(문서 흐름 HTML 이 든 요소)를 target 안의 슬라이드(.page.slide)로 나눈다.
   // o = { ratio, level, incremental, fontScale(slides.font-scale — 0 이면 기본), logo, org, footer(글자) }. 돌려주는 값: { slides, notes[], overflow, ms }
-  // notes[i] 는 슬라이드 i 에 붙은 노트 HTML 이다(없으면 "") — 노트는 원문에서 놓인 자리의 장에 붙는다(notePage, #518). 넘쳐 생긴
+  // notes[i] 는 슬라이드 i 에 붙은 노트 HTML 이다(없으면 "") — 노트는 원문에서 놓인 자리의 장에 붙는다(notePage, itda-hyve#518). 넘쳐 생긴
   // 「(계속)」 장도 제 노트만 갖고, 노트가 붙지 않은 장은 미리보기 노트 칸·발표 N 칸·공유 보는 화면 모두 「노트 없음」이다.
   function build(flow, target, o) {
     const t0 = performance.now();
@@ -312,7 +312,7 @@
     target.classList.add("slides", o.ratio === "4:3" ? "r43" : "r169");
     target.style.setProperty("--page-w", w + "px");
     target.style.setProperty("--page-h", h + "px");
-    // 글자 배율(slides.font-scale, #430) — 쪽을 나누기 전에 걸어 잰 크기와 그린 크기가 같다. 쪽마다도 건다(쪽은 target 밖
+    // 글자 배율(slides.font-scale, itda-hyve#430) — 쪽을 나누기 전에 걸어 잰 크기와 그린 크기가 같다. 쪽마다도 건다(쪽은 target 밖
     // 보기 영역·발표 사본·출력으로 옮겨진다). 없거나 범위 밖이면 걸지 않는다 — base.css 의 기본(--slide-scale 0.9)
     const fs = Number(o.fontScale);
     const scale = fs >= 0.6 && fs <= 1.5 ? String(fs) : "";
@@ -338,13 +338,13 @@
         markFigures(f);
         rowCaptions(f);
         sub.appendChild(f);
-        // 분할 그림이 있는 묶음(#550)은 쪽 class 로 글 영역을 반대쪽으로 좁힌다(base.css has-panel·panel-*·split-*) — 쪽을 나누기 전에
+        // 분할 그림이 있는 묶음(itda-hyve#550)은 쪽 class 로 글 영역을 반대쪽으로 좁힌다(base.css has-panel·panel-*·split-*) — 쪽을 나누기 전에
         // 걸어야 글 영역 폭으로 잰다(머리 높이 재기 probe 도 같은 class). 패널 자체는 나눈 뒤 장마다 붙인다(넘친 장도 반복).
         const cls = "slide k-" + g.kind + (g.title && g.kind !== "section" ? " has-head" : "") +
           (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
           (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
         // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
-        // 넘친 장의 머리에는 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(#482). 묶음의 쪽마다 같은 높이를 써야
+        // 넘친 장의 머리에는 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
         // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
         // 화면에 들어가는 블록은 늘 원본 f 이고 원본은 한 번만 나눈다 — 장 수를 미리 알아야 할 때는 사본(f.cloneNode)으로 센다.
         //   1. plain(표지 없는 머리)과 tagged(DIGITS_MAX 자리 표지)를 잰다. tagged ≤ plain 이면 어떤 장 수의 표지도 줄을 바꾸지
@@ -423,11 +423,11 @@
       pg.dataset.steps = String(kind === "title" ? 0 : steps(body, o.incremental));
       pg.dataset.slide = String(i + 1);
       pg.dataset.page = String(i + 1);
-      // 맨 구역 장(bare — 테마가 장식 면 위에 큰 제목을 놓는다)은 배경 그림 장이 아닐 때만. 배경 장에는 장식이 없어(아래) 그 모양을 쓰지 않는다(#569)
+      // 맨 구역 장(bare — 테마가 장식 면 위에 큰 제목을 놓는다)은 배경 그림 장이 아닐 때만. 배경 장에는 장식이 없어(아래) 그 모양을 쓰지 않는다(itda-hyve#569)
       const hasBg = !!pg.querySelector(":scope > .slide-bg");
       if (kind === "section" && body.children.length === 1 && !hasBg) { body.classList.add("bare"); pg.classList.add("bare"); }
       for (const x of [pg.querySelector(".page-header"), pg.querySelector(".page-footer")]) if (x) x.remove();
-      // 배경 그림 장(#569)에는 장식을 넣지 않는다 — 넓게 칠하는 장식이 그림을 가리고, DOM 에 두면 테마의 형제 선택자
+      // 배경 그림 장(itda-hyve#569)에는 장식을 넣지 않는다 — 넓게 칠하는 장식이 그림을 가리고, DOM 에 두면 테마의 형제 선택자
       // (.slide-deco.k-section ~ .page-body 들여쓰기 등)가 보이지 않는 장식 폭만큼 본문을 민다. 종류 class(k-*)는 그대로 단다.
       if (!hasBg)
         pg.insertBefore(el("div", "slide-deco k-" + kind + (pg.classList.contains("bare") ? " bare" : "")), pg.firstChild);
@@ -453,12 +453,12 @@
     return els.map(n => n.innerHTML).filter(h => h.trim() !== "").join("\n");
   }
 
-  // ---- 노트 칸(#344) — 문서 창의 슬라이드 미리보기(app.js)와 공유 보는 화면(share.js)이 함께 쓴다.
+  // ---- 노트 칸(itda-hyve#344) — 문서 창의 슬라이드 미리보기(app.js)와 공유 보는 화면(share.js)이 함께 쓴다.
   // 노트 칸(aside.slide-note)은 슬라이드(.page) 밖의 형제라 슬라이드 수·발표 사본·쪽 넘김(.page 만 센다)에 섞이지 않는다.
 
   // placeNotes 는 box(무대의 target 또는 #pages) 안의 슬라이드마다 노트 칸을 붙인다. o = { notes[](build 의 값), on(붙일지),
   // grip(오른쪽 배치에서 끌어 너비를 바꾸는 손잡이 .sn-grip 을 칸 왼쪽에 둘지) }. on 이 거짓이면 지우기만 한다.
-  // 노트가 없는 슬라이드는 넘쳐 생긴 「(계속)」 장이든 아니든 「노트 없음」(오른쪽 배치에서만 보이고 아래 배치에서는 접힌다, #518).
+  // 노트가 없는 슬라이드는 넘쳐 생긴 「(계속)」 장이든 아니든 「노트 없음」(오른쪽 배치에서만 보이고 아래 배치에서는 접힌다, itda-hyve#518).
   function placeNotes(box, o) {
     for (const x of box.querySelectorAll(":scope > .slide-note")) x.remove();
     if (!o.on) return;
@@ -482,7 +482,7 @@
   }
 
   // 노트 글자 크기 단계(px — Go 의 noteFontSizes 와 같다). 미리보기 노트 칸·발표 N 칸·공유 보는 화면이 함께 쓴다.
-  // #541 에서 28~64 를 더했다(최대 24→64 — 강의장에서 청중과 함께 읽는다).
+  // itda-hyve#541 에서 28~64 를 더했다(최대 24→64 — 강의장에서 청중과 함께 읽는다).
   const NOTE_FONTS = [12, 13, 14, 16, 18, 20, 22, 24, 28, 32, 36, 40, 48, 56, 64];
   // noteFontStep 은 지금 크기 cur(px — 단계 밖의 기본값 17 도 된다)에서 dir(1 크게, -1 작게) 쪽 다음 단계다. 끝이면 그대로.
   function noteFontStep(cur, dir) {

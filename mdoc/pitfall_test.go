@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 이슈 #140 의 시험 입력표 그대로 — 각 입력이 완전한 문서, 양성은 그 코드의 경고 하나(줄 1), 음성은 0.
+// 이슈 itda-hyve#140 의 시험 입력표 그대로 — 각 입력이 완전한 문서, 양성은 그 코드의 경고 하나(줄 1), 음성은 0.
 // 다른 코드의 경고도 없어야 한다(한 입력이 두 함정에 걸리지 않는다).
 func TestPitfallIssueTables(t *testing.T) {
 	cases := []struct {
@@ -145,7 +145,7 @@ func TestPitfallMessages(t *testing.T) {
 }
 
 // 저장소의 마크다운 문서(문서 창이 여는 docs·조사 자료·재현 샘플·README 등 모두)에는 함정 경고가 없다 — 범위·날짜는
-// \~·2026\. 로 적는다. 처음 켰을 때 28곳이 실제로 취소선이 되어 있었다(#140).
+// \~·2026\. 로 적는다. 처음 켰을 때 28곳이 실제로 취소선이 되어 있었다(itda-hyve#140).
 func TestPitfallRepoDocs(t *testing.T) {
 	var files []string
 	err := filepath.WalkDir("..", func(p string, d fs.DirEntry, err error) error {

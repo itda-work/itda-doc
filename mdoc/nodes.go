@@ -60,7 +60,7 @@ var KindFigure = ast.NewNodeKind("Figure")
 func (n *Figure) Kind() ast.NodeKind         { return KindFigure }
 func (n *Figure) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
 
-// FigureCaption 은 그림 바로 다음의 Figure: 문단이다(1.7, #466). 그림의 마지막 자식으로 옮겨
+// FigureCaption 은 그림 바로 다음의 Figure: 문단이다(1.7, itda-hyve#466). 그림의 마지막 자식으로 옮겨
 // <figcaption> 이 된다 — 인라인 서식을 살리는 것은 TableCaption 과 같은 꼴이다.
 type FigureCaption struct{ ast.BaseBlock }
 

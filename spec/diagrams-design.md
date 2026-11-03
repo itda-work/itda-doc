@@ -1,8 +1,7 @@
 # 마크다운 그림 — 새 mermaid 종류 구현 가이드
 
-` ```mermaid ` 에 새 그림 종류(④-2 상태도·④-3 클래스도·⑤ 이후)를 넣는 개발자·에이전트가 읽는 정본이다(#409).
-쓰는 사람용 문법은 [diagrams.md](diagrams.md), 종류마다의 설계 결정은
-[DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 1.10, 단계 공통 규칙은 #409 본문이다. 이 문서는 「~한다(코드 위치)」 또는
+` ```mermaid ` 에 새 그림 종류(④-2 상태도·④-3 클래스도·⑤ 이후)를 넣는 개발자·에이전트가 읽는 정본이다.
+쓰는 사람용 문법은 [diagrams.md](diagrams.md)다. 이 문서는 「~한다(코드 위치)」 또는
 「미검증」으로 쓴다 — 코드가 하지 않는 것을 보장으로 적지 않는다.
 
 ## 1. 구조 지도
@@ -47,7 +46,7 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
   (`diagram/state/layout.go` — 복합 상태는 `Clusters`, 모양별 끝 자르기는 `Clip` 콜백 `clipShape`)가 쓴다.
   성질은 `diagram/layered/layered_test.go` 가 직접 본다(아래 4장).
 
-## 2. 문법 정책 — 허용 목록 (#208 결정 두 번, ③에서 정함)
+## 2. 문법 정책 — 허용 목록 (③에서 정함)
 
 차단 목록(막을 꼴을 하나씩 더하기)은 ③ 리뷰 1~3회차가 연이어 새 lexer 경계를 찾아 버렸다(2026-10-30). 새 종류는 처음부터
 **허용 목록 문법**으로 짓는다(`diagram/sequence/parse.go`·`diagram/er/parse.go`·`diagram/state/parse.go` 머리 주석이 본보기):
@@ -98,8 +97,8 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
   한 줄 설정 지시·frontmatter `config` 등·`click`)만 무시하고 그린다(종류마다 첫 줄에 `Issue` 하나 — `note(key, …)`).
   뜻을 바꾸는 줄(방향·구조·라벨)을 모르면 무시하지 않고 원문이다.
 - **라벨**: 원본이 마크다운·HTML 로 그리는 글이면 그렇게 될 글자를 원문으로 돌린다(ER·state·classdiag `labelOK` — classdiag 는 멤버를 `member` 가 더 좁게 본다). 200자 상한.
-- **엔티티·공백 정책 B — 일곱 종류 공통**(state ④-2, #208 접근 방식 리뷰, 2026-10-31 사용자 결정. 흐름도·gantt·timeline·sequence·er
-  는 #409 ④-2 후속에서 옮겼다). 받은 라벨·설명·제목·접근성 값의 글자는 원본 전처리가 지킨 엔티티 표식만 한 번 되돌린 값이고, 그 밖의
+- **엔티티·공백 정책 B — 일곱 종류 공통**(state ④-2 접근 방식 리뷰, 2026-10-31 결정. 흐름도·gantt·timeline·sequence·er
+  는 ④-2 후속에서 옮겼다). 받은 라벨·설명·제목·접근성 값의 글자는 원본 전처리가 지킨 엔티티 표식만 한 번 되돌린 값이고, 그 밖의
   글자는 바꾸지 않는다(공통 `diagram/policy.go` `RestoreEntities` — 표식 → 검증된 글자 또는 오류. 표식 밖 글을 다시 찾지
   않고 되돌린 글자를 다시 읽지 않는다, `#35;35;` → `#35;`. state 의 `entity.go` `restore`·`numOK`·`unicodeVersion` 은 이 공통 구현의
   별칭이다).
@@ -126,7 +125,7 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
     `setAccDescription` 의 `replace(/\n\s+/g, '\n')` 를 옮긴다(`accBody`·`reNLSpace` — 줄바꿈·줄 끝 빈칸 보존, 줄 머리 빈칸·빈 줄 제거).
     표식 밖의 `#+65;` 는 글자 그대로, 복원한 `#lt;br#gt;` 는 `<br>` 글자일 뿐 줄바꿈으로 다시 해석하지 않는다. 맨 `&`·`<`·`>` 와 제어 문자(`AccSet` 이 탭·줄바꿈 밖의 `unicode.Cc` 를 검사한다 — C1 은 아래 관찰 표)는 원문 — 원본은 값을 `sanitizeText`(DOMPurify)에 넘겨 글이 바뀔
     수 있다(브라우저로 확인하지 않음 — 보수적).
-  - **받은 글자 = 출력 글자 — 출력 관문 하나로 닫는다**(④-2 리뷰 3·4회차, #208 규칙: 같은 종류가 두 회차라 문맥별 검사 대신 구조로).
+  - **받은 글자 = 출력 글자 — 출력 관문 하나로 닫는다**(④-2 리뷰 3·4회차 — 같은 종류 발견이 두 회차라 문맥별 검사 대신 구조로).
     `Parse` 가 본문을 다 읽은 뒤 `chart.gate` 가 SVG·`Result` 로 나가는 사용자 글자를 모두 `diagram.XmlChars` 에 묻고, 바뀌는 값이
     있으면 그 값이 나온 줄의 원문 + 경고다(원문에 실제로 든 U+FFFE·U+FFFF, YAML 이스케이프 `"\uFFFE"` 로 든 캡션 등 XML 1.0 Char 밖
     글자). 범위는 필드 목록 한곳(`chart.eachText`): frontmatter title 캡션(`FMCaption` — title 줄 `fm.TitleLine`), `accTitle`·`accDescr`, 상태 이름·설명, 전이 라벨, 복합 상태 이름·제목. `TestGateCoversAllText`
@@ -135,7 +134,7 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
     `TestAriaLabelTab`·`TestCaptionOutput`)이 본다. 라벨·acc 의 개별 `xmlOK` 는 그 줄에서
     먼저 같은 문구로 막는다(`TestGateMatchesFieldChecks`). 공통 `XmlChars` 는 묻기만 한다. **새 그림 종류도 이 관문 꼴(필드 목록 한곳 +
     빠짐 검사 + 본문 뒤 한 번)을 따른다.**
-  - **다섯 종류(흐름도·gantt·timeline·sequence·er)에 옮긴 것**(#409 ④-2 후속). 보이는 라벨은 공통 `Label`(앞뒤 빈칸·탭을 지운 뒤
+  - **다섯 종류(흐름도·gantt·timeline·sequence·er)에 옮긴 것**(④-2 후속). 보이는 라벨은 공통 `Label`(앞뒤 빈칸·탭을 지운 뒤
     안쪽 탭·연속 빈칸, `Label` 이 검사하는 제어 문자(탭 밖의 C0·DEL)는 원문 — C1 은 보장 밖이고 지금 동작은 아래 관찰 표, `<br>` 은
     줄바꿈 — er 는 `<br>` 을 줄바꿈으로 읽지 않는다), gantt 라벨과 흐름도 subgraph·
     sequence·timeline 의 제목은 `OneLine`(한 줄 — `<br>` 은 빈칸 하나). 접근성 값은 state 와 같은 `AccValue`·`AccBlock`·`AccSet`(원본
@@ -147,7 +146,7 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
     되돌린다. 흐름도·gantt 는 라벨 글에만 `EncodeEntities` 를 씌운다(갈래 (b)): 원본 lexer 가 라벨 글 상태에서는 `#`·`;` 를 글자로
     읽고(flow.jison text·STR·EDGE_TEXT `[^\[\]\(\)\{\}\|\"]+`, gantt.jison `taskTxt` `[^:\n]+`·`title`·`section` `[^\n]+`) 설정
     줄(`dateFormat`·`axisFormat` `[^#\n;]+`, flow 의 INITIAL 상태 `#`·`;`)에서만 갈라 읽으므로, 줄 단위로 바꾸면 이 판의 설정 줄
-    읽기가 바뀐다. **라벨 글만 전처리한 값이 원본(줄 전체 전처리)과 같은 것은 두 조건에서뿐이다**(#409 ④-2 후속 리뷰 1회차 [1]):
+    읽기가 바뀐다. **라벨 글만 전처리한 값이 원본(줄 전체 전처리)과 같은 것은 두 조건에서뿐이다**(④-2 후속 리뷰 1회차):
     ① 줄에 원본 전처리의 `style.*:\S*#.*;`·`classDef.*:\S*#.*;` 가 맞지 않는다 — 맞으면 원본은 **줄의** 마지막 `;` 를 지우는데
     라벨 전처리는 라벨 안의 `;` 를 지운다(`A["style x:#35;"];` → 원본 라벨 `style x:#`, 라벨 전처리 `style x:#35`; `A[style] -->|x:#35;| B`
     는 반대). 그런 줄은 원문이다(`diagram.StyleCut`). 쓰지 않는 문장(`style`·`classDef`·`class`·`linkStyle`·`click`·`direction`)만
@@ -170,7 +169,7 @@ mdoc ```mermaid 블록 ── mdoc/diagram.go  renderDiagram: diagram.Kind(src) 
     관문이 title 줄로 알린다. state 도 같다(2026-10-31 사용자 결정 「여섯 종류 통일」 — 옛 `fm.Title`(`DecodeLabel`)·frontmatter 시작 줄 1 에서
     옮겼다. `diagram/state/parse.go` frontmatter 처리, `TestCaptionPolicy`·`TestCaptionOutput`).
   - 공통 `DecodeLabel`·`namedEntities` 는 지우지 않았다 — `ParseFrontmatter` 의 title 길이 검사(`fm.Title`)만 쓴다. `WrapLabel` 은 바꾸지 않았다.
-  - **C1 제어 문자(U+0080~U+009F) — 현재 동작, 지원 약속 아님**(2026-10-31 사용자 결정 「보장에서 제외」, #409 ④-2 후속 접근 방식
+  - **C1 제어 문자(U+0080~U+009F) — 현재 동작, 지원 약속 아님**(2026-10-31 결정 「보장에서 제외」, ④-2 후속 접근 방식
     리뷰). C1 이 든 입력의 수락 여부와 표시 형태는 호환성 보장 대상이 아니다(안내서 1장). 아래는 구현을 지금 이 경로로 지나는
     결과의 관찰 기록이고, 각 행은 `policytest.C1Policy` 의 같은 이름 갈래가 일곱 종류에서 C1 32개로 회귀 감지한다(classdiag 는 라벨·수량 글 문맥만 — 멤버는 C1 을 받지 않고 `TestC1Policy` 가 따로 본다)(행 이름은
     `diagram` `TestC1ObserveTable` 이 대조한다). 결과가 바뀌면 의도한 변경인지 검토하고 이 표를 고친다. U+0085(NEL)는
@@ -234,14 +233,14 @@ gh api 'repos/mermaid-js/mermaid/contents/packages/mermaid/src/diagrams/er?ref=m
 | 지시 경계 고정 사례 — 종류마다 지시 사이 문장·acc 값·라벨·주석·블록 안 | 각 패키지 `TestDirectiveLines` |
 | 배치 속성 — viewBox 안·겹침 없음·그리기 순서·끝 기호 자리, 네 방향, 무작위 + 극단 | `diagram/er/er_test.go` `TestLayoutProperties` |
 | 공통 배치를 쓰면 — 성질은 `diagram/layered` 가 지킨다. 새 종류는 자기 감싸개(크기·Clip·끝 기호)만 본다 | `diagram/layered/layered_test.go` |
-| 뮤턴트 — 거부 뒤집기·값 훼손·배치를 `go test -overlay` 로 넣어 새 시험이 잡는지(저장소 파일을 바꿨다 되돌리지 않는다) | ④-1 보고(#409 댓글) |
+| 뮤턴트 — 거부 뒤집기·값 훼손·배치를 `go test -overlay` 로 넣어 새 시험이 잡는지(저장소 파일을 바꿨다 되돌리지 않는다) | ④-1 에서 한 번 했다 |
 | 안내서 표 실행 — 지원·무시·미지원 표의 표기를 읽어 실제로 그림/경고/원문인지, 필수 표기 목록 | `mdoc/diagramguide_test.go` `TestERGuide` |
 | mdoc golden(`-update` 로만 갱신)·보안(SVG 요소·속성 허용 목록, 공격 사례)·퍼즈 시드·클래스 접두사 | `mdoc/golden_test.go`·`security_test.go`·`TestClassCollisions` |
-| docview 견본·PDF 글자 | `internal/docview/testdata/diagram.md`·`scripts/docview_check.py` `diagram` |
-| 테마 스냅숏 | 조정 세션이 직접 본다 |
+| 앱 견본·PDF 글자 | 그림을 쓰는 앱 저장소의 몫 |
+| 테마 스냅숏 | 사람이 직접 본다 |
 
 **판정기는 구현과 같은 실수를 공유하지 않게 쓴다** — ④-1 2회차는 판정기가 acc 블록 여는 줄 본문을 다시 넣어 전처리를 두 번 한
-것을 찾았다(`result-er-r2` → #409 댓글). 판정기 안의 전처리·상태 전이도 원본 차례를 따로 따라간다.
+것을 찾았다. 판정기 안의 전처리·상태 전이도 원본 차례를 따로 따라간다.
 
 ## 5. SVG·CSS 규칙
 
@@ -255,7 +254,7 @@ gh api 'repos/mermaid-js/mermaid/contents/packages/mermaid/src/diagrams/er?ref=m
   본다). 진한 면 위 글자는 따로 글자색을 준다(`base.css` 의 `.tl-sec-t`·`.tl-per-t`).
 - 글자는 문서 글꼴의 `<text>` — PDF 에서 선택·검색된다. 숫자는 `diagram.F1`(소수 한 자리), 곱셈-덧셈은 명시적 `float64(…)`
   변환으로 FMA 합치기를 막는다(흐름도 `TestCorpusHash` 가 `GOARCH=amd64` 와 같은 출력을 본다).
-- 그림 자리(#475)는 SVG 안이 아니라 감싸는 `figure.diagram` 의 `data-diagram-*` 속성이 운반한다(`mdoc/diagramsize.go`
+- 그림 자리는 SVG 안이 아니라 감싸는 `figure.diagram` 의 `data-diagram-*` 속성이 운반한다(`mdoc/diagramsize.go`
   가 값 검사·경고 — 크기 속성은 따옴표 없는 낱말만 받는다: `diagramWords` 가 낱말 경계에서 `ratio=`·`width=`·`height=` 로
   시작하는 낱말을 다음 공백까지 통째로 검사하고(따옴표가 든 값은 검사에 걸려 경고 후 무시), 그 밖의 낱말은 따옴표 구간을
   닫는 따옴표까지(없으면 줄 끝까지) 건너뛰니 다른 속성의 따옴표 값 안 `width=…` 는 크기가 아니다. `codetitle.go` 의
@@ -272,31 +271,30 @@ gh api 'repos/mermaid-js/mermaid/contents/packages/mermaid/src/diagrams/er?ref=m
 
 - 원문 16KB·라벨 200자(공통, `diagram.MaxSource`·`MaxLabel`) + 종류별 요소 수(예: ER 엔티티 100·관계 300). 상한은 계산 전에 본다.
 - 파서는 원문을 한 번 훑는다(선형). 배치를 쓰면 `layered.MaxPoints`(12000) — 넘으면 원문 + 경고.
-- 같은 입력은 같은 출력: map 순회로 차례를 정하지 않는다, 오늘 날짜·난수·로캘·환경을 읽지 않는다(#409 규칙 4).
+- 같은 입력은 같은 출력: map 순회로 차례를 정하지 않는다, 오늘 날짜·난수·로캘·환경을 읽지 않는다.
 
 ## 7. 문서·정본 갱신 목록
 
 1. 안내서 [diagrams.md](diagrams.md) 새 장 — 지원·무시·미지원·원본과 다르게·상한 표(표지 주석
    `<!-- 종류-…:begin -->`), 머리 문단의 종류 목록. `just syntax` 로 `mdsyntax/topics/diagrams.md` 재생성.
-2. `FEATURES.md` 11장, [DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 1.10 의 종류 항목 — 아래 「문서 역할」대로 한 줄 소개와 안내서 링크만.
-3. 견본 `internal/docview/testdata/diagram.md`·`scripts/docview_check.py`, mdoc golden 의 `diagram` 견본.
+2. 그림을 쓰는 앱의 기능 목록·설계 문서 — 아래 「문서 역할」대로 한 줄 소개와 안내서 링크만(그 앱 저장소의 몫).
+3. mdoc golden 의 `diagram` 견본(`mdoc/testdata/diagram.md`). 앱의 견본·PDF 검사는 그 앱 저장소의 몫.
 4. 새 토큰이면 테마 안내서. 이 문서 9장 현황 표.
 
-**문서 역할**(#208 접근 방식 리뷰, 2026-11-01 — ER·상태도·클래스도부터 적용, 흐름도·gantt·timeline·sequence 의 지난 요약은 따로 정리):
+**문서 역할**(접근 방식 리뷰, 2026-11-01 — ER·상태도·클래스도부터 적용, 흐름도·gantt·timeline·sequence 의 지난 요약은 따로 정리):
 
 - 사용자 문법 경계(지원·무시·미지원·원본과 다르게 정한 점·상한)의 정본은 안내서 한 곳이다. `md_syntax`(`mdsyntax/topics/diagrams.md`)는 그 생성본이라 손으로 고치지 않는다(`just syntax`, `TestBundleFresh`).
-- `FEATURES.md`·[DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 1.10·이 문서 9장은 지원 경계와 원본 동작을 다시 쓰지 않는다 — 한 줄 소개, 설계 고유 정보(패키지·배치·토큰·계산량·판정기·검증 범위와 미검증), 안내서 링크만 둔다. 파서 구조·판정 함수 위치·설계 이유는 10장에 종류마다 한 번 쓴다.
+- 앱의 기능 목록·설계 문서와 이 문서 9장은 지원 경계와 원본 동작을 다시 쓰지 않는다 — 한 줄 소개, 설계 고유 정보(패키지·배치·토큰·계산량·판정기·검증 범위와 미검증), 안내서 링크만 둔다. 파서 구조·판정 함수 위치·설계 이유는 10장에 종류마다 한 번 쓴다.
 - 원본 동작 단정은 확인한 근거 수준까지만 쓴다. ① 버전(mermaid@12.2.0)·완전한 입력·관찰한 출력이나 오류·관찰 단계·근거 위치(파일·함수)를 댈 수 있을 때. ② 원본 함수를 Node 로 돌렸으면 「그 함수가 이 문자열을 돌려준다」까지 — 설정 파싱·전체 문법·화면 렌더 성공으로 넓히지 않는다. ③ 「원본은 그린다」는 그 입력의 렌더 근거가 있을 때만, 소스·함수 대조뿐이면 「원본 소스에서 이렇게 읽는다(소스 판독, 화면 미검증)」로. ④ 실측한 한 꼴을 같은 기호가 든 모든 입력으로 넓히지 않는다. ⑤ 원본 근거가 없어도 「이 판은 이 꼴을 받지 않는다」로 미지원은 안내할 수 있다.
 
 ## 8. 작업 방식
 
-조정 세션·구현 pane·Codex 리뷰 회차·같은 종류 발견 두 회차면 접근 방식 리뷰(#208)·이슈 댓글은 [`AGENTS.md`](https://github.com/itda-work/itda-hyve/blob/main/AGENTS.md)
-「일하는 방식」과 [`docs/agent-snippets/`](https://github.com/itda-work/itda-hyve/blob/main/docs/agent-snippets/README.md) 가 정본이다. 그림 종류 의뢰서에 넣는 금지 문구:
+이 저장소의 일하는 규칙은 [`AGENTS.md`](../AGENTS.md)다. 그림 종류를 구현할 때 함께 지킬 것:
 
-- 파일은 scratchpad 에 직접 쓴다 — `/tmp`·`cp`·`mv`·`rm` 을 쓰지 않는다. 저장소 안 임시 파일(`.tmp` 포함) 금지.
+- 저장소 안에 임시 파일(`.tmp` 포함)을 두지 않는다.
 - 뮤테이션·실험 시험은 `go test -overlay` 로만.
 - 원본 소스는 `curl` 대신 `gh api … -H 'Accept: application/vnd.github.raw'`.
-- 보고서에 자리표시자를 두지 않는다 — 검증 명령은 실제 결과를 적는다.
+- 보고서·PR 본문에 자리표시자를 두지 않는다 — 검증 명령은 실제 결과를 적는다.
 
 ## 9. 종류별 현황
 
@@ -314,7 +312,7 @@ gh api 'repos/mermaid-js/mermaid/contents/packages/mermaid/src/diagrams/er?ref=m
 
 사용자 문법 경계는 안내서 11·12·13장이 정본이다(7장 「문서 역할」). 여기는 구현을 읽는 사람을 위한 파서 구조·판정 함수
 위치·설계 이유만 둔다. 「원본」 근거는 mermaid@12.2.0 소스 판독이며 원본 화면은 실측하지 않았다(9장 미검증 칸). 세 종류 모두
-허용 목록 문법(#208)이다 — 줄마다 양성 꼴 하나에 통째로 맞는 줄만 그리고, 아니면 원문 + 줄 번호 경고.
+허용 목록 문법이다 — 줄마다 양성 꼴 하나에 통째로 맞는 줄만 그리고, 아니면 원문 + 줄 번호 경고.
 
 ### 10.1 ER (`diagram/er`)
 

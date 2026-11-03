@@ -10,7 +10,7 @@ import (
 )
 
 // notesLeak 은 DropNotes 로 렌더한 HTML 을 파서로 읽어 노트 자리(class 토큰에 notes 가 든 요소)가 비어 있지 않은 것 — 자식 요소·
-// 공백 아닌 글자, class="notes"·data-line 밖의 속성(사용자 class·id·data-*) — 과 글자·속성값에 든 marker 를 찾는다(#344 — 공유
+// 공백 아닌 글자, class="notes"·data-line 밖의 속성(사용자 class·id·data-*) — 과 글자·속성값에 든 marker 를 찾는다(itda-hyve#344 — 공유
 // 「노트 함께 보이기」 꺼짐의 불변식: 노트는 빈 자리로만 남고 노트 글이 없다). marker 가 비면 글자는 보지 않는다.
 func notesLeak(t *testing.T, doc, marker string) []string {
 	t.Helper()
@@ -54,7 +54,7 @@ func notesLeak(t *testing.T, doc, marker string) []string {
 }
 
 // noteAttrs 는 HTML 의 노트 요소(class 토큰 notes, 중첩 포함)에 붙은 class="notes"·data-line 밖의 속성이다 — 렌더러는 DropNotes 와
-// 상관없이 노트를 늘 class="notes" 하나로 낸다(transform.go notes, #344 2단계 리뷰 5회차). 노트 글은 보지 않는다(호스트 렌더에도 쓴다).
+// 상관없이 노트를 늘 class="notes" 하나로 낸다(transform.go notes, itda-hyve#344 2단계 리뷰 5회차). 노트 글은 보지 않는다(호스트 렌더에도 쓴다).
 func noteAttrs(t *testing.T, doc string) []string {
 	t.Helper()
 	root, err := html.Parse(strings.NewReader(doc))
@@ -89,7 +89,7 @@ func isNotesEl(n *html.Node) bool {
 }
 
 // topBlocks 는 HTML 의 맨 위 요소를 「태그.class…」 로 적은 것이다 — 노트 자리도 따로 정규화하지 않는다(렌더러가 노트를 늘
-// class="notes" 하나로 내므로 — transform.go notes, #344 2단계 리뷰 5회차: {.notes .page-break}). 호스트와 DropNotes 결과의 구조
+// class="notes" 하나로 내므로 — transform.go notes, itda-hyve#344 2단계 리뷰 5회차: {.notes .page-break}). 호스트와 DropNotes 결과의 구조
 // 비교에 쓴다(글자·id 는 보지 않는다 — 노트 안 제목이 빠지면 뒤 제목의 id 가 바뀔 수 있다).
 func topBlocks(t *testing.T, doc string) []string {
 	t.Helper()
@@ -113,7 +113,7 @@ func topBlocks(t *testing.T, doc string) []string {
 	return out
 }
 
-// sameStructure 는 같은 원문의 호스트 렌더(DropNotes 거짓)와 공유 렌더(참)의 자동 슬라이드 단계·맨 위 블록 구조가 같은지다(#344 2단계
+// sameStructure 는 같은 원문의 호스트 렌더(DropNotes 거짓)와 공유 렌더(참)의 자동 슬라이드 단계·맨 위 블록 구조가 같은지다(itda-hyve#344 2단계
 // 리뷰 3·4회차 — 노트를 빈 자리로 남기므로 구성상 같다). 블록 중첩 상한을 넘은 문서는 서로 다른 대체 렌더라 견주지 않는다.
 func sameStructure(t *testing.T, src string) (host, viewer Result, ok bool) {
 	t.Helper()
@@ -144,7 +144,7 @@ func sameStructure(t *testing.T, src string) (host, viewer Result, ok bool) {
 	return host, viewer, ok
 }
 
-// TestDropNotesInvariant 는 노트를 숨기는 꼴이 컨테이너 하나뿐이라는 보장(#344)을 여러 꼴로 고정한다. 노트 글에는 「비밀」 을 적고,
+// TestDropNotesInvariant 는 노트를 숨기는 꼴이 컨테이너 하나뿐이라는 보장(itda-hyve#344)을 여러 꼴로 고정한다. 노트 글에는 「비밀」 을 적고,
 // 제목의 {.notes} 는 노트가 아니므로 그 제목 글자는 남아야 한다(keep). 노트는 빈 자리로만 남고, 호스트와 구조가 같다(sameStructure).
 func TestDropNotesInvariant(t *testing.T) {
 	cases := []struct {
@@ -219,7 +219,7 @@ func TestDropNotesInvariant(t *testing.T) {
 }
 
 // FuzzDropNotesInvariant 는 정상 노트(식별 글자 notesMarker)를 앞에 두고 뒤 문서를 아무렇게나 바꿔도 DropNotes 결과의 노트 자리가
-// 비어 있고(자식·글자·사용자 속성 없음) 노트 글자가 — HTML·목차·경고 어디에도 — 없으며(#344 리뷰 3회차: 뒤 문서 때문에 원문 보기로
+// 비어 있고(자식·글자·사용자 속성 없음) 노트 글자가 — HTML·목차·경고 어디에도 — 없으며(itda-hyve#344 리뷰 3회차: 뒤 문서 때문에 원문 보기로
 // 바뀌는 경로까지), 호스트와 슬라이드 단계·맨 위 블록 구조가 같은지다(리뷰 4회차 — sameStructure). 노트는 앞에서 닫히므로 뒤 문서가
 // 그 글을 노트 밖으로 꺼낼 수 없다. go test 기본 실행은 시드만 돈다.
 func FuzzDropNotesInvariant(f *testing.F) {
@@ -272,7 +272,7 @@ func FuzzDropNotesInvariant(f *testing.F) {
 
 const notesMarker = "발표비밀표식"
 
-// TestDropNotesWithheldRaw 는 블록 중첩 상한을 넘어 원문 보기로 바뀌는 문서다(#344 리뷰 3회차 P1). 원문 글자에서는 노트를 뺄 수
+// TestDropNotesWithheldRaw 는 블록 중첩 상한을 넘어 원문 보기로 바뀌는 문서다(itda-hyve#344 리뷰 3회차 P1). 원문 글자에서는 노트를 뺄 수
 // 없으므로 DropNotes 면 원문 대신 안내만 내고(nesting.go withheldRaw), DropNotes 가 아니면(호스트 화면) 원문 보기 그대로다.
 func TestDropNotesWithheldRaw(t *testing.T) {
 	src := []byte("# 공개\n\n:::notes\n" + notesMarker + "\n:::\n\n" + strings.Repeat(">", MaxNestingDepth+1) + " 깊은 공개 인용\n")
@@ -305,7 +305,7 @@ func TestDropNotesWithheldRaw(t *testing.T) {
 	}
 }
 
-// TestDropNotesStructure 는 노트를 빈 자리로 남기므로 자동 슬라이드 단계·맨 위 블록 구조가 호스트와 같은지다(#344 2단계 리뷰 3·4회차 —
+// TestDropNotesStructure 는 노트를 빈 자리로 남기므로 자동 슬라이드 단계·맨 위 블록 구조가 호스트와 같은지다(itda-hyve#344 2단계 리뷰 3·4회차 —
 // 노트를 떼어 내면 제목 다음 블록이 바뀌어 단계가 달라졌다). 4회차 반례는 제목과 노트 사이에 변환이 지우는 HTML 블록이 있는 꼴이다.
 func TestDropNotesStructure(t *testing.T) {
 	cases := []struct {

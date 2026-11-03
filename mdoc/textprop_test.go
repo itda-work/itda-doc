@@ -81,7 +81,7 @@ func missingMarks(got string, marks []string) []string {
 	return miss
 }
 
-// 판정 자체의 시험(리뷰 R5 P3): 실제 렌더 글자에서 표식 하나를 지우면 missingMarks 가 그 표식을 찾아낸다 — 리뷰의 #5 꼴
+// 판정 자체의 시험(리뷰 R5 P3): 실제 렌더 글자에서 표식 하나를 지우면 missingMarks 가 그 표식을 찾아낸다 — 리뷰의 itda-hyve#5 꼴
 // (K1 과 K11·K14 가 함께 있던 문서)을 길이가 같은 표식으로.
 func TestTextPreservedOracle(t *testing.T) {
 	src := "시작 *K01K02K03- . . .K06가K08K09}K11**&K14\n:::box\nK16"

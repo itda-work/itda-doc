@@ -1,6 +1,6 @@
-// Package diagram 은 mermaid 그림 종류(flowchart·gantt …)가 함께 쓰는 부분이다(#409) — 공개 꼴(결과·경고·오류),
+// Package diagram 은 mermaid 그림 종류(flowchart·gantt …)가 함께 쓰는 부분이다(itda-hyve#409) — 공개 꼴(결과·경고·오류),
 // 공통 상한, 글자 폭·줄바꿈, SVG 쓰기 도구, frontmatter·접근성 문장 읽기, 종류 판별.
-// 종류마다의 파서·그리기는 internal/flowchart·internal/gantt 이 맡는다(공통 부분을 복제하지 않게 여기에 둔다).
+// 종류마다의 파서·그리기는 diagram/flowchart·diagram/gantt 이 맡는다(공통 부분을 복제하지 않게 여기에 둔다).
 //
 // 같은 입력은 같은 출력이다(map 순회 없음, 숫자는 소수 한 자리, 오늘 날짜·난수·로캘·환경변일 읽지 않는다).
 package diagram

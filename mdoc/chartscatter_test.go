@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 이슈 #114 단계 D: 산점도 scatter·버블 bubble — 표 꼴 라벨 | x | y [| 크기], x·y 연속 축, 버블 넓이 ∝ 크기.
+// 이슈 itda-hyve#114 단계 D: 산점도 scatter·버블 bubble — 표 꼴 라벨 | x | y [| 크기], x·y 연속 축, 버블 넓이 ∝ 크기.
 
 var (
 	scDotRe   = regexp.MustCompile(`<circle cx="([-\d.]+)" cy="([-\d.]+)" r="([-\d.]+)" class="dot (sc|bub) s1 d\d+"><title>([^<]*)</title></circle>`)

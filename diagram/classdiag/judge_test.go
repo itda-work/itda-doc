@@ -13,7 +13,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 독립 판정기(#409 ④-3 — er ④-1·state ④-2 judge_test.go 꼴). 허용 꼴과 원본 lexer·DB 의 함정을 이 파일 안에 따로 옮겨 적은
+// 독립 판정기(itda-hyve#409 ④-3 — er ④-1·state ④-2 judge_test.go 꼴). 허용 꼴과 원본 lexer·DB 의 함정을 이 파일 안에 따로 옮겨 적은
 // 손 스캐너로, 무작위 원문마다 받아들일지와 받아들이면 그 값(클래스 차례·이름·주석, 멤버 차례·종류(속성/메서드)·가시성·표시 글·
 // 분류자, 관계 양끝·모양 둘·선 종류·라벨·양끝 수량 글, 방향, 접근성 값, 캡션)을 스스로 구해 Parse 와 견준다. 구현의 정규식·
 // 상수·도우미(nameOK·member·labelOK·keywords·reRel·unicodeText …)는 쓰지 않는다 — 공통 패키지의 전처리(EncodeEntities·

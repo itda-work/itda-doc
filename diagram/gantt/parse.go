@@ -152,7 +152,7 @@ func (p *parser) parse(src string) error {
 			return p.fail("줄 안에 CR·FF·VT 글자가 있음 — 이 판은 그 줄을 그리지 않는다")
 		}
 		// ASCII 밖 공백·서식 문자는 줄째 그리지 않는다(원본 JS \s 와 Go 의 공백 판정이 갈리는 갈래 — er·sequence·state 와 같다,
-		// #409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
+		// itda-hyve#409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
 		// 정리가 원본 \n\s+ 와 갈린다).
 		if r, ok := diagram.OddSpace(lines[i]); ok {
 			return p.fail("ASCII 밖 공백·서식 문자(U+%04X)가 있음 — 이 판은 그 줄을 그리지 않는다(일반 빈칸으로 바꿔 쓴다)", r)
@@ -164,15 +164,15 @@ func (p *parser) parse(src string) error {
 		}
 		// 설정 지시 — 줄 전체가 지시 하나인 줄(accDescr { … } 밖)만 무시하는 지시다. 그 밖에 %%{ 가 든 줄(지시 앞뒤·사이의
 		// 글, acc 값·작업 이름·주석 안, accDescr 블록 안)은 원본 removeDirectives 가 지시만 지우고 남은 글을 읽는 갈래라
-		// 그리지 않는다(er·sequence 와 같은 공통 규칙 — #409 ④-1 후속).
+		// 그리지 않는다(er·sequence 와 같은 공통 규칙 — itda-hyve#409 ④-1 후속).
 		if msg := diagram.DirectiveProblem(t, p.inAcc); msg != "" {
 			return p.fail("%s", msg)
 		}
 		// 줄 머리 %% 주석 — 원본 전처리 cleanupComments(/^\s*%%(?!{)[^\n]+\n?/gm)가 lexer 상태와 관계없이(accDescr { … } 블록 안도)
-		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — #409 ④-1 후속 리뷰 1회차 [2]).
+		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 		// 뒤에 글이 없는 맨 %% 는 원본 전처리가 지우지 않는다. 블록 밖에서는 원본 lexer 의 주석 규칙(\%%[^\n]* — jison:34)이
 		// 건너뛰므로 이 판도 경고 없이 건너뛴다. accDescr { … } 블록 안에서는 원본이 설명 글로 넣는다 — 이 판은 그 줄을
-		// 그리지 않는다(보수적, #409 ④-1 후속 수정 2).
+		// 그리지 않는다(보수적, itda-hyve#409 ④-1 후속 수정 2).
 		// 여기 오는 %%{ 줄은 줄 전체가 지시 하나뿐이다(DirectiveProblem).
 		if strings.HasPrefix(t, "%%") {
 			if strings.HasPrefix(t, "%%{") {
@@ -479,7 +479,7 @@ func (p *parser) taskLine(s string, cur int) error {
 	}
 	// 간트는 라벨 글에만 엔티티 전처리를 씌운다(text). 작업 줄의 라벨(이름)은 줄의 앞부분이라, 원본의 줄 전체 전처리와 같으려면
 	// style…:…#…; 꼴(원본은 줄의 마지막 ; 를 자른다 — 작업 줄에서는 콜론 뒤 값 쪽)이 없고 줄의 엔티티 토큰이 모두 이름 안에 있어야
-	// 한다(#409 ④-2 후속 리뷰 1회차 [1] — 흐름도와 같은 검사). title·section·접근성 줄은 라벨이 줄 끝까지라 두 전처리가 같다.
+	// 한다(itda-hyve#409 ④-2 후속 리뷰 1회차 [1] — 흐름도와 같은 검사). title·section·접근성 줄은 라벨이 줄 끝까지라 두 전처리가 같다.
 	if diagram.StyleCut(s) {
 		return p.fail("style…:…#…; 꼴이 든 작업 줄 — 원본 전처리는 줄 끝 ; 를 자르고 엔티티를 지켜 이 판(라벨 글만 전처리)과 뜻이 갈린다")
 	}

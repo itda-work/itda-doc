@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 목록 기호 사다리(#141): 테마의 list-style 이 기본이고 문서의 list-style 이 덮는다. plain 은 끈다.
+// 목록 기호 사다리(itda-hyve#141): 테마의 list-style 이 기본이고 문서의 list-style 이 덮는다. plain 은 끈다.
 func TestListStyleThemeAndDoc(t *testing.T) {
 	ts, err := BuiltinThemes()
 	if err != nil {

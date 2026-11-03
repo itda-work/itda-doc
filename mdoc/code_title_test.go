@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 코드 블록 파일명 머리 띠(#441, codetitle.go): 펜스 info string 에 파일명을 적으면 pre 에 data-title 속성을
+// 코드 블록 파일명 머리 띠(itda-hyve#441, codetitle.go): 펜스 info string 에 파일명을 적으면 pre 에 data-title 속성을
 // 달고(띠 글자는 화면이 CSS ::before 로 그린다), 언어를 비우면 파일명 확장자·이름으로 강조 언어를 짐작한다.
 // 파일명은 속성값일 뿐 코드 글자(code textContent — 복사·줄 번호·검색)에 들어가지 않는다.
 // 표기: 정식 `title="…"`(·작은따옴표·따옴표 없는 값)과 줄임 `언어:파일명` 둘 다 받는다.

@@ -250,7 +250,7 @@ func TestContainers(t *testing.T) {
 	})
 }
 
-// 닫는 줄은 가장 안쪽에 열린 컨테이너의 것이다 — 사이에 목록·인용·각주·정의 목록이 있어도(#139)
+// 닫는 줄은 가장 안쪽에 열린 컨테이너의 것이다 — 사이에 목록·인용·각주·정의 목록이 있어도(itda-hyve#139)
 func TestContainerCloseInnermost(t *testing.T) {
 	steps := "<div class=\"steps\" data-line=\"1\">\n<ol>\n<li>\n<p>첫째</p>\n<div class=\"result\">\n<p>결과</p>\n</div>\n</li>\n<li>\n<p>둘째</p>\n</li>\n</ol>\n</div>\n"
 	for _, c := range []struct {
@@ -473,7 +473,7 @@ func TestRest(t *testing.T) {
 		{name: "코드 블록", src: "```go\nfmt.Println(\"<b>\")\n```",
 			want: []string{`<pre data-line="1"><code class="language-go"><span class="hl-`, `&lt;b&gt;`, `</code></pre>`}},
 		{name: "언어 이름 정리", src: "```c++\nx\n```\n\n```x\"onclick=y\nz\n```",
-			want: []string{`class="language-c++"`}, not: []string{`language-xonclicky`, `"onclick`}}, // 첫 낱말에 = 가 있으면 언어 없음(#441) — class 가 아예 안 나온다
+			want: []string{`class="language-c++"`}, not: []string{`language-xonclicky`, `"onclick`}}, // 첫 낱말에 = 가 있으면 언어 없음(itda-hyve#441) — class 가 아예 안 나온다
 		{name: "mermaid 흐름도는 그림(자세히는 diagram_test.go)", src: "```mermaid\ngraph TD\nA-->B\n```",
 			want: []string{`<figure class="diagram" data-line="1">`, `<svg class="diagram-svg"`}},
 		{name: "그리지 못한 mermaid 는 코드", src: "```mermaid\nsequenceDiagram\n```", want: []string{`<code class="language-mermaid">sequenceDiagram`}, warn: WarnDiagram},

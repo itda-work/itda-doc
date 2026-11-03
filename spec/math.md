@@ -1,7 +1,6 @@
 # 마크다운 수식 — `$…$` 와 `$$…$$` 안내서
 
-Itda Doc 문서에서 수식을 쓰는 사람을 위한 안내서다. 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 설계는 [DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 1.10,
-기능 목록은 [FEATURES.md](https://github.com/itda-work/itda-hyve/blob/main/FEATURES.md) 11장이다. 견본은 [`internal/docview/testdata/math.md`](https://github.com/itda-work/itda-hyve/blob/main/internal/docview/testdata/math.md)다.
+Itda Doc 문서에서 수식을 쓰는 사람을 위한 안내서다. 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 견본은 [`mdoc/testdata/math.md`](../mdoc/testdata/math.md)다(참조 렌더러의 골든 견본).
 
 <!-- syntax:math:begin -->
 수식은 **TeX(LaTeX 수식 문법) 그대로** 쓴다. 문서 창이 MathML 로 그리고(앱 안에서, 인터넷 없이), PDF 에서도 글자로 남아 선택·검색된다.

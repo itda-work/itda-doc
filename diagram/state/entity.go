@@ -2,8 +2,8 @@ package state
 
 import "github.com/itda-work/itda-doc/diagram"
 
-// 엔티티 정책 B(#409 ④-2 접근 방식 리뷰, 2026-10-31 사용자 결정)는 여섯 종류가 함께 쓰는 공통 구현으로 옮겼다
-// (internal/diagram/policy.go — RestoreEntities·EntityNumOK·EntityUnicodeVersion, 규칙은 그 머리 주석). 여기 이름은 state 의
+// 엔티티 정책 B(itda-hyve#409 ④-2 접근 방식 리뷰, 2026-10-31 사용자 결정)는 여섯 종류가 함께 쓰는 공통 구현으로 옮겼다
+// (diagram/policy.go — RestoreEntities·EntityNumOK·EntityUnicodeVersion, 규칙은 그 머리 주석). 여기 이름은 state 의
 // 파서·시험이 쓰는 별칭이다(동작은 옮기기 전과 같다).
 
 // unicodeVersion 은 숫자 정책이 기대는 Go unicode 표의 판본이다(Go 를 올려 판본이 바뀌면 TestEntityPolicyTable 이 알린다).

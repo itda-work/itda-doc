@@ -1,4 +1,4 @@
-<!-- itda-hyve 마크다운 문법 · 주제 index · 자동 생성(spec/markdown.md) — 손으로 고치지 않는다. 장 번호("3장")는 이 주제 안의 번호다 -->
+<!-- Itda Doc 마크다운 문법 · 주제 index · 자동 생성(spec/markdown.md) — 손으로 고치지 않는다. 장 번호("3장")는 이 주제 안의 번호다 -->
 
 ## 1. 빠른 시작
 
@@ -50,7 +50,7 @@ number-sections: true
 > 세부 일정은 붙임을 본다.
 ```
 
-**주제별 문법**(Claude 는 `md_syntax(주제)` 또는 `itda-hyve md --syntax 주제` 로 같은 글을 받는다):
+**주제별 문법**(Claude 는 앱의 문법 도구(예: MCP `md_syntax(주제)`)나 `itda-doc syntax 주제` 로 같은 글을 받는다):
 
 | 주제 | 내용 | 안내서 |
 |---|---|---|
@@ -60,5 +60,5 @@ number-sections: true
 | `diagrams` | ```` ```mermaid ```` 흐름도 — 지원 문법, 그리지 않는 것, 상한 | [diagrams.md](diagrams.md) |
 | `slides` | 슬라이드 나눔, `slides:`, 차례로 나타내기, 발표자 노트 | [slides.md](slides.md) |
 
-문서 작업 순서(사람이든 Claude 든): 필요한 주제의 문법을 읽는다 → 쓴다 → 문서 창의 경고 단추(또는 `md_check`·`itda-hyve md --check`)로 경고를 본다 → 고친다.
+문서 작업 순서(사람이든 Claude 든): 필요한 주제의 문법을 읽는다 → 쓴다 → 문서 창의 경고 단추(또는 앱의 검사 도구·`itda-doc check`)로 경고를 본다 → 고친다.
 경고를 숨기려고 데이터를 지우지 않는다(차트 상한을 넘으면 차트를 나누거나 `table=below` 로 표를 함께 싣는다).

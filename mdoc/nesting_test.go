@@ -151,7 +151,7 @@ func defListNest(n int) string {
 	return b.String()
 }
 
-// 문법 동등 변형(리뷰 #126 R5): 인용 뒤 공백 유무, 탭 들여쓰기·탭 목록 표지, 닫는 줄의 공백 — 판정이 각 꼴의 실제 깊이와 같다.
+// 문법 동등 변형(리뷰 itda-hyve#126 R5): 인용 뒤 공백 유무, 탭 들여쓰기·탭 목록 표지, 닫는 줄의 공백 — 판정이 각 꼴의 실제 깊이와 같다.
 // 얕은 문서(형제 콜아웃 64~200개)는 모두 보통 렌더다.
 func TestNestingSyntaxVariants(t *testing.T) {
 	shallow := map[string]string{
@@ -201,7 +201,7 @@ func TestNestingSyntaxVariants(t *testing.T) {
 	}
 }
 
-// RequireParagraph 후보 폐기 경계(리뷰 #126 R6): 64겹 ::: 안에서 정의 목록 후보가 앞 문단의 표 변환으로 버려지면 그 겹은 받아들여지지
+// RequireParagraph 후보 폐기 경계(리뷰 itda-hyve#126 R6): 64겹 ::: 안에서 정의 목록 후보가 앞 문단의 표 변환으로 버려지면 그 겹은 받아들여지지
 // 않아 보통 렌더다. setext 후보가 표 변환으로 버려진 뒤 다시 고른 실제 목록이 65번째 겹이면 안전 모드다.
 func TestNestingRequireParagraphDiscard(t *testing.T) {
 	deep := strings.Repeat(":::note\n", MaxNestingDepth)
@@ -305,7 +305,7 @@ func TestNestingGoldmarkContract(t *testing.T) {
 	}
 }
 
-// 상한 아래의 보통 문서는 안전 모드로 가지 않고 상한 없는 렌더와 같다(리뷰 #126 R4 재현 포함).
+// 상한 아래의 보통 문서는 안전 모드로 가지 않고 상한 없는 렌더와 같다(리뷰 itda-hyve#126 R4 재현 포함).
 func TestNestingNormalDocsNotFlagged(t *testing.T) {
 	rep := strings.Repeat
 	docs := map[string]string{
@@ -317,7 +317,7 @@ func TestNestingNormalDocsNotFlagged(t *testing.T) {
 		"깊은 들여쓰기 코드":         "- a\n\n```json\n" + rep(rep(" ", 140)+"{\n", 50) + "```\n",
 		"제목·표·가로줄":           rep("# 제목\n\n| a | b |\n|---|---|\n| 1 | 2 |\n\n---\n\n", 200),
 		"날짜 문단":              rep("2024. 10. 14. 오늘\n", 100),
-		// 리뷰 #126 R4: 목록 항목·인용마다 안내 상자(형제) — 실제 깊이 2, 들여쓴 콜아웃을 0열에서 닫음 — 실제 깊이 1
+		// 리뷰 itda-hyve#126 R4: 목록 항목·인용마다 안내 상자(형제) — 실제 깊이 2, 들여쓴 콜아웃을 0열에서 닫음 — 실제 깊이 1
 		"목록 항목마다 콜아웃 200개":    rep("- :::note\n  안내\n  :::\n\n", 200),
 		"번호 목록 항목마다 콜아웃 200개": rep("1. 단계\n\n   :::note\n   안내\n\n   ```sh\n   x\n   ```\n   :::\n", 200),
 		"인용 안 콜아웃 형제 200개":    rep("> :::note\n> 안내\n> :::\n>\n", 200),
@@ -350,7 +350,7 @@ func TestNestingNormalDocsNotFlagged(t *testing.T) {
 	}
 }
 
-// 현실적인 큰 문서는 안전 모드로 가지 않고 상한 없는 렌더와 같다(리뷰 #126 R4): 목록·번호 목록·인용·콜아웃(목록·인용 안, 서로 안)·표·펜스(안에 콜아웃
+// 현실적인 큰 문서는 안전 모드로 가지 않고 상한 없는 렌더와 같다(리뷰 itda-hyve#126 R4): 목록·번호 목록·인용·콜아웃(목록·인용 안, 서로 안)·표·펜스(안에 콜아웃
 // 문법 예시와 ::: 줄, > 줄)·차트·수식·정의 목록·각주·HTML 주석·제목을 실제 깊이 8 이하로 섞은 문서 — 수백~수천 블록 300개(절반은 블록
 // 사이 빈 줄을 가끔 뺀다)와 8만 줄 남짓 4개. 안전 모드 0건.
 func TestNestingRealisticDocs(t *testing.T) {
@@ -611,7 +611,7 @@ func TestNestingSafeMode(t *testing.T) {
 	if len(r.Warnings) != 1 || r.Warnings[0].Line != MaxNestingDepth+1 {
 		t.Errorf("경고 %+v", r.Warnings)
 	}
-	// frontmatter 바로 뒤의 본문 빈 줄은 남는다(리뷰 #126 R4 — frontmatter 자리만 뺀다)
+	// frontmatter 바로 뒤의 본문 빈 줄은 남는다(리뷰 itda-hyve#126 R4 — frontmatter 자리만 뺀다)
 	r = render(t, "---\ntitle: 제목\n---\n\n\n"+strings.Repeat(":::note\n", MaxNestingDepth+1))
 	if !isRaw(r) || !strings.HasPrefix(r.HTML, `<pre class="raw-source" data-line="4"><code><span data-line="4"></span>`+"\n"+`<span data-line="5"></span>`+"\n"+`<span data-line="6">:::note</span>`) {
 		t.Errorf("frontmatter 뒤 빈 줄: %.200s", r.HTML)
@@ -654,7 +654,7 @@ func TestNestingLinear(t *testing.T) {
 		"- :::box\n# 제목\n", "> :::box\n\n", ":::box\n```\n:::x\n```\n", ":::box\n<!--\n", "[^[^[^", "[^a]: [^a]: [^", ":::{" + strings.Repeat("a", 50) + " ",
 		"   :::box\n", "    :::box\n", ":::box\n:::\n", "```\n:::box\n", "- a\n  :::box\n  ", "\t> \t- ", "1. 2. 3) ", ": : ", "~~~~\n",
 		":::a\n```\n:::b\n", "<!--\n:::a\n```\n-->\n:::b\n:::c\n", "- $$\n  x\n", "     ```\n", "1. 1. ```\n", "> :::a\n>   $$\n", "- :::a\n  ```\n  :::b\n",
-		// 닫는 줄을 안쪽에 넘기는 길(#139): 목록 안 컨테이너를 닫는 줄, 안쪽까지 닿지 못해 넘긴 컨테이너가 받는 줄, 목록 안 펜스 코드
+		// 닫는 줄을 안쪽에 넘기는 길(itda-hyve#139): 목록 안 컨테이너를 닫는 줄, 안쪽까지 닿지 못해 넘긴 컨테이너가 받는 줄, 목록 안 펜스 코드
 		":::a\n- :::b\n  :::\n", ":::a\n- :::b\n  x\n:::\n", ":::a\n> - ```\n>   :::\n", "1. :::a\n   - :::b\n     :::\n",
 	} {
 		// 상한 600ms: `- :::box` 류 512KB 가 GitHub 러너에서 340~410ms(256KB 150~200ms — 선형).
@@ -675,7 +675,7 @@ func TestNestingLinear(t *testing.T) {
 		// 상한 600ms: 「64겹 ::: 안 본문」 512KB 가 GitHub 러너에서 460ms.
 		assertLinear(t, name, gen, 600*time.Millisecond)
 	}
-	// 앞에 무엇이 오든 깊은 ::: 는 안전 모드다(#126 R6 의 접두들 — 실제로 연 겹만 센다)
+	// 앞에 무엇이 오든 깊은 ::: 는 안전 모드다(itda-hyve#126 R6 의 접두들 — 실제로 연 겹만 센다)
 	for _, pre := range []string{"", "> ```\n\n", "    ```\n\n", "```\n```\n\n", "$$\n$$\n\n", "<div>\n\n", "> :::box\n\n", "- a\n\n  ```\n\n"} {
 		gen := func(size int) string {
 			n := size / 11

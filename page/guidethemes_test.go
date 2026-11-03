@@ -10,7 +10,7 @@ import (
 )
 
 // 입구 안내서(spec/markdown.md)의 테마 표는 내장 테마의 이름·별칭과 같고, 경고 코드 표에는 이 패키지가 더하는
-// unknown-theme 이 있다(#134). 테마를 더하거나 별칭을 바꾸고 안내서를 안 고치면 실패한다.
+// unknown-theme 이 있다(itda-hyve#134). 테마를 더하거나 별칭을 바꾸고 안내서를 안 고치면 실패한다.
 func TestGuideThemes(t *testing.T) {
 	b, err := os.ReadFile(filepath.Join("..", "spec", "markdown.md"))
 	if err != nil {

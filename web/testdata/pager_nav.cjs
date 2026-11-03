@@ -1,4 +1,4 @@
-// 쪽 넘김 키와 복사 단추(#413 리뷰 [2]): pager.js 의 navKey·typingTarget·hostNavKey 를 그대로 node 로 돌린다(pager_test.go).
+// 쪽 넘김 키와 복사 단추(itda-hyve#413 리뷰 [2]): pager.js 의 navKey·typingTarget·hostNavKey 를 그대로 node 로 돌린다(pager_test.go).
 // Space 는 단추(button)에 포커스가 있으면 단추 누르기의 키다 — 공유 보기 화면(share.js keyHandler)도 넘기지 않고, 문서 창 보기
 // 모드(hostNavKey — HOST_BUSY 제외)도 단추 위에서는 넘기지 않는다. 인자: pager.js 경로.
 "use strict";

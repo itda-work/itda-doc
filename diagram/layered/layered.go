@@ -1,4 +1,4 @@
-// Package layered 는 그림 종류가 함께 쓰는 계층 배치(Sugiyama)다(#409 ④ — 흐름도 internal/flowchart 의 배치를 꺼냈다).
+// Package layered 는 그림 종류가 함께 쓰는 계층 배치(Sugiyama)다(itda-hyve#409 ④ — 흐름도 diagram/flowchart 의 배치를 꺼냈다).
 // 입력은 상자(노드)의 크기·subgraph 소속, 간선의 양끝·길이·라벨 줄, 방향이고, 출력은 상자 가운데·간선이 지나는 점·라벨
 // 자리다. 모양은 모른다 — 간선 끝을 상자 테두리에서 자르는 일은 부르는 쪽의 Clip(없으면 사각형 ClipRect)이 한다.
 // 흐름도(flowchart)·ER(er)이 쓰고, 상태도·클래스도가 같은 입구를 쓴다.
@@ -452,8 +452,8 @@ func (lg *lgraph) order() {
 	lg.renumber()
 	// 쓸기는 한쪽 끝 계층(위로 쓸 때 맨 위, 아래로 쓸 때 맨 아래)을 다시 묶지 않아, 그 계층만 앞 반복의 subgraph 차례로 남을 수
 	// 있다 — 계층끼리 subgraph 차례가 어긋나면 unoverlapClusters 의 제약에 순환이 생겨 상자가 겹친다. 고른 차례(best)를 만든
-	// 반복의 subgraph 차례로 두 끝 계층을 다시 묶는다(이미 그 차례면 group 은 아무것도 바꾸지 않는다 — #409 ④-1 후속
-	// internal/layered 자체 시험 TestRandomProperties 가 찾음).
+	// 반복의 subgraph 차례로 두 끝 계층을 다시 묶는다(이미 그 차례면 group 은 아무것도 바꾸지 않는다 — itda-hyve#409 ④-1 후속
+	// diagram/layered 자체 시험 TestRandomProperties 가 찾음).
 	if lg.nc > 0 && len(lg.layers) > 0 {
 		lg.cOrder = bestCO
 		lg.group(0)

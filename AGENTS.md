@@ -11,7 +11,7 @@
 - 문법의 정본은 `spec/` 이다. 코드와 표는 시험이 묶는다(`mdoc/*guide*_test.go`·`page/guidethemes_test.go`·`mdsyntax`).
   `spec/*.md` 의 `<!-- syntax:주제:begin/end -->` 구간을 고치면 `just syntax` 로 `mdsyntax/topics`·`completions.json` 을 다시 만든다.
 
-## 명세 변경 절차(itda-work/itda-hyve#577 §3-4)
+## 명세 변경 절차
 - 어휘 추가(새 컨테이너·키·값)는 minor 판으로 낸다. 옛 판은 모르는 키로 두고 그린다.
 - 이미 있는 키의 뜻은 바꾸지 않는다. 다른 뜻이 필요하면 새 키를 만든다.
 - 폐기는 한 판 동안 경고를 낸 뒤에 한다.

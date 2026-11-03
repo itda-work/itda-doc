@@ -1,6 +1,6 @@
 # 문서 테마 만들기 — 회사 테마 안내서
 
-Itda Doc 문서의 테마를 만드는 사람을 위한 안내서다. 테마를 읽고 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 설계는 [DESIGN-markdown-docs.md](https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md) 3장, 문법은 1장이다.
+Itda Doc 문서의 테마를 만드는 사람을 위한 안내서다. 테마를 읽고 그리는 쪽은 Itda Doc 을 그리는 구현(예: Itda Hyve Docs 의 문서 창)이다. 문법은 [markdown.md](markdown.md)다.
 견본 회사 테마: [`themes/samples/acme/`](../themes/samples/acme/).
 
 테마는 **폴더 하나**다. 문서에는 뜻만 적고(제목·표·`:::box`), 모양은 테마가 정한다. 테마는 CSS 로 모양만 바꾸고,
@@ -8,10 +8,9 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 ## 1. 가장 작은 회사 테마 — 색과 로고만
 
-구현에서 만들기(예: Itda Hyve Docs 문서 창): 테마 고르기 옆 **⋯ → 회사 테마 만들기** 에 이름·바탕 테마·강조색·로고·조직 이름을 넣으면 아래 폴더를 만들고 바로 그 테마로 보여 준다.
-**⋯ → 테마 폴더 열기** 로 Finder 에서 연다.
+앱에 테마 만들기 화면이 있으면 이름·바탕 테마·강조색·로고·조직 이름으로 아래 폴더를 만들어 준다(`page.CreateUserTheme`).
 
-손으로 만들기: 사용자 테마 폴더(Itda Hyve Docs 는 `~/.itda/hyve/themes/`, `itda-doc` 명령은 `-themes DIR`)의 `acme/theme.json` 하나면 된다.
+손으로 만들기: 사용자 테마 폴더(자리는 앱이 정한다 — `itda-doc` 명령은 `-themes DIR`)의 `acme/theme.json` 하나면 된다.
 
 ```json
 {
@@ -24,7 +23,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 ```
 
 ```
-~/.itda/hyve/themes/
+<사용자 테마 폴더>/
   acme/
     theme.json
     assets/logo.svg
@@ -140,7 +139,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--h3-gap-top` | 항 제목 위 간격 | `12pt` |
 | `--h4-size` | h4~h6 크기 | `10.5pt` |
 | `--table-size` | 표 글자 크기 | `9.5pt` |
-| `--table-head-bg` | 표 머리 바탕 · 화면의 정렬 머리 칸 포커스·올림 표시는 이 바탕과 창 모양에 상관없이 남색 `#1e3a8a`·흰색 두 겹이라 한 겹이 이 바탕과 3:1 이상이다(비텍스트 색 대비 1.4.11 식, #528 — `dist/app.css` `th.sortable`, 테마가 `th` 의 `outline`·`box-shadow` 를 덮으면 미검증) | `#eef2f8` |
+| `--table-head-bg` | 표 머리 바탕 · 화면의 정렬 머리 칸 포커스·올림 표시는 이 바탕과 창 모양에 상관없이 남색 `#1e3a8a`·흰색 두 겹이라 한 겹이 이 바탕과 3:1 이상이다(비텍스트 색 대비 1.4.11 식 — 앱 창 CSS 의 `th.sortable`, 테마가 `th` 의 `outline`·`box-shadow` 를 덮으면 미검증) | `#eef2f8` |
 | `--table-head-ink` | 표 머리 글자색 | `var(--ink)` |
 | `--table-border` | 표 칸 선 | `var(--rule)` |
 | `--table-top-rule` | 표 맨 위 선 | `1.2pt solid var(--accent)` |
@@ -157,7 +156,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--code-op` | 연산자 글자색 | `#7b3434` |
 | `--code-diff-add` | diff 추가 바탕 | `#d9f2e3` |
 | `--code-diff-del` | diff 삭제 바탕 | `#fce1df` |
-| `--code-title-fg` | 코드 파일명 머리 띠 글자색 · 화면의 코드 복사 단추 아이콘색(#525) | `#596579` |
+| `--code-title-fg` | 코드 파일명 머리 띠 글자색 · 화면의 코드 복사 단추 아이콘색 | `#596579` |
 | `--code-title-line` | 코드 파일명 머리 띠 아래 구분선 | `#dfe3e9` |
 | `--code-title-size` | 코드 파일명 머리 띠 글자 크기 | `0.8em` |
 | `--code-hl-bg` | 코드 줄 강조 띠 배경(발표 노트 칸은 어두운 값 `#4a4020`) | `#fdf0c4` |
@@ -204,7 +203,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--diagram-label-bg` | 그림 화살표 글의 바탕 | `var(--paper)` |
 | `--diagram-cluster-bg` | 그림 묶음 바탕 | `var(--code-bg)` |
 | `--diagram-cluster-border` | 그림 묶음 테두리 | `var(--rule)` |
-| `--diagram-grid` | 간트 눈금 격자선(#409) | `var(--rule)` |
+| `--diagram-grid` | 간트 눈금 격자선 | `var(--rule)` |
 | `--diagram-exclude-bg` | 간트 제외 날짜 띠 | `var(--rule)` |
 | `--diagram-bar-done` | 간트 `done` 막대 | `var(--muted)` |
 | `--diagram-bar-active` | 간트 `active` 막대·마일스톤 | `var(--accent)` |
@@ -224,7 +223,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--slide-code-size` | 슬라이드의 코드 글자 | `14pt` |
 | `--slide-lead-size` | 슬라이드의 요약문(lead) 글자 | `27pt` |
 | `--slide-bg` | 슬라이드 바탕 | `var(--paper)` |
-| `--slide-scrim` | 배경 그림 `{.full .fill}` 위에 덮는 스크림 바탕(#569) — 글이 읽히게 그림을 어둡게. 색 하나로 둔다(반투명 `linear-gradient` 는 슬라이드 PDF 에서 불투명 검정으로 찍힌다 — 2026-11-02 macOS 슬라이드 PDF 실측) | `rgba(0, 0, 0, 0.4)` |
+| `--slide-scrim` | 배경 그림 `{.full .fill}` 위에 덮는 스크림 바탕 — 글이 읽히게 그림을 어둡게. 색 하나로 둔다(반투명 `linear-gradient` 는 슬라이드 PDF 에서 불투명 검정으로 찍힌다 — 2026-11-02 macOS 슬라이드 PDF 실측) | `rgba(0, 0, 0, 0.4)` |
 | `--slide-scrim-shade` | 스크림의 위·아래를 더 어둡게 하는 안쪽 그림자(`box-shadow` 값, 없애려면 `none`) | `inset 0 -260px 220px -60px rgba(0, 0, 0, 0.6), inset 0 160px 140px -60px rgba(0, 0, 0, 0.35)` |
 | `--slide-scrim-ink` | 스크림 위 바탕 없는 글 색 — 슬라이드 제목, 본문 맨 위(`.page-body` 직접 자식) 제목·문단·목록·정의 목록·구역 제목과 그 안의 굵은 글·링크. 인용·알림·상자·표·코드는 맨 위든 목록 항목 안이든 테마 색 그대로(목록 안 블록은 base.css 가 `--ink` 로 되돌린다 — 특이도 0,1,0 이라 테마가 정한 글자 색이 이김) — 그래서 그 블록은 바탕이 있어야 한다: 맨 위·목록 안 표는 base.css 가 종이색 판을 깔고(테마 바탕이 이김), `--box-bg`·`--lead-bg` 가 투명인 테마는 `.slide-bg.fill ~ .page-body { --box-bg: …; --lead-bg: … }` 로 덮는다(내장 compact·mono·bold) | `#ffffff` |
 | `--slide-scrim-muted` | 스크림 위 바닥글·「(계속)」·캡션, 맨 위 목록의 기호·맨 위 글 링크 밑줄 색 | `rgba(255, 255, 255, 0.82)` |
@@ -277,11 +276,11 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 `<figure><img><figcaption>`(번호는 `--figure-label` + CSS 카운터), 표 `<table><caption>`, 알림 `<div class="markdown-alert markdown-alert-note">
 <p class="markdown-alert-title">참고</p>…`, 각주 `<section class="footnotes">`, 쪽을 넘어 이어지는 조각은 `.cont`(목록 항목은 `li.cont`).
 메타 행은 `data-key` 로 고를 수 있다: `.meta-row[data-key="classification"] dd { color: #b42318 }`.
-코드 블록(2줄 이상)은 `<pre class="has-ln" data-ln-digits="N"><code><span class="ln" data-n="1">…</span>…` 이고 줄 번호 칸은 `code` 의 왼쪽 안쪽(`padding-left`, 번호는 `.ln::before`)이다 — 테마는 `pre` 의 `padding`·`border` 를 마음대로 바꿔도 되지만 `pre code` 의 `padding`·`display` 는 덮지 않는다(번호가 코드 글자와 겹친다). 파일명을 적은 코드 블록(여는 펜스에 ```` ```yaml:docker-compose.yml ```` 같이)은 `<pre data-title="…">` 이고 띠는 `pre[data-title]::before`(`content: attr(data-title)`)가 pre 흐름 안 첫 줄로 그린다(#441) — 띠 색·구분선·글자 크기는 `--code-title-*` 토큰, 띠의 오른쪽 패딩은 화면의 복사 단추 자리이니 `pre[data-title]::before` 의 `padding-right` 를 줄이지 않는다. 화면(미리보기·발표·공유 보기)에서는 이 띠를 누르면 파일명을 복사하는 단추 `pre > button.hyve-codetitle`(#516 — `::before` 로 파일명을 그린다)가 `::before` 띠 대신 같은 자리에 그린다 — `--code-title-*` 토큰은 두 쪽에 같이 걸리지만, 테마가 `pre[data-title]::before` 를 직접 덮은 규칙은 화면의 단추 띠에 걸리지 않는다(인쇄·PDF·사이드바 축소본·발표 한눈에 보기처럼 단추를 숨기고 `::before` 띠를 그대로 그리는 곳에만 걸린다). 화면의 두 단추(복사·파일명 띠) 색은 창 모양(밝게·어둡게)을 따르지 않고 밝은 코드 바탕에 맞춘다(#525 — `dist/app.css` `button.hyve-codecopy`·`button.hyve-codetitle`): 복사 아이콘은 `--code-title-fg`, 올리면 `--ink`, 띠를 올렸을 때·「✓ 복사됨」·포커스 테두리는 고정 `#2563eb` 이다(본문·밝은 노트 칸). 어두운 발표 노트 칸(`.pr-notes-body`)은 예외로 고정 어두운 배경용 색(아이콘 `#9aa3b0`, 올리면 `#e6e9ee`, 띠 올림 `#e6e9ee`, 「✓ 복사됨」 `#8fdfb2`, 포커스 `#8db4ff`)을 쓴다 — 테마가 `--code-bg` 를 어둡게 바꾸거나 `--ink` 를 밝게 바꾸면 이 색들의 대비는 미검증이다. 강조할 줄을 적은 코드 블록(```` ```go {2-3} ````·Deckset `[.code-highlight: 2-3]`)은 `<pre data-hl="2-3" class="… has-hl">` 이고 그 줄이 `<span class="ln hl">` 다(#479 — 줄 번호를 끈 문서·1줄 블록에서도 감싼다). 강조 줄은 `display: block` 으로 code 가로 전체(번호 칸 포함)와 양옆 4pt 에 띠를 깐다 — 테마는 띠 색을 `--code-hl-bg`·`--code-hl-bar` 로 바꾸고, `.ln.hl` 의 `display`·`margin`·`padding` 은 덮지 않는다(띠가 번호 칸과 어긋난다).
+코드 블록(2줄 이상)은 `<pre class="has-ln" data-ln-digits="N"><code><span class="ln" data-n="1">…</span>…` 이고 줄 번호 칸은 `code` 의 왼쪽 안쪽(`padding-left`, 번호는 `.ln::before`)이다 — 테마는 `pre` 의 `padding`·`border` 를 마음대로 바꿔도 되지만 `pre code` 의 `padding`·`display` 는 덮지 않는다(번호가 코드 글자와 겹친다). 파일명을 적은 코드 블록(여는 펜스에 ```` ```yaml:docker-compose.yml ```` 같이)은 `<pre data-title="…">` 이고 띠는 `pre[data-title]::before`(`content: attr(data-title)`)가 pre 흐름 안 첫 줄로 그린다 — 띠 색·구분선·글자 크기는 `--code-title-*` 토큰, 띠의 오른쪽 패딩은 화면의 복사 단추 자리이니 `pre[data-title]::before` 의 `padding-right` 를 줄이지 않는다. 화면(미리보기·발표·공유 보기)에서는 이 띠를 누르면 파일명을 복사하는 단추 `pre > button.hyve-codetitle`(`::before` 로 파일명을 그린다)가 `::before` 띠 대신 같은 자리에 그린다 — `--code-title-*` 토큰은 두 쪽에 같이 걸리지만, 테마가 `pre[data-title]::before` 를 직접 덮은 규칙은 화면의 단추 띠에 걸리지 않는다(인쇄·PDF·사이드바 축소본·발표 한눈에 보기처럼 단추를 숨기고 `::before` 띠를 그대로 그리는 곳에만 걸린다). 화면의 두 단추(복사·파일명 띠) 색은 창 모양(밝게·어둡게)을 따르지 않고 밝은 코드 바탕에 맞춘다(앱 창 CSS 의 `button.hyve-codecopy`·`button.hyve-codetitle`): 복사 아이콘은 `--code-title-fg`, 올리면 `--ink`, 띠를 올렸을 때·「✓ 복사됨」·포커스 테두리는 고정 `#2563eb` 이다(본문·밝은 노트 칸). 어두운 발표 노트 칸(`.pr-notes-body`)은 예외로 고정 어두운 배경용 색(아이콘 `#9aa3b0`, 올리면 `#e6e9ee`, 띠 올림 `#e6e9ee`, 「✓ 복사됨」 `#8fdfb2`, 포커스 `#8db4ff`)을 쓴다 — 테마가 `--code-bg` 를 어둡게 바꾸거나 `--ink` 를 밝게 바꾸면 이 색들의 대비는 미검증이다. 강조할 줄을 적은 코드 블록(```` ```go {2-3} ````·Deckset `[.code-highlight: 2-3]`)은 `<pre data-hl="2-3" class="… has-hl">` 이고 그 줄이 `<span class="ln hl">` 다(줄 번호를 끈 문서·1줄 블록에서도 감싼다). 강조 줄은 `display: block` 으로 code 가로 전체(번호 칸 포함)와 양옆 4pt 에 띠를 깐다 — 테마는 띠 색을 `--code-hl-bg`·`--code-hl-bar` 로 바꾸고, `.ln.hl` 의 `display`·`margin`·`padding` 은 덮지 않는다(띠가 번호 칸과 어긋난다).
 
 ### 목록 기호 사다리 — 개조식·공문
 
-한국 보고서·공문의 단계별 항목 기호를 문서에 글자로 적지 않고 테마가 그린다(#141). 문서는 보통 `-`·`1.` 목록을 들여 써서
+한국 보고서·공문의 단계별 항목 기호를 문서에 글자로 적지 않고 테마가 그린다. 문서는 보통 `-`·`1.` 목록을 들여 써서
 단계를 나누고, frontmatter `list-style`(없으면 `theme.json` 의 `list-style`)이 사다리를 켠다. 원문·HTML 은 보통 목록 그대로라
 다른 뷰어에서는 점·숫자 목록으로 보인다.
 
@@ -292,7 +291,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `plain` | 둘 다 끔 | 테마 기본을 끄고 보통 목록(• ◦ ▪ / 1. 2.) |
 
 - **단계**는 같은 종류 목록의 중첩 깊이다(`ul ul`·`ol ol ol`). 사다리보다 깊으면 마지막 단계를 되풀이한다. 두 값은 서로 다른 목록에 걸리므로 함께 켤 수 있다(`[gaejosik, gongmun]`). 문서의 값은 테마 기본을 통째로 바꾼다.
-- **들여쓰기**는 단계마다 같은 폭(`--list-indent`, 공문은 `--list-indent-gongmun`)이고 기호는 그 여백 안에서 글자 머리에 붙어 선다(`::marker`). 줄이 넘치면 기호 뒤 글자 머리에 맞춰 들어간다(내어쓰기). 가장 큰 번호(시작 번호 + 항목 수 − 1)가 두 자리 이상인 순서 목록은 `<ol class="ol-d2">`…`ol-d9`(아홉 자리 이상은 `ol-d9`)이고, 그 목록만 들여쓰기를 `max(들여쓰기 토큰, 자릿수 × 0.66em + 0.6em)`(공문 사다리는 `+ 1.1em`)으로 넓혀 번호 앞자리가 쪽 본문 밖으로 나가 잘리지 않게 한다(#575 — `web/base.css`, `mdoc/transform.go` `olDigits`). 한 자리 목록에는 class 가 없어 위 폭 그대로다. 각주 목록도 각주가 열 개 이상이면 같은 class 를 달고(`mdoc/render.go` `footnoteList`) 기본 1.4em 을 같은 공식(`+ 0.6em`)으로 넓힌다. 본문 목록 규칙은 특이도 0 이라 테마가 순서 목록의 들여쓰기나 기호 꼴(`--list-ol-N`)을 바꾸면 테마가 이긴다 — 그때 10번 이상 번호가 잘리지 않는지는 테마가 맡는다.
+- **들여쓰기**는 단계마다 같은 폭(`--list-indent`, 공문은 `--list-indent-gongmun`)이고 기호는 그 여백 안에서 글자 머리에 붙어 선다(`::marker`). 줄이 넘치면 기호 뒤 글자 머리에 맞춰 들어간다(내어쓰기). 가장 큰 번호(시작 번호 + 항목 수 − 1)가 두 자리 이상인 순서 목록은 `<ol class="ol-d2">`…`ol-d9`(아홉 자리 이상은 `ol-d9`)이고, 그 목록만 들여쓰기를 `max(들여쓰기 토큰, 자릿수 × 0.66em + 0.6em)`(공문 사다리는 `+ 1.1em`)으로 넓혀 번호 앞자리가 쪽 본문 밖으로 나가 잘리지 않게 한다(`web/base.css`, `mdoc/transform.go` `olDigits`). 한 자리 목록에는 class 가 없어 위 폭 그대로다. 각주 목록도 각주가 열 개 이상이면 같은 class 를 달고(`mdoc/render.go` `footnoteList`) 기본 1.4em 을 같은 공식(`+ 0.6em`)으로 넓힌다. 본문 목록 규칙은 특이도 0 이라 테마가 순서 목록의 들여쓰기나 기호 꼴(`--list-ol-N`)을 바꾸면 테마가 이긴다 — 그때 10번 이상 번호가 잘리지 않는지는 테마가 맡는다.
 - **번호**는 목록의 시작 번호(`3.` 으로 시작하면 `다.`)와 쪽을 넘어 이어지는 조각의 번호를 따른다. 가나다는 행정업무운영 편람대로 `가`\~`하` 다음 `거`\~`허`(28)이고 넘으면 숫자(`29.`), 원문자는 `①`\~`⑳` 다음 `(21)`\~`(50)`, `㉮`\~`㉻` 다음 `(거)`\~`(허)` 이고 그 너머는 숫자.
 - 내장 테마 중 **`mono`(모노)만 기본으로 둘 다 켠다** — 흑백 격식 꼴이 주로 담는 공공 문서는 개조식 보고(`□ ○`)와 공문 항목 번호(`1. 가.`)가 거의 늘 쓰이고, 공문 항목 구분은 규정(행정업무운영 편람)이다. `classic`·`bold`·`compact`·`spine` 은 보통 목록이 기본이고, 개조식으로 쓸 문서가 `list-style: gaejosik` 으로 고른다.
 - **회사 테마**는 토큰으로 기호를 바꾼다: `"--list-ul-4": "\"▸ \""`(P02 꼴), `"--list-ol-1": "upper-roman"`. 꼴 이름은 CSS 기본 꼴(`decimal`·`upper-roman`·`hangul`…)이나 위의 `hyve-…` 다(`theme.css` 에는 `@counter-style` 을 둘 수 없다). 기호 글자는 Pretendard 에 있는 것이 좋다 — `□ ○ · ① … ⑳` 은 있고 `㉮ … ㉻` 는 없어 시스템 글꼴(macOS Apple SD Gothic Neo, Windows 맑은 고딕)로 그린다.
@@ -314,9 +313,9 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
     .slide-foot.k-…          아래(.sf-logo·.sf-text 조직·.sf-num 번호)
   ```
 
-  배경 그림 장(`{.full}`·`{.full .fill}`, #569)은 쪽의 첫 자식이 `.slide-bg`(cover 면 `.slide-bg.fill`)이고 **`.slide-deco` 가 없다**(`web/slides.js`) — `.slide-deco.k-section ~ .page-body` 같은 형제 선택자는 배경 장에 걸리지 않는다. 또 배경 장은 본문이 없는 구역 장이라도 **`bare` 가 아니다** — `bare` 는 장식 면 위 큰 제목을 뜻하므로 장식 없는 배경 장에는 붙이지 않는다(spine 「제 n 장」 꼬리표 같은 `bare` 전용 모양은 배경 장에 나오지 않는다). 스크림 위 모양은 `.slide-bg.fill ~ …` 로 고른다(내장 mono·spine 의 `.ss-num` 예, spine 은 번호 목록 원도).
+  배경 그림 장(`{.full}`·`{.full .fill}`)은 쪽의 첫 자식이 `.slide-bg`(cover 면 `.slide-bg.fill`)이고 **`.slide-deco` 가 없다**(`web/slides.js`) — `.slide-deco.k-section ~ .page-body` 같은 형제 선택자는 배경 장에 걸리지 않는다. 또 배경 장은 본문이 없는 구역 장이라도 **`bare` 가 아니다** — `bare` 는 장식 면 위 큰 제목을 뜻하므로 장식 없는 배경 장에는 붙이지 않는다(spine 「제 n 장」 꼬리표 같은 `bare` 전용 모양은 배경 장에 나오지 않는다). 스크림 위 모양은 `.slide-bg.fill ~ …` 로 고른다(내장 mono·spine 의 `.ss-num` 예, spine 은 번호 목록 원도).
 
-  분할 그림 패널 장(`{.left}`·`{.right}`, itda-work/itda-hyve#550)은 쪽 직접 자식 `.slide-panel` 이 한쪽을 차지하고, `.slide-deco`·머리·본문·바닥은 반대쪽으로 좁아진다(`web/base.css` `panel-left`·`panel-right`). 왼쪽 패널 장에서 본문은 `left` 가 아니라 `margin-left` 로 밀린다 — 테마가 `.page-body` 의 `left` 를 정하면(구역 장을 장식 옆으로 미는 `.slide-deco.k-section ~ .page-body { left: … }` 꼴) 그 값은 그대로 남고, 패널 폭과 바깥 여백(`--slide-pad-x`)을 패널 간격(`--panel-gap`)으로 바꾼 차가 더해진다(itda-work/itda-hyve#581). 장식 상자 폭의 %로 그린 장식(classic 의 24% 띠)에 맞춘 본문 `left` 의 %는 쪽 폭 기준이라 패널만큼 넓게 잡히므로, 왼쪽 패널 장에서만 정해지는 `--slide-deco-x`(장식 상자 왼쪽 끝 = 패널 폭)로 `calc(24% - var(--slide-deco-x, 0%) * 0.24 + 60pt)` 처럼 뺀다(내장 classic). 패널 없는 장·오른쪽 패널 장에는 `--slide-deco-x` 가 없어 대체값(`0%`)이 쓰인다. 이 식은 테마 `left` 가 바깥 여백(`--slide-pad-x`)을 품는다고 보고 그 몫을 빼므로, `left` 가 `--slide-pad-x` 와 무관한 테마(classic 의 `24% + 60pt`)는 왼쪽 패널 장에서 들여쓰기가 `--slide-pad-x` 와 `--panel-gap` 의 차만큼 줄어든다 — 내장 classic(64pt)은 제목과 띠 선 사이가 25pt 로 남지만, 바깥 여백을 크게 잡은 회사 테마는 제목이 띠 선에 닿을 수 있다(계산, 미렌더). 이 보정이 없는 회사 테마의 왼쪽 패널 구역 장은 본문이 장식 상자 기준 자리보다 그 %×패널 폭만큼 더 오른쪽에서 시작한다(회사 테마로는 미검증). 오른쪽 패널 장은 본문 `left` 를 건드리지 않는다.
+  분할 그림 패널 장(`{.left}`·`{.right}`)은 쪽 직접 자식 `.slide-panel` 이 한쪽을 차지하고, `.slide-deco`·머리·본문·바닥은 반대쪽으로 좁아진다(`web/base.css` `panel-left`·`panel-right`). 왼쪽 패널 장에서 본문은 `left` 가 아니라 `margin-left` 로 밀린다 — 테마가 `.page-body` 의 `left` 를 정하면(구역 장을 장식 옆으로 미는 `.slide-deco.k-section ~ .page-body { left: … }` 꼴) 그 값은 그대로 남고, 패널 폭과 바깥 여백(`--slide-pad-x`)을 패널 간격(`--panel-gap`)으로 바꾼 차가 더해진다. 장식 상자 폭의 %로 그린 장식(classic 의 24% 띠)에 맞춘 본문 `left` 의 %는 쪽 폭 기준이라 패널만큼 넓게 잡히므로, 왼쪽 패널 장에서만 정해지는 `--slide-deco-x`(장식 상자 왼쪽 끝 = 패널 폭)로 `calc(24% - var(--slide-deco-x, 0%) * 0.24 + 60pt)` 처럼 뺀다(내장 classic). 패널 없는 장·오른쪽 패널 장에는 `--slide-deco-x` 가 없어 대체값(`0%`)이 쓰인다. 이 식은 테마 `left` 가 바깥 여백(`--slide-pad-x`)을 품는다고 보고 그 몫을 빼므로, `left` 가 `--slide-pad-x` 와 무관한 테마(classic 의 `24% + 60pt`)는 왼쪽 패널 장에서 들여쓰기가 `--slide-pad-x` 와 `--panel-gap` 의 차만큼 줄어든다 — 내장 classic(64pt)은 제목과 띠 선 사이가 25pt 로 남지만, 바깥 여백을 크게 잡은 회사 테마는 제목이 띠 선에 닿을 수 있다(계산, 미렌더). 이 보정이 없는 회사 테마의 왼쪽 패널 구역 장은 본문이 장식 상자 기준 자리보다 그 %×패널 폭만큼 더 오른쪽에서 시작한다(회사 테마로는 미검증). 오른쪽 패널 장은 본문 `left` 를 건드리지 않는다.
 
   크기·여백은 `--slide-*` 토큰이다. 슬라이드에서는 문서의 `--text-size`·`--h1-size`… 대신 `--slide-text-size`·`--slide-title-size` 에서 나온 값이 쓰인다. `--slide-scale`(기본 0.9)이 모든 `--slide-*-size` 글자에 곱해진다 — 테마가 이 토큰들을 덮어도 배율은 그대로 얹힌다. 슬라이드 전용 선택자(표지 `.sc-*`·구역 `.ss-*`·슬라이드 머리 `.slide-*`)의 `font-size` 는 `calc(Npt * var(--slide-scale))`·`calc(var(--slide-…-size) * 수 * var(--slide-scale))`·em·%·inherit 꼴만 쓴다(`font` 단축 속성은 금지) — 시험(`TestSlideFontSizeScaleGuard`, page/theme_test.go)이 이 허용 꼴만 통과시키고 다른 꼴(고정 pt·rem·var 참조 등)은 실패시킨다 — 내장 테마·base.css 에서 흔히 쓰는 꼴의 회귀를 잡는 검사다(완전한 CSS 해석기는 아니다). 관리 표시(선택자가 정확히 `.sc-class`·`.slide-foot`·`.sf-num`·`.sf-left`·`.sf-logo`)만 고정 크기를 쓸 수 있다. 본문 서식(`spine` 의 결과 상자·절차 번호처럼 쪽 문서와 함께 쓰는 것)의 고정 크기는 슬라이드에서도 그대로다. 내장 테마의 `theme.css` 끝에 슬라이드 절이 있다 — 표지의 띠·면, 장 머리의 꼴을 슬라이드로 옮긴 예다.
 - **이어보기**: 쪽 나눔 없이 보는 꼴이다. 같은 쪽 상자 하나(`.page.page-flow`)에 문서 흐름이 통째로 들어가고 높이는 내용만큼이다 — 테마에게는 "아주 긴 쪽 하나" 라 같은 선택자가 그대로 맞는다. 머리글·바닥글은 없다. 표지(`cover: true`)는 종이 한 장이 아니라 맨 위의 제목 영역이 되고, 이어보기 전용 모양은 본문 상자의 클래스 **`.page-body.flow-view`** 로 고른다(예: `.page-body.flow-view .cover { … }`). 내장 `classic`·`bold`·`spine` 의 `theme.css` 끝에 그 예가 있다. 회사 테마는 바탕 테마의 것을 물려받는다. 출력(PDF·인쇄)은 이어보기에서도 쪽으로 나오므로 이어보기 모양은 화면에만 쓰인다.
@@ -361,7 +360,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 **테마 폴더의 파일**: `css`·`json`·`md`·`svg`·`png`·`jpg`·`webp`·`woff2` 만, 파일 하나 8MB·테마 전체 32MB·200개까지, 폴더 4단까지.
 링크(심볼릭 링크)는 따라가지 않는다(테마가 쓸 수 없음 — 테마 폴더 자체가 링크여도). 숨김 파일(`.DS_Store` 등)과 편집기 백업(`theme.css~`·`#theme.css#`)은 건너뛴다.
-`~/.itda/hyve/themes` 자체는 링크여도 된다(팀 공유 폴더). 테마 SVG 는 문서 그림과 같이 스크립트를 막는 헤더(CSP `sandbox`)를 붙여 낸다.
+사용자 테마 폴더 자체는 링크여도 된다(팀 공유 폴더). 테마 SVG 는 문서 그림과 같이 스크립트를 막는 헤더(CSP `sandbox`)를 붙여 낸다.
 사용자 테마는 불러올 때 메모리에 읽어 두고, 창이 그림·글꼴을 달라고 하면 그것을 준다(고른 뒤 파일을 바꿔치기해 다른 파일을 내주게 하는 길이 없다).
 
 ## 7. 머리글·바닥글 자리표시자
@@ -400,15 +399,13 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 ## 10. 확인하는 법
 
 ```sh
-itda-hyve md --theme acme --export-pdf /tmp/acme.pdf 견본.md    # 창 없이 PDF. 테마가 틀리면 종료 코드 1 과 까닭
-itda-hyve md --theme acme 견본.md                                 # 창으로 보며 고치기 — 폴더를 고치면 1초 안에 따라온다
-pdffonts /tmp/acme.pdf                                            # 글꼴 임베드
+itda-doc themes -themes ~/테마                                       # 내장·사용자 테마 목록 — 쓸 수 없는 테마는 까닭과 함께
+itda-doc check -themes ~/테마 견본.md                                # 그 테마로 렌더한 경고
+itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표지·차례·테마 CSS 가 든 단일 HTML
 ```
 
-- 창의 **⋯** 메뉴에 "쓸 수 없는 회사 테마" 와 까닭이 보인다(테마 고르기에서는 고를 수 없게 흐리게).
-- `--export-pdf` 는 stdout 에 한 줄 JSON(`ok`·`pages`·`warnings`·`overflow`)을 쓴다. `overflow` 가 0 이 아니면 쪽에서 잘린 블록이 있다.
-- 작업 폴더를 바로 보려면(숨은 옵션) `--themes-dir <폴더>`: `~/.itda/hyve/themes` 대신 그 폴더를 사용자 테마 폴더로 쓴다.
-- 저장소에서: `just docview-check` 가 견본 × 테마(폴더에서 읽은 내장·견본 전부)의 PDF 를 쪽수·A4·쪽번호·머리글·표 머리 반복·글자 누락·글꼴 임베드로 센다.
+- 쓸 수 없는 테마는 까닭과 함께 목록에 남는다(`page.Themes` 의 `Broken`). 앱은 그 까닭을 테마 메뉴에 보일 수 있다.
+- PDF·글꼴 임베드(`pdffonts`)는 PDF 를 뽑는 앱에서 확인한다.
 
 ## 11. 빌드 때 넣기(내장 테마로)
 
@@ -416,9 +413,9 @@ pdffonts /tmp/acme.pdf                                            # 글꼴 임�
 
 ### 스타일 테마 — 남의 디자인 시스템에서 테마 만들기
 
-한국 서비스 디자인 시스템(토스 TDS·카카오·네이버…)에서 온 스타일 테마를 만드는 레시피다(#366). 문법·폴더 구조·검사는 위와 같고, 색 토큰·타이포·슬라이드 장식만 남의 것이다.
+한국 서비스 디자인 시스템(토스 TDS·카카오·네이버…)에서 온 스타일 테마를 만드는 레시피다. 문법·폴더 구조·검사는 위와 같고, 색 토큰·타이포·슬라이드 장식만 남의 것이다.
 
-**상표와 서체(#366 정책 C안)** — 폴더 이름은 회사명 소문자(`toss`), `aliases` 에 한글 별칭(`토스`)을 둔다. 로고·심볼 SVG·전용 서체 파일은 넣지 않는다. `description` 첫머리에 「비공식 — OO 디자인 시스템에서 영감」 을 적는다. 서체는 오픈 라이선스 글꼴(LINE Seed·Wanted Sans 등 — 테마마다 라이선스를 실측한다)만 9장 방식으로 임베드하고, 그 외는 Pretendard 기본 글꼴로 무드를 낸다.
+**상표와 서체** — 폴더 이름은 회사명 소문자(`toss`), `aliases` 에 한글 별칭(`토스`)을 둔다. 로고·심볼 SVG·전용 서체 파일은 넣지 않는다. `description` 첫머리에 「비공식 — OO 디자인 시스템에서 영감」 을 적는다. 서체는 오픈 라이선스 글꼴(LINE Seed·Wanted Sans 등 — 테마마다 라이선스를 실측한다)만 9장 방식으로 임베드하고, 그 외는 Pretendard 기본 글꼴로 무드를 낸다.
 
 **팔레트 → 토큰** — 색 값은 공식 디자인 문서에서 읽어 고정한다(기억으로 적지 않는다). 바탕 테마(`extends`)는 내장 구조 테마 5종 중에서 고른다 — 표지·머리글·목록 기호 같은 문서 구조는 바탕이 정한다.
 
@@ -469,15 +466,15 @@ go test ./page/ -run TestScratchDerived -v
 |---|---|
 | `spec/markdown.md` 3장 테마 표(`themes:begin`~`end` 사이) | 이름·별칭 한 줄 — `TestGuideThemes`(`guidethemes_test.go`)가 안내서 표와 theme.json 의 이름·별칭을 맞춰 본다(빠지면 `go test ./page/` 가 실패한다) |
 | `page/usertheme_test.go` | `TestUserThemeFolder` 의 목록 접두사(내장 순서·이름)와 내장 수 기대값을 새 테마에 맞춘다(빠지면 `go test ./page/` 가 실패한다) |
-| `FEATURES.md` 내장 테마 소개 절 | 테마 소개 덧붙이기 |
+| 테마를 넣는 앱의 기능 목록 | 테마 소개 덧붙이기(그 앱 저장소의 몫) |
 | 이 문서 1장 | 내장 테마를 나열하는 문장에 이름 넣기 |
 | `template.md` | 경고 없이 렌더된다 — `TestTemplatesRenderClean`(`save_test.go`)이 확인한다 |
 
-`scripts/docview_check.py` 는 검사 목록을 바이너리에게서 받는다(#367) — 숨은 옵션 `itda-hyve md --theme-meta` 가 Go 로더가 푼 테마 메타데이터(이름·별칭·최종 cover·머리글·바닥글 슬롯, 쓸 수 없는 테마와 까닭)를 한 줄 JSON 으로 낸다. 쓸 수 없는 테마는 그 까닭과 함께 따로 보고하고 나머지 검사는 계속한다. 내장·견본 폴더의 테마 전부 × 견본 전부로 PDF 를 잰다. 검증은 #366 뼈대 그대로: `go test ./internal/docview/` · `just docview-check`(슬라이드는 `SLIDES=1`)·`ITDA_HYVE_DOCVIEW_OLD_WEBKIT=all` 정합성 · 발표 견본 눈 검수. 눈 검수·PIL 검사는 `just`(빌드 포함) 뒤의 렌더로 — `theme.css` 는 go:embed 라 바이너리 재빌드 없이 재렌더하면 낡은 꼴이 나온다(#386 사건).
+앱 쪽 검사(내장·견본 테마 × 견본의 PDF, 옛 엔진 흉내 정합성, 발표 견본 눈 검수)는 테마를 넣는 앱 저장소의 몫이다.
 
 ## 12. 지원 엔진과 옛 WebKit
 
-문서 창은 시스템 WebKit(WKWebView)으로 그린다. Itda Hyve 는 macOS 12 이상을 지원하는데, Safari 를 올리지 않은 Mac 은 옛 엔진이다.
+macOS 의 앱은 시스템 WebKit(WKWebView)으로 그린다. 앱이 옛 macOS(예: 12)를 지원하면, Safari 를 올리지 않은 Mac 은 옛 엔진이다.
 테마가 쓰는 새 기능 둘을 엔진마다 이렇게 다룬다.
 
 | 기능 | 필요한 엔진 | 모르는 엔진에서 |
@@ -491,5 +488,5 @@ go test ./page/ -run TestScratchDerived -v
   새 색이 되고 옅은 면·제목 번호(표 머리 바탕·요약문 바탕·표지의 옅은 띠·절 번호)는 바탕 테마의 색(클래식이면 옅은 남색)이 남아 두 색이 섞인다.
   섞이지 않게 하려면 바탕의 `derived` 토큰(예: classic 의 `--accent-2`·`--accent-3`·`--accent-soft`·`--lead-bg`)에 새 강조색으로 계산한 값을 `tokens` 에 함께 적는다
   (정적 값을 직접 준 토큰은 물려받은 식이 덮지 않는다). "회사 테마 만들기" 는 이것을 저절로 한다.
-- 저장소에서 옛 엔진을 흉내 내 볼 수 있다(숨은 환경변수 — 줄 때만 영향): `ITDA_HYVE_DOCVIEW_OLD_WEBKIT=scope`(@scope 모름) · `relcolor`(상대 색 모름) · `all`.
-  예: `ITDA_HYVE_DOCVIEW_OLD_WEBKIT=all THEMES="classic bold mono compact spine" just docview-check`.
+- 옛 엔진을 흉내 내 볼 수 있다(시험·개발 전용 숨은 환경변수, macOS 에서만 — 줄 때만 영향, `page.FakeOldWebKit`): `ITDA_DOC_OLD_WEBKIT=scope`(@scope 모름) · `relcolor`(상대 색 모름) · `all`.
+  이 값을 읽어 CSS 꼴을 고르는 것은 `page` 를 쓰는 앱이다.

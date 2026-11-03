@@ -18,8 +18,8 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// 그림(1.10, #117·#409). ```mermaid 코드 블록을 인라인 SVG 로 그린다 — 종류(frontmatter·주석·빈 줄을 건너뛴 첫 낱말)로
-// 갈라 흐름도는 flowchart 패키지, 간트 차트는 gantt 패키지 …(renderDiagram)가 그린다(공개 꼴·공통 부분은 internal/diagram).
+// 그림(1.10, itda-hyve#117·itda-hyve#409). ```mermaid 코드 블록을 인라인 SVG 로 그린다 — 종류(frontmatter·주석·빈 줄을 건너뛴 첫 낱말)로
+// 갈라 흐름도는 flowchart 패키지, 간트 차트는 gantt 패키지 …(renderDiagram)가 그린다(공개 꼴·공통 부분은 diagram).
 // 다른 뷰어(GitHub 등)에서는 mermaid 코드 블록 그대로라 같은 원문이 그림이 된다.
 // 그리지 못하면(다른 그림 종류·미지원 문법·상한) 보통의 코드 블록으로 두고 줄 번호 경고를 남긴다(원문이 보인다).
 // 모양을 문서에 적는 줄(style·classDef·%%{init}%% …)과 click 은 쓰지 않고 그림은 그린다 — 종류마다 첫 줄에 경고 한 번(frontmatter 설정은 키마다).
@@ -105,14 +105,14 @@ func (st *state) diagram(fc *ast.FencedCodeBlock, src []byte) (string, bool) {
 	return w.String(), true
 }
 
-// renderDiagram 은 그림 종류로 갈라 그린다 — 간트 차트(gantt)는 internal/gantt(#409 ①), 타임라인(timeline)은
-// internal/timeline(#409 ②), 순서도(sequenceDiagram)는 internal/sequence(#409 ③ — timeline·sequence 의 머리 낱말은
+// renderDiagram 은 그림 종류로 갈라 그린다 — 간트 차트(gantt)는 diagram/gantt(itda-hyve#409 ①), 타임라인(timeline)은
+// diagram/timeline(itda-hyve#409 ②), 순서도(sequenceDiagram)는 diagram/sequence(itda-hyve#409 ③ — timeline·sequence 의 머리 낱말은
 // 원본 lexer 처럼 대소문자를 가리지 않는다. 흐름도·gantt 의 머리 판정은 대소문자를 가리는 지금 규칙 그대로다),
-// ER 다이어그램(erDiagram)은 internal/er(#409 ④ — 원본 detector /^\s*erDiagram/ 처럼 대소문자를 가린다), 상태도
-// (stateDiagram·stateDiagram-v2)는 internal/state(#409 ④-2 — 원본 detector /^\s*stateDiagram/ 처럼 앞머리·대소문자를 가린다.
-// 머리가 정확히 그 둘이 아니면 state 가 거부한다), 클래스도(classDiagram·classDiagram-v2)는 internal/classdiag(#409 ④-3 —
+// ER 다이어그램(erDiagram)은 diagram/er(itda-hyve#409 ④ — 원본 detector /^\s*erDiagram/ 처럼 대소문자를 가린다), 상태도
+// (stateDiagram·stateDiagram-v2)는 diagram/state(itda-hyve#409 ④-2 — 원본 detector /^\s*stateDiagram/ 처럼 앞머리·대소문자를 가린다.
+// 머리가 정확히 그 둘이 아니면 state 가 거부한다), 클래스도(classDiagram·classDiagram-v2)는 diagram/classdiag(itda-hyve#409 ④-3 —
 // 같은 규칙, 머리가 정확히 그 둘이 아니면 classdiag 가 거부한다), 나머지(흐름도와
-// 그리지 않는 종류의 경고)는 internal/flowchart 가 맡는다. 공개 꼴은 같다(internal/diagram).
+// 그리지 않는 종류의 경고)는 diagram/flowchart 가 맡는다. 공개 꼴은 같다(diagram).
 func renderDiagram(src string) (diagram.Result, error) {
 	kind := diagram.Kind(src)
 	switch {

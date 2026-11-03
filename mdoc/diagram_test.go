@@ -247,7 +247,7 @@ func TestDiagramLinear(t *testing.T) {
 		for _, n := range []int{12, 24, 48} {
 			assertSafe(t, render(t, g(n)).HTML)
 		}
-		// 비용은 CPU 시간이고 세 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest, #201). 잴 때마다 결과 기억을 비운다
+		// 비용은 CPU 시간이고 세 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest, itda-hyve#201). 잴 때마다 결과 기억을 비운다
 		timingtest.AssertDoubling(t, name, []int{12, 24, 48}, func(n int) func() {
 			src := []byte(g(n))
 			return func() {

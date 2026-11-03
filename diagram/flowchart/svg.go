@@ -18,7 +18,7 @@ import (
 //	cl-box·cl-title  subgraph 상자·제목      edge(+dotted·thick)·head  화살표 선·화살촉
 //	el-bg·el         간선 라벨 바탕·글       node(+rim)·node-in·nl      노드 모양(원통 테두리, 서브루틴 안쪽 선)·글
 //
-// SVG 를 쌓는 도구(Writer·Esc·F1)는 공통 패키지(internal/diagram)다 — 간트 차트가 함께 쓴다(#409).
+// SVG 를 쌓는 도구(Writer·Esc·F1)는 공통 패키지(diagram)다 — 간트 차트가 함께 쓴다(itda-hyve#409).
 
 func drawSVG(g *Graph, l *laid) string {
 	s := &diagram.Writer{}
@@ -146,7 +146,7 @@ func drawSVG(g *Graph, l *laid) string {
 	return diagram.AriaRefs(s.String()) // aria-label 의 탭·줄바꿈은 문자 참조로(공통 — state 와 같다)
 }
 
-// xmlChars 는 XML 1.0 의 Char 밖 글자를 U+FFFD 로 바꾼다(공통 internal/diagram — 시험이 쓴다).
+// xmlChars 는 XML 1.0 의 Char 밖 글자를 U+FFFD 로 바꾼다(공통 diagram — 시험이 쓴다).
 func xmlChars(s string) string { return diagram.XmlChars(s) }
 
 // writeLines 는 가운데 c 에 줄들을 쓴다(줄마다 tspan). 기준선은 글자 크기의 0.35 아래 — dominant-baseline 을 쓰지 않는다.

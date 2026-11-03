@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// 탭으로 나뉜 표(#579) — TabTable(글만)·TabBlockAt(문서의 탭 줄)·TabPasteSpot(붙여 넣은 자리).
+// 탭으로 나뉜 표(itda-hyve#579) — TabTable(글만)·TabBlockAt(문서의 탭 줄)·TabPasteSpot(붙여 넣은 자리).
 
 const tabSample = "모델\t이런 질문이면\t맞는 일\t비용 감각\n" +
 	"Haiku\t실수해도 금방 다시 하면 되나?\t분류 · 추출 · 짧은 정리\t×1\n" +
