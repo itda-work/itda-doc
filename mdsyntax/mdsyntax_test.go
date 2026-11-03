@@ -85,7 +85,7 @@ func TestBuildRules(t *testing.T) {
 	}
 }
 
-// 컨테이너 표에 줄이 더해지면 후보가 따라 늘고 이름·뜻이 표 칸 그대로다(#434 인수 조건 — 안내서를 고치고
+// 컨테이너 표에 줄이 더해지면 후보가 따라 늘고 이름·뜻이 표 칸 그대로다(itda-hyve#434 인수 조건 — 안내서를 고치고
 // just syntax 를 잊으면 TestBundleFresh 가 completions.json 차이로 실패한다는 것의 뽑는 쪽 반을 여기서 본다).
 func TestCompletionsFollowGuideTable(t *testing.T) {
 	dir := t.TempDir()

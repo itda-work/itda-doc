@@ -9,7 +9,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 코드 블록 파일명 머리 띠(#441): 펜스 info string 에 파일명을 적으면 pre 에 data-title 속성을 달고
+// 코드 블록 파일명 머리 띠(itda-hyve#441): 펜스 info string 에 파일명을 적으면 pre 에 data-title 속성을 달고
 // 화면(base.css ::before)이 코드 위에 머리 띠로 그린다. 표기는 둘 다 받는다 — 정식 title= (Docusaurus·
 // MkDocs) 과 줄임 언어:파일명(Zenn·Qiita).
 //
@@ -71,7 +71,7 @@ func sanitizeTitle(s string) string {
 //   - 첫 낱말에 `=` 가 있으면(`title="…"` 꼴) 언어는 없다.
 //   - 첫 낱말의 첫 `:` 는 줄임 `언어:파일명` 구분이다. 파일명이 비면 띠 없음(언어는 그대로).
 //   - title= 낱말은 첫 낱말이든 나머지든 찾는다. 줄임 파일명과 title= 이 둘 다 있으면 줄임이 이긴다.
-//   - 줄 강조 낱말 `{1,3-5}`(#479 — codehl.go cutHLWord)는 먼저 떼어 내고 나머지를 위 규칙으로 가른다.
+//   - 줄 강조 낱말 `{1,3-5}`(itda-hyve#479 — codehl.go cutHLWord)는 먼저 떼어 내고 나머지를 위 규칙으로 가른다.
 //
 // 기존 출력 불변: 언어만 적힌 info string(`go`·`math`·`mermaid`)은 lang 이 그 첫 낱말 그대로다. {…} 가 없으면
 // 언어·파일명 결과는 줄 강조 이전과 같다.
@@ -82,7 +82,7 @@ func parseCodeInfo(info []byte) codeInfo {
 	return ci
 }
 
-// parseCodeLangTitle 은 줄 강조 낱말을 뗀 info string 을 언어와 파일명으로 가른다(#441).
+// parseCodeLangTitle 은 줄 강조 낱말을 뗀 info string 을 언어와 파일명으로 가른다(itda-hyve#441).
 func parseCodeLangTitle(s string) codeInfo {
 	s, _ = codeInfoText(s)
 	if s == "" {

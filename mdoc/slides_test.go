@@ -40,7 +40,7 @@ func TestSlidesMeta(t *testing.T) {
 		{"slides:\n  ratio: \"21:9\"\n  level: 9\n  transition: zoom\n  incremental: 예\n  theme: dark", &SlidesMeta{}, 5},
 		{"slides: 발표", nil, 1},
 		{"slides: [a, b]", nil, 1},
-		// 글자 배율(#430): 0.6~1.5 의 숫자. 경계는 받고, 밖·숫자 아님·글자·목록은 경고하고 0(기본)
+		// 글자 배율(itda-hyve#430): 0.6~1.5 의 숫자. 경계는 받고, 밖·숫자 아님·글자·목록은 경고하고 0(기본)
 		{"slides:\n  font-scale: 0.8", &SlidesMeta{FontScale: 0.8}, 0},
 		{"slides:\n  font-scale: 1", &SlidesMeta{FontScale: 1}, 0},
 		{"slides:\n  fontscale: 0.6\n  ratio: \"4:3\"", &SlidesMeta{FontScale: 0.6, Ratio: "4:3"}, 0},
@@ -66,7 +66,7 @@ func TestSlidesMeta(t *testing.T) {
 	}
 }
 
-// 틀린 font-scale 은 frontmatter 값 경고(줄 번호는 값의 줄)이고, 모르는 키 경고는 키 목록에 font-scale 을 적는다(#430)
+// 틀린 font-scale 은 frontmatter 값 경고(줄 번호는 값의 줄)이고, 모르는 키 경고는 키 목록에 font-scale 을 적는다(itda-hyve#430)
 func TestSlidesFontScaleWarning(t *testing.T) {
 	r := render(t, "---\ntitle: t\nslides:\n  font-scale: 2\n  size: big\n---\n\n본문\n")
 	if len(r.Warnings) != 2 {
@@ -103,7 +103,7 @@ func TestSlideLevel(t *testing.T) {
 
 var notesClassRe = regexp.MustCompile(`class="[^"]*\bnotes\b`)
 
-// TestHeadingNotesClass 는 제목의 {.notes} 가 노트가 아닌지다(#344 — 발표자 노트는 :::notes 컨테이너만): DropNotes 와 상관없이
+// TestHeadingNotesClass 는 제목의 {.notes} 가 노트가 아닌지다(itda-hyve#344 — 발표자 노트는 :::notes 컨테이너만): DropNotes 와 상관없이
 // 제목은 보통 제목으로 남고(글자·id·번호·목차·각주), class 의 notes 만 경고와 함께 빠진다. 다른 class 는 남는다.
 func TestHeadingNotesClass(t *testing.T) {
 	src := "---\nnumber-sections: true\n---\n\n# 공개\n\n## 첫째 {.notes #first-id}\n\n### 둘째 {.x .notes}\n\n## 셋째[^n] {.notes}\n\n[^n]: 제목 각주\n"
@@ -193,7 +193,7 @@ func TestDropNotesFootnoteChain(t *testing.T) {
 	}
 }
 
-// DropNotes(#344 결정 7 — 공유의 「노트 함께 보이기」 꺼짐): :::notes·{.notes} 컨테이너의 안에 든 것을 빼고 빈 자리만 남긴다(상자 안·중첩 포함). 노트 안
+// DropNotes(itda-hyve#344 결정 7 — 공유의 「노트 함께 보이기」 꺼짐): :::notes·{.notes} 컨테이너의 안에 든 것을 빼고 빈 자리만 남긴다(상자 안·중첩 포함). 노트 안
 // 제목은 TOC 에도 없고, 노트에서만 가리킨 각주는 목록에서 빠지며 남은 각주는 1부터 다시 매긴다. 끄면(기본) 그대로 낸다.
 func TestDropNotes(t *testing.T) {
 	src := "# 제목\n\n앞 문단[^p]\n\n:::notes\n### 노트제목비밀\n노트 비밀 문장[^n] ![그림](비밀.png) [링크](http://e.com/비밀)\n\n" +

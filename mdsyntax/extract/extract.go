@@ -114,7 +114,7 @@ func Build(docsDir string) (map[string][]byte, error) {
 		if body == nil || strings.TrimSpace(body.String()) == "" {
 			return nil, fmt.Errorf("주제 %s 의 구간이 없음", t)
 		}
-		head := fmt.Sprintf("<!-- itda-hyve 마크다운 문법 · 주제 %s · 자동 생성(spec/%s) — 손으로 고치지 않는다. 장 번호(\"3장\")는 이 주제 안의 번호다 -->\n\n",
+		head := fmt.Sprintf("<!-- Itda Doc 마크다운 문법 · 주제 %s · 자동 생성(spec/%s) — 손으로 고치지 않는다. 장 번호(\"3장\")는 이 주제 안의 번호다 -->\n\n",
 			t, strings.Join(from[t], "·spec/"))
 		out[t] = []byte(head + collapseBlank(body.String()))
 	}

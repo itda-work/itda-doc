@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 이슈 #114 단계 C: 보조 축 axis2·unit2, 그 앞의 단위 혼합 경고와 표시 정밀도.
+// 이슈 itda-hyve#114 단계 C: 보조 축 axis2·unit2, 그 앞의 단위 혼합 경고와 표시 정밀도.
 
 var (
 	tick2Re   = regexp.MustCompile(`<text x="([-\d.]+)" y="([-\d.]+)" font-size="12" text-anchor="start" class="tick ax2">([^<]*)</text>`)

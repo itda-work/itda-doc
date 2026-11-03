@@ -98,7 +98,7 @@ func TestTopBlockAt(t *testing.T) {
 	}
 }
 
-// 자료 표 넣기(#365 ③ 조각 C)의 자리: 최상위 빈 줄은 그 줄, 최상위 블록 안은 그 블록 끝 다음 줄(표는 캡션까지), 목록·인용·컨테이너·
+// 자료 표 넣기(itda-hyve#365 ③ 조각 C)의 자리: 최상위 빈 줄은 그 줄, 최상위 블록 안은 그 블록 끝 다음 줄(표는 캡션까지), 목록·인용·컨테이너·
 // frontmatter 안은 거부.
 func TestInsertSpotAt(t *testing.T) {
 	src := strings.Join([]string{

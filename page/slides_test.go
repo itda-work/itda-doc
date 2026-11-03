@@ -19,10 +19,10 @@ func TestSlideView(t *testing.T) {
 		{"---\nslides:\n  ratio: \"4:3\"\n  level: 1\n  transition: none\n  incremental: true\n---\n\n# 장\n\n## 절\n\n글\n",
 			SlideView{Present: true, Ratio: "4:3", Level: 1, Transition: "none", Incremental: true}},
 		{"글만\n", SlideView{Ratio: "16:9", Level: 0, Transition: "none"}},
-		// 기본은 none 이지만 고른 전환은 그대로(#351)
+		// 기본은 none 이지만 고른 전환은 그대로(itda-hyve#351)
 		{"---\nslides:\n  transition: fade\n---\n\n# 장\n", SlideView{Present: true, Ratio: "16:9", Level: 1, Transition: "fade"}},
 		{"---\nslides:\n  transition: slide\n---\n\n# 장\n", SlideView{Present: true, Ratio: "16:9", Level: 1, Transition: "slide"}},
-		// 글자 배율(#430): 고른 값은 그대로, 틀린 값은 0(화면의 기본 0.9)
+		// 글자 배율(itda-hyve#430): 고른 값은 그대로, 틀린 값은 0(화면의 기본 0.9)
 		{"---\nslides:\n  font-scale: 0.8\n---\n\n# 장\n", SlideView{Present: true, Ratio: "16:9", Level: 1, Transition: "none", FontScale: 0.8}},
 		{"---\nslides:\n  font-scale: 2\n---\n\n# 장\n", SlideView{Present: true, Ratio: "16:9", Level: 1, Transition: "none"}},
 	}

@@ -1,4 +1,4 @@
-// Package flowchart 는 mermaid 흐름도(flowchart·graph)의 부분집합을 SVG 로 그린다(설계 1.10, #117).
+// Package flowchart 는 mermaid 흐름도(flowchart·graph)의 부분집합을 SVG 로 그린다(설계 1.10, itda-hyve#117).
 //
 // 문법은 실제 Mermaid 의 부분집합이다 — 새 문법을 만들지 않는다(안내서 spec/diagrams.md 의 표가 정본).
 // 모르는 문법은 그리지 않고 *Error(줄 번호)를 돌려준다 — 부르는 쪽(mdoc)이 원문 코드 블록을 그대로 두고 경고한다.
@@ -6,14 +6,14 @@
 // 그림은 그린다(Issue 경고) — 색·선·글꼴은 테마가 정하고, 링크·스크립트는 내지 않는다.
 //
 // 그리기는 이 패키지가 처음부터 한다(parse.go → layout.go → svg.go). 외부 렌더러(go-mermaid)의 출력은 그대로 쓸 수
-// 없었다 — 기술 검증은 #117 보고서. 배치는 계층 배치(Sugiyama, 공통 internal/layered): 순환 끊기 → 계층 → 더미 노드(간선 라벨도 더미 하나) →
+// 없었다 — 기술 검증은 itda-hyve#117 보고서. 배치는 계층 배치(Sugiyama, 공통 diagram/layered): 순환 끊기 → 계층 → 더미 노드(간선 라벨도 더미 하나) →
 // 교차 줄이기 → 좌표(가중 등위 회귀) → subgraph 상자 겹침 풀기.
 //
 // 결과 SVG 는 허용 목록의 요소·속성만 쓴다(차트와 같은 목록 + 곡선 C): style·이벤트·url()·href·id 가 없고, 색·선은
 // 클래스로 테마 토큰(--diagram-*)을 따른다. 글자는 문서 글꼴의 <text> 라 PDF 에서 선택·검색된다.
 // 같은 입력은 같은 출력이다(map 순회 없음, 숫자는 소수 한 자리).
 //
-// 흐름도와 간트가 함께 쓰는 부분(공개 꼴·상한·글자 폭·SVG 쓰기·frontmatter·접근성 문장)은 internal/diagram 패키지다.
+// 흐름도와 간트가 함께 쓰는 부분(공개 꼴·상한·글자 폭·SVG 쓰기·frontmatter·접근성 문장)은 diagram 패키지다.
 package flowchart
 
 import (
@@ -24,7 +24,7 @@ import (
 )
 
 // 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 계산 시간은 이 상한 안에서 묶인다.
-// 원문·라벨 상한은 공통(internal/diagram)이다.
+// 원문·라벨 상한은 공통(diagram)이다.
 const (
 	MaxSource    = diagram.MaxSource // 그림 하나의 원문(바이트)
 	MaxNodes     = 150               // 노드
@@ -36,7 +36,7 @@ const (
 	maxLayoutNodes = layered.MaxPoints
 )
 
-// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(internal/diagram — gantt 와 같다).
+// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(diagram — gantt 와 같다).
 type (
 	Error  = diagram.Error
 	Issue  = diagram.Issue

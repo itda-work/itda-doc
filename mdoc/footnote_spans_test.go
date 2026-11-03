@@ -10,7 +10,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 각주 정의의 원문 구간(footnote_spans.go)과 그것으로 정하는 넣을 자리(InsertSpotAt) — #365 ③ 조각 C 접근 리뷰 ⓐ.
+// 각주 정의의 원문 구간(footnote_spans.go)과 그것으로 정하는 넣을 자리(InsertSpotAt) — itda-hyve#365 ③ 조각 C 접근 리뷰 ⓐ.
 
 // 구간은 파서가 받아들인 정의마다 하나다 — 참조되지 않아 최종 AST 에서 지워진 정의, 같은 이름 둘째 정의도 따로 남는다. 끝은 정의 뒤
 // 빈 줄을 뺀 줄이고 문서 끝이면 마지막 줄이다(끝 줄바꿈이 없어도). topLevel 은 Open 때의 부모가 문서인지다.

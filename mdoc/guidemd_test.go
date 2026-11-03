@@ -16,7 +16,7 @@ import (
 )
 
 // 입구 안내서(spec/markdown.md)·발표 안내서(slides.md)를
-// 코드와 맞춘다(#134) — 경고 코드 표는 코드의 경고 상수와, frontmatter 키 표는 meta.go 가 읽는 키와, slides 키 표는 parseSlides 와
+// 코드와 맞춘다(itda-hyve#134) — 경고 코드 표는 코드의 경고 상수와, frontmatter 키 표는 meta.go 가 읽는 키와, slides 키 표는 parseSlides 와
 // 양방향으로. ```markdown 예제는 모두 그려 경고 0(경고 예제는 적은 코드 그대로). 상대 링크는 파일·제목이 있다.
 // 코드에 경고·키를 더하고 안내서를 안 고치면 여기서 실패한다.
 
@@ -182,7 +182,7 @@ func caseKeys(t *testing.T, fn string) []string {
 }
 
 // literalCodes 는 dir 의 시험 아닌 Go 파일에서 경고 코드를 글자로 직접 쓴 자리다 — st.warn(줄, "코드", …) 와 Warning{Code: "코드"}.
-// 코드는 Warn* 상수로만 써야 경고 코드 표 시험(상수 ↔ 안내서)이 새 코드를 놓치지 않는다(#134 리뷰 R1 P2-1).
+// 코드는 Warn* 상수로만 써야 경고 코드 표 시험(상수 ↔ 안내서)이 새 코드를 놓치지 않는다(itda-hyve#134 리뷰 R1 P2-1).
 func literalCodes(t *testing.T, dir string) []string {
 	t.Helper()
 	fset := token.NewFileSet()
@@ -248,7 +248,7 @@ func TestEntryGuideFrontmatterKeys(t *testing.T) {
 	sameSet(t, "frontmatter 키", tableNames(t, readDoc(t, "markdown.md"), "fm-keys"), caseKeys(t, "fill"))
 }
 
-// 알림 표(#434 — 편집기 자동 완성 후보가 이 표에서 나온다): 표시·제목 두 가지가 렌더러의 알림 제목과 같다.
+// 알림 표(itda-hyve#434 — 편집기 자동 완성 후보가 이 표에서 나온다): 표시·제목 두 가지가 렌더러의 알림 제목과 같다.
 func TestEntryGuideAlerts(t *testing.T) {
 	row := regexp.MustCompile("(?m)^\\| `([A-Z]+)` \\| ([^|]+) \\| ([^|]+) \\|")
 	var doc, code []string

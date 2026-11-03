@@ -1,10 +1,10 @@
 package mdoc
 
-// frontmatter 키의 스키마 표(#474 ①). 파서(meta.go fill·parseSlides·parseCode)가 받는 키·별칭의
+// frontmatter 키의 스키마 표(itda-hyve#474 ①). 파서(meta.go fill·parseSlides·parseCode)가 받는 키·별칭의
 // 정본을 한 곳에 둔다 — 시험(schema_test.go)이 이 표와 파서의 case 를 양방향으로 맞춘다(표에 없는 case·
-// case 에 없는 표 항목·사라진 별칭 모두 실패). 편집 화면(#474 ②)과 MCP 도구가 같은 표를 쓴다.
+// case 에 없는 표 항목·사라진 별칭 모두 실패). 편집 화면(itda-hyve#474 ②)과 MCP 도구가 같은 표를 쓴다.
 //
-// 키 변경 규칙(https://github.com/itda-work/itda-hyve/blob/main/docs/DESIGN-markdown-docs.md 1.2): 추가는 자유(옛 판은 모르는 키로 둔다). 이름을 바꾸면
+// 키 변경 규칙(AGENTS.md 「명세 변경 절차」): 추가는 자유(옛 판은 모르는 키로 둔다). 이름을 바꾸면
 // 옛 이름을 Aliases 에 넣어 계속 받는다. 폐기하는 키는 읽되 경고를 낸다. 같은 키의 뜻은 바꾸지 않는다 — 새 키를 만든다.
 
 // MetaKey 는 frontmatter 키 하나의 스키마다. 값 문장은 모두 한국어다.
@@ -24,7 +24,7 @@ type MetaKey struct {
 	// Aliases 는 옛 이름·다른 표기다. 파서는 이 이름들도 받는다.
 	Aliases []string `json:"aliases,omitempty"`
 
-	// 아래는 편집 화면(#474 ②)이 컨트롤을 고르는 기계용 필드다 — 사람용 Kind·Range 와 함께 둔다.
+	// 아래는 편집 화면(itda-hyve#474 ②)이 컨트롤을 고르는 기계용 필드다 — 사람용 Kind·Range 와 함께 둔다.
 	// Input 이 빈 키는 화면에 줄이 없다: author(글자 목록·`- name: …` 매핑이라 한 줄 컨트롤이 맞지
 	// 않음), slides·code 최상위(하위 키로만 다룬다).
 	Input string `json:"input,omitempty"` // text · bool · int · number · enum · theme · list-style
@@ -93,7 +93,7 @@ func schemaNames(group string) []string {
 }
 
 // metaAlias 는 그룹별 별칭 → 정규 키다(slides·code 하위 — 최상위 키에는 별칭이 없다). 폴더 상속의
-// 합치기·출처 등록은 이 표로 키를 정규 이름으로 바꾸고 본다(#474 리뷰 R1 — 별칭끼리 다른 키로
+// 합치기·출처 등록은 이 표로 키를 정규 이름으로 바꾸고 본다(itda-hyve#474 리뷰 R1 — 별칭끼리 다른 키로
 // 어긋나 폴더 값이 문서를 이기는 일이 없게).
 var metaAlias = func() map[string]string {
 	out := map[string]string{}

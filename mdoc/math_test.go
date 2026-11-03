@@ -311,7 +311,7 @@ func TestMathDelimiterRules(t *testing.T) {
 
 // 리뷰 R2: TeX 주석(% 부터 줄 끝) 안의 명령·괄호는 스캐너 상태를 바꾸지 않는다 — 다음 줄의 닫는 $$ 를 놓치지 않는다.
 // 주석 안의 $ 는 여전히 구분자다(Pandoc 은 TeX 주석을 모른다). \% 는 글자 %.
-// 주석이 같은 줄 뒤의 글을 지우는 예(pct)는 그 수식에 주석 경고 하나만 낸다(#180) — 다른 경고는 없다.
+// 주석이 같은 줄 뒤의 글을 지우는 예(pct)는 그 수식에 주석 경고 하나만 낸다(itda-hyve#180) — 다른 경고는 없다.
 func TestMathComment(t *testing.T) {
 	for _, c := range []struct {
 		src, want, not string
@@ -338,7 +338,7 @@ func TestMathComment(t *testing.T) {
 	}
 }
 
-// #180: 이스케이프하지 않은 % 가 보일 글을 지우면(숫자 뒤의 %, 같은 줄 앞뒤에 글이 있는 %) 수식은 그대로 그리고 math 경고를 낸다.
+// itda-hyve#180: 이스케이프하지 않은 % 가 보일 글을 지우면(숫자 뒤의 %, 같은 줄 앞뒤에 글이 있는 %) 수식은 그대로 그리고 math 경고를 낸다.
 // 줄 머리의 주석 줄·줄 끝에 홀로 남은 %·\% 는 경고하지 않는다. 경고 줄은 그 수식이 시작한 줄이다.
 func TestMathPercentWarning(t *testing.T) {
 	for _, c := range []struct {

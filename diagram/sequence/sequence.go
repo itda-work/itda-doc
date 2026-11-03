@@ -1,4 +1,4 @@
-// Package sequence 는 mermaid 순서도(sequenceDiagram)의 부분집합을 SVG 로 그린다(#409 ③, 설계 1.10).
+// Package sequence 는 mermaid 순서도(sequenceDiagram)의 부분집합을 SVG 로 그린다(itda-hyve#409 ③, 설계 1.10).
 //
 // 문법은 실제 Mermaid(mermaid@12.2.0 — parser/sequenceDiagram.jison 이 대소문자를 가리지 않는다)의 부분집합이다 —
 // 새 문법을 만들지 않는다(안내서 spec/diagrams.md 10장 표가 정본). 모르는 문장·값은 그리지 않고
@@ -21,7 +21,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(internal/diagram)이다.
+// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(diagram)이다.
 const (
 	MaxSource = diagram.MaxSource // 그림 하나의 원문(바이트)
 	MaxLabel  = diagram.MaxLabel  // 라벨 하나의 글자 수(룬)
@@ -34,7 +34,7 @@ const (
 	MaxNumDigits = 6 // autonumber 수·번호의 표시 자릿수(넘으면 원문 + 경고 — 리뷰 1회차 [8])
 )
 
-// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(internal/diagram — flowchart·gantt·timeline 과 같다).
+// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(diagram — flowchart·gantt·timeline 과 같다).
 type (
 	Error  = diagram.Error
 	Issue  = diagram.Issue

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// 표 전치(#468 — 미리보기 표 오른쪽 클릭 메뉴 「행/열 바꾸기」). TransposeTable 은 [Header, ...Rows] 를 뒤집는다:
+// 표 전치(itda-hyve#468 — 미리보기 표 오른쪽 클릭 메뉴 「행/열 바꾸기」). TransposeTable 은 [Header, ...Rows] 를 뒤집는다:
 // 왼쪽 위 칸은 제자리, 새 머리 행 = 옛 첫 열. 열 정렬·캡션·접두 규칙을 여기 본다.
 
 // equalTable 은 칸·정렬의 구조만 본다(빈 칸과 nil 을 같게 본다).

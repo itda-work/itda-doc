@@ -1132,7 +1132,7 @@ func TestReviewR3(t *testing.T) {
 	}
 }
 
-// 극단 날짜 속성 시험(수정 3회차, #208 접근 방식 — 상한을 비껴 가는 숫자·날짜 입력을 한 시험으로 닫는다).
+// 극단 날짜 속성 시험(수정 3회차, itda-hyve#208 접근 방식 — 상한을 비껴 가는 숫자·날짜 입력을 한 시험으로 닫는다).
 // 시드 고정 300판: 시작 연도 0001~9999, 범위 1분~100년, dateFormat 6꼴 × axisFormat(긴 글자 포함) × tickInterval 명시 ×
 // excludes 네 꼴 × after/until 연쇄. 4회차부터 설정 줄(dateFormat·axisFormat·tickInterval·excludes)을 작업 앞·사이·뒤에
 // 무작위로 섞고(같은 시드면 같은 입력), 설정을 모두 머리 바로 뒤로 옮긴 입력과 성패·SVG 바이트가 같음을 본다(두 단계 계산).
@@ -1333,7 +1333,7 @@ func TestExtremeDates(t *testing.T) {
 }
 
 // 설정 지시 — 줄 전체가 지시 하나인 줄만 무시하고 그린다. 그 밖에 %%{ 가 든 줄(지시 앞뒤·사이의 글, acc 값·작업 이름·
-// 제목·구역 이름·설정 값·주석 안, accDescr 블록 안)은 원문 + 그 줄 번호(er·sequence 와 같은 공통 규칙 — #409 ④-1 후속).
+// 제목·구역 이름·설정 값·주석 안, accDescr 블록 안)은 원문 + 그 줄 번호(er·sequence 와 같은 공통 규칙 — itda-hyve#409 ④-1 후속).
 func TestDirectiveLines(t *testing.T) {
 	const d = "%%{init: {}}%%"
 	const one = "한 줄에 하나만"
@@ -1368,7 +1368,7 @@ func TestDirectiveLines(t *testing.T) {
 }
 
 // 줄 머리 %% 주석 — 원본 cleanupComments 처럼 accDescr { … } 블록 안에서도 지운다(설명에 넣지 않는다). 블록 밖 주석은 그대로
-// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — #409 ④-1 후속 리뷰 1회차 [2]).
+// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 func TestCommentLines(t *testing.T) {
 	const head, tail = "gantt\n", "\nb :2026-01-02, 1d"
 	for _, c := range []struct{ src, desc string }{
@@ -1385,7 +1385,7 @@ func TestCommentLines(t *testing.T) {
 			t.Errorf("%q: 설명이 %q 가 아니거나 주석이 남음\n%s", c.src, c.desc, r.SVG)
 		}
 	}
-	// 블록 밖 맨 %% 는 원본 lexer 의 주석 규칙(jison:34)이 건너뛴다 — 경고 없이 그린다(#409 ④-1 후속 수정 2).
+	// 블록 밖 맨 %% 는 원본 lexer 의 주석 규칙(jison:34)이 건너뛴다 — 경고 없이 그린다(itda-hyve#409 ④-1 후속 수정 2).
 	for _, src := range []string{head + "%% 밖 주석" + tail, head + "%%" + tail, head + "  %%\r" + tail} {
 		if r, err := Render(src); err != nil || len(r.Issues) != 0 {
 			t.Errorf("%q 블록 밖 주석: %v %+v", src, err, r.Issues)

@@ -14,7 +14,7 @@ import (
 
 // assertLinear 는 gen(size) 를 크기 두 배씩(64KB~512KB) 렌더해 512KB 의 비용이 64KB 의 27배(3³, +3×5ms)를 넘지 않고 연속한 두 쌍이
 // 모두 세 배(+5ms)를 넘지 않는지 본다(timingtest judge — 이차면 64배).
-// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest — 부하에 흔들리지 않게, #201). 크기마다 limit 안이어야 한다.
+// 비용은 CPU 시간이고 두 번 재어 작은 쪽, 실패로 보이면 모든 크기를 다시 잰다(timingtest — 부하에 흔들리지 않게, itda-hyve#201). 크기마다 limit 안이어야 한다.
 func assertLinear(t *testing.T, name string, gen func(size int) string, limit time.Duration) {
 	t.Helper()
 	timingtest.AssertDoubling(t, name, []int{64_000, 128_000, 256_000, 512_000}, renderWork(t, gen),
@@ -60,7 +60,7 @@ func TestDelimiterLimit(t *testing.T) {
 	}
 }
 
-// 중첩 상한(nesting.go, #126). 상한 없이: `>>>>…` 한 줄 128KB 3.8초, `1. 1. …` 1.3초(둘 다 순수 goldmark 도 같다), `:::a` 줄 반복 17초.
+// 중첩 상한(nesting.go, itda-hyve#126). 상한 없이: `>>>>…` 한 줄 128KB 3.8초, `1. 1. …` 1.3초(둘 다 순수 goldmark 도 같다), `:::a` 줄 반복 17초.
 // 넘을 수 있는 문서는 통째 원문 글자다(안전 모드).
 func TestQuoteDepthLimit(t *testing.T) {
 	for _, unit := range []string{">", "> ", ">>x\n", "1. ", "- ", "* ", "+ ", ":::a\n", "> - ", "- > ", "[^a]: ", "> :::a\n"} {

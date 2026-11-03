@@ -10,7 +10,7 @@ import (
 	"github.com/itda-work/itda-doc/mdsyntax"
 )
 
-// MaxCheckBytes 는 Check 가 받는 원문 상한이다(#135). 문서 창의 편집기·렌더 상한을 재 본 문서는 수백 KB 이고(64겹 중첩 시험의
+// MaxCheckBytes 는 Check 가 받는 원문 상한이다(itda-hyve#135). 문서 창의 편집기·렌더 상한을 재 본 문서는 수백 KB 이고(64겹 중첩 시험의
 // 8만 줄 문서가 약 1MB), MCP 응답·CLI 가 한 번에 다룰 크기로 4MB 를 둔다 — 넘으면 검사하지 않고 알린다.
 const MaxCheckBytes = 4 << 20
 
@@ -36,7 +36,7 @@ type CheckResult struct {
 	// 조상 폴더 파일이 달라지면 결과가 달라질 수 있으니 folder_meta 를 함께 본다.
 	SourceHash string `json:"source_hash"`
 	SyntaxHash string `json:"syntax_hash"` // 이 판의 문법 단일본 해시(mdsyntax.Hash)
-	// FolderMeta 는 검사에 얹힌 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(#474 — 가까운 것부터).
+	// FolderMeta 는 검사에 얹힌 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(itda-hyve#474 — 가까운 것부터).
 	// 같은 원문도 path 의 조상 파일에 따라 결과가 달라지므로 출처를 함께 돌려준다. 경로 없는 검사는 비어 있다.
 	FolderMeta []string       `json:"folder_meta,omitempty"`
 	Warnings   []CheckWarning `json:"warnings"`
@@ -45,9 +45,9 @@ type CheckResult struct {
 	LayoutChecked bool `json:"layout_checked"`
 }
 
-// Check 는 문서 창과 같은 렌더러·테마 고르기로 원문을 검사한다(#135 — Itda Hyve 의 md_check·`md --check`). 창을 띄우지 않고,
+// Check 는 문서 창과 같은 렌더러·테마 고르기로 원문을 검사한다(itda-hyve#135 — 앱의 검사 도구와 `itda-doc check` 가 부른다). 창을 띄우지 않고,
 // 테마 폴더와 path 가 있으면 그 위 폴더의 `_metadata.yml` 만 읽는다 — 원격 그림은 문서 창의 기본처럼
-// 불러오지 않은 것으로 센다. 폴더 파일은 frontmatter 기본값으로 함께 검사에 얹힌다(#474 — 문서 창과 같은 값).
+// 불러오지 않은 것으로 센다. 폴더 파일은 frontmatter 기본값으로 함께 검사에 얹힌다(itda-hyve#474 — 문서 창과 같은 값).
 // path 가 비면 상속이 없다(붙여넣은 원문 검사는 지금과 같다). ts 는 쓸 테마 묶음이다(nil 이면 내장 테마만).
 func Check(src []byte, path string, ts *Themes) (CheckResult, error) {
 	if len(src) > MaxCheckBytes {

@@ -172,7 +172,7 @@ func TestUserThemesStamp(t *testing.T) {
 		t.Errorf("지문이 바뀌지 않음: %s %s %s", s0, s1, s2)
 	}
 	// Windows(NTFS)는 폴더 목록에 적힌 하위 폴더(a)의 수정 시각을 그 안에 파일을 만든 뒤 조금 늦게 고친다 — 쓴 직후 잰
-	// 지문이 한 번 더 바뀐다(win11-hyve 실측, #61). 감시는 한 번 더 다시 읽을 뿐 바뀐 것을 놓치지 않는다.
+	// 지문이 한 번 더 바뀐다(Windows 11 실측, itda-hyve#61). 감시는 한 번 더 다시 읽을 뿐 바뀐 것을 놓치지 않는다.
 	// 그래서 바뀌지 않는 폴더를 연달아 잰 두 지문이 (잠깐 뒤에는) 같은지를 본다.
 	same := false
 	for range 50 {

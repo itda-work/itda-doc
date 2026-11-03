@@ -6,7 +6,7 @@ import (
 )
 
 // TestPolicyOddSpaceDefense 는 공통 정책 함수가 호출자의 줄 검사에 기대지 않고 ASCII 밖 공백·서식 문자(NBSP·EM SPACE·U+200B·
-// U+FEFF·NEL)를 스스로 거부하는지 본다(#409 ④-2 후속 리뷰 1회차 [2]·[3] — 심층 방어). 기대는 손으로 적었다. 공백이 아닌 서식
+// U+FEFF·NEL)를 스스로 거부하는지 본다(itda-hyve#409 ④-2 후속 리뷰 1회차 [2]·[3] — 심층 방어). 기대는 손으로 적었다. 공백이 아닌 서식
 // 문자(U+00AD SHY)는 받는다 — state 가 받던 그대로다.
 func TestPolicyOddSpaceDefense(t *testing.T) {
 	for _, sp := range []string{"\u00a0", "\u2003", "\u200b", "\ufeff", "\u0085", "\u3000"} {

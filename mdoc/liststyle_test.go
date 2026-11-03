@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// frontmatter list-style(#141): 글자 하나 또는 목록, 정규형으로. 틀린 값은 경고하고 버린다(테마 기본).
+// frontmatter list-style(itda-hyve#141): 글자 하나 또는 목록, 정규형으로. 틀린 값은 경고하고 버린다(테마 기본).
 func TestListStyleFrontmatter(t *testing.T) {
 	cases := []struct {
 		front, want string
@@ -40,7 +40,7 @@ func TestListStyleFrontmatter(t *testing.T) {
 	}
 }
 
-// 글자로 적은 항목 기호·번호(#141)는 경고만 — 목록마다 하나, 줄은 첫 자리. HTML 은 그대로다.
+// 글자로 적은 항목 기호·번호(itda-hyve#141)는 경고만 — 목록마다 하나, 줄은 첫 자리. HTML 은 그대로다.
 func TestListMarkerWarning(t *testing.T) {
 	cases := []struct {
 		name, src string
@@ -112,7 +112,7 @@ func TestListMarkerWarning(t *testing.T) {
 	}
 }
 
-// 저장소의 마크다운 문서에는 글자로 적은 항목 기호가 없다(#141 — 재현 샘플도 list-style 로 다시 썼다). 조사 자료의
+// 저장소의 마크다운 문서에는 글자로 적은 항목 기호가 없다(itda-hyve#141 — 재현 샘플도 list-style 로 다시 썼다). 조사 자료의
 // 이슈 초안처럼 기호 문법 자체를 보이는 글은 코드로 적는다.
 func TestListMarkerRepoDocs(t *testing.T) {
 	err := filepath.WalkDir("..", func(p string, d fs.DirEntry, err error) error {

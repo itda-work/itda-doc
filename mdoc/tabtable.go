@@ -7,7 +7,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 탭으로 나뉜 표(#579) — 엑셀·시트 복사본(TSV, 웹 표는 미검증)을 표 편집 그리드·표 원문으로 읽는다. 문서 창의 붙여넣기 자동 변환
+// 탭으로 나뉜 표(itda-hyve#579) — 엑셀·시트 복사본(TSV, 웹 표는 미검증)을 표 편집 그리드·표 원문으로 읽는다. 문서 창의 붙여넣기 자동 변환
 // (TabPasteSpot + TabTable)과 「표 편집」의 탭 줄 경로(TabBlockAt — TableAt 이 실패했을 때)가 쓴다. 쓰기는 GFM 표와 같이
 // WriteTable 이다(열 너비 맞춤, 첫 줄 = 머리 행, 정렬 없음).
 

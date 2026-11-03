@@ -5,7 +5,7 @@ import (
 	"unicode/utf8"
 )
 
-// 코드 블록 단 나누기(#487): 펜스 줄의 cols=2·cols=3 으로 코드 블록 하나를 N단으로 흘려 그린다.
+// 코드 블록 단 나누기(itda-hyve#487): 펜스 줄의 cols=2·cols=3 으로 코드 블록 하나를 N단으로 흘려 그린다.
 //
 //	```python title="app.py" cols=2
 //

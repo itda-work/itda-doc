@@ -27,9 +27,9 @@ import (
 //	미지원(Error) 다른 그림 종류, subgraph 중첩·subgraph 로 잇기, (((글))) >글] @{…} "`마크다운`", --o --x 화살표
 
 // 다른 mermaid 그림 종류(머리 낱말). 이 판은 그리지 않는다 — 원문 그대로 두고 경고에 이름을 적는다.
-// gantt 는 internal/gantt(#409 ①), timeline 은 internal/timeline(#409 ②), sequenceDiagram 은 internal/sequence
-// (#409 ③), erDiagram 은 internal/er(#409 ④), stateDiagram 은 internal/state(#409 ④-2), classDiagram 은 internal/classdiag
-// (#409 ④-3)가 그린다(mdoc 가 종류로 갈라 보낸다)라 여기 없다.
+// gantt 는 diagram/gantt(itda-hyve#409 ①), timeline 은 diagram/timeline(itda-hyve#409 ②), sequenceDiagram 은 diagram/sequence
+// (itda-hyve#409 ③), erDiagram 은 diagram/er(itda-hyve#409 ④), stateDiagram 은 diagram/state(itda-hyve#409 ④-2), classDiagram 은 diagram/classdiag
+// (itda-hyve#409 ④-3)가 그린다(mdoc 가 종류로 갈라 보낸다)라 여기 없다.
 var otherKinds = map[string]bool{
 	"journey": true, "pie": true, "quadrantChart": true, "requirementDiagram": true,
 	"gitGraph": true, "C4Context": true, "C4Container": true, "C4Component": true, "C4Dynamic": true, "C4Deployment": true,
@@ -101,7 +101,7 @@ func (p *parser) parse(src string) error {
 			return p.fail("줄 안에 CR·FF·VT 글자가 있음 — 이 판은 그 줄을 그리지 않는다")
 		}
 		// ASCII 밖 공백·서식 문자는 줄째 그리지 않는다(원본 JS \s 와 Go 의 공백 판정이 갈리는 갈래 — er·sequence·state 와 같다,
-		// #409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
+		// itda-hyve#409 ④-2 후속 리뷰 1회차 [2]·[3]: 받으면 긴 라벨 줄바꿈(strings.Fields)이 NBSP 를 빈칸으로 바꾸고 accDescr 블록의 줄 머리
 		// 정리가 원본 \n\s+ 와 갈린다).
 		if r, ok := diagram.OddSpace(lines[i]); ok {
 			return p.fail("ASCII 밖 공백·서식 문자(U+%04X)가 있음 — 이 판은 그 줄을 그리지 않는다(일반 빈칸으로 바꿔 쓴다)", r)
@@ -113,12 +113,12 @@ func (p *parser) parse(src string) error {
 		}
 		// 설정 지시 — 줄 전체가 지시 하나인 줄(accDescr { … } 밖)만 무시하는 지시다. 그 밖에 %%{ 가 든 줄(지시 앞뒤·사이의
 		// 글, acc 값·노드 글·간선 글·주석 안, accDescr 블록 안)은 원본 removeDirectives 가 지시만 지우고 남은 글을 읽는
-		// 갈래라 그리지 않는다(er·sequence 와 같은 공통 규칙 — #409 ④-1 후속).
+		// 갈래라 그리지 않는다(er·sequence 와 같은 공통 규칙 — itda-hyve#409 ④-1 후속).
 		if msg := diagram.DirectiveProblem(t, p.inAcc); msg != "" {
 			return p.fail("%s", msg)
 		}
 		// 줄 머리 %% 주석 — 원본 전처리 cleanupComments(/^\s*%%(?!{)[^\n]+\n?/gm)가 lexer 상태와 관계없이(accDescr { … } 블록 안도)
-		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — #409 ④-1 후속 리뷰 1회차 [2]).
+		// 먼저 지운다. 그래서 지시 검사 뒤, 엔티티 전처리·상태 분기 앞에 둔다(er 와 같은 차례 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 		// 뒤에 글이 없는 맨 %% 는 원본 전처리가 지우지 않는다 — 이 판은 그 줄을 그리지 않는다(er 와 같게, 보수적).
 		// 여기 오는 %%{ 줄은 줄 전체가 지시 하나뿐이다(DirectiveProblem).
 		if strings.HasPrefix(t, "%%") {
@@ -201,7 +201,7 @@ func (p *parser) parse(src string) error {
 	return nil
 }
 
-// frontmatter 는 --- 사이의 YAML 읽기(공통 internal/diagram)를 흐름도 규칙으로 바꾼다: 글인 title 은 캡션,
+// frontmatter 는 --- 사이의 YAML 읽기(공통 diagram)를 흐름도 규칙으로 바꾼다: 글인 title 은 캡션,
 // 나머지 키는 쓰지 않는다(키마다 경고). YAML 오류·글 아닌 title 은 그리지 않는다(*Error — 원문 그대로).
 // diagram.ParseFrontmatter 의 줄은 frontmatter 소스 기준(1부터)이라 원문 줄(+1)로 바꾼다 — 블록은 원문 둘째 줄부터.
 func (p *parser) frontmatter(src string) error {
@@ -866,6 +866,6 @@ func unquote(s string) string {
 	return s
 }
 
-// clip·quote 는 경고에 넣는 원문 조각·이름 묶음이다(공통 internal/diagram).
+// clip·quote 는 경고에 넣는 원문 조각·이름 묶음이다(공통 diagram).
 func clip(s string) string  { return diagram.Clip(s) }
 func quote(s string) string { return diagram.Quote(s) }

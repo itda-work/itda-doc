@@ -1,4 +1,4 @@
-// Package gantt 는 mermaid 간트 차트(gantt)의 부분집합을 SVG 로 그린다(#409 ①, 설계 1.10).
+// Package gantt 는 mermaid 간트 차트(gantt)의 부분집합을 SVG 로 그린다(itda-hyve#409 ①, 설계 1.10).
 //
 // 문법은 실제 Mermaid 의 부분집합이다 — 새 문법을 만들지 않는다(안내서 spec/diagrams.md 의 표가 정본).
 // 모르는 문장·값은 그리지 않고 *Error(줄 번호)를 돌려준다 — 부르는 쪽(mdoc)이 원문 코드 블록을 그대로 두고 경고한다.
@@ -6,7 +6,7 @@
 //
 // 배치는 시간 축(아래) + 작업 행이다: 왼쪽에 구역 이름 열, 시간 영역에 구역마다 번갈이 띠·제외 날짜의 옅은 세로 띠·눈금 격자선,
 // 작업은 둥근 사각형 막대(이름은 폭이 되면 막대 안, 아니면 오른쪽 — Mermaid 와 같게), milestone 은 마름모(작업 시작·끝의 가운데).
-// 오늘 선(todayMarker)은 그리지 않는다 — PDF 는 기록이고 오늘 날짜에 의존하지 않는다(#409 공통 규칙 4).
+// 오늘 선(todayMarker)은 그리지 않는다 — PDF 는 기록이고 오늘 날짜에 의존하지 않는다(itda-hyve#409 공통 규칙 4).
 //
 // 결과 SVG 는 허용 목록의 요소·속성만 쓰고(흐름도·차트와 같은 목록) 색·선은 클래스 → 테마 토큰(--diagram-*),
 // 글자는 문서 글꼴의 <text> 라 PDF 에서 선택·검색된다. 같은 입력은 같은 출력이다(map 순회 없음, 숫자는 소수 한 자리,
@@ -20,7 +20,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(internal/diagram)이다.
+// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(diagram)이다.
 const (
 	MaxSource   = diagram.MaxSource // 그림 하나의 원문(바이트)
 	MaxLabel    = diagram.MaxLabel  // 라벨 하나의 글자 수(룬)
@@ -30,7 +30,7 @@ const (
 	MaxTicks    = 400               // 눈금 — 자동 눈금은 사다리의 다음 칸으로, tickInterval 이 넘으면 경고하고 자동 눈금
 )
 
-// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(internal/diagram — flowchart 와 같다).
+// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(diagram — flowchart 와 같다).
 type (
 	Error  = diagram.Error
 	Issue  = diagram.Issue

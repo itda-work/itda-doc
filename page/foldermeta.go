@@ -10,7 +10,7 @@ import (
 	"github.com/itda-work/itda-doc/mdoc"
 )
 
-// 폴더 기본 frontmatter `_metadata.yml` 찾기·읽기(#474). 경로를 아는 쪽(docview)이 파일을 찾아 읽어
+// 폴더 기본 frontmatter `_metadata.yml` 찾기·읽기(itda-hyve#474). 경로를 아는 쪽(docview)이 파일을 찾아 읽어
 // mdoc.Options.FolderMeta 로 넘긴다 — mdoc.Render 는 경로를 모르는 순수 함수다.
 
 const (
@@ -39,7 +39,7 @@ func FolderMetaStop(dir string) bool {
 
 // HomeDirFor 는 탐색을 멈출 홈 폴더다. 문서 폴더가 홈 아래(홈 자체 포함)면 홈을 돌려주고, 홈을 못
 // 찾거나 문서가 홈 밖이면 빈글자(그때는 볼륨·경로 루트·깊이 상한까지만 간다 — 홈 밖 문서도 상속은 쓴다,
-// #474 리뷰 R1 열린 결정 1 의 조정 정리).
+// itda-hyve#474 리뷰 R1 열린 결정 1 의 조정 정리).
 func HomeDirFor(dir string) string {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
@@ -105,7 +105,7 @@ func ReadFolderMeta(rel, p string) mdoc.FolderMeta {
 }
 
 // MetaFileRead 는 폴더 파일 하나를 연 파일에서 읽은 것이다. 내용(B)과 권한(Mode)은 같은 열린 파일에서 얻는다 —
-// 저장이 기존 권한으로 놓을 때 내용과 다른 순간의 권한을 쓰지 않게(#504 리뷰 2회차 [1]).
+// 저장이 기존 권한으로 놓을 때 내용과 다른 순간의 권한을 쓰지 않게(itda-hyve#504 리뷰 2회차 [1]).
 type MetaFileRead struct {
 	B       []byte
 	Mode    os.FileMode

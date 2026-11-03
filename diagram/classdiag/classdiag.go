@@ -1,16 +1,16 @@
-// Package classdiag 는 mermaid 클래스도(classDiagram·classDiagram-v2)의 부분집합을 SVG 로 그린다(#409 ④-3, 설계 1.10).
+// Package classdiag 는 mermaid 클래스도(classDiagram·classDiagram-v2)의 부분집합을 SVG 로 그린다(itda-hyve#409 ④-3, 설계 1.10).
 //
 // 문법은 실제 Mermaid(mermaid@12.2.0 — diagrams/class/parser/classDiagram.jison·classDb.ts·classTypes.ts)의 부분집합이다
 // — 새 문법을 만들지 않는다(안내서 spec/diagrams.md 13장 표가 정본). 줄마다 허용 꼴(양성 목록) 하나에 통째로
 // 맞는 줄만 그리고, 어느 꼴에도 맞지 않으면 *Error(줄 번호)를 돌려준다 — 부르는 쪽(mdoc)이 원문 코드 블록을 그대로 두고
-// 경고한다(#208 결정 「허용 목록 문법」, sequence ③·er ④-1·state ④-2 와 같은 틀). 모양을 문서에 적는 것(%%{init: …}%%·
+// 경고한다(itda-hyve#208 결정 「허용 목록 문법」, sequence ③·er ④-1·state ④-2 와 같은 틀). 모양을 문서에 적는 것(%%{init: …}%%·
 // frontmatter 의 title 밖 키·classDef·cssClass·style·:::·click·link·callback)은 쓰지 않고 그림은 그린다(Issue 경고).
 //
 // 패키지 이름은 class 가 아니라 classdiag 다 — class 는 Go 예약어가 아니어서 쓸 수는 있지만, CSS 클래스를 다루는 코드에서
 // 흔한 지역 이름이라 import 한 패키지를 가리기 쉽다(mdoc 의 state 를 statediagram 으로 고쳐 부르는 것과 같은 까닭).
 //
 // 두 머리(classDiagram·classDiagram-v2)는 원본에서 같은 렌더러(classRenderer-v3-unified — classDetector-V2 가 둘 다 맡는다)로
-// 같게 그려진다. 배치는 흐름도·ER·상태도와 같은 계층 배치(internal/layered)다: 클래스가 노드, 관계가 간선. 모양은 원본 v3
+// 같게 그려진다. 배치는 흐름도·ER·상태도와 같은 계층 배치(diagram/layered)다: 클래스가 노드, 관계가 간선. 모양은 원본 v3
 // 렌더(classBox·shapeUtil·markers)의 꼴 — 클래스는 이름 칸(주석 «이름» + 굵은 이름)·속성 칸·메서드 칸을 쌓은 사각형(빈 칸도
 // 그린다 — 원본 hideEmptyMembersBox 기본값 거짓), 정적 멤버는 밑줄·추상 멤버는 기울임, 관계는 실선·점선 + 양끝 모양(상속은
 // 속이 빈 삼각형, 합성은 채운 마름모, 집합은 속이 빈 마름모, 의존은 원본 dependency 표식의 채운 갈고리 화살촉 — marker 없이
@@ -26,7 +26,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(internal/diagram)이고 배치 점 수는 공통 배치의
+// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(diagram)이고 배치 점 수는 공통 배치의
 // 상한(layered.MaxPoints)이다.
 const (
 	MaxSource    = diagram.MaxSource // 그림 하나의 원문(바이트)
@@ -38,7 +38,7 @@ const (
 	maxNameList  = 20                // classDef·cssClass 의 이름 수(쓰지 않는 줄이라 짧게 묶는다)
 )
 
-// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(internal/diagram).
+// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(diagram).
 type (
 	Error  = diagram.Error
 	Issue  = diagram.Issue

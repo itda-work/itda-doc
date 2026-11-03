@@ -12,7 +12,7 @@ import (
 // (1) derived 식의 값이 같은 이름의 정적 값(tokens)과 같고 (2) tokens 에 상대 색 식(from )이 없으며,
 // 테마 규칙이 쪽 밖을 고르지 않도록 (3) 테마 CSS 가 @scope (.page) 안에 있고, 슬라이드 배율이 먹도록
 // (4) 슬라이드 전용 규칙의 font-size 가 --slide-scale 허용 꼴이다(slideGuardProblems).
-// hyve 는 내장 브랜드 테마를 합쳐 부른다(itda-work/itda-hyve#577).
+// 앱은 자기 내장 테마를 더한 묶음으로 부를 수 있다(itda-hyve#577).
 func BuiltinThemeProblems(ts *Themes) []string {
 	var out []string
 	for _, p := range builtinThemeProblems(ts) {
@@ -95,7 +95,7 @@ func derivedProblems(th *Theme) []string {
 	return out
 }
 
-// ---- 슬라이드 글자 배율 가드(#430 2단계, 리뷰 1~3회차) ----
+// ---- 슬라이드 글자 배율 가드(itda-hyve#430 2단계, 리뷰 1~3회차) ----
 // base.css 와 내장 테마의 슬라이드 전용 요소(표지 .sc-*·구역 .ss-*·슬라이드 머리/바닥 .slide-*)는
 // font-size 가 --slide-scale 배율을 받아야 한다. 테마의 고정 pt 선언이 calc 를 덮쳐 누락이 1·2회차 리뷰에
 // 연속 나왔으므로(grep 은 여러 줄 선언을 놓쳤다) 규칙 단위로 읽어 막는다. 3회차부터는 해석을 줄이고
@@ -145,33 +145,33 @@ var slideScaleFixedSel = []string{".sc-class", ".slide-foot", ".sf-num", ".sf-le
 // slideSelMark — 슬라이드에만 있는 요소 표식. 이 조각의 font-size 는 배율과 곱해져야 한다.
 var slideSelMark = []string{".sc-", ".ss-", ".slide-", ".page.slide"}
 
-// nestAtRuleName — 안으로 들어가는 @묶음 이름(AtName 이 뽑은 것을 소문자로). 안에 규칙을 담는 @묶음 중
+// nestAtRuleName — 안으로 들어가는 @묶음 이름(atName 이 뽑은 것을 소문자로). 안에 규칙을 담는 @묶음 중
 // 이 목록에 없는 이름은 파싱 실패로 본다(조용히 건너뛰지 않는다 — 리뷰 4회차 [1]). 리프 @규칙
 // (@font-face·@counter-style 등)는 이 목록과 무관하게 선언 블록으로 검사한다.
 var nestAtRuleName = []string{"media", "supports", "scope", "layer", "container", "keyframes"}
 
-// slideCSSRules 는 리프 규칙(선언 블록)만 남긴다. 주석은 문자열을 보존하는 StripCSSComments 로 지우고
-// themecss SplitCSSBlocks 로 가른다(content:"{" 같은 문자열은 SplitCSSBlocks 가 이미 건너뛴다).
-// @묶음은 AtName 이 뽑은 이름(소문자)으로 식별한다 — " @media\nprint"·"@MEDIA"·"@supports(…" 같은
+// slideCSSRules 는 리프 규칙(선언 블록)만 남긴다. 주석은 문자열을 보존하는 stripCSSComments 로 지우고
+// themecss splitCSSBlocks 로 가른다(content:"{" 같은 문자열은 splitCSSBlocks 가 이미 건너뛴다).
+// @묶음은 atName 이 뽑은 이름(소문자)으로 식별한다 — " @media\nprint"·"@MEDIA"·"@supports(…" 같은
 // 표기 변형을 ASCII 공백 자르기로는 못 얻는다(리뷰 4회차 [1]). 이 검사는 내장 테마·base.css 에서 흔히
 // 쓰는 꼴의 회귀를 잡는다(완전한 CSS 해석기가 아니다 — 거짓 실패를 감수한 허용 목록).
-func slideCSSRules(css string) ([]CSSBlock, error) {
-	return slideCSSRulesInner(StripCSSComments(css))
+func slideCSSRules(css string) ([]cssBlock, error) {
+	return slideCSSRulesInner(stripCSSComments(css))
 }
 
-func slideCSSRulesInner(css string) ([]CSSBlock, error) {
-	bs, err := SplitCSSBlocks(css)
+func slideCSSRulesInner(css string) ([]cssBlock, error) {
+	bs, err := splitCSSBlocks(css)
 	if err != nil {
 		return nil, err
 	}
-	var out []CSSBlock
+	var out []cssBlock
 	for _, b := range bs {
 		if b.Statement {
 			continue
 		}
 		pre := strings.TrimSpace(b.Prelude)
 		if strings.HasPrefix(pre, "@") {
-			name := strings.ToLower(AtName(pre))
+			name := strings.ToLower(atName(pre))
 			if slices.Contains(nestAtRuleName, name) {
 				inner, err := slideCSSRulesInner(b.Body)
 				if err != nil {
@@ -191,7 +191,7 @@ func slideCSSRulesInner(css string) ([]CSSBlock, error) {
 
 // hasRuleBlocks 는 css 안에 리프가 아닌 규칙 블록이 하나라도 있는지(@font-face 같은 리프 선언과 갈라).
 func hasRuleBlocks(css string) bool {
-	bs, err := SplitCSSBlocks(css)
+	bs, err := splitCSSBlocks(css)
 	if err != nil {
 		return true // 못 가르는 것도 규칙이 있는 것으로 본다 — 조용히 통과시키지 않는다
 	}
@@ -284,7 +284,7 @@ func slideFontSizeOK(v string) bool {
 }
 
 // slideGuardRuleErr 은 규칙 하나의 검사 결과(없으면 ""). font 단축 속성은 슬라이드 규칙에서 금지한다.
-func slideGuardRuleErr(r CSSBlock) string {
+func slideGuardRuleErr(r cssBlock) string {
 	for _, piece := range slideSelectorPieces(r.Prelude) {
 		if !slideGuardChecked(piece) {
 			continue

@@ -7,7 +7,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram/layered"
 )
 
-// 글자 폭 어림·줄바꿈은 공통 패키지(internal/diagram)다 — 간트 차트가 함께 쓴다(#409). 여기는 흐름도 배치가
+// 글자 폭 어림·줄바꿈은 공통 패키지(diagram)다 — 간트 차트가 함께 쓴다(itda-hyve#409). 여기는 흐름도 배치가
 // 쓰는 짧은 위임과 모양 크기 계산이다.
 
 func wrapLabel(s string, width float64) []string { return diagram.WrapLabel(s, width) }

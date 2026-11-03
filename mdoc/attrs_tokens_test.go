@@ -8,8 +8,8 @@ import (
 )
 
 // attrTokenCase 는 testdata/attr-tokens.json 한 줄이다 — 속성 중괄호 안 글을 커서까지 자른 입력과, 그 자리가 어느
-// 토큰의 어디인지(kind). 같은 표를 문서 창 편집기의 자동 완성 판정(dist/edit-util.js attrTail)이 읽는다
-// (Itda Hyve 의 문서 창(docview) TestAttrTokensMatchEditor). 여기서는 그 판정이 parseAttrs 의 토큰 규칙과 맞는지 본다(#434).
+// 토큰의 어디인지(kind). 같은 표를 앱 편집기의 자동 완성 판정이 읽을 수 있다
+// (itda-hyve 의 TestAttrTokensMatchEditor 가 그 판정과 맞춰 본다). 여기서는 그 판정이 parseAttrs 의 토큰 규칙과 맞는지 본다(itda-hyve#434).
 type attrTokenCase struct {
 	In   string `json:"in"`
 	Kind string `json:"kind"`

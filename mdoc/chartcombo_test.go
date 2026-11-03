@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 이슈 #114 단계 B: 혼합 차트 — :::chart{type=bar line="계열 이름"} 은 그 계열을 선으로, 나머지를 묶은 막대로 그린다.
+// 이슈 itda-hyve#114 단계 B: 혼합 차트 — :::chart{type=bar line="계열 이름"} 은 그 계열을 선으로, 나머지를 묶은 막대로 그린다.
 
 var (
 	comboColRe  = regexp.MustCompile(`<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="[-\d.]+" class="col (s\d) d(\d+)[^"]*"><title>([^<]*)</title></rect>`)

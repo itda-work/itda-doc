@@ -823,7 +823,7 @@ func TestBounded(t *testing.T) {
 		f(&b)
 		var r Result
 		var err error
-		el, ok := timingtest.Within(time.Second, func() { r, err = Render(b.String()) }) // CPU 시간, 넘으면 다시 잰다(#201)
+		el, ok := timingtest.Within(time.Second, func() { r, err = Render(b.String()) }) // CPU 시간, 넘으면 다시 잰다(itda-hyve#201)
 		t.Logf("%s: %v, SVG %dKB, 오류 %v", name, el, len(r.SVG)>>10, err)
 		if !ok {
 			t.Errorf("%s: %v", name, el)
@@ -1019,7 +1019,7 @@ func TestRandomXMLValid(t *testing.T) {
 		}
 	}
 	// 정책 B(받은 글자 = 출력 글자) 뒤로는 위험 코드 포인트(엔티티·원문 U+FFFE·제어 문자)가 든 그림 대부분이 원문이다 — 이
-	// 씨앗에서 3000판 가운데 55판을 그린다(원문 U+0085 는 ASCII 밖 공백이라 줄째 원문 — #409 ④-2 후속 수정 1). 그린 것은 모두 XML
+	// 씨앗에서 3000판 가운데 55판을 그린다(원문 U+0085 는 ASCII 밖 공백이라 줄째 원문 — itda-hyve#409 ④-2 후속 수정 1). 그린 것은 모두 XML
 	// 로 읽혀야 한다.
 	if drawn < 40 {
 		t.Errorf("그린 그림이 %d 개뿐 — 생성기가 문법을 너무 자주 깸", drawn)
@@ -1091,7 +1091,7 @@ func TestCorpusHash(t *testing.T) {
 }
 
 // 설정 지시 — 줄 전체가 지시 하나인 줄만 무시하고 그린다. 그 밖에 %%{ 가 든 줄(지시 앞뒤·사이의 글, acc 값·노드 글·
-// 간선 글·주석 안, accDescr 블록 안, subgraph 안의 그런 줄)은 원문 + 그 줄 번호(er·sequence 와 같은 공통 규칙 — #409 ④-1 후속).
+// 간선 글·주석 안, accDescr 블록 안, subgraph 안의 그런 줄)은 원문 + 그 줄 번호(er·sequence 와 같은 공통 규칙 — itda-hyve#409 ④-1 후속).
 func TestDirectiveLines(t *testing.T) {
 	const d = "%%{init: {}}%%"
 	const one = "한 줄에 하나만"
@@ -1142,7 +1142,7 @@ func TestDirectiveLines(t *testing.T) {
 }
 
 // 줄 머리 %% 주석 — 원본 cleanupComments 처럼 accDescr { … } 블록 안에서도 지운다(설명에 넣지 않는다). 블록 밖 주석은 그대로
-// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — #409 ④-1 후속 리뷰 1회차 [2]).
+// 건너뛰고, 뒤에 글이 없는 맨 %% 줄은 원문 + 그 줄 번호(er 와 같은 차례·규칙 — itda-hyve#409 ④-1 후속 리뷰 1회차 [2]).
 func TestCommentLines(t *testing.T) {
 	const head, tail = "flowchart TD\n", "\nA"
 	for _, c := range []struct{ src, desc string }{

@@ -254,12 +254,12 @@ func TestChartGuideLinks(t *testing.T) {
 	prose := regexp.MustCompile("(?s)```.*?```").ReplaceAllString(g, "")
 	prose = regexp.MustCompile("`[^`\n]*`").ReplaceAllString(prose, "")
 	link := regexp.MustCompile(`(!?)\[([^\]]*)\]\(([^)\s]+)\)`)
-	issue := regexp.MustCompile(`^https://github\.com/itda-work/itda-hyve/issues/\d+$`)
+	issue := regexp.MustCompile(`^https://github\.com/itda-work/itda-(hyve|doc)/issues/\d+$`)
 	images := 0
 	for _, m := range link.FindAllStringSubmatch(prose, -1) {
 		img, alt, target := m[1] == "!", m[2], m[3]
 		if strings.HasPrefix(target, "http") {
-			if strings.Contains(target, "github.com/itda-work/itda-hyve/issues") && !issue.MatchString(target) {
+			if strings.Contains(target, "/issues") && strings.Contains(target, "github.com/itda-work/") && !issue.MatchString(target) {
 				t.Errorf("이슈 링크 꼴이 틀림: %s", target)
 			}
 			continue

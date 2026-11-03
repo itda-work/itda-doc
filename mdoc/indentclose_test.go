@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// #494 의 꼴 — 목록 바로 뒤에 빈 줄 없이 쓴 닫는 줄을 포매터가 4칸 들여써 :::notes 가 문서 끝까지 이어졌다.
+// itda-hyve#494 의 꼴 — 목록 바로 뒤에 빈 줄 없이 쓴 닫는 줄을 포매터가 4칸 들여써 :::notes 가 문서 끝까지 이어졌다.
 const indentedCloseDoc = "## 하나\n\n본문\n\n:::notes\n\n### 노트 제목\n\n- 항목\n  - 아래 항목\n    :::\n\n## 둘\n\n본문\n\n## 셋\n\n### 셋의 아래\n"
 
 func TestIndentedClose(t *testing.T) {
@@ -110,7 +110,7 @@ func applyFix(t *testing.T, src string, f Fix) string {
 }
 
 // 부모(목록 항목·각주) 안의 컨테이너 — Fix 는 여는 줄의 앞 공백을 남기고 넘친 들여쓰기만 지운다. 고친 뒤 경고가 없고
-// 닫는 줄 뒤의 글(after)이 부모 안에 남는다(#494 리뷰 1회차 [1]).
+// 닫는 줄 뒤의 글(after)이 부모 안에 남는다(itda-hyve#494 리뷰 1회차 [1]).
 func TestIndentedCloseInParent(t *testing.T) {
 	for _, c := range []struct {
 		name, src string

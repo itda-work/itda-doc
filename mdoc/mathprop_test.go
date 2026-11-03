@@ -17,7 +17,7 @@ import (
 
 // 수식 구분자 찾기의 리뷰 재현(R1~R3)을 한곳에 모은다. 각 사례는 그 라운드의 리뷰가 적은 입력 그대로이고,
 // want 는 결과 HTML 에 있어야 할 조각, not 은 없어야 할 조각, warns 는 경고 수다. R2·R3 의 주석 사례는 주석이 같은 줄 뒤의 글을
-// 지우므로 주석 경고(percentLoss) 하나를 낸다(#180) — 구분자 판정(want·not)은 그대로다.
+// 지우므로 주석 경고(percentLoss) 하나를 낸다(itda-hyve#180) — 구분자 판정(want·not)은 그대로다.
 func TestMathReviewRepros(t *testing.T) {
 	cases := []struct {
 		round, src string
@@ -79,7 +79,7 @@ func randMath(rng *rand.Rand, n int) string {
 // 속성 1 — 시간 선형성: 무작위 조각을 되풀이한 문단과, 리뷰가 찾은 "긴 구간을 읽고 곧 실패" 꼴의 가족을 크기를 두 배씩 키워
 // 렌더한다(64KB~512KB, 크기 넷). 512KB 의 비용(CPU 시간)이 64KB 의 27배(3³, +3×5ms)를 넘지 않고 연속한 두 쌍이 모두 세 배(+5ms)를
 // 넘지 않는다(timingtest judge — 이차면 네 배씩). 잡음을 줄이려 두 번 재어 짧은 쪽을 쓰고,
-// 실패로 보이면 모든 크기를 다시 잰다(timingtest, #130).
+// 실패로 보이면 모든 크기를 다시 잰다(timingtest, itda-hyve#130).
 func TestMathPropLinear(t *testing.T) {
 	rng := rand.New(rand.NewSource(1163))
 	type family struct {

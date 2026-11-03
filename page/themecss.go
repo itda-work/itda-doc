@@ -43,7 +43,7 @@ func checkThemeCSS(css, theme string, files map[string]themeAsset, rev int64) (s
 	if strings.ContainsRune(css, 0) {
 		return "", "", errors.New("NUL 글자가 있음")
 	}
-	css = StripCSSComments(css)
+	css = stripCSSComments(css)
 	low := strings.ToLower(css)
 	for _, bad := range []string{"@import", "expression(", "javascript:", "behavior:", "-moz-binding", "</style", ":scope"} {
 		if strings.Contains(low, bad) {
@@ -75,7 +75,7 @@ func checkThemeCSS(css, theme string, files map[string]themeAsset, rev int64) (s
 	if bad != nil {
 		return "", "", bad
 	}
-	blocks, err := SplitCSSBlocks(css)
+	blocks, err := splitCSSBlocks(css)
 	if err != nil {
 		return "", "", err
 	}
@@ -86,11 +86,11 @@ func checkThemeCSS(css, theme string, files map[string]themeAsset, rev int64) (s
 	return sb.String(), fb.String(), nil
 }
 
-func walkCSSBlocks(blocks []CSSBlock, depth int, sb, fb *strings.Builder) error {
+func walkCSSBlocks(blocks []cssBlock, depth int, sb, fb *strings.Builder) error {
 	for _, b := range blocks {
 		pre := strings.TrimSpace(b.Prelude)
 		if strings.HasPrefix(pre, "@") {
-			name := strings.ToLower(AtName(pre))
+			name := strings.ToLower(atName(pre))
 			switch {
 			case name == "font-face" && depth == 0:
 				ff, err := checkFontFace(b.Body)
@@ -101,7 +101,7 @@ func walkCSSBlocks(blocks []CSSBlock, depth int, sb, fb *strings.Builder) error 
 				fb.WriteString(ff)
 				fb.WriteString("}\n")
 			case keptAtRules[name] && !b.Statement:
-				inner, err := SplitCSSBlocks(b.Body)
+				inner, err := splitCSSBlocks(b.Body)
 				if err != nil {
 					return err
 				}
@@ -182,15 +182,15 @@ func checkFontFace(body string) (string, error) {
 	return " " + strings.Join(out, "; ") + "; ", nil
 }
 
-// CSSBlock 은 맨 위의 규칙 하나다: Prelude { Body } 또는 Prelude; (Statement).
-type CSSBlock struct {
+// cssBlock 은 맨 위의 규칙 하나다: Prelude { Body } 또는 Prelude; (Statement).
+type cssBlock struct {
 	Prelude, Body string
 	Statement     bool
 }
 
-// SplitCSSBlocks 는 CSS 를 맨 위 규칙으로 가른다. 글자열("…"·'…')·괄호 안의 { } ; 는 세지 않는다.
-func SplitCSSBlocks(css string) ([]CSSBlock, error) {
-	var out []CSSBlock
+// splitCSSBlocks 는 CSS 를 맨 위 규칙으로 가른다. 글자열("…"·'…')·괄호 안의 { } ; 는 세지 않는다.
+func splitCSSBlocks(css string) ([]cssBlock, error) {
+	var out []cssBlock
 	i, n := 0, len(css)
 	start := 0
 	for i < n {
@@ -212,7 +212,7 @@ func SplitCSSBlocks(css string) ([]CSSBlock, error) {
 			continue
 		case ';':
 			if p := strings.TrimSpace(css[start:i]); p != "" {
-				out = append(out, CSSBlock{Prelude: p, Statement: true})
+				out = append(out, cssBlock{Prelude: p, Statement: true})
 			}
 			i++
 			start = i
@@ -222,7 +222,7 @@ func SplitCSSBlocks(css string) ([]CSSBlock, error) {
 			if err != nil {
 				return nil, err
 			}
-			out = append(out, CSSBlock{Prelude: css[start:i], Body: css[i+1 : end]})
+			out = append(out, cssBlock{Prelude: css[start:i], Body: css[i+1 : end]})
 			i = end + 1
 			start = i
 			continue
@@ -232,7 +232,7 @@ func SplitCSSBlocks(css string) ([]CSSBlock, error) {
 		i++
 	}
 	if p := strings.TrimSpace(css[start:]); p != "" {
-		out = append(out, CSSBlock{Prelude: p, Statement: true})
+		out = append(out, cssBlock{Prelude: p, Statement: true})
 	}
 	return out, nil
 }
@@ -327,8 +327,8 @@ func splitDecls(body string) []string {
 	return out
 }
 
-// StripCSSComments 는 주석을 빈칸 하나로 지운다(글자열 안의 /* 는 그대로 둔다).
-func StripCSSComments(css string) string {
+// stripCSSComments 는 주석을 빈칸 하나로 지운다(글자열 안의 /* 는 그대로 둔다).
+func stripCSSComments(css string) string {
 	var b strings.Builder
 	for i := 0; i < len(css); i++ {
 		c := css[i]
@@ -356,8 +356,8 @@ func StripCSSComments(css string) string {
 	return b.String()
 }
 
-// AtName 은 @규칙 머리에서 이름(@ 뒤의 영숫자·-)을 뽑는다.
-func AtName(prelude string) string {
+// atName 은 @규칙 머리에서 이름(@ 뒤의 영숫자·-)을 뽑는다.
+func atName(prelude string) string {
 	s := strings.TrimPrefix(prelude, "@")
 	for i, r := range s {
 		if !(r == '-' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
@@ -392,7 +392,7 @@ var (
 func loadReserved() {
 	reservedTok, reservedFamily = map[string]bool{}, map[string]bool{}
 	b := ShellCSS()
-	css := StripCSSComments(string(b))
+	css := stripCSSComments(string(b))
 	for _, m := range regexp.MustCompile(`(--[a-zA-Z0-9-]+)\s*:`).FindAllStringSubmatch(css, -1) {
 		reservedTok[m[1]] = true
 	}
@@ -407,7 +407,7 @@ func loadReserved() {
 	// 문서 기본 글꼴(base.css 의 --font-* 값)과 CSS 의 일반 이름도 막는다 — 같은 이름으로 덮으면 내장 테마 모양이 몰래 바뀐다.
 	// base.css 는 창 틀이 아니라 문서 층이라 ShellCSS 와 무관하게 늘 읽는다.
 	base := web.BaseCSS
-	for _, m := range regexp.MustCompile(`--font-[a-z0-9-]+\s*:\s*([^;}]+)`).FindAllStringSubmatch(StripCSSComments(string(base)), -1) {
+	for _, m := range regexp.MustCompile(`--font-[a-z0-9-]+\s*:\s*([^;}]+)`).FindAllStringSubmatch(stripCSSComments(string(base)), -1) {
 		for f := range strings.SplitSeq(m[1], ",") {
 			if f = strings.ToLower(strings.Trim(strings.TrimSpace(f), `"'`)); f != "" && !strings.HasPrefix(f, "var(") && f != "inherit" {
 				reservedFamily[f] = true

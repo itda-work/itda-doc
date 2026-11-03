@@ -1,5 +1,5 @@
 // gen 은 안내서(spec/*.md)의 syntax 구간을 모아 mdsyntax/topics/*.md 를, 표지 표에서 뽑은
-// 편집기 자동 완성 후보를 mdsyntax/completions.json 으로 다시 쓴다(#434).
+// 편집기 자동 완성 후보를 mdsyntax/completions.json 으로 다시 쓴다(itda-hyve#434).
 // 저장소 맨 위나 mdsyntax 에서 `go generate ./mdsyntax`(또는 just syntax) 로 돈다.
 package main
 

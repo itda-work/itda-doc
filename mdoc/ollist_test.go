@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-// 번호 목록의 자릿수 class(#575): 가장 큰 번호(시작 번호 + 항목 수 − 1)의 자릿수가 둘 이상이면 <ol> 에 ol-dN 을 단다.
+// 번호 목록의 자릿수 class(itda-hyve#575): 가장 큰 번호(시작 번호 + 항목 수 − 1)의 자릿수가 둘 이상이면 <ol> 에 ol-dN 을 단다.
 // 한 자리 목록·글머리 목록에는 class 를 달지 않고, style 속성도 내지 않는다.
 func TestOrderedListDigitsClass(t *testing.T) {
 	items := func(start, n int) string {
@@ -56,7 +56,7 @@ func TestOrderedListDigitsClass(t *testing.T) {
 	}
 }
 
-// 각주 목록도 자릿수 class 를 단다(#575): 각주 아홉 개는 class 없음, 열 개는 ol-d2. 각주는 1 부터 차례라 각주 수가 가장 큰 번호다.
+// 각주 목록도 자릿수 class 를 단다(itda-hyve#575): 각주 아홉 개는 class 없음, 열 개는 ol-d2. 각주는 1 부터 차례라 각주 수가 가장 큰 번호다.
 func TestFootnoteListDigitsClass(t *testing.T) {
 	notes := func(n int) string {
 		var body, defs strings.Builder

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// 이슈 #114 단계 A: 모르는 type 은 표로 남기고, 기준선 ref·ref-label 을 긋는다.
+// 이슈 itda-hyve#114 단계 A: 모르는 type 은 표로 남기고, 기준선 ref·ref-label 을 긋는다.
 
 var (
 	refLineRe = regexp.MustCompile(`<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)" class="ref-line"><title>([^<]*)</title></line><text x="([-\d.]+)" y="([-\d.]+)" font-size="11" text-anchor="(\w+)" class="ref-lab">([^<]*)</text>`)

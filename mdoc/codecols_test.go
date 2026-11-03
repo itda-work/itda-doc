@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// #487 코드 블록 단 나누기 — 펜스 줄 cols= 의 가림(parseCodeCols).
+// itda-hyve#487 코드 블록 단 나누기 — 펜스 줄 cols= 의 가림(parseCodeCols).
 func TestCodeColsParse(t *testing.T) {
 	cases := []struct {
 		info string
@@ -88,7 +88,7 @@ func TestCodeColsFence(t *testing.T) {
 	}
 	runCases(t, cases)
 
-	// 줄 강조(#479)와 함께 — 두 낱말이 서로의 값·언어·파일명을 건드리지 않고, 어느 쪽도 경고하지 않는다
+	// 줄 강조(itda-hyve#479)와 함께 — 두 낱말이 서로의 값·언어·파일명을 건드리지 않고, 어느 쪽도 경고하지 않는다
 	combos := []syntaxCase{
 		{name: "cols + {…}", src: "```python cols=2 {2,5}\na\nb\nc\nd\ne\n```",
 			want: []string{`<pre data-line="1" data-cols="2" data-hl="2,5"><code class="language-python">`}},

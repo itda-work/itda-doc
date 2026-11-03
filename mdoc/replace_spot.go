@@ -7,7 +7,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 「스냅샷 바꾸기」(#365 ③ 조각 D)의 범위 판정 — 읽기 전용이다. 렌더 경로·옵션은 바꾸지 않는다(InsertSpotAt 과 같은 읽기 파싱 parseSpots,
+// 「스냅샷 바꾸기」(itda-hyve#365 ③ 조각 D)의 범위 판정 — 읽기 전용이다. 렌더 경로·옵션은 바꾸지 않는다(InsertSpotAt 과 같은 읽기 파싱 parseSpots,
 // 차트 값 읽기는 렌더의 transform 을 고치지 않고 그대로 부른다).
 
 // ReplaceFitsAt 은 원문 from~to 줄(1부터, 양끝 포함 — 기록 주석 줄부터 블록 끝 줄까지)을 block(끝 줄바꿈 없는 세 층 글 — 기록 주석
@@ -108,7 +108,7 @@ type ChartSeries struct {
 }
 
 // ChartValues 는 원문 src 의 첫 최상위 차트를 렌더와 같은 판정(transform — 단위·보조 축 unit2·% 추론·그리는 계열)으로 읽은 계열이다.
-// 차트로 그리지 않은 블록(표로 남음)·산점도·버블은 ok 가 거짓이다. 「스냅샷 바꾸기」(#365 ③ D)가 보존한 차트 속성이 새 값 읽기를
+// 차트로 그리지 않은 블록(표로 남음)·산점도·버블은 ok 가 거짓이다. 「스냅샷 바꾸기」(itda-hyve#365 ③ D)가 보존한 차트 속성이 새 값 읽기를
 // 바꾸는지 보려고 쓴다 — 읽기 전용.
 func ChartValues(src []byte) (series []ChartSeries, ok bool) {
 	defer func() {

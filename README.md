@@ -11,7 +11,7 @@
 
 ## 상태
 
-1단계 a: 렌더러·테마·쪽 모델 자원·명세를 Itda Hyve(69812397)에서 옮겨 왔다. 다음은 Itda Hyve 가 이 모듈을 쓰도록 전환(1b), 명세의 새 절(1c), 웹 뷰어(2단계).
+1단계: 렌더러·테마·쪽 모델 자원·명세를 Itda Hyve 에서 옮겨 왔고(a), Itda Hyve 가 이 모듈을 쓴다(b). 남은 Itda Hyve 이름·이슈 번호·옛 경로를 정리했다(c). 다음은 명세의 새 절과 웹 뷰어(2단계).
 
 ## 라이선스
 
@@ -56,4 +56,10 @@ itda-doc themes -themes ~/회사테마            # 내장·사용자 테마 목
 
 ## English
 
-Itda Doc is a way of writing documents in Markdown. It is not a new syntax but a **profile** (CommonMark → GFM → a subset of Pandoc) plus a **vocabulary** on top of it (containers, frontmatter keys, charts, diagrams, math, slides), a **reference renderer** (Go, compiles to WebAssembly) that draws it the same way everywhere, and a **theme contract** that decides how it looks. Files stay plain `.md` (`.itda.md` to state that a file follows the profile (a naming convention; renderers treat it as `.md`)); no new symbols are invented, so documents read fine on GitHub, VS Code and Obsidian. Documents carry meaning, themes carry looks. Remote images are blocked by default and raw HTML is not rendered. Code, themes and web assets are MIT-licensed; the specification in `spec/` is CC BY 4.0. The specification is written in Korean; an English translation will follow the 1.0 release of the specification.
+Itda Doc is a way of writing documents in Markdown. It is not a new syntax but a **profile** (CommonMark → GFM → a subset of Pandoc) plus a **vocabulary** on top of it (containers, frontmatter keys, charts, diagrams, math, slides), a **reference renderer** (Go, compiles to WebAssembly) that draws it the same way everywhere, and a **theme contract** that decides how it looks. Files stay plain `.md`; `.itda.md` states that a file follows the profile (a naming convention — renderers treat it as `.md`, and no code here gives it special handling). No new symbols are invented, so documents read fine on GitHub, VS Code and Obsidian. Documents carry meaning, themes carry looks. Remote images are blocked by default and raw HTML is not rendered.
+
+- **License**: code, themes and web assets are MIT; the specification in `spec/` is CC BY 4.0.
+- **Packages**: `mdoc` (Markdown → HTML fragment, TOC, warnings), `texmath` (TeX → MathML), `diagram/…` (a Mermaid subset: flowchart, gantt, timeline, sequence, ER, state, class), `mdsyntax` (syntax digest generated from `spec/`), `page` (page model: themes, cover, TOC, header/footer, `Check`), `themes` (five neutral built-in themes), `web` (page-model CSS/JS and the read-only share view), `cmd/itda-doc` (CLI: `render`, `check`, `syntax`, `themes`).
+- **Relation to Itda Hyve**: [Itda Hyve Docs](https://itda.work/hyve) is a desktop app that uses this module as its document renderer and adds its own brand themes and app features on top.
+
+The specification is written in Korean; an English translation will follow the 1.0 release of the specification.

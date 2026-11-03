@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-// 코드 블록 표시(#435): frontmatter code: — line-numbers(별칭 linenumbers·line_numbers). 기본은 켬이라
+// 코드 블록 표시(itda-hyve#435): frontmatter code: — line-numbers(별칭 linenumbers·line_numbers). 기본은 켬이라
 // "정하지 않음"(nil)과 false 를 갈라 화면이 정한다(정하지 않음 = 켬).
 func TestCodeMeta(t *testing.T) {
 	f := func(b bool) *bool { return &b }

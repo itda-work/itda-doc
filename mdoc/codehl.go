@@ -11,7 +11,7 @@ import (
 	"github.com/yuin/goldmark/ast"
 )
 
-// 코드 블록 줄 강조(#479): 펜스 info string 에 강조할 줄을 적으면 pre 에 data-hl 속성(정규화한 목록 "1,3-5")을
+// 코드 블록 줄 강조(itda-hyve#479): 펜스 info string 에 강조할 줄을 적으면 pre 에 data-hl 속성(정규화한 목록 "1,3-5")을
 // 달고 화면(codelines.js — 줄 span 에 hl 클래스, base.css 띠)이 그 줄을 띠로 강조한다. 표기는 둘이다 —
 //
 //	```go {1,3-5}   ```go{1,3-5}   ``` {2}   ```go title="a.go" {2-3}   ```go:a.go {2}   (정식 — Docusaurus·VitePress)

@@ -7,11 +7,11 @@ import (
 	"github.com/itda-work/itda-doc/diagram/layered"
 )
 
-// 계층 배치(Sugiyama)는 공통 패키지 internal/layered 다(#409 ④ — ER 이 같은 배치를 쓰게 꺼냈다). 여기는 흐름도 노드의
+// 계층 배치(Sugiyama)는 공통 패키지 diagram/layered 다(itda-hyve#409 ④ — ER 이 같은 배치를 쓰게 꺼냈다). 여기는 흐름도 노드의
 // 크기(모양·라벨 줄)와 간선 라벨 줄을 정해 넘기고, 간선 끝을 모양의 테두리에서 자르는 일(clipShape)을 맡는다.
 
 const (
-	fontSize  = diagram.FontSize // 공통(internal/diagram) — 글자 폭 어림의 기준
+	fontSize  = diagram.FontSize // 공통(diagram) — 글자 폭 어림의 기준
 	lineH     = diagram.LineH    // 공통
 	padX      = 14.0
 	padY      = 9.0

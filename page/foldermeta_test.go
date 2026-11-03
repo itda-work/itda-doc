@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// 폴더 기본 frontmatter `_metadata.yml`(#474 ①) — 찾기·읽기(foldermeta.go)와 모든 렌더 입구가
+// 폴더 기본 frontmatter `_metadata.yml`(itda-hyve#474 ①) — 찾기·읽기(foldermeta.go)와 모든 렌더 입구가
 // 같은 합친 값을 쓰는지(renderViewOpts·Check·공유). 시험은 HOME 을 임시 폴더로 바꿔 홈 멈춤을 확정한다
 // (사용자 실제 홈·~/.itda 에 파일을 만들지 않는다).
 
@@ -139,7 +139,7 @@ func TestFindFolderMetasRereadsContent(t *testing.T) {
 	}
 }
 
-// 창 렌더(renderViewOpts)가 폴더 값을 문서에 얹힌다 — 인수 조건 ①②③(#474).
+// 창 렌더(renderViewOpts)가 폴더 값을 문서에 얹힌다 — 인수 조건 ①②③(itda-hyve#474).
 func TestRenderViewFolderMeta(t *testing.T) {
 	ts, err := BuiltinThemes()
 	if err != nil {
@@ -185,7 +185,7 @@ func TestRenderViewFolderMeta(t *testing.T) {
 	}
 }
 
-// md_check(docview.Check)도 경로가 있으면 폴더 값을 함께 검사한다(#474 — 문서 창과 같은 값).
+// md_check(docview.Check)도 경로가 있으면 폴더 값을 함께 검사한다(itda-hyve#474 — 문서 창과 같은 값).
 func TestCheckFolderMeta(t *testing.T) {
 	_, docs := homeSandbox(t)
 	writeMeta(t, docs, "theme: mono\ntoc: 안녕\n")
@@ -300,7 +300,7 @@ func TestCheckFolderMetaJSON(t *testing.T) {
 	}
 }
 
-// #504 인수 1: 폴더에서 받은 테마는 View.DocThemeFrom 이 그 파일(문서 기준 상대 경로)이고, 문서 자신의 theme: 은 ""
+// itda-hyve#504 인수 1: 폴더에서 받은 테마는 View.DocThemeFrom 이 그 파일(문서 기준 상대 경로)이고, 문서 자신의 theme: 은 ""
 // (화면 「(문서 설정)」)다. 테마 값 고르기(DocTheme·Theme)는 그대로다. 화면 표기는 TestFolderFormUI 가 본다.
 func TestRenderViewDocThemeFrom(t *testing.T) {
 	ts, err := BuiltinThemes()

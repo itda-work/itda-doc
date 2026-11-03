@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// 스키마 표(FrontmatterSchema)와 파서가 어긋나지 않게 막는다(#474 ① — 뮤테이션으로 확인:
+// 스키마 표(FrontmatterSchema)와 파서가 어긋나지 않게 막는다(itda-hyve#474 ① — 뮤테이션으로 확인:
 // meta.go 의 case 를 하나 더하거나 별칭을 지우면 이 시험이 실패한다). 파서가 아는 키·별칭은
 // meta.go 의 `switch …Value` case 에서 뽑는다(guidemd_test.go caseKeys 와 같은 방법).
 
@@ -61,7 +61,7 @@ func TestSchemaAliasesParse(t *testing.T) {
 	}
 }
 
-// ---- 편집 화면용 필드(#474 ②) — Input·Values·Min·Max·Step·PerDoc 이 파서와 맞는지 막는다.
+// ---- 편집 화면용 필드(itda-hyve#474 ②) — Input·Values·Min·Max·Step·PerDoc 이 파서와 맞는지 막는다.
 
 // Input 이 있는 키의 사람용 스키마(Kind)도 함께 있다(기계용 필드만 덩그러니 있는 키가 없게).
 func TestSchemaInputHasKind(t *testing.T) {
@@ -229,7 +229,7 @@ func schemaByPath(path string) MetaKey {
 }
 
 // ① 의 경고 JSON 은 34cd175 와 같은 모양이다 — Warning.Key 는 편집 화면의 내부 보조 정보라
-// 직렬화에서 뺀다(#474 ② 리뷰 3회차 [6], baseline 비교: Key 만 빼면 8표본 전부 동일).
+// 직렬화에서 뺀다(itda-hyve#474 ② 리뷰 3회차 [6], baseline 비교: Key 만 빼면 8표본 전부 동일).
 func TestWarningKeyNotSerialized(t *testing.T) {
 	r, err := Render([]byte("---\ntoc-depth: bad\n---\n\n# a\n"), Options{})
 	if err != nil {

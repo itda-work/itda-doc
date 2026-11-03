@@ -205,7 +205,7 @@ func fmtNum(v float64, dec int) string {
 }
 
 // fmtVal 은 값 글자다: 소수 자리 dec 로 적되, 0 이 아닌 값이 0 으로 보이면(0.0004 를 3자리로 "0.000") 첫 유효 숫자가 보일 때까지
-// 그 값만 자리를 늘린다(6 까지) — 다른 값의 자리는 그대로다(#114 함께 볼 것: 표시 정밀도).
+// 그 값만 자리를 늘린다(6 까지) — 다른 값의 자리는 그대로다(itda-hyve#114 함께 볼 것: 표시 정밀도).
 func fmtVal(v float64, dec int) string {
 	s := fmtNum(v, dec)
 	for d := dec + 1; v != 0 && d <= 6 && strings.Trim(s, "-0.,") == ""; d++ {

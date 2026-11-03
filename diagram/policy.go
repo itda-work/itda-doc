@@ -9,7 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-// 엔티티·공백 정책 B 와 출력 관문 도구 — 여섯 종류(흐름도·gantt·timeline·sequence·er·state)가 함께 쓴다(#409 ④-2 접근 방식
+// 엔티티·공백 정책 B 와 출력 관문 도구 — 여섯 종류(흐름도·gantt·timeline·sequence·er·state)가 함께 쓴다(itda-hyve#409 ④-2 접근 방식
 // 리뷰, 2026-10-31 사용자 결정 — state 에서 정하고 후속 PR 에서 여기로 옮겼다. 설계 spec/diagrams-design.md 2장).
 //
 // 원본은 전처리 encodeEntities 가 지킨 표식(`#\w+;` → 정수 ﬂ°°N¶ß·이름 ﬂ°N¶ß — EncodeEntities)만 SVG 정리 단계(decodeEntities →
@@ -103,7 +103,7 @@ func spaceProblem(what string) string {
 
 // oddProblem 은 글에 ASCII 밖 공백·서식 문자(OddSpace — NBSP·EM SPACE·U+200B 따위)가 있으면 그 까닭이다. 이 파일의 함수들은
 // 「공백은 ASCII 빈칸·탭(·acc 의 LF)뿐」을 전제로 원본 JS \s 규칙(줄 머리 정리 \n\s+, 줄바꿈 자리)을 ASCII 로 옮겼다. 각 종류의 줄
-// 루프가 그 줄을 먼저 막지만(DESIGN 2장 줄 루프 차례), 호출자 전제에 기대지 않게 함수가 스스로도 거부한다(#409 ④-2 후속 리뷰
+// 루프가 그 줄을 먼저 막지만(DESIGN 2장 줄 루프 차례), 호출자 전제에 기대지 않게 함수가 스스로도 거부한다(itda-hyve#409 ④-2 후속 리뷰
 // 1회차 [2]·[3] — 심층 방어). 거부 범위는 OddSpace 그대로다 — 공백이 아닌 다른 서식 문자(U+00AD SHY·U+200E 따위)는 Go·JS 어느
 // 쪽도 공백으로 보지 않아 줄바꿈·정리에서 바뀌지 않으므로 글자로 받는다(state 가 받던 그대로 — 바이트 불변).
 func oddProblem(s, what string) string {
@@ -319,7 +319,7 @@ type TextFunc func(field, what, v string, line int) error
 
 // Gate 는 출력 관문이다 — each(종류마다의 필드 목록 한곳 eachText)가 넘기는 내보낼 사용자 글자가 모두 XmlChars(SVG 쓰기 경로 Esc 와
 // Result.Caption)를 지나도 그대로인지 보고, 바뀌는 값이 있으면 그 값이 나온 줄의 *Error 다(받은 글자 = 출력 글자 — ④-2 리뷰
-// 3·4회차, #208 규칙으로 구조로 닫음). 각 종류의 Parse 가 본문을 다 읽은 뒤 한 번 부른다(본문 오류가 먼저다).
+// 3·4회차, itda-hyve#208 규칙으로 구조로 닫음). 각 종류의 Parse 가 본문을 다 읽은 뒤 한 번 부른다(본문 오류가 먼저다).
 func Gate(each func(TextFunc) error) error {
 	return each(func(_, what, v string, line int) error {
 		if msg := XMLProblem(v, what); msg != "" {

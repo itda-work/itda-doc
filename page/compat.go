@@ -11,14 +11,14 @@ import (
 	"strings"
 )
 
-// 옛 WebKit 대응(4단계 E-2). Itda Hyve 문서 창은 macOS 12 이상을 지원하고(그 저장소 scripts/macos-app.sh LSMinimumSystemVersion),
-// WKWebView 는 시스템 WebKit 이라 Safari 를 올리지 않은 Mac 은 옛 엔진이다. 테마가 쓰는 새 기능 둘:
+// 옛 WebKit 대응(4단계 E-2). macOS 의 앱은 WKWebView(시스템 WebKit)로 그리므로, 앱이 옛 macOS(예: 12)를 지원하면
+// Safari 를 올리지 않은 Mac 은 옛 엔진이다. 테마가 쓰는 새 기능 둘:
 //
 //   - 상대 색 oklch(from var(--accent) …) — Safari 18 부터. 내장 테마는 정적 값(tokens)을 기본으로 두고 식(derived)은
 //     @supports 로 덮는다. 정적 값 = 그 테마의 강조색으로 계산한 식의 값(테스트가 맞춰 본다)이라 내장 테마는 어느 엔진에서나
 //     같다. 회사 테마는 옛 엔진에서 바탕 테마의 정적 색이 남는다(강조색과 바탕 색이 섞인다 — 안내서).
 //   - @scope — Safari 17.4 부터. 모르는 엔진은 @scope 블록을 통째로 버려 테마 CSS 가 사라진다. 화면(JS)이 CSSScopeRule 로
-//     판정해 알리면(App.SetScopeSupport) Go 가 내장 테마는 가두지 않은 CSS 로 내고(내장은 우리 코드이고 @scope 는
+//     판정해 알리면(앱의 몫) Go 가 내장 테마는 가두지 않은 CSS 로 내고(내장은 우리 코드이고 @scope 는
 //     우선순위를 바꾸지 않으니 모양이 같다), 사용자 테마는 그 엔진에서 쓰지 않는다 — 가두지 못하는 남의 CSS 는 받지 않는다.
 //     가두지 않은 꼴을 낼지는 Go 가 테마가 내장인지 보고 정한다. 화면은 그것을 고를 수 없다.
 
@@ -31,12 +31,12 @@ type CSSMode struct {
 const (
 	// 상대 색과 채널 calc() 를 함께 가린다 — 상대 색을 일부만 아는 엔진(채널 calc 를 모름)도 정적 값으로 가게
 	relColorSupports  = "(color: oklch(from red calc(l + 0.1) calc(c * 0.5) h))"
-	fakeFalseSupports = "(color: hyve-old-webkit(0))"
+	fakeFalseSupports = "(color: itda-old-webkit(0))"
 )
 
 // oldWebKitEnv 는 옛 WebKit 흉내 내기다(시험·검사용 숨은 환경변수). "scope"·"relcolor" 를 쉼표로, 또는 "all".
-// 제품 동작에는 이 변수를 줄 때만 영향이 있다.
-const oldWebKitEnv = "ITDA_HYVE_DOCVIEW_OLD_WEBKIT"
+// 제품 동작에는 이 변수를 줄 때만 영향이 있다. 옛 이름(ITDA_HYVE_DOCVIEW_OLD_WEBKIT)은 받지 않는다(itda-hyve#614).
+const oldWebKitEnv = "ITDA_DOC_OLD_WEBKIT"
 
 // OldWebKit 은 흉내 내는 옛 WebKit 의 모자란 기능이다(NoScope: @scope 없음, NoRelColor: 상대 색 없음).
 type OldWebKit struct{ NoScope, NoRelColor bool }

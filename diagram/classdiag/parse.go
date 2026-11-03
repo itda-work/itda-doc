@@ -12,7 +12,7 @@ import (
 
 // 원문을 한 번 훑는다 — 줄마다 아래 허용 꼴(양성 목록) 하나에 통째로 맞아야 그리고, 어느 꼴에도 맞지 않으면 그 자리에서
 // *Error(줄 번호)로 멈춘다(원문 길이에 선형). 허용 꼴은 mermaid@12.2.0 classDiagram.jison 이 같은 뜻으로 읽는다고 이 판이
-// 확신할 수 있는 좁은 꼴만 모은 것이다(#208 「허용 목록 문법」). 원본이 그리는 구석 꼴(한 겹 밖의 이름 제네릭·namespace·note·
+// 확신할 수 있는 좁은 꼴만 모은 것이다(itda-hyve#208 「허용 목록 문법」). 원본이 그리는 구석 꼴(한 겹 밖의 이름 제네릭·namespace·note·
 // 클래스 라벨 ["…"]·lollipop ()·한 줄 여러 문장 …)은 원문 + 줄 번호 경고로 간다(의도된 축소). 원본 lexer 는 대소문자를 가린다
 // (%options case-insensitive 가 없다) — 지시자·키워드는 원문 그대로의 대소문자로 맞춘다.
 //
@@ -30,7 +30,7 @@ import (
 //	접근성    accTitle: 값 · accDescr: 값(줄 끝까지) · accDescr { … } (jison:30–36)
 //	무시      %%{…}%%(한 줄) · frontmatter 의 title 밖 키 · classDef · cssClass · style · ::: · click · link · callback
 //
-// 원본 전처리(encodeEntities — 엔티티 `#…;` 를 내부 표식으로 지켜 준다)는 본문 줄마다 먼저 지나간다(공통 internal/diagram).
+// 원본 전처리(encodeEntities — 엔티티 `#…;` 를 내부 표식으로 지켜 준다)는 본문 줄마다 먼저 지나간다(공통 diagram).
 // 표식은 정책 B(diagram.RestoreEntities — Label·AccSet 안)로만 한 번 되돌린다.
 
 // Parse 는 mermaid classDiagram 원문을 읽는다. 그릴 수 없는 문법이면 *Error 다. issues 는 쓰지 않은 줄이다.

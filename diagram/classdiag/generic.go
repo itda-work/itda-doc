@@ -8,7 +8,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 제네릭 ~T~ (#409 ④-3 후속). 원본(mermaid@12.2.0)의 두 자리를 옮긴다.
+// 제네릭 ~T~ (itda-hyve#409 ④-3 후속). 원본(mermaid@12.2.0)의 두 자리를 옮긴다.
 //
 //	이름   classDiagram.jison:106–108 — <*>"~" 가 generic 상태를 열고, 그 상태에서는 [^~]*(GENERICTYPE)·[~](닫기)만 쓴다.
 //	       문법 className: alphaNumToken GENERICTYPE { $$=$1+'~'+$2+'~' } — 제네릭은 이름 끝에 한 번만 붙는다. classDb

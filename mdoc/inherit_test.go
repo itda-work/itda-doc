@@ -10,7 +10,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// 폴더 기본 frontmatter 상속(#474 ①) — Options.FolderMeta 로 폴더 값을 넣어 합침 규칙을 본다.
+// 폴더 기본 frontmatter 상속(itda-hyve#474 ①) — Options.FolderMeta 로 폴더 값을 넣어 합침 규칙을 본다.
 // 우선순위: 문서 frontmatter > 가까운 폴더 > 먼 폴더 > (테마 defaults·기본값은 문서 창 쪽).
 
 func fm(rel, yaml string) FolderMeta   { return FolderMeta{Rel: rel, YAML: []byte(yaml)} }
@@ -41,14 +41,14 @@ func TestInheritSlidesNeedsOwnKey(t *testing.T) {
 	if r.Meta.Slides != nil {
 		t.Errorf("폴더 slides 가 문서에 얹힘: %+v", r.Meta.Slides)
 	}
-	// 버린 폴더 slides 값은 값 경고 대신 안내 경고 하나로 알린다(#543).
+	// 버린 폴더 slides 값은 값 경고 대신 안내 경고 하나로 알린다(itda-hyve#543).
 	if len(r.Warnings) != 1 || r.Warnings[0].Code != WarnFolderSlidesUnused || r.Warnings[0].Line != 0 ||
 		!strings.HasPrefix(r.Warnings[0].Message, "_metadata.yml: ") {
 		t.Errorf("안내 경고 하나가 아님: %v", r.Warnings)
 	}
 }
 
-// #543: 폴더 slides 를 버릴 때만 안내한다 — 문서가 slides 를 정했거나(true·false·맵) 폴더 slides 가
+// itda-hyve#543: 폴더 slides 를 버릴 때만 안내한다 — 문서가 slides 를 정했거나(true·false·맵) 폴더 slides 가
 // 꺼짐·틀린 값이면 내지 않는다. slides 를 정한 가장 가까운 폴더 파일의 경로로 알린다(줄 없음).
 func TestFolderSlidesUnusedHint(t *testing.T) {
 	cases := []struct {
@@ -335,7 +335,7 @@ func TestInheritDuplicateFolderLastKeyWins(t *testing.T) {
 	}
 }
 
-// 문서가 slides: true(또는 빈 값)로 슬라이드임만 정했다면 하위 설정은 폴더 매핑이 채운다(#474 의 뜻 —
+// 문서가 slides: true(또는 빈 값)로 슬라이드임만 정했다면 하위 설정은 폴더 매핑이 채운다(itda-hyve#474 의 뜻 —
 // 조정 정리). slides: false 는 슬라이드 아님을 정한 것이다(폴더 slides 값도 쓰지 않는다).
 func TestInheritSlidesTrueFillsFromFolder(t *testing.T) {
 	r := renderFM(t, "---\nslides: true\n---\n\n# a\n", fm("_metadata.yml", "slides:\n  font-scale: 0.8\n  ratio: \"4:3\"\n"))
@@ -468,7 +468,7 @@ func TestInheritAliasOnlyDirectChildren(t *testing.T) {
 	}
 }
 
-// 경고 계약(#504): 폴더 파일이 적용돼도 문서 frontmatter 의 경고는 폴더가 없을 때와 같다 — 같은 키의
+// 경고 계약(itda-hyve#504): 폴더 파일이 적용돼도 문서 frontmatter 의 경고는 폴더가 없을 때와 같다 — 같은 키의
 // 앞 값 경고가 남는다(정리 규칙이 값은 마지막 키로 정해도). 값은 정리 규칙대로 마지막 키다.
 func TestTidyKeepsEarlierDuplicateWarnings(t *testing.T) {
 	r := renderFM(t, "---\ntoc: 안녕\ntoc: true\n---\n\n# a\n", fm("_metadata.yml", "theme: classic\n"))
@@ -481,7 +481,7 @@ func TestTidyKeepsEarlierDuplicateWarnings(t *testing.T) {
 	}
 }
 
-// 경고 계약(#504): 문서 경고는 폴더가 있을 때와 없을 때 JSON 까지 같다 — 무관한 폴더 파일(모르는 키
+// 경고 계약(itda-hyve#504): 문서 경고는 폴더가 있을 때와 없을 때 JSON 까지 같다 — 무관한 폴더 파일(모르는 키
 // 하나)을 더해 견준다. 입력은 리뷰 3회차 기준판 비교 표의 사례와 별칭·모르는 하위 키·틀린 그룹 값이다.
 func TestFolderWarningsMatchNoFolder(t *testing.T) {
 	warned := 0
@@ -520,7 +520,7 @@ func TestFolderWarningsMatchNoFolder(t *testing.T) {
 	}
 }
 
-// 경고 계약(#504): 폴더 파일의 값 경고는 그 파일에 적힌 표기(별칭 그대로)·그 파일의 줄로 난다.
+// 경고 계약(itda-hyve#504): 폴더 파일의 값 경고는 그 파일에 적힌 표기(별칭 그대로)·그 파일의 줄로 난다.
 // Key 는 정규 키 경로다(편집 화면의 키별 풀이 정규 경로로 본다).
 func TestFolderWarningKeepsWrittenAlias(t *testing.T) {
 	r := renderFM(t, "---\nslides: true\n---\n\n# a\n", fm("_metadata.yml", "theme: classic\nslides:\n  font_scale: bad\n"))

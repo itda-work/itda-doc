@@ -1,4 +1,4 @@
-// Package timeline 은 mermaid 타임라인(timeline)의 부분집합을 SVG 로 그린다(#409 ②, 설계 1.10).
+// Package timeline 은 mermaid 타임라인(timeline)의 부분집합을 SVG 로 그린다(itda-hyve#409 ②, 설계 1.10).
 //
 // 문법은 실제 Mermaid 의 부분집합이다 — 새 문법을 만들지 않는다(안내서 spec/diagrams.md 의 표가 정본).
 // 모르는 문장·값은 그리지 않고 *Error(줄 번호)를 돌려준다 — 부르는 쪽(mdoc)이 원문 코드 블록을 그대로 두고 경고한다.
@@ -22,7 +22,7 @@ import (
 	"github.com/itda-work/itda-doc/diagram"
 )
 
-// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(internal/diagram)이다.
+// 상한. 넘으면 그리지 않고 *Error 다(원문 + 경고). 원문·라벨 상한은 공통(diagram)이다.
 const (
 	MaxSource          = diagram.MaxSource // 그림 하나의 원문(바이트)
 	MaxLabel           = diagram.MaxLabel  // 라벨 하나의 글자 수(룬)
@@ -32,7 +32,7 @@ const (
 	MaxSections        = 20                // 구역
 )
 
-// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(internal/diagram — flowchart·gantt 와 같다).
+// Error·Issue·Result 는 그림 종류가 함께 쓰는 공개 꼴이다(diagram — flowchart·gantt 와 같다).
 type (
 	Error  = diagram.Error
 	Issue  = diagram.Issue

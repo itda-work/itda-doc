@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// #475 그림 자리 — 펜스 줄 ratio·width·height 의 가림(parseDiagramSize)과 문서 자리(figure 속성·경고 줄).
+// itda-hyve#475 그림 자리 — 펜스 줄 ratio·width·height 의 가림(parseDiagramSize)과 문서 자리(figure 속성·경고 줄).
 func TestDiagramSizeParse(t *testing.T) {
 	cases := []struct {
 		info  string
@@ -135,7 +135,7 @@ func TestDiagramSizeFence(t *testing.T) {
 	notContains(t, r.HTML, "data-diagram")
 }
 
-// 그림 안내서 6장의 그림 자리 절(#475) — 조합 표의 각 줄(쓴 것)이 그대로 data-diagram-* 속성이 되는지,
+// 그림 안내서 6장의 그림 자리 절(itda-hyve#475) — 조합 표의 각 줄(쓴 것)이 그대로 data-diagram-* 속성이 되는지,
 // 속성 없는 줄은 아무 속성도 내지 않는지, 예제가 경고 없이 그려지는지. 기대 속성은 parseDiagramSize 로 다시 얻어
 // 표와 코드가 같은 규칙을 말하는지를 본다(안내서가 코드를 따라가는지, 값 표기의 검증은 TestDiagramSizeParse).
 func TestDiagramSizeGuide(t *testing.T) {

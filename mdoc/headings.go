@@ -142,7 +142,7 @@ func buildTree(flat []TOCItem) []TOCItem {
 	return out
 }
 
-// dropHeadingNotes 는 제목 class 에서 notes 를 경고와 함께 버린다(#344). 발표자 노트는 :::notes 컨테이너만이라(transform.go
+// dropHeadingNotes 는 제목 class 에서 notes 를 경고와 함께 버린다(itda-hyve#344). 발표자 노트는 :::notes 컨테이너만이라(transform.go
 // notes) 제목이 화면(slides.js 의 .notes 선택자)에서 노트로 분류되지 않게, DropNotes 와 상관없이 늘 뺀다.
 func (st *state) dropHeadingNotes(classes []string, line int) []string {
 	out := classes[:0:0]

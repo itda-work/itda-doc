@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 표 편집 그리드(#355)의 읽기(TableAt)·쓰기(FormatTable).
+// 표 편집 그리드(itda-hyve#355)의 읽기(TableAt)·쓰기(FormatTable).
 
 func mustTable(t *testing.T, src string, line int) Table {
 	t.Helper()
@@ -75,7 +75,7 @@ func TestTableAtVariants(t *testing.T) {
 			header: []string{"a", "b"}, align: []string{"", ""}, rows: [][]string{{"1", "2"}}, caption: "인용 표", prefix: "Table:", head: "> ", p: "> "},
 		{name: "목록 안", src: "- 항목\n\n  | a | b |\n  |---|---|\n  | 1 | 2 |\n", line: 5,
 			header: []string{"a", "b"}, align: []string{"", ""}, rows: [][]string{{"1", "2"}}, head: "  ", p: "  "},
-		// 머리 행에 | 가 없는 한 열 표 — 구분 행에 | 나 콜론이 있으면 goldmark 가 표로 읽는다(화면은 판정하지 않고 Go 에 맡긴다, #355 접근 방식 결정)
+		// 머리 행에 | 가 없는 한 열 표 — 구분 행에 | 나 콜론이 있으면 goldmark 가 표로 읽는다(화면은 판정하지 않고 Go 에 맡긴다, itda-hyve#355 접근 방식 결정)
 		{name: "머리 행 | 없음(한 열)", src: "a\n|---|\nx\n", line: 1, header: []string{"a"}, align: []string{""}, rows: [][]string{{"x"}}},
 		{name: "| 없는 구분 행(:---)", src: "a\n:---\nx\n", line: 3, header: []string{"a"}, align: []string{"left"}, rows: [][]string{{"x"}}},
 		{name: "frontmatter 뒤", src: "---\ntitle: x\n---\n\n| a |\n|---|\n| 1 |\n", line: 6,
@@ -112,7 +112,7 @@ func TestTableAtVariants(t *testing.T) {
 	}
 }
 
-// 여러 줄 캡션의 강제 줄바꿈(줄 끝 공백 둘)은 읽고 쓸 때 지우지 않는다(#355 리뷰 [2]). 첫 줄·뒤 줄, 인용 안.
+// 여러 줄 캡션의 강제 줄바꿈(줄 끝 공백 둘)은 읽고 쓸 때 지우지 않는다(itda-hyve#355 리뷰 [2]). 첫 줄·뒤 줄, 인용 안.
 func TestTableCaptionHardBreak(t *testing.T) {
 	for _, src := range []string{
 		"| a |\n|---|\n| x |\n\nTable: first  \nsecond\n",
@@ -132,7 +132,7 @@ func TestTableCaptionHardBreak(t *testing.T) {
 	}
 }
 
-// 쓰기 예산(#355 리뷰 [3]): 맞춘 표가 상한을 넘을 것이면 맞춤 없이 쓰고 알린다, 그것도 넘거나 칸·입력이 많으면 거부한다.
+// 쓰기 예산(itda-hyve#355 리뷰 [3]): 맞춘 표가 상한을 넘을 것이면 맞춤 없이 쓰고 알린다, 그것도 넘거나 칸·입력이 많으면 거부한다.
 // 상한은 패키지 변수를 작게 바꿔 시험한다(거대 글을 만들지 않는다).
 func TestWriteTableBudget(t *testing.T) {
 	defer func(c, i, o int) { tableMaxCells, tableMaxIn, tableMaxOut = c, i, o }(tableMaxCells, tableMaxIn, tableMaxOut)
@@ -230,7 +230,7 @@ func TestFormatTable(t *testing.T) {
 	}
 }
 
-// 읽은 표를 그대로 쓰면 렌더 결과(HTML)가 같다 — 열 맞춤만 바뀐다(#355 시험 「왕복」). 견본·golden 의 모든 표.
+// 읽은 표를 그대로 쓰면 렌더 결과(HTML)가 같다 — 열 맞춤만 바뀐다(itda-hyve#355 시험 「왕복」). 견본·golden 의 모든 표.
 func TestTableRoundTrip(t *testing.T) {
 	var files []string
 	for _, g := range []string{"testdata/*.md", "../spec/samples/*.md", "testdata/tables/*.md"} {
@@ -293,7 +293,7 @@ func firstDiff(a, b string) string {
 	return "기존: " + a[lo:min(len(a), i+120)] + "\n새것: " + b[lo:min(len(b), i+120)]
 }
 
-// 렌더는 표마다(최상위·컨테이너·목록·인용 안) data-table-line 에 머리 행 원문 줄을 싣는다 — TableAt 의 Start 와 같다(#355, 미리보기에서
+// 렌더는 표마다(최상위·컨테이너·목록·인용 안) data-table-line 에 머리 행 원문 줄을 싣는다 — TableAt 의 Start 와 같다(itda-hyve#355, 미리보기에서
 // 표 편집으로 가는 길). 제목 다음의 구분 행 꼴 문단(:---)에는 붙지 않는다(리뷰 3회차 [6]).
 func TestTableLineAttr(t *testing.T) {
 	re := regexp.MustCompile(`<table[^>]*data-table-line="(\d+)"`)

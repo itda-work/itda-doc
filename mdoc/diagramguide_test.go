@@ -154,7 +154,7 @@ func TestDiagramGuide(t *testing.T) {
 	}
 	// 설정 지시 경계(④-1 후속) — 표에서 빠지면 위 실행도 빠지므로 표기가 남아 있는지 본다
 	for _, m := range []string{"%%{init: {", "%%{init: {}}%% A --> B", "accTitle: 앞 %%{", "A[글 %%{", "%% 메모 %%{", "%%",
-		"A[#copy;]", "A[x#160;y]", "A[두  칸]", "accTitle: a&b", // 엔티티·공백 정책 B(#409 ④-2 후속)
+		"A[#copy;]", "A[x#160;y]", "A[두  칸]", "accTitle: a&b", // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 		`A["style x:#35;"];`, `A["classDef x:#35;"];`, "A --> B; classDef c fill:#f00;", // 줄 전처리 경계(같은 후속 수정 1)
 		"accTitle:", "accDescr:", "accDescr { 설명 } 뒤"} { // 빈 접근성 값·} 뒤 글(같은 후속 수정 2) // 줄 전처리 경계(같은 후속 수정 1)
 		found := false
@@ -456,7 +456,7 @@ func TestGanttGuide(t *testing.T) {
 			src = "gantt\naxisFormat " + strings.Repeat("가", 100) + " %Y\n작업 :1900-01-01, 100y"
 		case c == "알 수 없는 문장":
 			src = ghead + "이것은 문장"
-		case c == "준비 #copy; :2026-01-01, 1d" || c == "두  칸 :2026-01-01, 1d": // 엔티티·공백 정책 B(#409 ④-2 후속)
+		case c == "준비 #copy; :2026-01-01, 1d" || c == "두  칸 :2026-01-01, 1d": // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 			src = ghead + c
 		case c == "accTitle: a&b", c == "accTitle:", c == "accDescr:", c == "accDescr { 설명 } 뒤":
 			src = ghead + c + "\n작업 :2026-01-01, 1d"
@@ -474,7 +474,7 @@ func TestGanttGuide(t *testing.T) {
 		"after x9", "until x9", "같은 id 두 번", "1.5d", "준비 :5d", "날짜 범위", "상한 초과", "축 라벨이 겹침",
 		"excludes 공휴일", "excludes ,", "dateFormat YYYY-MM-DD",
 		"%%{init: {", "%%{init: {}}%% 작업", "accTitle: 앞 %%{", "작업 %%{", "%% 메모 %%{", "accDescr {", // 설정 지시 경계·블록 안의 글 없는 주석(④-1 후속)
-		"준비 #copy;", "두  칸", "accTitle: a&b", // 엔티티·공백 정책 B(#409 ④-2 후속)
+		"준비 #copy;", "두  칸", "accTitle: a&b", // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 		"axisFormat %m#%d", "axisFormat %m;%d", "axisFormat %m#35;%d", "accTitle:", "accDescr:", "accDescr { 설명 } 뒤")
 	// 8장 예제
 	i := strings.Index(g, "<!-- gantt-example -->")
@@ -663,7 +663,7 @@ func TestTimelineGuide(t *testing.T) {
 			src = "timeline\naccTitle:\n2026 : 사건"
 		case c == "# 메모":
 			src = "timeline\n# 메모\n2026 : 사건"
-		case c == "2026 : #copy;" || c == "2026 : 두  칸": // 엔티티·공백 정책 B(#409 ④-2 후속)
+		case c == "2026 : #copy;" || c == "2026 : 두  칸": // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 			src = "timeline\n" + c
 		case c == "accTitle: a&b", c == "accDescr:", c == "accDescr { 설명 } 뒤":
 			src = "timeline\n" + c + "\n2026 : 사건"
@@ -690,7 +690,7 @@ func TestTimelineGuide(t *testing.T) {
 	}
 	check("timeline-unsupported", ran, rows, "timeline TD", "timeline RL", "2026 :사건", "2026 :", ": 사건", "section a:b", "# 메모", "2026 # 메모", "ﬂ°", "¶ß", "상한 초과",
 		"%%{init: {", "%%{init: {}}%% 2026", "accTitle: 앞 %%{", "2026 : 사건 %%{", "%% 메모 %%{", "accDescr {", // 설정 지시 경계·블록 안의 글 없는 주석(④-1 후속)
-		"2026 : #copy;", "2026 : 두  칸", "accTitle: a&b", // 엔티티·공백 정책 B(#409 ④-2 후속)
+		"2026 : #copy;", "2026 : 두  칸", "accTitle: a&b", // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 		"accDescr:", "accDescr { 설명 } 뒤")
 	// 9장 예제
 	i := strings.Index(g, "<!-- timeline-example -->")
@@ -875,7 +875,7 @@ func TestSequenceGuide(t *testing.T) {
 		}
 		ran = append(ran, c)
 	}
-	check("sequence-ignored", ran, rows, "%%{init", "config:", "rect rgb", "box grey", "link A") // wrap 은 미지원 표로 옮겼다(#208)
+	check("sequence-ignored", ran, rows, "%%{init", "config:", "rect rgb", "box grey", "link A") // wrap 은 미지원 표로 옮겼다(itda-hyve#208)
 
 	uns, rows := sqCodes("sequence-unsupported")
 	ran = nil
@@ -925,7 +925,7 @@ func TestSequenceGuide(t *testing.T) {
 		"단계가 커서", "ﬂ°", "상한 초과", "participant API Server", "A->>B: 첫째;", "participant end", "end가", "accDescr { 설명 }",
 		"5->>B", "A%%->>B", "A->>-xB", "rect 무지개", "link A {", "%%{init: {", "autonumber 1.5", "title:제목",
 		"%%{init: {}}%% A->>B", "accTitle: 앞 %%{", "A->>B: 글 %%{", "%% 메모 %%{", "accDescr {",
-		"A->>B: #copy;", "A->>B: 두  칸", "accTitle: a&b", "accTitle:", "accDescr:") // 엔티티·공백 정책 B(#409 ④-2 후속) · 설정 지시 경계(er ④ 리뷰 1회차)·블록 안의 글 없는 주석(④-1 후속 수정 2)
+		"A->>B: #copy;", "A->>B: 두  칸", "accTitle: a&b", "accTitle:", "accDescr:") // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속) · 설정 지시 경계(er ④ 리뷰 1회차)·블록 안의 글 없는 주석(④-1 후속 수정 2)
 	// 10장 예제
 	i := strings.Index(g, "<!-- sequence-example -->")
 	ex := g[i:]
@@ -1110,7 +1110,7 @@ func TestERGuide(t *testing.T) {
 		"A ||--o{ B : x %%", `A["a*b"]`, `A["_기울임_"]`, `A["- 목록"]`, `A["1. 첫째"]`, `A["a<b"]`, `A[""]`, "string a pk", "string pk", "list~int~",
 		"*int", `int 번호 PK "설명`, "A ||--o{ B : direction", "title 주문", "subgraph", "ERDIAGRAM", "A {", "}", "%%", "%%{init: {", "ﬂ°", "¶ß",
 		"ASCII 밖", "𝔸", "상한 초과", "%%{init: {}}%% A %%{", "accTitle: 앞 %%{", "A %%{", "%% 메모 %%{",
-		`A["#copy;"]`, `A["두  칸"]`, "accTitle: a&b", // 엔티티·공백 정책 B(#409 ④-2 후속)
+		`A["#copy;"]`, `A["두  칸"]`, "accTitle: a&b", // 엔티티·공백 정책 B(itda-hyve#409 ④-2 후속)
 		"accTitle:", "accDescr:", "accDescr { 설명 } 뒤")
 
 	// 11장 예제
