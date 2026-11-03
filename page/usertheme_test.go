@@ -303,14 +303,7 @@ func TestDocFontFamiliesReserved(t *testing.T) {
 
 // 내장 테마의 CSS 도 같은 길(@scope)을 탄다.
 func TestBuiltinThemesAreScoped(t *testing.T) {
-	ts := builtin(t)
-	for _, i := range ts.List() {
-		th, _ := ts.Get(i.Name)
-		css := th.StyleSheet(CSSMode{})
-		if !strings.Contains(css, "@scope (.page) {\n/* ---- ") {
-			t.Errorf("%s: 테마 CSS 가 @scope 안에 있지 않음", i.Name)
-		}
-	}
+	builtinProblems(t, checkScope)
 }
 
 // 회사 테마 만들기: 이름 검사, 덮어쓰기 거부, 사용자 테마 폴더 밖에 쓰지 못함, 만든 테마가 로더를 통과.

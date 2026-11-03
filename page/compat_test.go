@@ -5,42 +5,18 @@ import (
 	"testing"
 )
 
-// 옛 WebKit 은 상대 색을 모른다 — 내장 테마는 정적 값(tokens)을 쓰고, 지원하는 엔진만 식(derived)으로 덮는다.
-// 내장 테마의 강조색은 고정이므로 정적 값은 그 강조색으로 계산한 식의 값과 같아야 한다(어느 엔진에서나 같은 PDF).
-// 계산은 CSS Color 4 의 OKLab(sRGB 로 자르기)이다 — WebKit 이 그린 값과 8개 모두 같았다(실측).
+// 파생 토큰의 정적 값 = 식의 값, tokens 에 상대 색 식 없음 — 판정은 BuiltinThemeProblems(derivedProblems)에 있다.
 func TestDerivedTokensMatchStatic(t *testing.T) {
 	ts := builtin(t)
 	n := 0
 	for _, i := range ts.List() {
 		th, _ := ts.Get(i.Name)
-		vals := map[string]string{}
-		for _, kv := range th.Tokens {
-			vals[kv[0]] = kv[1]
-		}
-		for _, kv := range th.Derived {
-			n++
-			got, err := evalRelColor(kv[1], vals)
-			if err != nil {
-				t.Errorf("%s %s: %v", i.Name, kv[0], err)
-				continue
-			}
-			if !strings.EqualFold(got, vals[kv[0]]) {
-				t.Errorf("%s %s: 정적 값 %s ≠ 식의 값 %s (%s)", i.Name, kv[0], vals[kv[0]], got, kv[1])
-			}
-		}
+		n += len(th.Derived)
 	}
 	if n < 8 {
 		t.Errorf("파생 토큰이 %d 개뿐", n)
 	}
-	// 내장 테마의 tokens 에는 상대 색 식이 없다(옛 엔진에서 무효가 된다)
-	for _, i := range ts.List() {
-		th, _ := ts.Get(i.Name)
-		for _, kv := range th.Tokens {
-			if strings.Contains(kv[1], "from ") {
-				t.Errorf("%s: tokens 의 %s 에 상대 색 식 — derived 로 옮겨라", i.Name, kv[0])
-			}
-		}
-	}
+	builtinProblems(t, checkDerived)
 }
 
 // 엔진에 맞춘 CSS 꼴: 파생 토큰은 @supports 안(시험 흉내면 늘 거짓인 조건), @scope 를 모르는 엔진이면 내장만 가두지 않는다.
