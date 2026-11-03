@@ -90,3 +90,27 @@ func TestLinkCodeColor(t *testing.T) {
 		t.Error("제목 안 링크 코드 규칙이 본문 규칙보다 앞에 있어 --ink 에 진다")
 	}
 }
+
+// 표 머리 안 인라인 코드는 머리 글자색을 따르고 상자는 그 글자색을 옅게 깐다(itda-doc#19) — 진한 머리(bold·spine)에서 옅은
+// --code-bg 위 흰 글자가 되지 않게. 본문 링크 안 코드 규칙(같은 특이도)보다 뒤에 있어야 머리 안 링크 코드도 따른다.
+// 실제 엔진의 계산값은 보지 않는다(미검증).
+func TestTableHeadCodeColor(t *testing.T) {
+	b, err := web.FS.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
+	head := strings.Index(css, ".page-body th code { color: inherit; background: transparent; }")
+	if head < 0 {
+		t.Fatal("표 머리 안 인라인 코드가 머리 글자색을 따르는 규칙이 없음")
+	}
+	if !strings.Contains(css, ".page-body th code { background: color-mix(in srgb, currentColor 16%, transparent); }") {
+		t.Error("표 머리 안 인라인 코드 상자가 글자색(currentColor) 기반이 아님")
+	}
+	if link := strings.Index(css, ".page-body a code { color: var(--ink); }"); link < 0 || head < link {
+		t.Error("표 머리 코드 규칙이 본문 링크 안 코드 규칙보다 앞에 있어 머리 안 링크 코드가 --ink 가 된다")
+	}
+	if code := strings.Index(css, ".page-body code {"); code < 0 || head < code {
+		t.Error("표 머리 코드 규칙이 인라인 코드 기본 규칙보다 앞에 있음")
+	}
+}
