@@ -80,7 +80,7 @@ func LoadCheckThemes(dir string) (*Themes, error) {
 	return loadThemeSet(dir)
 }
 
-// countHeadings 는 목차 트리의 제목 수다(toc-depth·.unlisted 를 따른 목차 기준).
+// countHeadings 는 목차 트리의 제목 수다(toc-depth·.unlisted 를 따르고 노트 안 제목을 뺀 목차 기준).
 func countHeadings(items []mdoc.TOCItem) int {
 	n := len(items)
 	for _, it := range items {

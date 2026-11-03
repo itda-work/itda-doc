@@ -32,7 +32,7 @@ type Options struct {
 	// 빈 `<div class="notes">` 만 그 자리에 남긴다(맨 위 블록 구조가 호스트와 같다). 노트의 다른 class·id·속성은 이 값과 상관없이
 	// 경고와 함께 버리므로 노트 자리의 태그·속성은 호스트와 같다(transform.go notes). 제목의 `{.notes}` 는 노트가 아니다 —
 	// 이 값과 상관없이 경고와 함께 class 를 버린다(headings.go dropHeadingNotes). 빼기는 다른 변환 전에 AST 에서 하므로 노트 안
-	// 제목은 TOC·번호에도, 노트 안 그림·링크는 경고에도 남지 않는다. 노트에서만 닿는 각주도 빠지고(목록이 비면 빈 목록 자리만),
+	// 그림·링크는 경고에 남지 않는다. 노트 안 제목은 이 값과 상관없이 TOC·번호·기준 단계에 들어가지 않는다(headings.go inNotes). 노트에서만 닿는 각주도 빠지고(목록이 비면 빈 목록 자리만),
 	// 공개 본문에서 (각주를 거쳐) 닿는 각주는 남는다(transform.go notes·pruneFootnotes).
 	// 공유 화면이 「노트 함께 보이기」 를 끈 동안 쓴다(itda-hyve#344 결정 7). 기본은 거짓 — 노트를 그대로 낸다.
 	DropNotes bool
@@ -56,7 +56,7 @@ type Result struct {
 	Meta Meta
 	// HTML 은 본문이다. 표지·머리글·바닥글은 넣지 않는다.
 	HTML string
-	// TOC 는 목차에 들어갈 제목 트리다. toc 설정과 무관하게 늘 채운다(toc-depth·.unlisted 적용).
+	// TOC 는 목차에 들어갈 제목 트리다. toc 설정과 무관하게 늘 채운다(toc-depth·.unlisted 적용, 노트 안 제목 제외 — headings.go inNotes).
 	TOC []TOCItem
 	// TOCPlaced 는 본문의 [TOC] 자리에 목차를 이미 넣었는지다.
 	// 거짓인데 Meta.TOC 가 참이면 목차 자리는 다음 단계가 정한다(RenderTOC 로 그린다).
