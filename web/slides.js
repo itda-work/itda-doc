@@ -147,8 +147,10 @@
   }
 
   // headClone 은 제목의 사본이다(번호 span 포함). id 는 첫 슬라이드에만 둔다(목차 링크가 한 곳을 가리키게).
-  // cont 는 넘쳐 생긴 장의 표지 — 없거나 false 면 표지 없음, { k, n } 이면 「(계속 k/n)」(영어 「(cont. k/n)」, itda-hyve#482).
-  // k 는 그 묶음 안 순번(첫 장이 1), n 은 묶음의 장 수다. 표지 글자는 contLabel 하나에서 만든다.
+  // cont 는 넘쳐 여러 장이 된 묶음의 표지 — 없거나 false 면 표지 없음(한 장 묶음), { k, n } 이면 「(계속 k/n)」(영어 「(cont. k/n)」,
+  // itda-hyve#482). k 는 그 묶음 안 순번(첫 장이 1 — 첫 장에도 「(계속 1/n)」을 단다), n 은 묶음의 장 수다. 표지 글자는 contLabel 하나에서
+  // 만든다. 첫 장 표지는 class 가 slide-seq, 이어진 장(k ≥ 2)만 slide-cont 다 — .slide-cont 는 「이어진 장」 표식으로 쓰인다(pager.js
+  // pageBands, itda-hyve present.js 목차 묶기). 첫 장은 id·내용 앵커를 그대로 갖는다.
   function contLabel(k, n) { return (lang() ? "(계속 " : "(cont. ") + k + "/" + n + ")"; }
   // headHeight 는 넘치는 묶음의 머리 높이(--slide-head-h)를 고른다(itda-hyve#482). 재기·나누기는 넘겨받는 순수 함수다(selftest 가 주입해 본다).
   //   plain: 표지 없는 머리 높이. tagged(d): 순번·장 수가 d 자리인 표지를 단 머리 높이 — 「(계속 9…9/9…9)」(k 와 n 을 d 개의 9 로.
@@ -180,10 +182,11 @@
     const t = document.createElement("div");
     t.className = "slide-title";
     t.innerHTML = h.innerHTML;
-    if (h.id && !cont) t.id = h.id;
+    const first = !cont || cont.k === 1;
+    if (h.id && first) t.id = h.id;
     if (h.dataset.line) t.dataset.line = h.dataset.line;
-    if (h.dataset.n && !cont) t.dataset.n = h.dataset.n; // 내용 앵커(itda-hyve#346) — 제목 블록은 첫 슬라이드의 머리로만 그려진다
-    if (cont) { const c = document.createElement("span"); c.className = "slide-cont"; c.textContent = contLabel(cont.k, cont.n); t.append(" ", c); }
+    if (h.dataset.n && first) t.dataset.n = h.dataset.n; // 내용 앵커(itda-hyve#346) — 제목 블록은 첫 슬라이드의 머리로만 그려진다
+    if (cont) { const c = document.createElement("span"); c.className = cont.k === 1 ? "slide-seq" : "slide-cont"; c.textContent = contLabel(cont.k, cont.n); t.append(" ", c); }
     return t;
   }
 
@@ -344,7 +347,7 @@
           (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
           (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
         // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
-        // 넘친 장의 머리에는 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
+        // 넘쳐 여러 장이 된 묶음의 머리에는(첫 장 포함) 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
         // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
         // 화면에 들어가는 블록은 늘 원본 f 이고 원본은 한 번만 나눈다 — 장 수를 미리 알아야 할 때는 사본(f.cloneNode)으로 센다.
         //   1. plain(표지 없는 머리)과 tagged(DIGITS_MAX 자리 표지)를 잰다. tagged ≤ plain 이면 어떤 장 수의 표지도 줄을 바꾸지
@@ -394,7 +397,7 @@
         pages.forEach((pg, i) => {
           if (g.title && g.kind !== "section") {
             const hd = el("div", "slide-head");
-            hd.appendChild(headClone(g.title, i > 0 && { k: i + 1, n: pages.length }));
+            hd.appendChild(headClone(g.title, pages.length > 1 && { k: i + 1, n: pages.length }));
             pg.insertBefore(hd, pg.firstChild);
           }
           if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));
