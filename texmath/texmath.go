@@ -1,6 +1,8 @@
 // Package texmath 는 TeX 수식 하나를 MathML 로 바꾼다(설계 1.10).
 //
-// 변환은 Temml(내장 JS, temml/README.md)을 순수 Go JS 실행기 goja 에서 돌린다 — cgo·외부 프로그램·네트워크 없음.
+// 변환은 Temml(temml/README.md)이 한다. 네이티브 판은 내장한 Temml 을 순수 Go JS 실행기 goja 에서 돌린다 — cgo·외부 프로그램·
+// 네트워크 없음(temml.go). js/wasm 판은 goja 를 싣지 않고 페이지가 올린 globalThis.temml 을 직접 부른다(temml_js.go). 두 판의
+// 옵션·오류 고르기는 temmlcommon.go 한 곳이다.
 // Temml 의 결과는 그대로 내지 않는다. 앞뒤로 이 패키지가 지킨다:
 //
 //   - 앞(check.go): 길이·중첩 상한, 문서에 모양을 적는 명령(색·크기·HTML·주소·식 번호)을 막는다.
@@ -15,7 +17,6 @@ package texmath
 import (
 	"fmt"
 	"sync"
-	"time"
 )
 
 // 상한. 넘으면 그 수식을 그리지 않고 CodeLimit 오류다.
@@ -25,7 +26,7 @@ const (
 	MaxExpand     = 500  // 매크로 확장 횟수(Temml maxExpand)
 	MaxLengthEm   = 10   // 길이 값(간격·\rule 등)의 절댓값 상한(em). 결과의 길이 속성도 이것으로 본다
 	MaxOutput     = 256 << 10
-	renderTimeout = 2 * time.Second
+	// 시간 상한(renderTimeout)은 네이티브 판에만 있다 — temml.go. js 판은 끊지 못한다(temml_js.go).
 )
 
 // 오류 코드.
