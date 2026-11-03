@@ -39,7 +39,11 @@
 // 채우면 그 이름을 붙이고, 비우거나 채우지 않으면(자리 글자 그대로) 접미 없이 문서 제목만 쓴다(appName·docTitle).
 // 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
 // ItdaTableSort·ItdaCodeCopy·ItdaCodeLines)로 찾고, 없으면 옛 이름 window.Hyve* 로 물러선다(hostPart·extInit — 둘 다 pick). 이 파일은 window.ItdaShare 로
-// 내보내고 옛 이름 window.HyveShare 도 같은 객체다.
+// 내보내고 옛 이름 window.HyveShare 도 같은 객체다. 호스트 부품이 없으면(설치 없는 뷰어 — web/viewer) 그 기능만 빠지고 그리기는 이어 간다.
+// View 원천(itda-hyve#577 2b): 받은 View 를 그리는 것(아래 「화면」 — render·draw·보기 꼴·목차·노트·표 정렬·쪽 넘김 키)과 View 를 어디서
+// 받는지(원천)를 가른다. body 에 data-base 가 있으면(공유 화면 — share.html) 원천은 hostSource(view.json·SSE syncer·follower 에 넘길 이벤트·
+// 끝남·kick·테마 CSS link·다시 불러오기) 하나로 정해지고 다른 것으로 바꿀 수 없다. data-base 가 없으면 share.js 보다 먼저 실행된 스크립트가 둔
+// window.ItdaViewSource 를 쓴다(web/viewer 의 wasm 원천). 둘 다 없으면 화면을 시작하지 않는다(pickSource). 원천의 꼴은 hostSource 머리 주석.
 (function () {
   "use strict";
 
@@ -640,21 +644,113 @@
     return /^\{\{.*\}\}$/.test(s) ? "" : s;
   }
 
-  // docTitle 은 탭 제목이다 — 앱 이름이 있으면 「<name> — <app>」, 없으면 name 그대로.
-  function docTitle(name, app) { return app ? name + " — " + app : name; }
+  // docTitle 은 탭 제목이다 — fixed(원천의 tabTitle)가 있으면 늘 그 글(뷰어 — 문서 제목·파일 이름을 탭 제목·브라우저 기록에 넣지 않는다),
+  // 아니면 앱 이름이 있으면 「<name> — <app>」, 없으면 name 그대로.
+  function docTitle(name, app, fixed) { if (fixed) return String(fixed); return app ? name + " — " + app : name; }
   // pick 은 호스트가 둔 전역 하나다 — 정식 이름 w["Itda" + name] 을 먼저, 없으면 옛 이름 w["Hyve" + name](호환용 별칭)을 본다. 둘 다 없으면 undefined.
   function pick(w, name) { return w["Itda" + name] || w["Hyve" + name]; }
+
+  // hostSource 는 공유 화면의 View 원천이다 — 호스트(공유 서버)와 이어진 것 전부: <base>/view.json 받기(syncer)·갱신 스트림(<base>/events —
+  // connect, hello·slide·pos 는 화면의 follower 로)·테마 CSS(<base>/_/_theme/… 를 <link id="theme-css"> 에 — themeApplier)·다시 불러오기
+  // (reloadGate)·끝남(stop·kick·404·403). w 는 window(시험은 가짜 — EventSource·fetch·sessionStorage·location·setTimeout·clearTimeout·
+  // addEventListener·document).
+  // 원천의 꼴(뷰어의 원천도 같다): { base, linkMsg?, attach(api) → { applyTheme(v), start(), stop() } }.
+  //  - base: 확장(ItdaShareExt)에 넘기는 base. linkMsg: 문서 안 파일 링크를 눌렀을 때의 안내(없으면 공유 화면의 글).
+  //    tabTitle: 있으면 탭 제목을 늘 이 글로 둔다(docTitle — 뷰어). 공유 화면(hostSource)은 두지 않는다 — 문서 제목 그대로.
+  //  - attach(api) 는 화면이 시작할 때 한 번(첫 그리기 전) 부른다. api 는 화면 부품이다: $(id), ended()(공유가 끝남), current()(지금
+  //    view 또는 null), show(v)(view 를 바꾸고 그린다 — Promise), redraw()(끝나지 않았고 view 가 있으면 다시 그림), look(name)(보기 꼴을
+  //    골라 다시 그림 — Promise), failed(msg)(안내 줄), themeFailed()(「테마를 불러오지 못했습니다」), end(reason)(끝난 화면),
+  //    hello(d)·slide(d)·pos(d)(발표자 따라가기 — follower), toast(msg).
+  //  - applyTheme(v): render 가 그리기 전에 부른다(오류 view 는 부르지 않는다). true(또는 Promise<true>)면 그리고, false 면 그리지 않는다.
+  //  - start(): 화면 준비가 끝난 뒤 한 번 — 첫 view 를 받아 show 한다. stop(): 끝난 화면(showEnded)이 부른다 — 타이머·요청을 거둔다.
+  function hostSource(base, w) {
+    return {
+      base,
+      attach(api) {
+        const gate = reloadGate(base, {
+          storage: () => w.sessionStorage,
+          now: () => Date.now(),
+          reload: () => w.location.reload(),
+          ended: () => api.ended(),
+          setTimeout: (f, ms) => w.setTimeout(f, ms),
+          clearTimeout: t => w.clearTimeout(t),
+          failed: () => api.themeFailed(),
+        });
+        const applyTheme = themeApplier(api.$("theme-css"), base, {
+          setTimer: (f, ms) => w.setTimeout(f, ms),
+          late: () => api.redraw(),
+          reload: why => gate.once(why), // CSS error 만
+          changed: () => gate.server(),
+        });
+        // fetchView 는 view.json 의 {status, view} 다(view 는 200 일 때만).
+        async function fetchView() {
+          const r = await w.fetch(base + "/view.json", { cache: "no-store", credentials: "same-origin" });
+          return { status: r.status, view: r.ok ? await r.json() : null };
+        }
+        let conn = null;
+        // sync 는 view.json 다시 받기다(syncer — 처음·hello·version·다시 붙음). 공유가 끝난 뒤에는 요청하지 않는다.
+        const sync = syncer({
+          fetch: fetchView,
+          current: () => api.current(),
+          pageKey: () => applyTheme.key(),
+          apply: v => api.show(v),
+          gate,
+          ended: () => api.ended(),
+          end: reason => conn.end(reason),
+          failed: () => api.failed("문서를 받지 못했습니다 — 네트워크를 확인하세요."),
+          setTimeout: (f, ms) => w.setTimeout(f, ms),
+          clearTimeout: t => w.clearTimeout(t),
+        });
+        return {
+          applyTheme,
+          start() {
+            conn = connect(base, {
+              EventSource: w.EventSource,
+              probe: () => w.fetch(base + "/view.json", { method: "HEAD", cache: "no-store", credentials: "same-origin" })
+                .then(r => r.status === 403 ? "kicked" : r.status !== 404, () => true),
+              setTimeout: (f, ms) => w.setTimeout(f, ms),
+              clearTimeout: t => w.clearTimeout(t),
+              // 처음이든 다시 붙었든 hello 의 판·테마가 제 view 와 다르면 다시 받는다 — 첫 구독 전·끊긴 사이의 저장을 따라잡는다
+              onHello: (first, data) => { api.hello(data); sync.check(data); },
+              onReload: () => gate.server(),
+              onVersion: data => sync.check(data),
+              onSlide: data => api.slide(data),
+              onPos: data => api.pos(data),
+              onEnded: reason => api.end(reason),
+            });
+            // 폰 Safari 는 뒤로 갔다 오면(bfcache) 스트림이 끊겨 있다 — 보이면 바로 다시 붙는다
+            w.addEventListener("pageshow", () => conn.wake());
+            w.document.addEventListener("visibilitychange", () => { if (w.document.visibilityState === "visible") conn.wake(); });
+            sync.refresh(true);
+          },
+          stop() { gate.cancel(); sync.cancel(); },
+        };
+      },
+    };
+  }
+
+  // pickSource 는 화면의 View 원천이다: body 에 data-base 가 있으면 공유 화면(hostSource — 다른 원천으로 바꿀 수 없다), 없으면
+  // w.ItdaViewSource(페이지가 share.js 앞에서 둔 것 — 뷰어), 그것도 없으면 null(화면을 시작하지 않는다).
+  function pickSource(w, body) {
+    const base = body && body.dataset ? body.dataset.base : "";
+    if (base) return hostSource(base, w);
+    const s = w.ItdaViewSource;
+    return s && typeof s.attach === "function" ? s : null;
+  }
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot,
-    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick };
-  if (typeof document === "undefined" || !document.body || !document.body.dataset.base) return;
+    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
+    hostSource, pickSource };
+  if (typeof document === "undefined" || !document.body) return;
+  const source = pickSource(window, document.body);
+  if (!source) return;
 
   // ---- 화면
 
   const $ = id => document.getElementById(id);
-  const base = document.body.dataset.base;
+  const base = source.base || "";
   // 호스트 부품은 정식 이름 window.Itda* 를 먼저, 없으면 옛 이름 window.Hyve* 를 본다(머리 주석 「호스트 부품」).
   const hostPart = name => pick(window, name);
   const TableCopy = hostPart("TableCopy"), TableSort = hostPart("TableSort"), CodeCopy = hostPart("CodeCopy"), CodeLines = hostPart("CodeLines");
@@ -687,26 +783,28 @@
   }
 
   const THEME_FAILED = "테마를 불러오지 못했습니다 — 화면을 새로 고쳐 주세요.";
-  const gate = reloadGate(base, {
-    storage: () => window.sessionStorage,
-    now: () => Date.now(),
-    reload: () => location.reload(),
+  // 원천을 화면에 잇는다(hostSource 머리 주석의 api). fol 은 아래에서 만든다 — 원천은 start() 뒤에만 부른다.
+  const linked = source.attach({
+    $,
     ended: () => state.ended,
-    setTimeout: (f, ms) => setTimeout(f, ms),
-    clearTimeout: t => clearTimeout(t),
-    failed: () => {
+    current: () => state.view,
+    show: v => { state.view = v; return draw(); },
+    redraw: () => { if (!state.ended && state.view) draw(); },
+    look: name => { state.chosen = name; return draw(); },
+    failed: msg => { $("load-err").hidden = false; $("load-err").textContent = msg; },
+    themeFailed: () => {
       if (state.ended) return;
       state.themeFailed = true;
       $("load-err").hidden = false;
       $("load-err").textContent = THEME_FAILED;
     },
+    end: reason => showEnded(reason),
+    hello: d => fol.hello(d),
+    slide: d => fol.onSlide(d),
+    pos: d => fol.onPos(d),
+    toast: msg => toast(msg),
   });
-  const applyTheme = themeApplier($("theme-css"), base, {
-    setTimer: (f, ms) => setTimeout(f, ms),
-    late: () => { if (!state.ended && state.view) draw(); },
-    reload: why => gate.once(why), // CSS error 만
-    changed: () => gate.server(),
-  });
+  const applyTheme = v => linked.applyTheme(v);
 
   function imagesSettled(root, ms) {
     const imgs = [...root.querySelectorAll("img[src]")];
@@ -714,12 +812,6 @@
       Promise.all(imgs.map(im => im.complete ? null : new Promise(r => { im.addEventListener("load", r, { once: true }); im.addEventListener("error", r, { once: true }); }))),
       new Promise(r => setTimeout(r, ms)),
     ]);
-  }
-
-  // fetchView 는 view.json 의 {status, view} 다(view 는 200 일 때만).
-  async function fetchView() {
-    const r = await fetch(base + "/view.json", { cache: "no-store", credentials: "same-origin" });
-    return { status: r.status, view: r.ok ? await r.json() : null };
   }
 
   function lookClasses(el, look) {
@@ -787,7 +879,7 @@
     if (state.ended) return;
     $("load-err").hidden = !v.error && !state.themeFailed;
     $("load-err").textContent = v.error || (state.themeFailed ? THEME_FAILED : "");
-    document.title = docTitle(v.title || "문서", app);
+    document.title = docTitle(v.title || "문서", app, source.tabTitle);
     $("doc-title").textContent = v.title || "";
     paintTOC(v);
     if (v.error) state.tableSort = null; // 본문을 비운다 — 아래 줄(시험이 글로 보는 자리)
@@ -822,7 +914,7 @@
     stage.appendChild(target);
     // 표 정렬(itda-hyve#349 2단계): 쪽·이어보기에서만, 나누기 전 흐름에(문서 창과 같다 — 쪽 나눔이 정렬된 표 전체를 다시 나눈다)
     let sorted = null;
-    if (state.look !== "slides") {
+    if (state.look !== "slides" && TableSort) {
       TableSort.mark(flow);
       if (sort && TableSort.apply(flow, sort)) sorted = sort;
     }
@@ -865,7 +957,7 @@
     pagesEl.replaceChildren(frag);
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     // 쪽·이어보기·슬라이드(발표 공유) 모두.
-    CodeCopy.arm(pagesEl);
+    if (CodeCopy) CodeCopy.arm(pagesEl);
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
     target.remove();
@@ -908,7 +1000,7 @@
     if (replace) {
       placeSlideNotes($("pages"));
       // 노트 칸을 다시 만들었으니 복사 단추(itda-hyve#413)도 다시 붙인다 — 노트 코드의 조각 범위는 그 노트 안(codecopy.js noteOf)
-      CodeCopy.arm($("pages"));
+      if (CodeCopy) CodeCopy.arm($("pages"));
     }
     applyZoom();
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac);
@@ -1049,20 +1141,6 @@
     try { await state.rendering; } finally { state.rendering = null; }
   }
 
-  // sync 는 view.json 다시 받기다(syncer — 처음·hello·version·다시 붙음). 공유가 끝난 뒤에는 요청하지 않는다.
-  const sync = syncer({
-    fetch: fetchView,
-    current: () => state.view,
-    pageKey: () => applyTheme.key(),
-    apply: v => { state.view = v; return draw(); },
-    gate,
-    ended: () => state.ended,
-    end: reason => conn.end(reason),
-    failed: () => { $("load-err").hidden = false; $("load-err").textContent = "문서를 받지 못했습니다 — 네트워크를 확인하세요."; },
-    setTimeout: (f, ms) => setTimeout(f, ms),
-    clearTimeout: t => clearTimeout(t),
-  });
-
   // fol 은 발표자 따라가기다(follower). 맞출 때 할 일은 followAction 이 정한다 — 발표 슬라이드는 보기 꼴이 슬라이드가 아니면 슬라이드로
   // 바꿔 다시 그리고(render 가 끝에 맞춘다), 내용 위치는 보기 꼴을 그대로 둔 채 지금 꼴에서 맞춘다(⑧ — 원래 슬라이드 문서는 슬라이드로).
   const fol = follower({
@@ -1096,8 +1174,7 @@
   // showEnded 는 「공유가 끝났습니다」 화면이다. 이 화면만 끊겼으면(kicked) 「이 화면의 공유가 끝났습니다」.
   function showEnded(reason) {
     state.ended = true;
-    gate.cancel();
-    sync.cancel();
+    linked.stop();
     if (reason === "kicked") {
       $("ended-title").textContent = "이 화면의 공유가 끝났습니다";
       $("ended-msg").textContent = "공유한 사람이 이 화면의 연결을 끊었습니다.";
@@ -1119,7 +1196,7 @@
     $("load-err").hidden = true;
     hook("ended"); // 확장: 끝난 화면(자기 칸을 숨기고 끝난 카드의 자리를 채운다)
     $("ended").hidden = false;
-    document.title = docTitle($("ended-title").textContent, app);
+    document.title = docTitle($("ended-title").textContent, app, source.tabTitle);
   }
 
   // pageTurn 은 쪽 넘김 키 한 번이다(⑨): 쪽(슬라이드)들의 자리를 scrollTop 좌표로 재어 pageNav 가 고른 자리로 굴린다.
@@ -1140,13 +1217,14 @@
   }
 
   // 문서 안 링크·목차 항목: #제목은 그 자리로, 바깥 http(s)·mailto·tel 은 새 탭(토큰 주소가 Referer 로 가지 않게 noreferrer), 그 밖(다른 md 등
-  // 문서 폴더의 파일)은 열지 않는다 — 서버도 404 다. 목차 서랍에서 누르면 이동 뒤 서랍을 닫는다.
+  // 문서 폴더의 파일)은 열지 않는다 — 서버도 404 다. 목차 서랍에서 누르면 이동 뒤 서랍을 닫는다. 뷰어 원천은 그런 링크의 href 를
+  // data-local-href 로 옮겨 두므로(viewer.js localLinks) href 없는 <a data-local-href> 도 같은 안내를 낸다(공유 화면 html 에는 없다).
   function onClick(e) {
-    const a = e.target.closest && e.target.closest("a[href]");
+    const a = e.target.closest && e.target.closest("a[href], a[data-local-href]");
     if (!a) return;
     const inToc = $("sidebar").contains(a);
     if (!inToc && !$("viewer").contains(a)) return;
-    const href = a.getAttribute("href");
+    const href = a.getAttribute("href") || "";
     if (href.startsWith("#")) {
       e.preventDefault();
       jumper.jump(href, inToc); // 직접 옮긴 것 — 따라가기를 먼저 풀고, 옮겼으면 그 제목을 강조한다
@@ -1159,7 +1237,7 @@
       return;
     }
     e.preventDefault();
-    toast("문서 안의 파일 링크는 공유 화면에서 열지 않습니다");
+    toast(source.linkMsg || "문서 안의 파일 링크는 공유 화면에서 열지 않습니다");
   }
 
   for (const b of document.querySelectorAll("[data-notes]")) b.addEventListener("click", () => setNotesMode(b.dataset.notes));
@@ -1187,6 +1265,7 @@
   // 키로 contextmenu 를 이어 보내면(fromKey) 기본 메뉴만 막고 다시 열지 않는다.
   // openTableMenu 는 target 이 표 안이고 고른 글이 없으면 메뉴를 (x, y)에 열고 true 다. 아니면 메뉴를 닫고 false(브라우저 기본 메뉴).
   function openTableMenu(target, x, y, how) {
+    if (!TableCopy) return false; // 호스트 부품이 없으면(뷰어) 브라우저 기본 메뉴
     const table = TableCopy.tableAt(target, $("pages"));
     const sel = window.getSelection && String(window.getSelection() || "");
     if (!table || (sel && sel.trim())) { closeTableMenu(); return false; }
@@ -1211,13 +1290,13 @@
   for (const b of document.querySelectorAll("[data-table-copy]")) b.addEventListener("click", () => { copyFromMenu(b.dataset.tableCopy); });
   // ---- 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 위임 클릭 하나를 문서(document)에 단다 — 본문을 다시 그려도 살아 있다.
   // 이 화면은 http(비보안 컨텍스트)라 navigator.clipboard 가 없다 — 누른 처리 안에서 바로 execCommand 로 쓴다(tablecopy.js write).
-  document.addEventListener("click", CodeCopy.handler({ toast }));
+  if (CodeCopy) document.addEventListener("click", CodeCopy.handler({ toast }));
   // ---- 표 열 정렬(itda-hyve#349 2단계 — tablesort.js): 머리 칸 왼쪽 클릭(키보드는 Enter·Space)으로 오름 → 내림 → 해제. 보는 사람 각자(이 화면의
   // 메모리에만 — 서버에 보내지 않는다). 슬라이드 보기에는 없다(표시를 달지 않는다). 다시 그린 뒤 누른 조각의 머리가 같은 높이에 남게 굴린다 —
   // 발표자를 따라가는 중이면 render 가 따라가는 자리로 굴리므로 굴리지 않는다(블록 번호 data-n 은 정렬과 상관없이 같다). 키보드로 눌렀으면
   // 따라가는 중에도 새 머리 칸에 포커스를 돌려준다(settle — preventScroll).
   async function sortByHead(th) {
-    if (state.ended || !state.view || state.look === "slides" || state.rendering) return;
+    if (!TableSort || !TableCopy || state.ended || !state.view || state.look === "slides" || state.rendering) return;
     const S = TableSort, pagesEl = $("pages"), viewer = $("viewer");
     const spec = S.specFor(th), table = th.closest("table");
     const k = Math.max(0, TableCopy.pieces(table, pagesEl).indexOf(table));
@@ -1229,7 +1308,7 @@
   }
   $("pages").addEventListener("click", e => {
     if (e.button !== 0 || e.detail > 1 || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
-    const th = TableSort.headAt(e.target, $("pages"));
+    const th = TableSort && TableSort.headAt(e.target, $("pages"));
     if (!th) return;
     const sel = window.getSelection && window.getSelection();
     if (sel && !sel.isCollapsed && String(sel).trim()) return;
@@ -1259,7 +1338,7 @@
   // 목차의 펼침 기본값은 화면(본문) 폭으로 고른다 — 경계(1024px)를 넘나들 때만 기본값으로 되돌린다(tocPanel)
   toc.width(document.body.clientWidth);
   paintTocPanel();
-  // 확장(itda-hyve#617)을 시작한다 — 목차 폭을 정한 뒤·첫 그리기(sync.refresh) 전. 넘기는 것은 이 화면의 부품 그대로다(같은 객체 — 확장이
+  // 확장(itda-hyve#617)을 시작한다 — 목차 폭을 정한 뒤·첫 그리기(linked.start — 공유 화면은 sync.refresh) 전. 넘기는 것은 이 화면의 부품 그대로다(같은 객체 — 확장이
   // 읽는 state·toc 은 늘 지금 값). 확장이 던지면 확장 없이 계속한다.
   const extInit = pick(window, "ShareExt");
   if (typeof extInit === "function") {
@@ -1285,22 +1364,6 @@
     scheduleTocOn();
   }).observe($("viewer"));
 
-  const conn = connect(base, {
-    EventSource: window.EventSource,
-    probe: () => fetch(base + "/view.json", { method: "HEAD", cache: "no-store", credentials: "same-origin" })
-      .then(r => r.status === 403 ? "kicked" : r.status !== 404, () => true),
-    setTimeout: (f, ms) => setTimeout(f, ms),
-    clearTimeout: t => clearTimeout(t),
-    // 처음이든 다시 붙었든 hello 의 판·테마가 제 view 와 다르면 다시 받는다 — 첫 구독 전·끊긴 사이의 저장을 따라잡는다
-    onHello: (first, data) => { fol.hello(data); sync.check(data); },
-    onReload: () => gate.server(),
-    onVersion: data => sync.check(data),
-    onSlide: data => fol.onSlide(data),
-    onPos: data => fol.onPos(data),
-    onEnded: reason => showEnded(reason),
-  });
-  // 폰 Safari 는 뒤로 갔다 오면(bfcache) 스트림이 끊겨 있다 — 보이면 바로 다시 붙는다
-  window.addEventListener("pageshow", () => conn.wake());
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") conn.wake(); });
-  sync.refresh(true);
+  // 원천을 시작한다 — 공유 화면은 갱신 스트림을 열고 첫 view.json 을 받는다(hostSource start)
+  linked.start();
 })();

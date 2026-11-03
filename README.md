@@ -28,7 +28,8 @@
 | `mdsyntax/` | 명세의 syntax 구간에서 모은 문법 단일본(`topics/`)과 편집기 자동 완성 후보(`completions.json`) |
 | `page/` | 쪽 모델 조립 — 테마 고르기·표지·차례·머리글(`RenderView`), 테마 묶음(`LoadThemes`·`LoadThemeSet`), 검사(`Check`), 폴더 기본값(`_metadata.yml`) |
 | `themes/` | 내장 중립 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 견본 회사 테마 `samples/acme` |
-| `web/` | 쪽 모델 웹 자원 — `base.css`·`pager.js`·`slides.js`·보기 전용 공유 화면(`share.*`)·글꼴 |
+| `web/` | 쪽 모델 웹 자원 — `base.css`·`pager.js`·`slides.js`·보기 전용 공유 화면(`share.*`)·글꼴. `share.js` 의 그리기는 View 원천(공유 서버 `hostSource` · 뷰어의 `window.ItdaViewSource`)과 나뉜다 |
+| `web/viewer/` | 설치 없는 웹 뷰어 — 파일 열기·붙여넣기·견본을 wasm 으로 그려 `share.js` 와 같은 화면에 그린다(문서를 네트워크로 보내지 않음). `itda-doc.js` 는 `itdaDoc` 을 감싸는 로더(옵션 오류는 throw). `just web` 이 `build/web/viewer/` 에 정적 번들을 만든다. 탭 제목은 늘 「itda-doc 뷰어」라 브라우저 인쇄의 「PDF 로 저장」 기본 파일 이름도 문서 제목이 아니라 「itda-doc 뷰어」다 |
 | `cmd/itda-doc/` | 명령줄 도구 |
 | `cmd/itda-doc-wasm/` | 브라우저용 렌더 입구(WebAssembly) — 전역 `itdaDoc.render`·`themes`·`themeCSS`. 수식은 페이지가 올린 `temml.min.js` 로 그린다. `just wasm` 이 `build/web/` 에 만든다 |
 
@@ -41,6 +42,9 @@ just check     # gofmt · go vet
 just test      # ITDA_DOC_STRICT=1 go test ./...
 just syntax    # spec/ 을 고친 뒤 mdsyntax/topics·completions.json 다시 만들기
 GOOS=js GOARCH=wasm go build ./mdoc/ ./page/ ./texmath/   # WebAssembly 컴파일 확인
+just wasm      # build/web/ 에 itda-doc.wasm·.gz·wasm_exec.js·temml.min.js
+just web       # build/web/viewer/ 에 웹 뷰어 정적 번들(.wasm.br 은 brotli 가 있을 때)
+python3 -m http.server -d build/web/viewer 8000   # http://localhost:8000/ 로 뷰어 열기
 ```
 
 ## CLI
