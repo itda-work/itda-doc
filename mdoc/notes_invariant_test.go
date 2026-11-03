@@ -373,18 +373,22 @@ func tocIDs(items []TOCItem) string {
 
 // TestNotesHeadingsOutOfTOC 는 발표자 노트 안 제목이 DropNotes 와 상관없이 목차·절 번호·기준 단계에서 빠지는지다(itda-doc#15,
 // headings.go inNotes). 노트 안 제목은 id 를 받되 본문 제목과 겹치지 않고, 제목의 {.notes}(노트 아님)는 목차에 남는다.
+// 본문 제목이 자동 id 를 먼저 받아 목차 id 도 노트를 내든 빼든 같다(itda-doc#20) — 노트 안에 직접 적은 {#id} 만 예외다.
 func TestNotesHeadingsOutOfTOC(t *testing.T) {
 	cases := []struct {
 		name, src, toc string
 		notesIDs       []string // 노트 안 제목의 기대 id — 렌더 HTML 에 있고 번호 꾸밈이 없어야 한다
-		ids, dropIDs   string   // 비지 않으면 호스트·DropNotes 목차의 id(tocIDs) — 글자·번호가 같아도 id 는 갈릴 수 있다
+		ids            string   // 비지 않으면 호스트·DropNotes 목차의 id(tocIDs)
+		dropIDs        string   // 비지 않으면 DropNotes 목차 id 가 ids 와 갈리는 예외(노트 안 직접 적은 {#id}). 비면 두 목차 id 가 같아야 한다
 	}{
 		{"이슈 본문", "---\ntoc: true\n---\n# 발표\n## 첫 장\n:::notes\n### 노트 제목\n:::\n## 둘째 장\n", "발표 > 첫 장, 둘째 장", []string{"노트-제목"}, "", ""},
 		{"번호 건너뜀 없음", "---\nnumber-sections: true\n---\n## A\n:::notes\n## 노트\n:::\n## B\n", "A[1], B[2]", []string{"노트"}, "", ""},
 		{"노트에만 높은 단계", "---\nnumber-sections: true\n---\n:::notes\n# 노트 큰 제목\n:::\n## A\n### A1\n## B\n", "A[1] > A1[1.1], B[2]", []string{"노트-큰-제목"}, "", ""},
-		// 노트 안 제목이 자동 id 를 먼저 가져 셋째 제목 id 가 호스트 요약-2, DropNotes 요약-1 로 갈린다(바꾸기 전부터 있던 동작 —
-		// 맞추려면 id 가 바뀌어 사용자 결정이 필요하다). 목차의 글자·번호만 같다.
-		{"같은 글자 id — 목차 id 는 갈림", "## 요약\n:::notes\n## 요약\n:::\n## 요약\n", "요약, 요약", []string{"요약-1"}, "요약, 요약-2", "요약, 요약-1"},
+		// 본문 제목이 자동 id 를 먼저 받아 셋째 제목은 노트를 내든 빼든 요약-1, 노트 안 제목이 요약-2 다(itda-doc#20).
+		{"같은 글자 id — 본문 먼저", "## 요약\n:::notes\n## 요약\n:::\n## 요약\n", "요약, 요약", []string{"요약-2"}, "요약, 요약-1", ""},
+		{"같은 글자 id — 노트가 맨 앞", ":::notes\n## 요약\n:::\n## 요약\n", "요약", []string{"요약-1"}, "요약", ""},
+		// 노트 안에 직접 적은 id 는 자동 id 보다 먼저 등록돼 본문 자동 id 가 비킨다 — 노트를 빼면 비킬 까닭이 없어 갈린다(예외).
+		{"노트 안 직접 적은 id 는 예외", ":::notes\n## 노트 {#요약}\n:::\n## 요약\n", "요약", []string{"요약"}, "요약-1", "요약"},
 		{"제목이 노트 안에만", "---\nnumber-sections: true\n---\n본문\n\n:::notes\n# 노트만\n:::\n", "", []string{"노트만"}, "", ""},
 		{"다른 class 와 함께 단 노트", "---\nnumber-sections: true\n---\n## A\n::: {.box .notes}\n## 노트\n:::\n## B\n", "A[1], B[2]", []string{"노트"}, "", ""},
 		{"노트의 높은 단계가 toc-depth 를 줄이지 않음", "---\ntoc-depth: 1\n---\n:::notes\n# 노트 큰 제목\n:::\n## A\n### A1\n## B\n", "A, B", []string{"노트-큰-제목"}, "", ""},
@@ -412,9 +416,13 @@ func TestNotesHeadingsOutOfTOC(t *testing.T) {
 				if got := tocIDs(host.TOC); got != c.ids {
 					t.Errorf("목차 id %q, 기대 %q", got, c.ids)
 				}
-				if got := tocIDs(viewer.TOC); got != c.dropIDs {
-					t.Errorf("DropNotes 목차 id %q, 기대 %q", got, c.dropIDs)
-				}
+			}
+			wantDrop := tocIDs(host.TOC)
+			if c.dropIDs != "" {
+				wantDrop = c.dropIDs
+			}
+			if got := tocIDs(viewer.TOC); got != wantDrop {
+				t.Errorf("DropNotes 목차 id %q, 기대 %q", got, wantDrop)
 			}
 			for _, id := range c.notesIDs {
 				root, err := html.Parse(strings.NewReader(host.HTML))
