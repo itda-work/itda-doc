@@ -21,13 +21,13 @@
   --list-ul-3: "- ";
   --list-ul-4: "· ";
   --list-ol-1: decimal;
-  --list-ol-2: hyve-ganada-dot;
-  --list-ol-3: hyve-decimal-paren;
-  --list-ol-4: hyve-ganada-paren;
-  --list-ol-5: hyve-decimal-parens;
-  --list-ol-6: hyve-ganada-parens;
-  --list-ol-7: hyve-circled;
-  --list-ol-8: hyve-circled-ganada;
+  --list-ol-2: itda-ganada-dot;
+  --list-ol-3: itda-decimal-paren;
+  --list-ol-4: itda-ganada-paren;
+  --list-ol-5: itda-decimal-parens;
+  --list-ol-6: itda-ganada-parens;
+  --list-ol-7: itda-circled;
+  --list-ol-8: itda-circled-ganada;
   --ink: #23272f;
   --muted: #6b7280;
   --accent: #2b4a7e;
@@ -263,13 +263,21 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
    올리지 않아, 테마 CSS 가 목록 모양을 정하면(compact 의 .decisions ol, spine 의 .page-body > ol ol) 어느 단계에서나 테마가
    이긴다(테마는 @scope 안이라 같은 특이도여도 이기고, 가두지 않는 옛 엔진에서는 뒤에 와서 이긴다 — 리뷰 R1-1). 목차(nav)와
    각주(.footnotes)의 목록은 두 사다리 모두에서 뺀다. @counter-style 을 모르는 옛 WebKit(Safari 17 미만)에서는 순서 목록이 바깥 목록의 꼴(숫자)로 보인다. */
-@counter-style hyve-ganada-dot { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; suffix: ". "; fallback: decimal; }
-@counter-style hyve-decimal-paren { system: extends decimal; suffix: ") "; }
-@counter-style hyve-ganada-paren { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; suffix: ") "; fallback: hyve-decimal-paren; }
-@counter-style hyve-decimal-parens { system: extends decimal; prefix: "("; suffix: ") "; }
-@counter-style hyve-ganada-parens { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; prefix: "("; suffix: ") "; fallback: hyve-decimal-parens; }
-@counter-style hyve-circled { system: fixed; symbols: ① ② ③ ④ ⑤ ⑥ ⑦ ⑧ ⑨ ⑩ ⑪ ⑫ ⑬ ⑭ ⑮ ⑯ ⑰ ⑱ ⑲ ⑳ "(21)" "(22)" "(23)" "(24)" "(25)" "(26)" "(27)" "(28)" "(29)" "(30)" "(31)" "(32)" "(33)" "(34)" "(35)" "(36)" "(37)" "(38)" "(39)" "(40)" "(41)" "(42)" "(43)" "(44)" "(45)" "(46)" "(47)" "(48)" "(49)" "(50)"; suffix: " "; fallback: decimal; }
-@counter-style hyve-circled-ganada { system: fixed; symbols: ㉮ ㉯ ㉰ ㉱ ㉲ ㉳ ㉴ ㉵ ㉶ ㉷ ㉸ ㉹ ㉺ ㉻ "(거)" "(너)" "(더)" "(러)" "(머)" "(버)" "(서)" "(어)" "(저)" "(처)" "(커)" "(터)" "(퍼)" "(허)"; suffix: " "; fallback: decimal; }
+@counter-style itda-ganada-dot { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; suffix: ". "; fallback: decimal; }
+@counter-style itda-decimal-paren { system: extends decimal; suffix: ") "; }
+@counter-style itda-ganada-paren { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; suffix: ") "; fallback: itda-decimal-paren; }
+@counter-style itda-decimal-parens { system: extends decimal; prefix: "("; suffix: ") "; }
+@counter-style itda-ganada-parens { system: fixed; symbols: 가 나 다 라 마 바 사 아 자 차 카 타 파 하 거 너 더 러 머 버 서 어 저 처 커 터 퍼 허; prefix: "("; suffix: ") "; fallback: itda-decimal-parens; }
+@counter-style itda-circled { system: fixed; symbols: ① ② ③ ④ ⑤ ⑥ ⑦ ⑧ ⑨ ⑩ ⑪ ⑫ ⑬ ⑭ ⑮ ⑯ ⑰ ⑱ ⑲ ⑳ "(21)" "(22)" "(23)" "(24)" "(25)" "(26)" "(27)" "(28)" "(29)" "(30)" "(31)" "(32)" "(33)" "(34)" "(35)" "(36)" "(37)" "(38)" "(39)" "(40)" "(41)" "(42)" "(43)" "(44)" "(45)" "(46)" "(47)" "(48)" "(49)" "(50)"; suffix: " "; fallback: decimal; }
+@counter-style itda-circled-ganada { system: fixed; symbols: ㉮ ㉯ ㉰ ㉱ ㉲ ㉳ ㉴ ㉵ ㉶ ㉷ ㉸ ㉹ ㉺ ㉻ "(거)" "(너)" "(더)" "(러)" "(머)" "(버)" "(서)" "(어)" "(저)" "(처)" "(커)" "(터)" "(퍼)" "(허)"; suffix: " "; fallback: decimal; }
+/* 옛 이름(호환용 별칭, itda-hyve#625): 사용자 테마 토큰의 hyve-… 값이 계속 같은 꼴로 그려진다 — system: extends 라 기호·앞뒤 글자·대체가 새 이름 그대로다 */
+@counter-style hyve-ganada-dot { system: extends itda-ganada-dot; }
+@counter-style hyve-decimal-paren { system: extends itda-decimal-paren; }
+@counter-style hyve-ganada-paren { system: extends itda-ganada-paren; }
+@counter-style hyve-decimal-parens { system: extends itda-decimal-parens; }
+@counter-style hyve-ganada-parens { system: extends itda-ganada-parens; }
+@counter-style hyve-circled { system: extends itda-circled; }
+@counter-style hyve-circled-ganada { system: extends itda-circled-ganada; }
 :where(body.list-gaejosik .page-body ul:not(nav ul, .footnotes ul)) { list-style-type: var(--list-ul-1); }
 :where(body.list-gaejosik .page-body ul ul:not(nav ul, .footnotes ul)) { list-style-type: var(--list-ul-2); }
 :where(body.list-gaejosik .page-body ul ul ul:not(nav ul, .footnotes ul)) { list-style-type: var(--list-ul-3); }
@@ -398,7 +406,7 @@ h1 > .header-section-number::after { content: "."; }
 .diagram-svg .cl-box { fill: var(--diagram-cluster-bg); stroke: var(--diagram-cluster-border); stroke-width: 1; }
 .diagram-svg .cl-title { fill: var(--diagram-muted); font-weight: 600; }
 
-/* 간트 차트(itda-hyve#409 ①, diagram/gantt) — 같은 .diagram-svg 안, 시간축 + 작업 행. 클래스는 모두 gt- 접두사 — app.css 의 .bar 같은
+/* 간트 차트(itda-hyve#409 ①, diagram/gantt) — 같은 .diagram-svg 안, 시간축 + 작업 행. 클래스는 모두 gt- 접두사 — 호스트 앱 창 틀 CSS 의 .bar 같은
    앱 규칙이 SVG 기하 속성에 걸리는 충돌을 막는다(수정 1회차). 구역 띠(gt-band)는 흐름도 묶음(cl-box)과 같은 바탕 토큰을 테두리
    없이, 제외 날짜(gt-excl)는 아주 옅은 세로 띠(격자선과 같은 토큰에 불투명도로 구분). gt-done·gt-active·gt-crit
    막대와 마일스톤 마름모(gt-ms)는 각자 토큰 — done 은 무채색, active 는 강조색, crit 는 경고 계열(--alert-caution). */
@@ -441,7 +449,7 @@ h1 > .header-section-number::after { content: "."; }
 .diagram-svg .tl-title { fill: var(--diagram-text); font-weight: 600; }
 
 /* 순서도(itda-hyve#409 ③, diagram/sequence) — 같은 .diagram-svg 안, 생명선 + 순서 메시지. 클래스는 모두 sq- 접두사(gt-·tl- 와
-   같은 이유 — app.css 의 일반 이름이 SVG 기하를 덮지 않게). 새 토큰 없이 기존 --diagram-* 토큰만 쓴다: 참여자 상자는
+   같은 이유 — 호스트 앱 창 틀 CSS 의 일반 이름이 SVG 기하를 덮지 않게). 새 토큰 없이 기존 --diagram-* 토큰만 쓴다: 참여자 상자는
    노드 토큰, 무리(box)·묶음(loop·alt·…) 띠는 묶음 토큰, 메시지 글 바탕(sq-tbg)은 화살표 글 바탕 토큰(--paper)이라
    생명선·점선이 글자를 가로지르지 않는다. 활성 막대(sq-act)도 노드 토큰 — 겹친 활성은 옆으로 비껴 쌓여 구분된다. */
 .diagram-svg .sq-par { fill: var(--diagram-node-bg); stroke: var(--diagram-node-border); stroke-width: 1.2; }
@@ -585,7 +593,7 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   math .tml-right { text-align: -webkit-right; } math .tml-left { text-align: -webkit-left; }
 }
 
-/* 차트 움직임 — 화면에서만(인쇄·PDF·움직임 줄이기는 다 그려진 모습). 화면(app.js)이 처음 보일 때 chart-wait → chart-play 를 붙이고
+/* 차트 움직임 — 화면에서만(인쇄·PDF·움직임 줄이기는 다 그려진 모습). 화면(호스트 앱)이 처음 보일 때 chart-wait → chart-play 를 붙이고
    끝나면 뗀다. chart-wait 는 첫 프레임(0)에 멈춘 상태다 — 보이기 전에 다 그려진 모습이 한 번 번쩍이지 않게.
    항목 차례(d0…d15)로 조금씩 늦게 시작한다. */
 @media screen and (prefers-reduced-motion: no-preference) {
@@ -594,20 +602,27 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .chart-svg .d11 { --d: 11; } .chart-svg .d12 { --d: 12; } .chart-svg .d13 { --d: 13; } .chart-svg .d14 { --d: 14; } .chart-svg .d15 { --d: 15; }
   :is(.chart-wait, .chart-play) .chart-svg .col, :is(.chart-wait, .chart-play) .chart-svg .stack {
     transform-box: fill-box; transform-origin: 50% 100%;
-    animation: hyve-grow-y 0.75s cubic-bezier(0.22, 0.8, 0.26, 1) calc(var(--d, 0) * 55ms) both; }
+    animation: itda-grow-y 0.75s cubic-bezier(0.22, 0.8, 0.26, 1) calc(var(--d, 0) * 55ms) both; }
   :is(.chart-wait, .chart-play) .chart-svg .col.neg { transform-origin: 50% 0; }
-  :is(.chart-wait, .chart-play) .chart-svg.t-hbar .col { transform-origin: 0 50%; animation-name: hyve-grow-x; }
+  :is(.chart-wait, .chart-play) .chart-svg.t-hbar .col { transform-origin: 0 50%; animation-name: itda-grow-x; }
   :is(.chart-wait, .chart-play) .chart-svg.t-hbar .col.neg { transform-origin: 100% 50%; }
-  :is(.chart-wait, .chart-play) .chart-svg .line { stroke-dasharray: 1 1; animation: hyve-draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) both; }
-  :is(.chart-wait, .chart-play) .chart-svg .area { animation: hyve-fade 0.9s ease-out 0.35s both; }
+  :is(.chart-wait, .chart-play) .chart-svg .line { stroke-dasharray: 1 1; animation: itda-draw 1.1s cubic-bezier(0.4, 0, 0.2, 1) both; }
+  :is(.chart-wait, .chart-play) .chart-svg .area { animation: itda-fade 0.9s ease-out 0.35s both; }
   :is(.chart-wait, .chart-play) .chart-svg .dot { transform-box: fill-box; transform-origin: center;
-    animation: hyve-pop 0.35s ease-out calc(0.15s + var(--d, 0) * 60ms) both; }
-  :is(.chart-wait, .chart-play) .chart-svg .val { animation: hyve-fade 0.4s ease-out calc(0.45s + var(--d, 0) * 55ms) both; }
+    animation: itda-pop 0.35s ease-out calc(0.15s + var(--d, 0) * 60ms) both; }
+  :is(.chart-wait, .chart-play) .chart-svg .val { animation: itda-fade 0.4s ease-out calc(0.45s + var(--d, 0) * 55ms) both; }
   :is(.chart-wait, .chart-play) .chart-svg .pie { transform-box: fill-box; transform-origin: center;
-    animation: hyve-spin 0.9s cubic-bezier(0.22, 0.8, 0.26, 1) both; }
+    animation: itda-spin 0.9s cubic-bezier(0.22, 0.8, 0.26, 1) both; }
   :is(.chart-wait, .chart-play) .chart-svg .val.in, :is(.chart-wait, .chart-play) .chart-svg .total { animation-delay: 0.7s; }
   .chart-wait .chart-svg * { animation-play-state: paused !important; }
 }
+@keyframes itda-grow-y { from { transform: scaleY(0); } to { transform: none; } }
+@keyframes itda-grow-x { from { transform: scaleX(0); } to { transform: none; } }
+@keyframes itda-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes itda-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes itda-pop { from { opacity: 0; transform: scale(0.2); } to { opacity: 1; transform: none; } }
+@keyframes itda-spin { from { opacity: 0; transform: rotate(-100deg) scale(0.7); } to { opacity: 1; transform: none; } }
+/* 옛 이름(호환용 별칭, itda-hyve#625): 테마 CSS 가 animation 에 hyve-… 를 써도 같은 움직임이다(본문은 위와 같다 — @keyframes 에는 잇는 문법이 없다) */
 @keyframes hyve-grow-y { from { transform: scaleY(0); } to { transform: none; } }
 @keyframes hyve-grow-x { from { transform: scaleX(0); } to { transform: none; } }
 @keyframes hyve-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
@@ -697,9 +712,9 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
    attr(data-title))로 그린다 — 줄 번호(itda-hyve#435)와 같은 방식이라 선택·복사·검색·textContent 에 들어가지 않고
    인라인 style(CSP)도 쓰지 않는다. 띠는 pre 흐름 안 첫 블록(block)이라 테마가 pre 의 padding 을 바꿔도
    코드 위 제자리에 있다(번호 칸을 code 안쪽으로 옮긴 것과 같은 까닭). 쪽 나눔 뒷조각(pager.js splitPre shallow
-   복제)에도 속성이 남아 띠가 다시 그려진다. 오른쪽 패딩은 화면의 복사 단추(app.css 26px·오른쪽 4px) 자리다.
+   복제)에도 속성이 남아 띠가 다시 그려진다. 오른쪽 패딩은 화면의 복사 단추(호스트 앱 창 틀 CSS — 26px·오른쪽 4px) 자리다.
    토큰 --code-title-fg·--code-title-line·--code-title-size 로 색·구분선·글자 크기를 바꾼다(GUIDE-document-themes).
-   화면에서는 codecopy.js armTitle 이 붙인 띠 단추(itda-hyve#516 — 누르면 파일명 복사)가 이 ::before 를 대신해 같은 값으로 그린다(app.css
+   화면에서는 호스트 앱이 붙인 띠 단추(itda-hyve#516 — 누르면 파일명 복사)가 이 ::before 를 대신해 같은 값으로 그린다(호스트 앱 창 틀 CSS
    「파일명 띠 단추」 — 이 규칙의 값을 바꾸면 거기도 같이 바꾼다). 인쇄·PDF·축소본·발표 한눈에 보기는 이 ::before 그대로. */
 :where(.page-body, .sn-body, .pr-notes-body) pre[data-title]::before {
   content: attr(data-title); display: block; font-size: var(--code-title-size); color: var(--code-title-fg);

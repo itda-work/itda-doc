@@ -567,10 +567,10 @@ func viewW(t *testing.T, svg string) float64 {
 	return v
 }
 
-// 클래스 충돌(수정 1회차) — 간트 SVG 의 클래스는 모두 gt- 접두사를 단다. app.css 의 .bar { height: 46px } 같은
+// 클래스 충돌(수정 1회차) — 간트 SVG 의 클래스는 모두 gt- 접두사를 단다. 호스트 앱 창 틀 CSS 의 .bar { height: 46px } 같은
 // 앱 도구 막대 규칙이 <rect class="bar"> 의 기하 속성에 걸려 막대가 3.5배로 그려지는 충돌을 막는다.
 // .gt- 선택자는 base.css 의 .diagram-svg 아래에만 있어야 하고, 흐름도 클래스(node·edge … 접두사 없음)도
-// 지금 app.css·share.css 와 겹치지 않음을 같은 시험이 고정한다.
+// 지금 web/*.css(share.css 등 — 창 틀 CSS 가 이 폴더에 있으면 그것까지)와 겹치지 않음을 같은 시험이 고정한다.
 func TestClassCollisions(t *testing.T) {
 	svg, _ := drawn(t, "gantt\ndateFormat YYYY-MM-DD\ntitle 제목\nsection 구역\na :done, 2026-01-05, 4d\nb :active, 2026-01-12, 5d\nc :crit, 2026-01-19, 1w\nd :milestone, 2026-01-26, 0d")
 	classWords := func(svg string) map[string]bool {
@@ -608,7 +608,7 @@ func TestClassCollisions(t *testing.T) {
 		}
 	}
 
-	// 흐름도 — 접두사 없는 클래스가 앱 css(app.css·share.css)의 선택자와 겹치면 실패
+	// 흐름도 — 접두사 없는 클래스가 앱 css(창 틀 app.css 가 있으면 그것·share.css)의 선택자와 겹치면 실패
 	fr, err := flowchart.Render("flowchart LR\n  A[시작] --> B{갈림}\n  B -->|예| C((고리))\n  B -->|아니오| A\n  subgraph S[묶음]\n    C\n  end")
 	if err != nil {
 		t.Fatalf("흐름도 렌더 실패: %v", err)

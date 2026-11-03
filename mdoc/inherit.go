@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// 폴더 기본 frontmatter `_metadata.yml` 상속(itda-hyve#474 ①). 문서 창(docview)이 경로를 알아 폴더 위로
+// 폴더 기본 frontmatter `_metadata.yml` 상속(itda-hyve#474 ①). 호스트 앱이 경로를 알아 폴더 위로
 // 파일을 찾아 읽고, 이 패키지는 받은 YAML 을 문서 frontmatter 와 합친다 — mdoc.Render 는 경로를
 // 모르는 순수 함수 그대로다(값은 Options.FolderMeta 로 들어온다).
 //
@@ -33,7 +33,7 @@ import (
 //     folder-slides-unused, Line 0, 문구 앞머리 "<rel>: " — slides 를 정한 가장 가까운 파일, 줄 없음).
 //   - 순서: 폴더 파일 오류 → 폴더 slides 안내 → 폴더 값 경고 → 문서 경고(Render 는 Line 으로 안정 정렬한다 — Line 0 이 앞).
 
-// FolderMeta 는 문서 위 폴더의 `_metadata.yml` 하나다. docview 가 읽어 Options.FolderMeta 로 넘긴다.
+// FolderMeta 는 문서 위 폴더의 `_metadata.yml` 하나다. 호스트 앱(page.ReadFolderMeta 등)이 읽어 Options.FolderMeta 로 넘긴다.
 type FolderMeta struct {
 	// Rel 은 문서 기준 상대 경로다(예: "_metadata.yml", "../_metadata.yml"). 경고 문구·출처 표시에 쓴다.
 	Rel string

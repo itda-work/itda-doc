@@ -73,7 +73,7 @@ func TestListStyleThemeFile(t *testing.T) {
 	}
 }
 
-// base.css 의 사다리 토큰이 부르는 기호 꼴(@counter-style hyve-…)은 모두 base.css 에 있고, 넘침 대체(fallback)도
+// base.css 의 사다리 토큰이 부르는 기호 꼴(@counter-style itda-…)은 모두 base.css 에 있고, 넘침 대체(fallback)도
 // 있는 꼴이다. 단계 규칙은 개조식 넷·공문 여덟이고 목차·각주의 목록은 빠진다.
 func TestListLadderCSS(t *testing.T) {
 	b, err := web.FS.ReadFile("base.css")
@@ -82,7 +82,7 @@ func TestListLadderCSS(t *testing.T) {
 	}
 	css := string(b)
 	defined := map[string]bool{"decimal": true}
-	for _, m := range regexp.MustCompile(`@counter-style (hyve-[a-z-]+) \{([^}]*)\}`).FindAllStringSubmatch(css, -1) {
+	for _, m := range regexp.MustCompile(`@counter-style ((?:itda|hyve)-[a-z-]+) \{([^}]*)\}`).FindAllStringSubmatch(css, -1) {
 		defined[m[1]] = true
 	}
 	for _, m := range regexp.MustCompile(`(?:fallback|extends): *([a-z-]+);`).FindAllStringSubmatch(css, -1) {
@@ -92,8 +92,8 @@ func TestListLadderCSS(t *testing.T) {
 	}
 	for i := 1; i <= 8; i++ {
 		m := regexp.MustCompile(`--list-ol-` + string(rune('0'+i)) + `: ([a-z-]+);`).FindStringSubmatch(css)
-		if m == nil || !defined[m[1]] {
-			t.Errorf("--list-ol-%d 의 꼴이 없음: %v", i, m)
+		if m == nil || !defined[m[1]] || (m[1] != "decimal" && !strings.HasPrefix(m[1], "itda-")) {
+			t.Errorf("--list-ol-%d 의 꼴이 없거나 새 이름(itda-)이 아님: %v", i, m)
 		}
 		sel := ":where(body.list-gongmun .page-body ol" + strings.Repeat(" ol", i-1) + ":not(nav ol, .footnotes ol)) { list-style-type: var(--list-ol-"
 		if !strings.Contains(css, sel) {
@@ -107,9 +107,65 @@ func TestListLadderCSS(t *testing.T) {
 		}
 	}
 	// 가나다 차례는 행정업무운영 편람대로 가~하, 거~허 — 경고(mdoc)가 알아보는 차례와 같다
-	ganada := regexp.MustCompile(`hyve-ganada-dot \{ system: fixed; symbols: ([^;]+);`).FindStringSubmatch(css)
+	ganada := regexp.MustCompile(`itda-ganada-dot \{ system: fixed; symbols: ([^;]+);`).FindStringSubmatch(css)
 	if ganada == nil || strings.ReplaceAll(ganada[1], " ", "") != "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허" {
 		t.Errorf("가나다 차례: %v", ganada)
+	}
+}
+
+// 옛 이름 별칭(itda-hyve#625): 사용자 테마가 토큰 값으로 쓰는 hyve-… 기호 꼴은 모두 같은 이름의 itda-… 를 그대로 잇는다
+// (system: extends 하나뿐 — 기호·앞뒤 글자·대체를 다르게 두지 않는다). 새 이름마다 옛 이름이 있고, 거꾸로도 그렇다.
+// 차트 움직임의 @keyframes 도 옛 이름 hyve-… 가 새 이름 itda-… 와 같은 본문으로 남는다.
+func TestLegacyNameAliases(t *testing.T) {
+	b, err := web.FS.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(b)
+	newCS := map[string]bool{}
+	for _, m := range regexp.MustCompile(`@counter-style itda-([a-z-]+) \{`).FindAllStringSubmatch(css, -1) {
+		newCS[m[1]] = true
+	}
+	oldCS := map[string]string{}
+	for _, m := range regexp.MustCompile(`@counter-style hyve-([a-z-]+) \{([^}]*)\}`).FindAllStringSubmatch(css, -1) {
+		oldCS[m[1]] = strings.TrimSpace(m[2])
+	}
+	if len(newCS) != 7 {
+		t.Errorf("itda- 기호 꼴 %d 개, 기대 7", len(newCS))
+	}
+	for n := range newCS {
+		if got, want := oldCS[n], "system: extends itda-"+n+";"; got != want {
+			t.Errorf("옛 이름 hyve-%s: %q, 기대 %q", n, got, want)
+		}
+	}
+	for n := range oldCS {
+		if !newCS[n] {
+			t.Errorf("옛 이름 hyve-%s 에 맞는 새 이름이 없음", n)
+		}
+	}
+	// 공문 2단계의 깨지는 입력: list-style: hyve-ganada-dot 를 쓰는 사용자 테마 — 그 이름이 정의돼 있어야 한다
+	if !strings.Contains(css, "@counter-style hyve-ganada-dot {") {
+		t.Error("옛 이름 hyve-ganada-dot 이 없음")
+	}
+	kf := func(prefix string) map[string]string {
+		out := map[string]string{}
+		for _, m := range regexp.MustCompile(`@keyframes `+prefix+`-([a-z-]+) (\{.*\})\n`).FindAllStringSubmatch(css, -1) {
+			out[m[1]] = m[2]
+		}
+		return out
+	}
+	nk, ok := kf("itda"), kf("hyve")
+	if len(nk) == 0 || len(nk) != len(ok) {
+		t.Errorf("@keyframes 새 %d 개·옛 %d 개", len(nk), len(ok))
+	}
+	for n, body := range nk {
+		if ok[n] != body {
+			t.Errorf("@keyframes hyve-%s 본문이 itda-%s 와 다름: %q / %q", n, n, ok[n], body)
+		}
+	}
+	// 문서 층 자신은 새 이름만 쓴다(옛 이름은 별칭 정의에만)
+	for _, m := range regexp.MustCompile(`(?:animation(?:-name)?|--list-ol-\d|fallback|extends)\s*:\s*[^;]*\bhyve-`).FindAllString(css, -1) {
+		t.Errorf("base.css 가 옛 이름을 씀: %s", m)
 	}
 }
 

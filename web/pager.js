@@ -643,7 +643,7 @@
     }
   }
 
-  // numberBlocks 는 나누기 전 문서 흐름의 최상위 블록마다 data-n(0부터)을 붙이고 그 수를 돌려준다(itda-hyve#346 ⑧ 내용 앵커). 호스트(app.js)와
+  // numberBlocks 는 나누기 전 문서 흐름의 최상위 블록마다 data-n(0부터)을 붙이고 그 수를 돌려준다(itda-hyve#346 ⑧ 내용 앵커). 호스트 앱과
   // 보는 화면(share.js)이 같은 view HTML 에 같은 규칙으로 붙이므로, 창 폭·배율·쪽 수·보기 꼴이 달라도 같은 번호는 같은 내용이다.
   // 쪽 나눔이 블록을 쪼개도 조각(shallow·cut 의 cloneNode)마다 같은 data-n 이 남고, 슬라이드 나눔(slides.js groups)은 같은 요소를 옮긴다.
   // 표지·제목 블록·목차·쪽 나눔 표시·발표 단계(.pause)·노트는 번호에서 뺀다(쪽·이어보기에 내용으로 그려지지 않는다).
@@ -657,7 +657,7 @@
     return n;
   }
 
-  // ---- 쪽 넘김 키(itda-hyve#346 ⑨) — 보는 화면(share.js)과 문서 창 보기 모드(app.js)가 같은 규칙을 쓴다.
+  // ---- 쪽 넘김 키(itda-hyve#346 ⑨) — 보는 화면(share.js)과 호스트 앱의 보기 모드가 같은 규칙을 쓴다.
 
   // navKey 는 쪽 넘김 키의 방향이다: →·PageDown 은 1, ←·PageUp 은 -1, Home 은 "first", End 는 "last", 그 밖은 "". space 면 Space 는 1,
   // Shift+Space 는 -1(보는 화면만 — 문서 창은 Space 를 브라우저 굴림 그대로 둔다). 단추·링크에 포커스가 있으면 Space 는 그것을 누르는 키라
@@ -760,8 +760,8 @@
     });
   }
 
-  // 현재 장 미리보기(itda-hyve#443): 커서 줄이 든 띠의 쪽 범위. bands 는 HyveEditor.displayBands 의 값({page, line} …), line 은 커서 줄,
-  // pages 는 쪽 번호 목록(미리보기 쪽 순서 — app.js state.pages 의 data-page). 커서 줄 이하의 마지막 띠 k 를 찾아
+  // 현재 장 미리보기(itda-hyve#443): 커서 줄이 든 띠의 쪽 범위. bands 는 호스트 편집기가 준 띠({page, line} …), line 은 커서 줄,
+  // pages 는 쪽 번호 목록(미리보기 쪽 순서 — 호스트 앱이 그린 쪽의 data-page). 커서 줄 이하의 마지막 띠 k 를 찾아
   // 띠 k 의 쪽부터 띠 k+1 의 쪽 앞까지(띠 없는 이어진 쪽 — 「(계속)」 넘침 쪽 — 은 앞 띠에 딸린다)를 돌려준다:
   // {first, last}(pages 인덱스, 닫힌 구간). 커서가 첫 띠 앞(머리말·표지)이면 첫 띠 앞의 모든 쪽(표지·차례)인데 그런 쪽이 없으면
   // (표지 없는 문서) 첫 띠 구간으로 본다. 띠가 없거나(pages 와 짝이 안 되는 낡은 띠 포함) 쪽 목록이 비었으면 null — 모든 쪽.
@@ -817,5 +817,6 @@
     return points[points.length - 1][to];
   }
 
-  window.HyvePager = { paginate, prepareTOC, adoptWidths, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
+  // 정식 이름은 window.ItdaPager 다. window.HyvePager 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입해 둘이 갈라지지 않는다.
+  window.ItdaPager = window.HyvePager = { paginate, prepareTOC, adoptWidths, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
 })();

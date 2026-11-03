@@ -14,7 +14,8 @@ const page = (n, children, head = null, continuedHead = false) => ({
   dataset: { page: String(n) },
   querySelector: x => x === '.page-body' ? { children } : x === '.slide-head' ? head : x === '.slide-head .slide-cont' && continuedHead ? {} : null,
 });
-const bands = window.HyvePager.pageBands;
+assert.ok(window.ItdaPager && window.HyvePager === window.ItdaPager, '옛 이름 HyvePager 는 ItdaPager 와 같은 객체'); // itda-hyve#625 별칭
+const bands = window.ItdaPager.pageBands;
 const plain = bands([page(1, [el('P', 1)]), page(2, [el('H1', 20)])], 'doc');
 assert.deepStrictEqual(JSON.parse(JSON.stringify(plain)), [{ page: 1, total: 2, line: 1 }, { page: 2, total: 2, line: 20 }]);
 const cases = bands([

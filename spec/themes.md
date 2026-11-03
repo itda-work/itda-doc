@@ -95,13 +95,13 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--list-ul-3` | 개조식 3단계 | `"- "` |
 | `--list-ul-4` | 개조식 4단계(더 깊으면 되풀이) | `"· "` |
 | `--list-ol-1` | 공문 사다리(`list-style: gongmun`) 1단계 번호 꼴(`list-style-type` 값) — `1.` | `decimal` |
-| `--list-ol-2` | 공문 2단계 — `가.` | `hyve-ganada-dot` |
-| `--list-ol-3` | 공문 3단계 — `1)` | `hyve-decimal-paren` |
-| `--list-ol-4` | 공문 4단계 — `가)` | `hyve-ganada-paren` |
-| `--list-ol-5` | 공문 5단계 — `(1)` | `hyve-decimal-parens` |
-| `--list-ol-6` | 공문 6단계 — `(가)` | `hyve-ganada-parens` |
-| `--list-ol-7` | 공문 7단계 — `①` | `hyve-circled` |
-| `--list-ol-8` | 공문 8단계 — `㉮`(더 깊으면 되풀이) | `hyve-circled-ganada` |
+| `--list-ol-2` | 공문 2단계 — `가.` | `itda-ganada-dot` |
+| `--list-ol-3` | 공문 3단계 — `1)` | `itda-decimal-paren` |
+| `--list-ol-4` | 공문 4단계 — `가)` | `itda-ganada-paren` |
+| `--list-ol-5` | 공문 5단계 — `(1)` | `itda-decimal-parens` |
+| `--list-ol-6` | 공문 6단계 — `(가)` | `itda-ganada-parens` |
+| `--list-ol-7` | 공문 7단계 — `①` | `itda-circled` |
+| `--list-ol-8` | 공문 8단계 — `㉮`(더 깊으면 되풀이) | `itda-circled-ganada` |
 | `--ink` | 글자색 | `#23272f` |
 | `--muted` | 옅은 글자색(이름표·캡션) | `#6b7280` |
 | `--accent` | 강조색 — 제목·표 머리·띠가 여기서 나온다 | `#2b4a7e` |
@@ -236,7 +236,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 <!-- tokens:end -->
 
 테마는 자기 토큰을 더 만들어 `theme.css` 에서 써도 된다(내장 `classic` 의 `--accent-2`·`--accent-3`, `spine` 의 `--highlight`).
-창 틀이 쓰는 이름(`--ui-…`·`--wails-…`·`--editor-w` 등 `app.css` 의 변수)과 `--page-w`·`--page-h`·`--img-max-h` 는 줄 수 없다.
+창 틀이 쓰는 이름(`--ui-…`·`--wails-…`·`--editor-w` 등 호스트 앱 창 틀 CSS 의 변수)과 `--page-w`·`--page-h`·`--img-max-h` 는 줄 수 없다.
 
 ## 4. HTML 구조와 클래스
 
@@ -276,7 +276,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 `<figure><img><figcaption>`(번호는 `--figure-label` + CSS 카운터), 표 `<table><caption>`, 알림 `<div class="markdown-alert markdown-alert-note">
 <p class="markdown-alert-title">참고</p>…`, 각주 `<section class="footnotes">`, 쪽을 넘어 이어지는 조각은 `.cont`(목록 항목은 `li.cont`).
 메타 행은 `data-key` 로 고를 수 있다: `.meta-row[data-key="classification"] dd { color: #b42318 }`.
-코드 블록(2줄 이상)은 `<pre class="has-ln" data-ln-digits="N"><code><span class="ln" data-n="1">…</span>…` 이고 줄 번호 칸은 `code` 의 왼쪽 안쪽(`padding-left`, 번호는 `.ln::before`)이다 — 테마는 `pre` 의 `padding`·`border` 를 마음대로 바꿔도 되지만 `pre code` 의 `padding`·`display` 는 덮지 않는다(번호가 코드 글자와 겹친다). 파일명을 적은 코드 블록(여는 펜스에 ```` ```yaml:docker-compose.yml ```` 같이)은 `<pre data-title="…">` 이고 띠는 `pre[data-title]::before`(`content: attr(data-title)`)가 pre 흐름 안 첫 줄로 그린다 — 띠 색·구분선·글자 크기는 `--code-title-*` 토큰, 띠의 오른쪽 패딩은 화면의 복사 단추 자리이니 `pre[data-title]::before` 의 `padding-right` 를 줄이지 않는다. 화면(미리보기·발표·공유 보기)에서는 이 띠를 누르면 파일명을 복사하는 단추 `pre > button.hyve-codetitle`(`::before` 로 파일명을 그린다)가 `::before` 띠 대신 같은 자리에 그린다 — `--code-title-*` 토큰은 두 쪽에 같이 걸리지만, 테마가 `pre[data-title]::before` 를 직접 덮은 규칙은 화면의 단추 띠에 걸리지 않는다(인쇄·PDF·사이드바 축소본·발표 한눈에 보기처럼 단추를 숨기고 `::before` 띠를 그대로 그리는 곳에만 걸린다). 화면의 두 단추(복사·파일명 띠) 색은 창 모양(밝게·어둡게)을 따르지 않고 밝은 코드 바탕에 맞춘다(앱 창 CSS 의 `button.hyve-codecopy`·`button.hyve-codetitle`): 복사 아이콘은 `--code-title-fg`, 올리면 `--ink`, 띠를 올렸을 때·「✓ 복사됨」·포커스 테두리는 고정 `#2563eb` 이다(본문·밝은 노트 칸). 어두운 발표 노트 칸(`.pr-notes-body`)은 예외로 고정 어두운 배경용 색(아이콘 `#9aa3b0`, 올리면 `#e6e9ee`, 띠 올림 `#e6e9ee`, 「✓ 복사됨」 `#8fdfb2`, 포커스 `#8db4ff`)을 쓴다 — 테마가 `--code-bg` 를 어둡게 바꾸거나 `--ink` 를 밝게 바꾸면 이 색들의 대비는 미검증이다. 강조할 줄을 적은 코드 블록(```` ```go {2-3} ````·Deckset `[.code-highlight: 2-3]`)은 `<pre data-hl="2-3" class="… has-hl">` 이고 그 줄이 `<span class="ln hl">` 다(줄 번호를 끈 문서·1줄 블록에서도 감싼다). 강조 줄은 `display: block` 으로 code 가로 전체(번호 칸 포함)와 양옆 4pt 에 띠를 깐다 — 테마는 띠 색을 `--code-hl-bg`·`--code-hl-bar` 로 바꾸고, `.ln.hl` 의 `display`·`margin`·`padding` 은 덮지 않는다(띠가 번호 칸과 어긋난다).
+코드 블록(2줄 이상)은 `<pre class="has-ln" data-ln-digits="N"><code><span class="ln" data-n="1">…</span>…` 이고 줄 번호 칸은 `code` 의 왼쪽 안쪽(`padding-left`, 번호는 `.ln::before`)이다 — 테마는 `pre` 의 `padding`·`border` 를 마음대로 바꿔도 되지만 `pre code` 의 `padding`·`display` 는 덮지 않는다(번호가 코드 글자와 겹친다). 파일명을 적은 코드 블록(여는 펜스에 ```` ```yaml:docker-compose.yml ```` 같이)은 `<pre data-title="…">` 이고 띠는 `pre[data-title]::before`(`content: attr(data-title)`)가 pre 흐름 안 첫 줄로 그린다 — 띠 색·구분선·글자 크기는 `--code-title-*` 토큰, 띠의 오른쪽 패딩은 화면의 복사 단추 자리이니 `pre[data-title]::before` 의 `padding-right` 를 줄이지 않는다. 화면(미리보기·발표·공유 보기)에서는 이 띠를 누르면 파일명을 복사하는 단추 `pre > button.itda-codetitle`(`::before` 로 파일명을 그린다)가 `::before` 띠 대신 같은 자리에 그린다 — `--code-title-*` 토큰은 두 쪽에 같이 걸리지만, 테마가 `pre[data-title]::before` 를 직접 덮은 규칙은 화면의 단추 띠에 걸리지 않는다(인쇄·PDF·사이드바 축소본·발표 한눈에 보기처럼 단추를 숨기고 `::before` 띠를 그대로 그리는 곳에만 걸린다). 화면의 두 단추(복사·파일명 띠) 색은 창 모양(밝게·어둡게)을 따르지 않고 밝은 코드 바탕에 맞춘다(호스트 앱 창 CSS 의 `button.itda-codecopy`·`button.itda-codetitle` — 호스트가 옛 이름 `hyve-codecopy`·`hyve-codetitle` 도 호환용 별칭으로 함께 붙일 수 있다): 복사 아이콘은 `--code-title-fg`, 올리면 `--ink`, 띠를 올렸을 때·「✓ 복사됨」·포커스 테두리는 고정 `#2563eb` 이다(본문·밝은 노트 칸). 어두운 발표 노트 칸(`.pr-notes-body`)은 예외로 고정 어두운 배경용 색(아이콘 `#9aa3b0`, 올리면 `#e6e9ee`, 띠 올림 `#e6e9ee`, 「✓ 복사됨」 `#8fdfb2`, 포커스 `#8db4ff`)을 쓴다 — 테마가 `--code-bg` 를 어둡게 바꾸거나 `--ink` 를 밝게 바꾸면 이 색들의 대비는 미검증이다. 강조할 줄을 적은 코드 블록(```` ```go {2-3} ````·Deckset `[.code-highlight: 2-3]`)은 `<pre data-hl="2-3" class="… has-hl">` 이고 그 줄이 `<span class="ln hl">` 다(줄 번호를 끈 문서·1줄 블록에서도 감싼다). 강조 줄은 `display: block` 으로 code 가로 전체(번호 칸 포함)와 양옆 4pt 에 띠를 깐다 — 테마는 띠 색을 `--code-hl-bg`·`--code-hl-bar` 로 바꾸고, `.ln.hl` 의 `display`·`margin`·`padding` 은 덮지 않는다(띠가 번호 칸과 어긋난다).
 
 ### 목록 기호 사다리 — 개조식·공문
 
@@ -294,7 +294,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 - **들여쓰기**는 단계마다 같은 폭(`--list-indent`, 공문은 `--list-indent-gongmun`)이고 기호는 그 여백 안에서 글자 머리에 붙어 선다(`::marker`). 줄이 넘치면 기호 뒤 글자 머리에 맞춰 들어간다(내어쓰기). 가장 큰 번호(시작 번호 + 항목 수 − 1)가 두 자리 이상인 순서 목록은 `<ol class="ol-d2">`…`ol-d9`(아홉 자리 이상은 `ol-d9`)이고, 그 목록만 들여쓰기를 `max(들여쓰기 토큰, 자릿수 × 0.66em + 0.6em)`(공문 사다리는 `+ 1.1em`)으로 넓혀 번호 앞자리가 쪽 본문 밖으로 나가 잘리지 않게 한다(`web/base.css`, `mdoc/transform.go` `olDigits`). 한 자리 목록에는 class 가 없어 위 폭 그대로다. 각주 목록도 각주가 열 개 이상이면 같은 class 를 달고(`mdoc/render.go` `footnoteList`) 기본 1.4em 을 같은 공식(`+ 0.6em`)으로 넓힌다. 본문 목록 규칙은 특이도 0 이라 테마가 순서 목록의 들여쓰기나 기호 꼴(`--list-ol-N`)을 바꾸면 테마가 이긴다 — 그때 10번 이상 번호가 잘리지 않는지는 테마가 맡는다.
 - **번호**는 목록의 시작 번호(`3.` 으로 시작하면 `다.`)와 쪽을 넘어 이어지는 조각의 번호를 따른다. 가나다는 행정업무운영 편람대로 `가`\~`하` 다음 `거`\~`허`(28)이고 넘으면 숫자(`29.`), 원문자는 `①`\~`⑳` 다음 `(21)`\~`(50)`, `㉮`\~`㉻` 다음 `(거)`\~`(허)` 이고 그 너머는 숫자.
 - 내장 테마 중 **`mono`(모노)만 기본으로 둘 다 켠다** — 흑백 격식 꼴이 주로 담는 공공 문서는 개조식 보고(`□ ○`)와 공문 항목 번호(`1. 가.`)가 거의 늘 쓰이고, 공문 항목 구분은 규정(행정업무운영 편람)이다. `classic`·`bold`·`compact`·`spine` 은 보통 목록이 기본이고, 개조식으로 쓸 문서가 `list-style: gaejosik` 으로 고른다.
-- **회사 테마**는 토큰으로 기호를 바꾼다: `"--list-ul-4": "\"▸ \""`(P02 꼴), `"--list-ol-1": "upper-roman"`. 꼴 이름은 CSS 기본 꼴(`decimal`·`upper-roman`·`hangul`…)이나 위의 `hyve-…` 다(`theme.css` 에는 `@counter-style` 을 둘 수 없다). 기호 글자는 Pretendard 에 있는 것이 좋다 — `□ ○ · ① … ⑳` 은 있고 `㉮ … ㉻` 는 없어 시스템 글꼴(macOS Apple SD Gothic Neo, Windows 맑은 고딕)로 그린다.
+- **회사 테마**는 토큰으로 기호를 바꾼다: `"--list-ul-4": "\"▸ \""`(P02 꼴), `"--list-ol-1": "upper-roman"`. 꼴 이름은 CSS 기본 꼴(`decimal`·`upper-roman`·`hangul`…)이나 위의 `itda-…` 다(`theme.css` 에는 `@counter-style` 을 둘 수 없다). 옛 이름 `hyve-…`(`hyve-ganada-dot` 등 같은 꼬리의 일곱)는 호환용 별칭으로 계속 같은 꼴을 그린다(`web/base.css` — `system: extends itda-…`). 기호 글자는 Pretendard 에 있는 것이 좋다 — `□ ○ · ① … ⑳` 은 있고 `㉮ … ㉻` 는 없어 시스템 글꼴(macOS Apple SD Gothic Neo, Windows 맑은 고딕)로 그린다.
 - 기호를 글자로 적은 목록(`- ○ 내용`, `1. 가. 내용`, `2. 본문` 아래 줄 `가. 내용`)은 알아보지 않고 경고(`list-marker`)만 낸다 — 점과 기호가 겹쳐 `• ○ 내용` 이 된다.
 - 테마 CSS 가 목록 모양을 정하면 테마가 이긴다: 사다리와 보통 목록의 기본 꼴·들여쓰기는 특이도 0(`:where()`)이라 `.decisions ol { list-style: none }` 같은 규칙이 중첩 단계까지 그대로 맞는다. 목차·각주 안의 목록에는 사다리가 걸리지 않는다.
 - 옛 WebKit(Safari 17 미만)은 `@counter-style` 을 몰라 공문 사다리의 2단계 이하가 숫자로 보인다(개조식 기호는 보인다).

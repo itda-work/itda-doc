@@ -240,7 +240,7 @@ func TestWarnCodesAreConstants(t *testing.T) {
 }
 
 func TestEntryGuideWarnCodes(t *testing.T) {
-	// unknown-theme 은 문서 창(docview)이 테마를 고르며 더한다 — docview 의 시험이 그 상수를 이 표와 맞춘다
+	// unknown-theme 은 호스트 앱이 테마를 고르며 더한다 — 호스트 앱의 시험이 그 상수를 이 표와 맞춘다
 	sameSet(t, "경고 코드", tableNames(t, readDoc(t, "markdown.md"), "warn-codes"), append(warnCodes(t), "unknown-theme"))
 }
 

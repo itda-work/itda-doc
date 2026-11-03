@@ -135,7 +135,7 @@ func atLineStart(n ast.Node) bool {
 // ※ 는 보충 문단 표지라 넣지 않는다. - * + 는 그 자체로 목록 표지라 문단 머리에 오지 않는다.
 const markerSymbols = "□■◻◼▢○●◦◎◇◆▪▫▸▹▶▷►•∙·"
 
-// ganada 는 공문 항목 번호의 한글 차례다(가~하, 넘으면 거~허 — 행정업무운영 편람). base.css 의 hyve-ganada-* 와 같다.
+// ganada 는 공문 항목 번호의 한글 차례다(가~하, 넘으면 거~허 — 행정업무운영 편람). base.css 의 itda-ganada-* 와 같다.
 const ganada = "가나다라마바사아자차카타파하거너더러머버서어저처커터퍼허"
 
 const (

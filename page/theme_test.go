@@ -204,7 +204,7 @@ func TestThemeRejects(t *testing.T) {
 }
 
 // 문서 CSS 는 OpenType 숫자 기능(tnum 등)을 쓰지 않는다 — WKWebView PDF 에서 그 숫자 글리프가 유니코드 대응 없이
-// 들어가 표의 숫자를 복사·검색할 수 없었다(scripts/docview_check.py 가 잡은 결함).
+// 들어가 표의 숫자를 복사·검색할 수 없었다(호스트 앱의 PDF 화면 검사가 잡은 결함).
 func TestNoNumericFontFeatures(t *testing.T) {
 	ts := builtin(t)
 	base, err := web.FS.ReadFile("base.css")

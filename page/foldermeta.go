@@ -10,7 +10,7 @@ import (
 	"github.com/itda-work/itda-doc/mdoc"
 )
 
-// 폴더 기본 frontmatter `_metadata.yml` 찾기·읽기(itda-hyve#474). 경로를 아는 쪽(docview)이 파일을 찾아 읽어
+// 폴더 기본 frontmatter `_metadata.yml` 찾기·읽기(itda-hyve#474). 경로를 아는 쪽(호스트 앱)이 파일을 찾아 읽어
 // mdoc.Options.FolderMeta 로 넘긴다 — mdoc.Render 는 경로를 모르는 순수 함수다.
 
 const (

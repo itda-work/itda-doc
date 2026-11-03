@@ -98,7 +98,7 @@ func TestIndentedCloseFixAll(t *testing.T) {
 	t.Fatal("고치기가 끝나지 않음")
 }
 
-// applyFix 는 화면(app.js)이 하는 것과 같게 Line 줄이 Old 일 때 New 로 바꾼다.
+// applyFix 는 화면(호스트 앱)이 하는 것과 같게 Line 줄이 Old 일 때 New 로 바꾼다.
 func applyFix(t *testing.T, src string, f Fix) string {
 	t.Helper()
 	ls := strings.Split(src, "\n")

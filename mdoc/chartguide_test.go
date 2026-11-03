@@ -167,7 +167,7 @@ func guideExamples(t *testing.T, g string) []guideExample {
 }
 
 // 예제 md 는 경고 없이 그려지고(경고 예제는 chart 경고와 함께), 일곱 종류가 모두 나온다. 경고 아닌 예제는 견본
-// spec/samples/charts-guide.md 에 그대로 들어 있어야 한다 — 그림과 just docview-check 가 그 견본을 쓴다.
+// spec/samples/charts-guide.md 에 그대로 들어 있어야 한다 — 그림과 호스트 앱의 화면 검사가 그 견본을 쓴다.
 func TestChartGuideExamples(t *testing.T) {
 	g := readGuide(t)
 	sample, err := os.ReadFile(filepath.Join(guideDir, "samples", "charts-guide.md"))
@@ -250,7 +250,7 @@ func TestChartGuideExamples(t *testing.T) {
 // 거꾸로 README·FEATURES·테마 안내서는 이 안내서로 잇는다.
 func TestChartGuideLinks(t *testing.T) {
 	g := readGuide(t)
-	// 코드 블록·인라인 코드 안의 글자는 링크가 아니다(15장의 "`[링크](…)` 가 든 칸")
+	// 코드 블록·인라인 코드 안의 글자는 링크가 아니다(인라인 코드로 적은 "`[링크](…)`" 같은 글)
 	prose := regexp.MustCompile("(?s)```.*?```").ReplaceAllString(g, "")
 	prose = regexp.MustCompile("`[^`\n]*`").ReplaceAllString(prose, "")
 	link := regexp.MustCompile(`(!?)\[([^\]]*)\]\(([^)\s]+)\)`)
