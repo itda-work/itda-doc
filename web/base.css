@@ -217,6 +217,18 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
   .page-body a:where([href]:not(nav.toc a, .footnote-ref)):hover { color: var(--link-hover-ink); background-color: var(--link-hover-bg);
     box-shadow: 0 0 0 0.12em var(--link-hover-bg); text-decoration-color: var(--link-hover-line); text-decoration-thickness: 0.12em; }
 } }
+/* 제목 안 링크(itda-work/itda-hyve#621): 글자색은 제목 색이다(--link 가 아니다) — 링크 안 인라인 코드도 따라 제목 색이다(인라인 코드는
+   제 글자색이 없다). 링크임은 옅은 밑줄로만 알리고 밑줄 색도 글자색(currentColor)을 옅게 섞는다. 슬라이드 제목 띠(.slide-title —
+   slides.js headClone 이 제목 안 HTML 을 .page-body 밖에 옮긴다)도 같다 — 그 밖이라 위 링크 규칙이 닿지 않는다.
+   특이도는 .page-body a 와 같은 (0,1,1)이고 그 뒤에 두어 base 의 --link 를 이기며, 테마 CSS 의 같은 특이도 규칙이 덮을 수 있다.
+   각주 번호는 위 예외처럼 뺀다(링크 색 그대로 — 슬라이드 제목 띠에서도 --link·밑줄 없음). hover 는 위 :hover 규칙(특이도가 더 높다) 그대로 — 화면에서만, .page-body 안만 */
+.page-body :where(h1, h2, h3, h4, h5, h6) a:where(:not(.footnote-ref)), .slide-title a:where(:not(.footnote-ref)) { color: inherit; }
+.slide-title a:where(.footnote-ref) { color: var(--link); text-decoration: none; } /* 본문 각주 번호와 같게(.page-body a 가 닿지 않는 자리) */
+.slide-title a:where([href]:not(.footnote-ref)) { text-decoration: underline; text-decoration-thickness: 0.06em; text-underline-offset: 0.2em; text-decoration-color: var(--rule); }
+@supports (color: color-mix(in srgb, black 40%, transparent)) {
+  .page-body :where(h1, h2, h3, h4, h5, h6) a:where([href]:not(.footnote-ref)), .slide-title a:where([href]:not(.footnote-ref)) {
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+}
 .page-body strong { font-weight: 700; }
 .page-body mark { background: #fff1a8; color: inherit; padding: 0 1pt; }
 .page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--rule); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
