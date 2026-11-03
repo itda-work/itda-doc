@@ -56,6 +56,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `description` | 한 줄 설명 | |
 | `extends` | 물려받을 테마. 토큰·머리글·로고·CSS 를 물려받고 적은 것만 바꾼다(4단까지) | `"classic"` |
 | `aliases` | 다른 이름(`theme:` 에 써도 되는 이름) | `["에이크미"]` |
+| `group` | 테마 고르기에서 묶어 보일 성격 묶음(아래 표의 값 하나). `extends` 로 물려받지 않는다. 없으면 묶음 없음 | `"vivid"` |
 | `tokens` | CSS 변수 값(3장). 어느 엔진에서나 쓰이는 정적 값 | `{"--accent": "#b3122e"}` |
 | `derived` | 상대 색을 아는 엔진에서만 `tokens` 를 덮는 식(12장). 같은 이름의 정적 값이 `tokens`(또는 물려받은 테마)에 꼭 있어야 한다 | `{"--accent-soft": "oklch(from var(--accent) 0.955 calc(c * 0.14) h)"}` |
 | `margin` | 쪽 여백 `top`·`right`·`bottom`·`left`(길이: `mm` `cm` `in` `pt` `pc` `px` `em` `rem`) | `{"top": "25mm"}` |
@@ -70,6 +71,26 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `list-style` | 문서가 `list-style` 을 적지 않았을 때의 목록 기호 사다리(4장 "목록 기호 사다리"). `"gaejosik"`·`"gongmun"`·`"plain"` 또는 둘 다 `["gaejosik", "gongmun"]`. 적지 않으면 물려받거나 보통 목록 | `"gongmun"` |
 
 모르는 키는 거부한다(오타 `"foter"` 를 조용히 넘기지 않는다). 쪽번호는 표지를 빼고 센다.
+
+`group` 은 쓰임새가 아니라 성격·무드로 고른다. 값은 아래 다섯 가운데 하나이고, 표의 차례가 테마 고르기에서 묶음을 보이는 차례다
+(`page.ThemeGroups`). 표 밖의 값(`"fun"`)은 거부하지 않는다 — 테마는 그대로 쓸 수 있고 묶음 없음(`Theme.Group == ""`)이 되며
+경고 문장이 남는다. 경고는 `itda-doc themes`(그 테마 줄 끝의 `경고: …`, `cmd/itda-doc/main.go`)와 `Theme.GroupWarning()`
+(`page/themegroup.go`)으로 본다. 내장 테마에서는 그 경고가 `BuiltinThemeProblems` 의 문제다. 값은 대소문자·공백까지 그대로 맞춰 본다
+(`"Vivid"`·`" vivid"` 는 표 밖의 값이다).
+
+`group` 을 모르는 옛 판은 모르는 키를 거부하므로(위 문단) `group` 을 적은 테마를 쓸 수 없음으로 둔다. 여러 판의 앱이 함께 읽는
+테마 폴더라면 앱을 먼저 올리고 `group` 을 적는다.
+이 표는 테스트(`TestThemeGroupTableMatchesSpec`)가 코드의 어휘와 맞춰 본다.
+
+<!-- theme-groups:begin -->
+| 값 | 묶음 이름 | 성격 |
+|---|---|---|
+| `basic` | 기본 | 중립 — 내장 다섯(`classic`·`bold`·`compact`·`mono`·`spine`) |
+| `formal` | 단정·격식 | 차분하고 격식 있는 |
+| `vivid` | 선명·브랜드 | 브랜드색이 앞에 서는 |
+| `editorial` | 감성·에디토리얼 | 잡지·감성 무드 |
+| `dark` | 다크 | 어두운 바탕 |
+<!-- theme-groups:end -->
 
 ## 3. 토큰 — 전체 표
 
@@ -416,6 +437,8 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 한국 서비스 디자인 시스템(토스 TDS·카카오·네이버…)에서 온 스타일 테마를 만드는 레시피다. 문법·폴더 구조·검사는 위와 같고, 색 토큰·타이포·슬라이드 장식만 남의 것이다.
 
 **상표와 서체** — 폴더 이름은 회사명 소문자(`toss`), `aliases` 에 한글 별칭(`토스`)을 둔다. 로고·심볼 SVG·전용 서체 파일은 넣지 않는다. `description` 첫머리에 「비공식 — OO 디자인 시스템에서 영감」 을 적는다. 서체는 오픈 라이선스 글꼴(LINE Seed·Wanted Sans 등 — 테마마다 라이선스를 실측한다)만 9장 방식으로 임베드하고, 그 외는 Pretendard 기본 글꼴로 무드를 낸다.
+
+**묶음 하나 고르기** — `group` 에 2장 묶음 표의 값 하나를 적는다. 바탕(`extends`)의 묶음은 물려받지 않으니 바탕이 `basic` 이어도 그 테마의 무드로 고른다(브랜드색이 앞에 서면 `vivid`).
 
 **팔레트 → 토큰** — 색 값은 공식 디자인 문서에서 읽어 고정한다(기억으로 적지 않는다). 바탕 테마(`extends`)는 내장 구조 테마 5종 중에서 고른다 — 표지·머리글·목록 기호 같은 문서 구조는 바탕이 정한다.
 

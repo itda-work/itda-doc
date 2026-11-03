@@ -8,10 +8,11 @@ import (
 )
 
 // BuiltinThemeProblems 는 내장(또는 내장 꼴로 불러온) 테마 묶음 ts 를 이름 순으로 검사해 문제 문장
-// "<테마>: <무엇>" 을 모은다. 빈 목록이면 통과다. 보는 것은 넷이다 — 옛 엔진과 새 엔진의 PDF 가 같도록
+// "<테마>: <무엇>" 을 모은다. 빈 목록이면 통과다. 보는 것은 다섯이다 — 옛 엔진과 새 엔진의 PDF 가 같도록
 // (1) derived 식의 값이 같은 이름의 정적 값(tokens)과 같고 (2) tokens 에 상대 색 식(from )이 없으며,
 // 테마 규칙이 쪽 밖을 고르지 않도록 (3) 테마 CSS 가 @scope (.page) 안에 있고, 슬라이드 배율이 먹도록
-// (4) 슬라이드 전용 규칙의 font-size 가 --slide-scale 허용 꼴이다(slideGuardProblems).
+// (4) 슬라이드 전용 규칙의 font-size 가 --slide-scale 허용 꼴이다(slideGuardProblems). 또 (5) theme.json 의 group 이
+// 어휘 밖이면(GroupWarning) 문제다 — 사용자 테마에서는 경고일 뿐이지만 내장 테마는 고쳐서 낸다. group 이 없는 것은 문제가 아니다.
 // 앱은 자기 내장 테마를 더한 묶음으로 부를 수 있다(itda-hyve#577).
 func BuiltinThemeProblems(ts *Themes) []string {
 	var out []string
@@ -29,6 +30,7 @@ const (
 	checkDerived                   // (1)·(2) 파생 색·from 금지
 	checkScope                     // (3) @scope
 	checkSlide                     // (4) 슬라이드 글자 크기
+	checkGroup                     // (5) 어휘 밖 group
 )
 
 type themeProblem struct {
@@ -50,6 +52,9 @@ func builtinThemeProblems(ts *Themes) []themeProblem {
 			why, _ := ts.Broken(name)
 			add(checkTheme, fmt.Sprintf("%s: 쓸 수 없는 테마 — %s", name, why))
 			continue
+		}
+		if w := th.GroupWarning(); w != "" {
+			add(checkGroup, name+": "+w)
 		}
 		for _, p := range derivedProblems(th) {
 			add(checkDerived, p)

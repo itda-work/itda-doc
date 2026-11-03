@@ -3,6 +3,7 @@
   "title": "클래식",
   "description": "남색 한 가지 강조색, 띠 두른 표지, 제목 번호, 머리글에 조직·문서 제목",
   "aliases": ["클래식"],
+  "group": "basic",
   "cover": "auto",
   "toc-break": true,
   "h1-break": false,

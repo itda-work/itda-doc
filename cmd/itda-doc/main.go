@@ -266,14 +266,19 @@ func cmdThemes(args []string, stdout, stderr io.Writer) error {
 		if i.User {
 			kind = "사용자"
 		}
-		switch {
-		case i.Error != "":
+		if i.Error != "" {
 			fmt.Fprintf(stdout, "%s\t%s\t쓸 수 없음: %s\n", i.Name, kind, i.Error)
-		case i.Description != "":
-			fmt.Fprintf(stdout, "%s\t%s\t%s — %s\n", i.Name, kind, i.Title, i.Description)
-		default:
-			fmt.Fprintf(stdout, "%s\t%s\t%s\n", i.Name, kind, i.Title)
+			continue
 		}
+		line := i.Title
+		if i.Description != "" {
+			line += " — " + i.Description
+		}
+		// 어휘 밖 group 은 테마를 막지 않으므로 줄 끝 경고로만 알린다(itda-doc#24)
+		if th, ok := ts.Get(i.Name); ok && th.GroupWarning() != "" {
+			line += "\t경고: " + th.GroupWarning()
+		}
+		fmt.Fprintf(stdout, "%s\t%s\t%s\n", i.Name, kind, line)
 	}
 	return nil
 }

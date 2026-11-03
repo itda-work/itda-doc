@@ -3,6 +3,7 @@
   "title": "컴팩트",
   "description": "표지 없이 촘촘한 한 장, 맨 위 정보 표, 눈에 띄는 결정 사항 상자·할 일 표, 초록 강조",
   "aliases": ["컴팩트"],
+  "group": "basic",
   "cover": "never",
   "toc-break": false,
   "h1-break": false,

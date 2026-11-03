@@ -32,6 +32,7 @@ type themeFile struct {
 	Description string            `json:"description"`
 	Extends     string            `json:"extends"`
 	Aliases     []string          `json:"aliases"`
+	Group       string            `json:"group"` // 성격 묶음(ThemeGroups 의 Name 하나, itda-doc#24). 물려받지 않는다
 	Tokens      map[string]string `json:"tokens"`
 	// Derived 는 지원하는 엔진에서만 tokens 를 덮는 식이다(상대 색 oklch(from var(--accent) …)). 같은 이름의 정적 값이
 	// tokens 에(또는 물려받은 테마에) 꼭 있어야 한다 — 옛 WebKit(macOS 12~14 의 Safari 17 이하)은 상대 색을 몰라
@@ -114,6 +115,7 @@ type Theme struct {
 	Title       string
 	Description string
 	Aliases     []string
+	Group       string // 성격 묶음(ThemeGroups 의 Name). theme.json 에 없거나 어휘 밖 값이면 "" — 묶음 없음(GroupWarning)
 	Extends     string
 	User        bool // 사용자 테마 폴더에서 왔다
 	// Tokens 는 CSS 변수(이름 순). 여백도 --page-margin-* 토큰으로 들어 있다.
@@ -139,6 +141,8 @@ type Theme struct {
 	Fonts string
 	// Template 은 "새 문서" 의 시작 글(template.md)이다. 없으면 물려받은 테마의 것.
 	Template string
+	// groupWarn 은 어휘 밖 group 값의 경고 문장이다(GroupWarning).
+	groupWarn string
 	// files 는 이 테마(와 조상)의 assets 를 내줄 때 쓴다: 앱 주소 → (fs, 경로).
 	files map[string]themeAsset
 }
@@ -167,6 +171,7 @@ type ThemeInfo struct {
 	HasTemplate bool   `json:"has_template"` // "새 문서" 메뉴에 보일지
 	User        bool   `json:"user"`         // 사용자 테마 폴더의 테마
 	Extends     string `json:"extends,omitempty"`
+	Group       string `json:"group,omitempty"` // 성격 묶음(Theme.Group). 없거나 어휘 밖이면 비운다
 	Error       string `json:"error,omitempty"` // 쓸 수 없는 까닭(있으면 고를 수 없다)
 }
 
@@ -542,6 +547,8 @@ func resolveTheme(entries map[string]*themeEntry, broken map[string]string, name
 		}
 		*t = *parent
 		t.Aliases = nil // 별칭은 물려받지 않는다(같은 별칭이 두 테마를 가리키게 된다)
+		// 묶음도 물려받지 않는다 — 바탕 구조와 성격은 다르다(classic 을 물려받은 선명한 브랜드 테마, itda-doc#24)
+		t.Group, t.groupWarn = "", ""
 		t.Labels = copyMap(parent.Labels)
 		t.Defaults = copyMap(parent.Defaults)
 		t.files = map[string]themeAsset{}
@@ -561,6 +568,14 @@ func resolveTheme(entries map[string]*themeEntry, broken map[string]string, name
 	t.Name, t.Title, t.Description, t.Aliases, t.Extends, t.User = name, tf.Title, tf.Description, tf.Aliases, tf.Extends, e.user
 	if t.Title == "" {
 		t.Title = name
+	}
+	if tf.Group != "" {
+		if validThemeGroup(tf.Group) {
+			t.Group = tf.Group
+		} else {
+			// 거부하지 않는다 — 테마는 쓸 수 있고 묶음만 없다
+			t.groupWarn = fmt.Sprintf("group %q 는 모르는 묶음 — 묶음 없음으로 둔다(%s 중 하나)", tf.Group, themeGroupNames())
+		}
 	}
 	for k, v := range tf.Tokens {
 		tokens[k] = v
@@ -737,7 +752,7 @@ func (ts *Themes) List() []ThemeInfo {
 	for _, n := range ts.order {
 		t := ts.byName[n]
 		out = append(out, ThemeInfo{Name: t.Name, Title: t.Title, Description: t.Description, HasTemplate: t.Template != "",
-			User: t.User, Extends: t.Extends})
+			User: t.User, Extends: t.Extends, Group: t.Group})
 	}
 	for _, n := range sortedKeys(ts.broken) {
 		out = append(out, ThemeInfo{Name: n, Title: n, User: true, Error: ts.broken[n]})
