@@ -307,7 +307,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
   ```
   .page.slide
     .slide-deco.k-…          장식 자리(테마가 ::before·::after 로 띠·면을 칠한다)
-    .slide-head.k-…          제목(.slide-title — 제목 번호 .header-section-number, 이어진 슬라이드는 .slide-cont "(계속)")
+    .slide-head.k-…          제목(.slide-title — 제목 번호 .header-section-number, 넘쳐 여러 장이 된 묶음은 첫 장 .slide-seq "(계속 1/n)"·이어진 장 .slide-cont "(계속 k/n)")
     .page-body.k-…           본문. 제목 슬라이드는 .slide-cover(.sc-top·.sc-logo·.sc-org·.sc-main·.sc-title·.sc-sub·.sc-meta),
                              구역 슬라이드는 .slide-section(.ss-num — 번호가 없는 문서는 구역 차례 — · .ss-title)
     .slide-foot.k-…          아래(.sf-logo·.sf-text 조직·.sf-num 번호)

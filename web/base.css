@@ -819,7 +819,7 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .slide-head { position: absolute; top: var(--slide-pad-top); left: var(--slide-pad-x); right: var(--slide-pad-x); }
 .slide-title { font-family: var(--font-heading); font-size: calc(var(--slide-title-size) * var(--slide-scale)); font-weight: 700; line-height: 1.25; color: var(--slide-title-color); letter-spacing: -0.01em; }
 .slide-title .header-section-number { color: var(--accent); margin-right: 0.4em; }
-.slide-title .slide-cont { font-size: 0.55em; font-weight: 600; color: var(--muted); letter-spacing: 0; white-space: nowrap; } /* 「(계속 k/n)」 표지는 한 덩이로 줄바꿈(itda-hyve#482) */
+.slide-title :is(.slide-cont, .slide-seq) { font-size: 0.55em; font-weight: 600; color: var(--muted); letter-spacing: 0; white-space: nowrap; } /* 「(계속 k/n)」 표지는 한 덩이로 줄바꿈(itda-hyve#482) */
 .slide-foot { position: absolute; left: var(--slide-pad-x); right: var(--slide-pad-x); bottom: 16pt; display: flex; align-items: center;
   justify-content: space-between; font-size: 11pt; color: var(--muted); line-height: 1; }
 .sf-left { display: flex; align-items: center; gap: 8pt; min-width: 0; }
@@ -927,7 +927,7 @@ nav.toc .toc-section-number { margin-right: 3pt; }
    바탕을 정하면 그쪽이 이기고, 머리 칸·줄무늬 행은 칸 바탕이라 그 위에 그대로 그려진다. 바탕 토큰이 투명인 상자(.box·.lead)는 그 테마 CSS 가
    스크림 장 범위로 토큰을 덮는다(compact·mono·bold) */
 :where(.page.slide.bg-fill > .page-body > table, .page.slide.bg-fill > .page-body > :is(ul, ol, dl) table) { background: var(--paper); }
-.page.slide.bg-fill > .slide-head .slide-cont, .page.slide.bg-fill > .slide-foot, .page.slide.bg-fill > .slide-foot :is(.sf-num, .sf-text),
+.page.slide.bg-fill > .slide-head :is(.slide-cont, .slide-seq), .page.slide.bg-fill > .slide-foot, .page.slide.bg-fill > .slide-foot :is(.sf-num, .sf-text),
 .page.slide.bg-fill > .slide-bg figcaption { color: var(--slide-scrim-muted); }
 .page.slide.bg-fill > .slide-head .slide-title, .page.slide.bg-fill > .slide-foot { border-color: var(--slide-scrim-muted); } /* 테마가 먹색으로 그은 제목 밑줄·바닥 줄(mono) */
 /* 가로 배치(itda-hyve#569): mdoc 이 class fit-row 를 단 맨 위 문단(.fit 그림 2장 이상만)을 그림 줄·캡션 줄 격자로 놓는다 — 그림 하나가 한 칸,
