@@ -110,7 +110,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--rule` | 가는 선 | `#cfd5de` |
 | `--rule-strong` | 굵은 선(결재란 칸) | `#23272f` |
 | `--paper` | 쪽 바탕 | `#ffffff` |
-| `--link` | 링크 색 | `var(--accent)` |
+| `--link` | 링크 색(제목·슬라이드 제목 안 링크는 제목 색을 따르고 밑줄만 옅게 — `web/base.css`, itda-work/itda-hyve#621) | `var(--accent)` |
 | `--link-hover-ink` | 화면에서 링크를 가리킬 때 글자색(hover 는 color-mix 를 아는 엔진에서만. 평소 밑줄은 링크 색을 옅게, PDF 에도) | `color-mix(in srgb, var(--accent) 75%, black)` |
 | `--link-hover-bg` | 가리킬 때 링크 뒤 면 | `var(--accent-soft)` |
 | `--link-hover-line` | 가리킬 때 밑줄 색 | `var(--accent)` |
