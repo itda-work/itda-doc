@@ -70,6 +70,8 @@ func TestGlobalNamesAndTitle(t *testing.T) {
   eq("없음", S.appName(null), "");
   eq("제목 + 앱", S.docTitle("보고서", "Itda Hyve Docs"), "보고서 — Itda Hyve Docs");
   eq("제목만", S.docTitle("보고서", ""), "보고서");
+  eq("고정 제목(뷰어)", S.docTitle("보고서", "앱", "itda-doc 뷰어"), "itda-doc 뷰어");
+  eq("고정 제목 없음", S.docTitle("보고서", "앱", undefined), "보고서 — 앱");
   // 호스트 전역 물러서기(pick — hostPart·extInit 가 쓴다): 정식 이름 Itda* 먼저, 없으면 옛 이름 Hyve*
   const a = {}, b = {};
   eq("둘 다 → Itda", S.pick({ ItdaCodeCopy: a, HyveCodeCopy: b }, "CodeCopy"), a);

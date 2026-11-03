@@ -27,3 +27,8 @@ syntax:
 # 브라우저용 렌더 입구: build/web/ 에 itda-doc.wasm·.wasm.gz·wasm_exec.js·temml.min.js (scripts/build-wasm.sh)
 wasm:
     scripts/build-wasm.sh
+
+# 설치 없는 웹 뷰어: build/web/viewer/ 에 정적 번들(뷰어·share.js·base.css·글꼴·wasm·.gz·.br·견본) — scripts/build-web.sh.
+# 띄워 보기: python3 -m http.server -d build/web/viewer 8000 → http://localhost:8000/
+web:
+    scripts/build-web.sh

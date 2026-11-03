@@ -196,10 +196,32 @@ func TestUnsupported(t *testing.T) {
 			t.Errorf("%q: 미지원 %s 이어야 함, %v", tex, cmd, err)
 		}
 	}
-	for _, tex := range []string{`\frac{1}{`, `x^`, `\left( x`, `a & b`, `}`, `\sqrt`, "   "} {
+	for _, tex := range []string{`\frac{1}{`, `\left( x`, `a & b`, `}`, `\sqrt`, "   "} {
 		if _, err := Render(tex, false); !isCode(err, CodeSyntax) {
 			t.Errorf("%q: 문법 오류여야 함, %v", tex, err)
 		}
+	}
+}
+
+// Temml 이 ParseError 가 아닌 것(안의 TypeError)을 던지는 입력은 JS 엔진 문장 대신 정해진 한 문장이고(itda-work/itda-hyve#577
+// 결정 1 — wasm 판과 같은 글, cmd/itda-doc-wasm/wasm_test.go), CodeEngine 이라 기억하지 않는다.
+func TestInternalError(t *testing.T) {
+	for _, tex := range []string{`x^`, `x_`, `\operatorname{__proto__}`} {
+		_, err := Render(tex, false)
+		var e *Error
+		if !errors.As(err, &e) || e.Code != CodeEngine || e.Msg != internalMsg {
+			t.Errorf("%q: 내부 오류 한 문장이어야 함, %#v", tex, err)
+		}
+		cacheMu.Lock()
+		_, cached := cache[key{tex, false}]
+		cacheMu.Unlock()
+		if cached {
+			t.Errorf("%q: 내부 오류가 기억됨", tex)
+		}
+	}
+	// 같은 문서의 다음 수식은 그려진다(예외를 낸 실행기를 버리고 새로 만든다)
+	if _, err := Render(`x^2`, false); err != nil {
+		t.Fatal(err)
 	}
 }
 
