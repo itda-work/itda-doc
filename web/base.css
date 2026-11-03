@@ -229,6 +229,10 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
   .page-body :where(h1, h2, h3, h4, h5, h6) a:where([href]:not(.footnote-ref)), .slide-title a:where([href]:not(.footnote-ref)) {
     text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
 }
+/* 본문 링크 안 인라인 코드: 글자색은 본문 글자색(--ink)이다(--link 가 아니다) — 코드 상자(--code-bg)가 이미 눈에 띄어 링크임은 밑줄로
+   알린다. 제목 안 링크의 코드는 위 제목 규칙처럼 제목 색을 따른다(같은 특이도 (0,1,2), 뒤에 두어 이긴다). hover 에도 코드 글자색은 그대로다 */
+.page-body a code { color: var(--ink); }
+.page-body :where(h1, h2, h3, h4, h5, h6) a code { color: inherit; }
 .page-body strong { font-weight: 700; }
 .page-body mark { background: #fff1a8; color: inherit; padding: 0 1pt; }
 .page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--rule); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
