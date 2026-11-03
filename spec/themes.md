@@ -140,7 +140,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--h4-size` | h4~h6 크기 | `10.5pt` |
 | `--table-size` | 표 글자 크기 | `9.5pt` |
 | `--table-head-bg` | 표 머리 바탕 · 화면의 정렬 머리 칸 포커스·올림 표시는 이 바탕과 창 모양에 상관없이 남색 `#1e3a8a`·흰색 두 겹이라 한 겹이 이 바탕과 3:1 이상이다(비텍스트 색 대비 1.4.11 식 — 앱 창 CSS 의 `th.sortable`, 테마가 `th` 의 `outline`·`box-shadow` 를 덮으면 미검증) | `#eef2f8` |
-| `--table-head-ink` | 표 머리 글자색 | `var(--ink)` |
+| `--table-head-ink` | 표 머리 글자색(머리 칸 안 인라인 코드는 그 칸의 글자색을 물려받고 — 보통 이 색, 머리 안 링크면 링크 색 — 상자는 그 글자색을 옅게 깐다. `web/base.css`, itda-doc#19) | `var(--ink)` |
 | `--table-border` | 표 칸 선 | `var(--rule)` |
 | `--table-top-rule` | 표 맨 위 선 | `1.2pt solid var(--accent)` |
 | `--table-cell-pad` | 칸 안 여백 | `3.5pt 6pt` |

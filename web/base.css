@@ -648,6 +648,14 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .page-body pre { font-family: var(--font-mono); font-size: var(--code-size); line-height: 1.55; background: var(--code-bg);
   padding: 7pt 10pt; border-radius: 3pt; margin: 8pt 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
 .page-body pre code { background: none; padding: 0; font-size: inherit; }
+/* 표 머리 안 인라인 코드: 글자색은 머리 글자색(--table-head-ink, 머리 안 링크면 그 링크 색)을 따르고, 상자는 그 글자색을 옅게 깐다 —
+   진한 머리(bold·spine)에서 옅은 --code-bg 위 흰 글자가 되지 않게(itda-doc#19). 특이도 (0,1,2)라 본문 링크 안 코드 규칙
+   (.page-body a code)과 같고 뒤에 있어 이긴다. color-mix 를 모르는 엔진은 상자 없이 글자만이다 */
+.page-body th code { color: inherit; background: transparent; }
+@supports (color: color-mix(in srgb, black 16%, transparent)) {
+  .page-body th code { background: color-mix(in srgb, currentColor 16%, transparent); }
+}
+.page-body th pre code { background: none; } /* 머리 칸 안 코드 블록(raw HTML pre)은 pre 상자 하나만 */
 
 /* 코드 줄 번호(itda-hyve#435 — codelines.js): 펜스 코드 블록(2줄 이상)의 왼쪽에 1부터 줄 번호. codelines.js 가 code 안을
    줄마다 span.ln(data-n)으로 감싸고, 번호 글자는 ::before(content: attr(data-n))로만 그린다 — 선택·복사·검색·
