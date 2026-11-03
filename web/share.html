@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <!-- 문서 창 공유의 보기 화면(itda-hyve#339 ①·②·③·④, 표 복사 itda-hyve#349, 코드 복사 단추 itda-hyve#413). 같은 네트워크의 브라우저가 연다 — Wails 바인딩이 없다. Go(share_http.go)가 {{BASE}} 를
-     /s/<토큰> 으로 채우고 콘텐츠 보안 정책은 응답 머리로 단다(shareCSP — 원격 그림 늘 끔). -->
+     /s/<토큰> 으로 채우고 콘텐츠 보안 정책은 응답 머리로 단다(shareCSP — 원격 그림 늘 끔).
+     확장 자리(itda-hyve#617): 중괄호 둘로 싼 EXT_HEAD(share.js 앞 — 확장의 link·script, share.js 의 HyveShareExt)·EXT_BAR(머리 막대 끝)·
+     EXT_ENDED(끝난 카드 안)·EXT_SIDE(보기 영역 옆, .main 안) 를 서버가 채운다 — 확장이 없으면 빈 글로 바꾼다. 이 주석에는 자리 글자를 쓰지 않는다. -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer">
 <title>Itda Hyve Docs</title>
@@ -17,6 +19,7 @@
 <script src="{{BASE}}/_/codecopy.js"></script>
 <script src="{{BASE}}/_/codelines.js"></script>
 <script src="{{BASE}}/_/tablesort.js"></script>
+{{EXT_HEAD}}
 <script src="{{BASE}}/_/share.js" defer></script>
 </head>
 <body class="share-view paper-a4" data-base="{{BASE}}">
@@ -47,6 +50,7 @@
     <button class="gbtn" data-look="doc" title="쪽 — A4 로 나눠 보기">쪽</button>
     <button class="gbtn" data-look="flow" title="이어보기 — 쪽 나눔 없이">이어보기</button>
   </div>
+{{EXT_BAR}}
 </header>
 <div class="main">
   <aside id="sidebar" class="sidebar" aria-label="목차" hidden>
@@ -60,10 +64,12 @@
       <div class="share-ended-card">
         <h2 id="ended-title">공유가 끝났습니다</h2>
         <p id="ended-msg">공유한 사람이 공유를 중단했거나 시간이 지났습니다. 다시 보려면 새 주소를 받으세요.</p>
+{{EXT_ENDED}}
       </div>
     </div>
     <p id="load-err" class="share-err" hidden></p>
   </div>
+{{EXT_SIDE}}
   <button type="button" id="follow-back" class="follow-back" hidden>발표자 위치로</button>
 </div>
 <div class="menu" id="table-ctx" role="menu" aria-label="표 복사" hidden>
