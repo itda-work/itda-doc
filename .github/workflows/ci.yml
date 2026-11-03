@@ -33,4 +33,4 @@ jobs:
         env:
           GOOS: js
           GOARCH: wasm
-        run: go build ./mdoc/ ./page/ ./texmath/
+        run: go build ./mdoc/ ./page/ ./texmath/ ./cmd/itda-doc-wasm/

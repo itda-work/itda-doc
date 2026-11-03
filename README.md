@@ -30,6 +30,7 @@
 | `themes/` | 내장 중립 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 견본 회사 테마 `samples/acme` |
 | `web/` | 쪽 모델 웹 자원 — `base.css`·`pager.js`·`slides.js`·보기 전용 공유 화면(`share.*`)·글꼴 |
 | `cmd/itda-doc/` | 명령줄 도구 |
+| `cmd/itda-doc-wasm/` | 브라우저용 렌더 입구(WebAssembly) — 전역 `itdaDoc.render`·`themes`·`themeCSS`. 수식은 페이지가 올린 `temml.min.js` 로 그린다. `just wasm` 이 `build/web/` 에 만든다 |
 
 ## 빌드·시험
 

@@ -23,3 +23,7 @@ node-check:
 # 명세를 고치면 돌린다 — 잊으면 TestBundleFresh 가 실패한다
 syntax:
     go generate ./mdsyntax
+
+# 브라우저용 렌더 입구: build/web/ 에 itda-doc.wasm·.wasm.gz·wasm_exec.js·temml.min.js (scripts/build-wasm.sh)
+wasm:
+    scripts/build-wasm.sh
