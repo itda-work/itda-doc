@@ -66,8 +66,18 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 	// 2) 나머지는 GitHub 규칙으로 id 를 만든다. 겹치면 -1, -2.
 	// next 는 base 마다 다음에 볼 번호다 — 그보다 작은 번호는 이미 쓰였고 쓰인 id 는 계속 쓰인 채라 다시 보지 않는다
 	// (같은 제목 n 개가 n² 번 찾지 않게).
+	// 본문 제목을 모두 매긴 뒤 노트 안 제목을 매긴다(itda-doc#20) — DropNotes 는 노트를 먼저 빼므로, 본문 제목이 먼저 받아야
+	// 노트를 내든 빼든 본문 제목의 자동 id 가 같다. 같은 글자면 노트 안 제목이 -N 을 받는다.
+	order := make([]*headingInfo, 0, len(infos))
+	for _, notes := range []bool{false, true} {
+		for _, info := range infos {
+			if info.inNotes == notes {
+				order = append(order, info)
+			}
+		}
+	}
 	next := map[string]int{}
-	for _, info := range infos {
+	for _, info := range order {
 		if info.id != "" {
 			continue
 		}
@@ -90,7 +100,8 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 	// 3) 번호와 목차는 문서에서 가장 높은 제목 단계를 1로 센다.
 	// h1 없이 ## 부터 쓴 문서가 "0.1" 이 되지 않게 하려는 것이다(Pandoc 은 0.1 을 낸다).
 	// 발표자 노트 안 제목은 DropNotes 와 상관없이 기준 단계·번호·목차 모두에서 뺀다(itda-doc#15) — 노트를 빼든 내든 목차의
-	// 글자·번호·구조가 같다(노트 안 제목이 자동 id 를 먼저 가지면 뒤 같은 글자 본문 제목의 id 는 다를 수 있다). id 는 위에서 받았다(노트 칸에 그려지고 본문 제목과 겹치지 않아야 한다).
+	// 글자·번호·구조·id 가 같다(id 는 위 2) 에서 본문 먼저 받았다 — 노트 안에 직접 적은 {#id} 는 예외로 본문 자동 id 를 비키게 한다).
+	// 노트 안 제목도 id 는 받는다(노트 칸에 그려지고 본문 제목과 겹치지 않아야 한다).
 	top := 7
 	for i, h := range hs {
 		if !infos[i].inNotes {
