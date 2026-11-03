@@ -69,3 +69,24 @@ func TestHeadingLinkInheritsColor(t *testing.T) {
 		t.Error("제목 안 링크의 밑줄 색이 글자색(currentColor) 기반이 아님")
 	}
 }
+
+// 본문 링크 안 인라인 코드는 본문 글자색(--ink)이고, 제목 안 링크의 코드는 제목 색(inherit)이다. 둘 다 특이도 (0,1,2)라 제목 규칙이
+// 뒤에 있어야 이긴다. 실제 엔진의 계산값은 보지 않는다(미검증).
+func TestLinkCodeColor(t *testing.T) {
+	b, err := web.FS.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
+	body := strings.Index(css, ".page-body a code { color: var(--ink); }")
+	head := strings.Index(css, ".page-body :where(h1, h2, h3, h4, h5, h6) a code { color: inherit; }")
+	if body < 0 {
+		t.Fatal("본문 링크 안 인라인 코드가 본문 글자색(--ink)인 규칙이 없음")
+	}
+	if head < 0 {
+		t.Fatal("제목 안 링크의 인라인 코드가 제목 색을 따르는 규칙이 없음")
+	}
+	if head < body {
+		t.Error("제목 안 링크 코드 규칙이 본문 규칙보다 앞에 있어 --ink 에 진다")
+	}
+}
