@@ -400,6 +400,16 @@ func (m *Meta) fill(n *yaml.Node, srcs metaSrc) []Warning {
 			warns = append(warns, ws...)
 		default:
 			m.Extra = append(m.Extra, extraField(k.Value, v))
+			// 아는 키와 아주 가까운 모르는 키는 오타일 수 있어 알린다 — 값은 위처럼 Extra 에 그대로(itda-doc#14, typo.go).
+			// 그 아는 키가 같은 frontmatter 에 함께 있어도 낸다(둘 다 적었어도 한쪽은 오타일 수 있다).
+			if s, ok := typoSuggest("", k.Value); ok {
+				msg := fmt.Sprintf("frontmatter %s 는 모르는 키 — %s 의 오타?", k.Value, s)
+				if p, ok := folderWarnPrefix(srcs, k.Value, k); ok {
+					warns = append(warns, Warning{Line: 0, Code: WarnFrontmatterTypo, Key: k.Value, Message: p + msg})
+				} else {
+					warns = append(warns, Warning{Line: k.Line + 1, Code: WarnFrontmatterTypo, Key: k.Value, Message: msg})
+				}
+			}
 		}
 	}
 	return warns
@@ -568,11 +578,11 @@ func parseSlides(v *yaml.Node, srcs metaSrc) (*SlidesMeta, []Warning) {
 		default:
 			if p, ok := folderWarnPrefix(srcs, "slides."+kk.Value, kk); ok {
 				warns = append(warns, Warning{Line: 0, Code: WarnFrontmatterValue, Key: "slides." + normalizeAlias("slides", kk.Value),
-					Message: p + fmt.Sprintf("frontmatter slides.%s 는 모르는 키라 무시함(ratio·level·transition·incremental·font-scale)", kk.Value)})
+					Message: p + fmt.Sprintf("frontmatter slides.%s 는 모르는 키라 무시함(ratio·level·transition·incremental·font-scale%s)", kk.Value, typoHint("slides", kk.Value))})
 				continue
 			}
 			warns = append(warns, Warning{Line: kk.Line + 1, Code: WarnFrontmatterValue, Key: "slides." + normalizeAlias("slides", kk.Value),
-				Message: fmt.Sprintf("frontmatter slides.%s 는 모르는 키라 무시함(ratio·level·transition·incremental·font-scale)", kk.Value)})
+				Message: fmt.Sprintf("frontmatter slides.%s 는 모르는 키라 무시함(ratio·level·transition·incremental·font-scale%s)", kk.Value, typoHint("slides", kk.Value))})
 		}
 	}
 	return sm, warns
@@ -632,11 +642,11 @@ func parseCode(v *yaml.Node, srcs metaSrc) (*CodeMeta, []Warning) {
 		default:
 			if p, ok := folderWarnPrefix(srcs, "code."+kk.Value, kk); ok {
 				warns = append(warns, Warning{Line: 0, Code: WarnFrontmatterValue, Key: "code." + normalizeAlias("code", kk.Value),
-					Message: p + fmt.Sprintf("frontmatter code.%s 는 모르는 키라 무시함(line-numbers)", kk.Value)})
+					Message: p + fmt.Sprintf("frontmatter code.%s 는 모르는 키라 무시함(line-numbers%s)", kk.Value, typoHint("code", kk.Value))})
 				continue
 			}
 			warns = append(warns, Warning{Line: kk.Line + 1, Code: WarnFrontmatterValue, Key: "code." + normalizeAlias("code", kk.Value),
-				Message: fmt.Sprintf("frontmatter code.%s 는 모르는 키라 무시함(line-numbers)", kk.Value)})
+				Message: fmt.Sprintf("frontmatter code.%s 는 모르는 키라 무시함(line-numbers%s)", kk.Value, typoHint("code", kk.Value))})
 		}
 	}
 	return cm, warns
