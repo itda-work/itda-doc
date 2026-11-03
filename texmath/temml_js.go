@@ -3,7 +3,6 @@
 package texmath
 
 import (
-	"fmt"
 	"syscall/js"
 )
 
@@ -50,31 +49,28 @@ func temml(tex string, display bool) (out string, err error) {
 	return v.String(), nil
 }
 
-// jsError 는 Temml 이 던진 값에서 문장을 꺼낸다.
-//   - 글자를 던지면 그 글을, message 가 글자인 객체(Error)를 던지면 message 를 classifyError 로 고른다 — 네이티브 판(temml.go
-//     parseError)과 같다. 결과는 기억(cache)된다. 한계: Temml 이 아닌 받침이 Error 를 던져도(예 「Temml loading」) 같은 길이라
-//     CodeSyntax 로 기억되어, 진짜 Temml 로 바꾼 뒤에도 같은 수식은 그 경고로 남는다(Temml 0.13.5 자신은 이렇게 던지지 않는다 — 추정).
-//   - 그 밖의 값(숫자·undefined·null·message 가 없는 객체 등)은 CodeEngine 이다 — 기억하지 않아 엔진이 고쳐지면 다음 렌더에 그려진다.
-//   - 여기서 값을 읽다 panic 하면 한 겹 더 받아 CodeEngine 으로 둔다(지금 부르는 읽기는 panic 하지 않는다 — 앞으로 읽기를 더할 때를 위한 방어). 다만 message 가 던지는 getter 면 Get 이 잡지
-//     않아 JS 예외로 나간다(temml 머리 주석과 같은 한계).
+// jsError 는 Temml 이 던진 값을 네이티브 판(temml.go parseError)과 같은 규칙으로 고른다(classifyThrown): name 이
+// "ParseError" 이고 message 가 글자인 객체면 그 message 를 classifyError 로, 그 밖(Temml 안의 TypeError, Temml 이 아닌 받침의
+// Error, 글자·숫자·undefined·원형 없는 객체 등 Error 가 아닌 값)은 한 문장(internalMsg, CodeEngine — 기억하지 않는다)이다.
+// 그래서 Temml 이 아닌 받침이 Error 를 던져도 기억되지 않아, 진짜 Temml 로 바꾸면 다음 렌더에 그려진다.
+//   - 여기서 값을 읽다 panic 하면 한 겹 더 받아 같은 한 문장으로 둔다(지금 부르는 읽기는 panic 하지 않는다 — 앞으로 읽기를 더할
+//     때를 위한 방어). 다만 name·message 가 던지는 getter 면 Get 이 잡지 않아 JS 예외로 나간다(temml 머리 주석과 같은 한계).
 func jsError(r any) (err error) {
 	je, ok := r.(js.Error)
 	if !ok {
-		return &Error{Code: CodeEngine, Msg: fmt.Sprintf("수식 엔진 오류: %v", r)}
+		return classifyThrown(false, "")
 	}
 	defer func() {
 		if r2 := recover(); r2 != nil {
-			err = &Error{Code: CodeEngine, Msg: "수식 엔진 오류: 던진 값을 읽지 못함"}
+			err = classifyThrown(false, "")
 		}
 	}()
 	// je.Error() 는 쓰지 않는다 — 안에서 Value.Get("message") 를 불러 던진 값이 객체가 아니면 panic 한다
-	switch je.Value.Type() {
-	case js.TypeString:
-		return classifyError(je.Value.String())
-	case js.TypeObject:
-		if m := je.Value.Get("message"); m.Type() == js.TypeString {
-			return classifyError(m.String())
+	if je.Value.Type() == js.TypeObject {
+		n, m := je.Value.Get("name"), je.Value.Get("message")
+		if n.Type() == js.TypeString && n.String() == "ParseError" && m.Type() == js.TypeString {
+			return classifyThrown(true, m.String())
 		}
 	}
-	return &Error{Code: CodeEngine, Msg: "수식 엔진 오류: Error 도 글자도 아닌 값(" + je.Value.Type().String() + ")을 던짐"}
+	return classifyThrown(false, "")
 }

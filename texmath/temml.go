@@ -102,16 +102,26 @@ func temml(tex string, display bool) (string, error) {
 	return out, nil
 }
 
-// parseError 는 goja 가 돌려준 오류에서 Temml 의 문장을 꺼내 고른다(classifyError).
+// parseError 는 goja 가 돌려준 오류에서 Temml 의 문장을 꺼내 고른다(classifyThrown). ParseError(name 이 "ParseError" 인
+// 객체)가 아니면 — goja 의 TypeError 등 — 한 문장(internalMsg)이다.
 func parseError(err error) error {
-	msg := err.Error()
 	var ex *goja.Exception
 	if errors.As(err, &ex) {
 		if o, ok := ex.Value().(*goja.Object); ok {
-			if m := o.Get("message"); m != nil {
-				msg = m.String()
+			name, _ := exportString(o.Get("name"))
+			if msg, ok := exportString(o.Get("message")); ok && name == "ParseError" {
+				return classifyThrown(true, msg)
 			}
 		}
 	}
-	return classifyError(msg)
+	return classifyThrown(false, "")
+}
+
+// exportString 은 JS 값이 글자면 그 글이다(없는 속성은 nil).
+func exportString(v goja.Value) (string, bool) {
+	if v == nil {
+		return "", false
+	}
+	s, ok := v.Export().(string)
+	return s, ok
 }

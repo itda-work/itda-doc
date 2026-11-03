@@ -29,6 +29,8 @@ const temmlModes = {
   throwString: () => ({ renderToString: () => { throw "Undefined control sequence: \\zzthrown"; } }),
   throwNumber: () => ({ renderToString: () => { throw 42; } }),
   throwBare: () => ({ renderToString: () => { throw Object.create(null); } }),
+  throwError: () => ({ renderToString: () => { throw new Error("Temml loading"); } }),
+  throwParse: () => ({ renderToString: () => { const e = new Error("ParseError: Undefined control sequence: \\zzparse"); e.name = "ParseError"; throw e; } }),
 };
 
 (async () => {

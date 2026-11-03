@@ -25,7 +25,24 @@ func temmlOptions(display bool) map[string]any {
 	}
 }
 
-// classifyError 는 Temml 의 영어 오류 문장(던진 Error 의 message)을 고른다. 모르는 명령은 따로 알린다(경고가 명령 이름을 보여 준다).
+// internalMsg 는 Temml 이 ParseError 가 아닌 것을 던졌을 때의 경고 한 문장이다 — Temml 안의 TypeError(`$x^$`·
+// `\operatorname{__proto__}`), Temml 자신의 단언 `new Error(…)`(name 이 "Error" — temml.min.js 의 「Expected node of type …」 등.
+// 어느 입력이 닿는지는 찾지 않았다), Temml 이 아닌 받침의 Error, Error 가 아닌 값(글자·숫자 등) 모두. 거꾸로 name 만 "ParseError" 인
+// 가짜(Temml 이 아닌 받침 — js 판에서만 생길 수 있다)는 문법 오류로 골라 기억된다. 그 문장은 JS 엔진(goja·V8)이
+// 지어 판마다 다르므로 내보이지 않는다(itda-work/itda-hyve#577 결정 1). CodeEngine 이라 기억(cache)하지 않는다(texmath.go Render) —
+// 엔진을 바꾸면(진짜 Temml 을 올리면) 다음 렌더에 다시 부른다.
+const internalMsg = "수식 엔진 내부 오류(Temml 이 문법 오류가 아닌 예외를 냄)"
+
+// classifyThrown 은 Temml 이 던진 값을 고른다. parse 는 그 값이 Temml 의 ParseError 인지(name 이 "ParseError" 이고 message 가
+// 글자인 객체), msg 는 그 message 다. 두 판(temml.go parseError, temml_js.go jsError)이 이 함수 하나로 고른다.
+func classifyThrown(parse bool, msg string) error {
+	if !parse {
+		return &Error{Code: CodeEngine, Msg: internalMsg}
+	}
+	return classifyError(msg)
+}
+
+// classifyError 는 Temml 의 영어 오류 문장(ParseError 의 message)을 고른다. 모르는 명령은 따로 알린다(경고가 명령 이름을 보여 준다).
 func classifyError(msg string) error {
 	msg = strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
 	msg = strings.TrimPrefix(msg, "ParseError:")

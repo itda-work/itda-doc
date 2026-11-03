@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -31,19 +30,19 @@ type renderCase struct {
 	Src    string `json:"src"`
 	Opts   any    `json:"opts,omitempty"`   // 객체나 JSON 문자열(둘 다 받는지 본다)
 	RawSrc any    `json:"rawSrc,omitempty"` // 있으면 src 대신 이 값을 첫 인자로(글자가 아닌 인자)
-	Temml  string `json:"temml,omitempty"`  // 그 렌더 동안만 globalThis.temml 을 바꾼다(run.cjs temmlModes: none·notFunc·nonString·throwString)
+	Temml  string `json:"temml,omitempty"`  // 그 렌더 동안만 globalThis.temml 을 바꾼다(run.cjs temmlModes: none·notFunc·nonString·throw*)
 	// 네이티브와 비교하지 않는 사례: wantErr 는 View.error 에 든 글, wantWarn 은 math 경고에 든 글이다(그때 HTML 에 <math 가 없어야 한다)
 	wantErr  string
 	wantWarn string
 	// wantMath: 네이티브와 같고, HTML 에 <math 가 있어야 한다
 	wantMath bool
-	// jsText: Temml 이 ParseError 가 아닌 JS 실행 오류(TypeError)를 던지는 입력이다. 그 문장은 JS 엔진이 짓는다(goja 「Cannot read
-	// property 'type' of undefined」, V8 「Cannot read properties of null (reading 'type')」) — 경고의 그 문장만 가리고 나머지는 같게 본다.
-	// 두 판이 다른 유일한 곳이다(열린 결정: classifyError 가 ParseError 아닌 오류를 한 문장으로 고르면 없어지지만 네이티브 경고 글이 바뀐다).
-	jsText bool
-	theme  string
-	allow  bool
-	drop   bool
+	// internal: Temml 이 ParseError 가 아닌 JS 실행 오류(TypeError)를 던지는 입력이다. 그 문장은 JS 엔진이 지어 판마다 다르지만
+	// (goja 「Cannot read property 'type' of undefined」, V8 「Cannot read properties of null (reading 'type')」) 경고는 두 판 모두
+	// 정해진 한 문장이다(texmath internalMsg — itda-work/itda-hyve#577 결정 1). 가리지 않고 네이티브와 같게 보고, 그 문장이 든지도 본다.
+	internal bool
+	theme    string
+	allow    bool
+	drop     bool
 }
 
 type cssCase struct {
@@ -86,7 +85,7 @@ func cases(t *testing.T) []renderCase {
 		renderCase{Name: "노트 빼기", Src: "---\nslides: true\n---\n\n# 하나\n\n본문 $a+b$\n\n:::notes\n노트 $c^2$\n:::\n", Opts: map[string]any{"dropNotes": true}, drop: true},
 		renderCase{Name: "모르는 테마", Src: "---\ntheme: nope\n---\n\n본문\n"},
 		// 수식 오류 사례 — 엔진(Temml)이 던지는 것과 앞(check.go)에서 막는 것
-		renderCase{Name: "Temml 실행 오류(엔진 문장)", Src: "위첨자 없음 $x^$\n", jsText: true},
+		renderCase{Name: "Temml 실행 오류(엔진 문장)", Src: "위첨자 없음 $x^$ 와 $\\operatorname{__proto__}$ 와 $y_$\n", internal: true},
 		renderCase{Name: "수식 오류", Src: strings.Join([]string{
 			`모르는 명령 $\foo{x}$`,
 			`모르는 정의 $\undefinedthing$`,
@@ -120,7 +119,9 @@ func nativeView(t *testing.T, ts *page.Themes, c renderCase) string {
 	return string(b)
 }
 
-var jsEngineText = regexp.MustCompile(`(수식 문법 오류: )Cannot read propert[^"]*`)
+// internalWarn 은 Temml 이 ParseError 가 아닌 것을 던졌을 때의 경고 글이다(texmath/temmlcommon.go internalMsg 와 같아야 한다 —
+// 따로 적어 문장이 바뀌면 이 시험이 알린다).
+const internalWarn = "수식을 그리지 않고 원문 그대로 둠: 수식 엔진 내부 오류(Temml 이 문법 오류가 아닌 예외를 냄)"
 
 // normalize 는 View JSON 에서 version(렌더 시각)을 빼고 키 순서를 고정해 다시 쓴다.
 func normalize(t *testing.T, s string) (string, map[string]any) {
@@ -225,13 +226,18 @@ func TestWasmMatchesNative(t *testing.T) {
 		// 엔진 거부 경로(temml_js.go)
 		renderCase{Name: "renderToString 이 함수가 아님", Src: "$q_{1}$\n", Temml: "notFunc", wantWarn: "temml.renderToString 이 함수가 아님"},
 		renderCase{Name: "renderToString 이 글자를 돌려주지 않음", Src: "$q_{2}$\n", Temml: "nonString", wantWarn: "renderToString 이 글자를 돌려주지 않음"},
-		// Error 가 아닌 값을 던지면 그 값의 글로 고른다(classifyError — 여기서는 「지원하지 않는 명령」)
-		// Error 도 글자도 아닌 값을 던지면 CodeEngine — 기억하지 않아 Temml 을 되돌린 뒤 같은 원문이 그려진다
-		renderCase{Name: "숫자를 던짐", Src: "$q_{4}$\n", Temml: "throwNumber", wantWarn: "수식 엔진 오류: Error 도 글자도 아닌 값(number)을 던짐"},
+		// ParseError 가 아닌 것을 던지면 — Error 가 아닌 값(숫자·원형 없는 객체·글자)도, Temml 이 아닌 받침의 Error 도 — 한 문장
+		// (CodeEngine)이고 기억하지 않아, Temml 을 되돌린 뒤 같은 원문이 그려진다(짝 「…뒤 복구」)
+		renderCase{Name: "숫자를 던짐", Src: "$q_{4}$\n", Temml: "throwNumber", wantWarn: internalWarn},
 		renderCase{Name: "숫자를 던진 뒤 복구", Src: "$q_{4}$\n", wantMath: true},
-		renderCase{Name: "원형 없는 객체를 던짐", Src: "$q_{5}$\n", Temml: "throwBare", wantWarn: "수식 엔진 오류: Error 도 글자도 아닌 값(object)을 던짐"},
+		renderCase{Name: "원형 없는 객체를 던짐", Src: "$q_{5}$\n", Temml: "throwBare", wantWarn: internalWarn},
 		renderCase{Name: "원형 없는 객체를 던진 뒤 복구", Src: "$q_{5}$\n", wantMath: true},
-		renderCase{Name: "글자를 던짐", Src: "$q_{3}$\n", Temml: "throwString", wantWarn: "수식을 그리지 않고 원문 그대로 둠: 지원하지 않는 명령 \\zzthrown"},
+		renderCase{Name: "글자를 던짐", Src: "$q_{3}$\n", Temml: "throwString", wantWarn: internalWarn},
+		renderCase{Name: "글자를 던진 뒤 복구", Src: "$q_{3}$\n", wantMath: true},
+		renderCase{Name: "Temml 아닌 Error", Src: "$q_{6}$\n", Temml: "throwError", wantWarn: internalWarn},
+		renderCase{Name: "Temml 아닌 Error 뒤 복구", Src: "$q_{6}$\n", wantMath: true},
+		// name 만 ParseError 인 객체는 Temml 의 것처럼 고른다(두 판이 name·message 만 본다)
+		renderCase{Name: "ParseError 꼴", Src: "$q_{7}$\n", Temml: "throwParse", wantWarn: "지원하지 않는 명령 \\zzparse"},
 		// render 인자·옵션 오류는 View.error
 		renderCase{Name: "모르는 옵션 키", Src: "본문\n", Opts: map[string]any{"thme": "mono"}, wantErr: "옵션을 읽지 못함"},
 		renderCase{Name: "깨진 JSON 옵션", Src: "본문\n", Opts: "{", wantErr: "옵션을 읽지 못함"},
@@ -288,13 +294,11 @@ func TestWasmMatchesNative(t *testing.T) {
 			t.Errorf("%s: wasm 결과에 <math 가 없음: %v", c.Name, gm["warnings"])
 		}
 		ns, nm := normalize(t, nativeView(t, ts, c))
-		if c.jsText {
-			if !jsEngineText.MatchString(ns) || !jsEngineText.MatchString(gs) {
-				t.Errorf("%s: JS 실행 오류 문장이 없음 — 사례가 낡았다\n네이티브 %.400s\nwasm     %.400s", c.Name, nm["warnings"], gm["warnings"])
+		if c.internal {
+			// 세 수식 모두 그 한 문장이어야 한다 — 다른 경고로 바뀌면 사례가 낡았다
+			if n := strings.Count(gs, internalWarn); n != 3 {
+				t.Errorf("%s: 내부 오류 문장이 %d 번(3 이어야 함)\n%.600s", c.Name, n, gm["warnings"])
 			}
-			ns, gs = jsEngineText.ReplaceAllString(ns, "${1}<JS 엔진 문장>"), jsEngineText.ReplaceAllString(gs, "${1}<JS 엔진 문장>")
-			_, nm = normalize(t, ns)
-			_, gm = normalize(t, gs)
 		}
 		if gs != ns {
 			t.Errorf("%s: wasm View 가 네이티브와 다름\n%s", c.Name, firstDiff(nm, gm))
