@@ -119,6 +119,7 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 		if entering {
 			if out, ok := r.st.math(rawLines(fc, src), true, r.st.lines.line(fc.Pos())); ok {
 				r.st.mathDone[fc] = true
+				r.st.mathOut[fc] = out
 				r.mathDiv(w, fc, out)
 				return ast.WalkSkipChildren, nil
 			}

@@ -129,3 +129,11 @@ func (t *Theme) ThemeStyleSheet() string { return t.StyleSheet(CSSMode{}) }
 // FindFolderMetas 는 문서(docPath)에 얹힐 폴더 기본값 파일(`_metadata.yml`)을 먼 폴더 → 가까운 폴더 순으로 돌려준다 —
 // mdoc.Options.FolderMeta 에 그대로 넘긴다. RenderView·Check 가 쓰는 것과 같다(findFolderMetas). docPath 가 비면 nil.
 func FindFolderMetas(docPath string) []mdoc.FolderMeta { return findFolderMetas(docPath) }
+
+// ThemedValue 는 표지·머리글이 보이는 메타 값이다 — 문서 frontmatter 의 값, 없으면 테마 defaults 의 값(Assemble 과 같은 판정 —
+// view.go themedValue). HTML 말고 다른 출력(docx 등)이 같은 표지를 만들 때 쓴다(itda-work/itda-hyve#608).
+func ThemedValue(m mdoc.Meta, t *Theme, key string) (string, bool) { return themedValue(m, t, key) }
+
+// MetaLabel 은 표지 메타 줄의 이름표다 — 테마 labels, 없으면 문서 lang(ko·그 밖)에 따른 기본 이름, 그것도 없으면 키 그대로
+// (Assemble 과 같은 판정 — view.go label).
+func MetaLabel(t *Theme, lang, key string) string { return label(t, lang, key) }
