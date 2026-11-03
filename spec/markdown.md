@@ -147,6 +147,7 @@ organization: 잇다
 - **속성**: `## 제목 {#custom-id .class}`. 속성을 하나라도 읽지 못하면 `{…}` 전체를 글자로 남기고 `bad-attribute` 경고를 낸다. 직접 적은 id 가 겹치면 `duplicate-id` 경고.
 - **번호**: `number-sections: true` 면 렌더러가 번호를 넣는다. `{-}` 또는 `{.unnumbered}` 는 번호를 건너뛰고, `{.unlisted}` 는 목차에서만 뺀다(번호는 받는다).
 - **기준 단계**: 번호와 `toc-depth` 는 문서에서 **가장 높은 제목 단계를 1로** 센다. frontmatter `title` 을 두고 `##` 부터 써도 번호는 `1` 부터다.
+- **발표자 노트 안 제목**(`:::notes` 안)은 목차·번호에 넣지 않고 기준 단계에서도 뺀다. id 는 받는다([발표 안내서](slides.md) 5절, `mdoc/headings.go` `inNotes`).
 
 ```markdown
 # 개요

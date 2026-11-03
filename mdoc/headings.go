@@ -2,6 +2,7 @@ package mdoc
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -29,6 +30,7 @@ type headingInfo struct {
 	text     string
 	unnumber bool
 	unlisted bool
+	inNotes  bool // 발표자 노트(:::notes) 안 — 목차·번호·기준 단계에서 빠진다(inNotes)
 }
 
 // 제목 끝의 { … } 속성. 앞에 공백이 있어야 한다(Pandoc).
@@ -58,6 +60,7 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 			}
 		}
 		info.text = plainText(h, st.src)
+		info.inNotes = inNotes(h)
 	}
 
 	// 2) 나머지는 GitHub 규칙으로 id 를 만든다. 겹치면 -1, -2.
@@ -86,14 +89,18 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 
 	// 3) 번호와 목차는 문서에서 가장 높은 제목 단계를 1로 센다.
 	// h1 없이 ## 부터 쓴 문서가 "0.1" 이 되지 않게 하려는 것이다(Pandoc 은 0.1 을 낸다).
+	// 발표자 노트 안 제목은 DropNotes 와 상관없이 기준 단계·번호·목차 모두에서 뺀다(itda-doc#15) — 노트를 빼든 내든 목차의
+	// 글자·번호·구조가 같다(노트 안 제목이 자동 id 를 먼저 가지면 뒤 같은 글자 본문 제목의 id 는 다를 수 있다). id 는 위에서 받았다(노트 칸에 그려지고 본문 제목과 겹치지 않아야 한다).
 	top := 7
-	for _, h := range hs {
-		top = min(top, h.Level)
+	for i, h := range hs {
+		if !infos[i].inNotes {
+			top = min(top, h.Level)
+		}
 	}
 	if st.meta.NumberSections {
 		var counters [6]int
 		for i, h := range hs {
-			if infos[i].unnumber {
+			if infos[i].unnumber || infos[i].inNotes {
 				continue
 			}
 			d := h.Level - top
@@ -112,12 +119,23 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 	// 4) 목차 트리. toc-depth 도 같은 기준으로 센다.
 	var flat []TOCItem
 	for i, h := range hs {
-		if infos[i].unlisted || h.Level-top >= st.meta.TOCDepth {
+		if infos[i].unlisted || infos[i].inNotes || h.Level-top >= st.meta.TOCDepth {
 			continue
 		}
 		flat = append(flat, TOCItem{Level: h.Level, ID: infos[i].id, Number: infos[i].number, Text: infos[i].text})
 	}
 	st.toc = buildTree(flat)
+}
+
+// inNotes 는 제목의 조상 중 발표자 노트 컨테이너가 있는지다 — 노트 안 인용·목록·다른 컨테이너 속 제목도 노트 안이다.
+// 판정은 transform.go notes 와 같은 classes() 의 notes 다(notes 가 먼저 돌아 이름을 notes 로 정리해 둔 뒤다).
+func inNotes(h ast.Node) bool {
+	for p := h.Parent(); p != nil; p = p.Parent() {
+		if c, ok := p.(*Container); ok && slices.Contains(c.classes(), "notes") {
+			return true
+		}
+	}
+	return false
 }
 
 // buildTree 는 단계 목록을 트리로 묶는다. 단계를 건너뛴 제목(h1 다음 h3)은 바로 위 제목의 자식이 된다.

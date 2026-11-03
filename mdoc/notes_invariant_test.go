@@ -342,3 +342,111 @@ func TestDropNotesStructure(t *testing.T) {
 		})
 	}
 }
+
+// tocLine 은 목차 트리를 「글자[번호] > 자식」 꼴 한 줄로 편다 — 시험의 기대값을 짧게 적으려는 것이다.
+func tocLine(items []TOCItem) string {
+	var parts []string
+	for _, it := range items {
+		s := it.Text
+		if it.Number != "" {
+			s += "[" + it.Number + "]"
+		}
+		if len(it.Children) > 0 {
+			s += " > " + tocLine(it.Children)
+		}
+		parts = append(parts, s)
+	}
+	return strings.Join(parts, ", ")
+}
+
+// tocIDs 는 목차 트리의 id 를 차례대로 편다.
+func tocIDs(items []TOCItem) string {
+	var parts []string
+	for _, it := range items {
+		parts = append(parts, it.ID)
+		if s := tocIDs(it.Children); s != "" {
+			parts = append(parts, s)
+		}
+	}
+	return strings.Join(parts, ", ")
+}
+
+// TestNotesHeadingsOutOfTOC 는 발표자 노트 안 제목이 DropNotes 와 상관없이 목차·절 번호·기준 단계에서 빠지는지다(itda-doc#15,
+// headings.go inNotes). 노트 안 제목은 id 를 받되 본문 제목과 겹치지 않고, 제목의 {.notes}(노트 아님)는 목차에 남는다.
+func TestNotesHeadingsOutOfTOC(t *testing.T) {
+	cases := []struct {
+		name, src, toc string
+		notesIDs       []string // 노트 안 제목의 기대 id — 렌더 HTML 에 있고 번호 꾸밈이 없어야 한다
+		ids, dropIDs   string   // 비지 않으면 호스트·DropNotes 목차의 id(tocIDs) — 글자·번호가 같아도 id 는 갈릴 수 있다
+	}{
+		{"이슈 본문", "---\ntoc: true\n---\n# 발표\n## 첫 장\n:::notes\n### 노트 제목\n:::\n## 둘째 장\n", "발표 > 첫 장, 둘째 장", []string{"노트-제목"}, "", ""},
+		{"번호 건너뜀 없음", "---\nnumber-sections: true\n---\n## A\n:::notes\n## 노트\n:::\n## B\n", "A[1], B[2]", []string{"노트"}, "", ""},
+		{"노트에만 높은 단계", "---\nnumber-sections: true\n---\n:::notes\n# 노트 큰 제목\n:::\n## A\n### A1\n## B\n", "A[1] > A1[1.1], B[2]", []string{"노트-큰-제목"}, "", ""},
+		// 노트 안 제목이 자동 id 를 먼저 가져 셋째 제목 id 가 호스트 요약-2, DropNotes 요약-1 로 갈린다(바꾸기 전부터 있던 동작 —
+		// 맞추려면 id 가 바뀌어 사용자 결정이 필요하다). 목차의 글자·번호만 같다.
+		{"같은 글자 id — 목차 id 는 갈림", "## 요약\n:::notes\n## 요약\n:::\n## 요약\n", "요약, 요약", []string{"요약-1"}, "요약, 요약-2", "요약, 요약-1"},
+		{"제목이 노트 안에만", "---\nnumber-sections: true\n---\n본문\n\n:::notes\n# 노트만\n:::\n", "", []string{"노트만"}, "", ""},
+		{"다른 class 와 함께 단 노트", "---\nnumber-sections: true\n---\n## A\n::: {.box .notes}\n## 노트\n:::\n## B\n", "A[1], B[2]", []string{"노트"}, "", ""},
+		{"노트의 높은 단계가 toc-depth 를 줄이지 않음", "---\ntoc-depth: 1\n---\n:::notes\n# 노트 큰 제목\n:::\n## A\n### A1\n## B\n", "A, B", []string{"노트-큰-제목"}, "", ""},
+		{"노트 안 인용·목록·상자", "---\nnumber-sections: true\n---\n## A\n:::notes\n> ## 인용 제목\n\n- ## 목록 제목\n\n:::box\n## 상자 제목\n:::\n:::\n## B\n", "A[1], B[2]", []string{"인용-제목", "목록-제목", "상자-제목"}, "", ""},
+		{"속성 노트", "---\nnumber-sections: true\n---\n## A\n::: {.notes}\n## 노트\n:::\n## B\n", "A[1], B[2]", []string{"노트"}, "", ""},
+		{"제목 .notes 는 노트 아님", "---\nnumber-sections: true\n---\n## A\n## 제목 노트 {.notes}\n## B\n", "A[1], 제목 노트[2], B[3]", nil, "", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			host, err := Render([]byte(c.src), Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			viewer, err := Render([]byte(c.src), Options{DropNotes: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := tocLine(host.TOC); got != c.toc {
+				t.Errorf("목차 %q, 기대 %q", got, c.toc)
+			}
+			if got := tocLine(viewer.TOC); got != c.toc {
+				t.Errorf("DropNotes 목차 %q, 기대 %q", got, c.toc)
+			}
+			if c.ids != "" {
+				if got := tocIDs(host.TOC); got != c.ids {
+					t.Errorf("목차 id %q, 기대 %q", got, c.ids)
+				}
+				if got := tocIDs(viewer.TOC); got != c.dropIDs {
+					t.Errorf("DropNotes 목차 id %q, 기대 %q", got, c.dropIDs)
+				}
+			}
+			for _, id := range c.notesIDs {
+				root, err := html.Parse(strings.NewReader(host.HTML))
+				if err != nil {
+					t.Fatal(err)
+				}
+				var found *html.Node
+				var walk func(*html.Node)
+				walk = func(n *html.Node) {
+					if n.Type == html.ElementNode {
+						for _, a := range n.Attr {
+							if a.Key == "id" && a.Val == id {
+								found = n
+							}
+						}
+					}
+					for ch := n.FirstChild; ch != nil; ch = ch.NextSibling {
+						walk(ch)
+					}
+				}
+				walk(root)
+				if found == nil {
+					t.Errorf("노트 안 제목 id %q 가 없음\n%s", id, host.HTML)
+					continue
+				}
+				if !slices.Contains([]atom.Atom{atom.H1, atom.H2, atom.H3}, found.DataAtom) {
+					t.Errorf("id %q 가 제목이 아님: %s", id, found.Data)
+				}
+				if found.FirstChild != nil && found.FirstChild.Type == html.ElementNode {
+					t.Errorf("노트 안 제목 %q 에 번호 꾸밈이 붙음\n%s", id, host.HTML)
+				}
+			}
+		})
+	}
+}

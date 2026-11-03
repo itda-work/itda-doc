@@ -79,7 +79,7 @@ func (d *Doc) Line(n ast.Node) int {
 type HeadingInfo struct {
 	ID       string // 본문 제목의 id(목차·링크의 #조각)
 	Number   string // number-sections 의 번호("1.2"), 없으면 ""
-	Unlisted bool   // .unlisted — 목차에 넣지 않는다
+	Unlisted bool   // .unlisted — 목차에 넣지 않는다. 노트 안 제목은 이 값과 상관없이 목차에 없다(headings.go inNotes)
 }
 
 // Heading 은 제목의 id·번호다.
