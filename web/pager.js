@@ -206,7 +206,9 @@
     if (!hasContent(tail)) return { head, tail: null };
     if (node.tagName === "OL") {
       // 번호를 이어 간다. 반쯤 들어간 항목의 뒷조각(li.cont)은 번호 없이 보이고 다음 항목이 다음 번호를 받는다.
-      const start = parseInt(node.getAttribute("start") || "1", 10) || 1;
+      // start="0"·음수도 그 값에서 잇는다 — 숫자가 아닌 값만 1(HTML 기본값)로 둔다(itda-hyve#584: `|| 1` 은 0 을 1 로 읽었다).
+      const n = parseInt(node.getAttribute("start") || "1", 10);
+      const start = Number.isNaN(n) ? 1 : n;
       tail.setAttribute("start", String(start + placedItems - (partialTail ? 1 : 0)));
     }
     return { head, tail };

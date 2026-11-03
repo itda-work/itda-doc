@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -80,4 +81,65 @@ func TestPagerNavKeys(t *testing.T) {
 	if m := regexp.MustCompile(`PAGERNAV DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out)); m == nil || m[1] == "0" {
 		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
 	}
+}
+
+// 번호 목록 쪽 나눔(itda-hyve#584): 쪽을 넘어 나뉜 OL 의 뒷조각은 앞 조각에 놓인 항목 수만큼 start 를 이어 간다 — start="0" 도
+// 0 으로 읽는다(예전 판정 `|| 1` 은 0 을 1 로 읽어 뒷조각 번호가 하나씩 밀렸다). 숫자가 아닌 값만 1 로 둔다. 반쯤 들어간
+// 항목(li.cont)·start 없음·start="3"·음수도 함께 본다. pager.js 의 splitChildren 을 그대로 떼어 node 로 돌린다(testdata/pager_list.cjs).
+func TestPagerSplitListStart(t *testing.T) {
+	src := pagerSource(t)
+	a := strings.Index(src, "  function splitChildren(")
+	z := strings.Index(src[max(a, 0):], "\n  // ---- 표:")
+	if a < 0 || z < 0 {
+		t.Fatal("pager.js 에서 splitChildren 을 찾지 못함")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다 — ITDA_DOC_STRICT=1(just test·CI)은 node 가 필요하다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	part := filepath.Join(t.TempDir(), "list.js")
+	if err := os.WriteFile(part, []byte(src[a:a+z]), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner, _ := filepath.Abs(filepath.Join("testdata", "pager_list.cjs"))
+	out, err := exec.Command(node, runner, part).CombinedOutput()
+	if err != nil {
+		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
+	}
+	if m := regexp.MustCompile(`PAGERLIST DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out)); m == nil || m[1] == "0" {
+		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
+	}
+}
+
+// pagerSource 는 pager.js 원문이다. ITDA_DOC_TEST_OVERLAY 가 가리키는 overlay JSON 의 Replace 에 pager.js 가 있으면 그 파일을 읽는다
+// (뮤테이션 시험이 디스크의 원문 대신 바꿔 끼운 소스를 보게 — mdoc/guidemd_test.go 의 overlayReplace 와 같은 약속).
+func pagerSource(t *testing.T) string {
+	t.Helper()
+	name := "pager.js"
+	if p := os.Getenv("ITDA_DOC_TEST_OVERLAY"); p != "" {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("ITDA_DOC_TEST_OVERLAY=%s 를 읽지 못함: %v", p, err)
+		}
+		var ov struct {
+			Replace map[string]string `json:"Replace"`
+		}
+		if json.Unmarshal(b, &ov) != nil {
+			t.Fatalf("ITDA_DOC_TEST_OVERLAY=%s 가 overlay JSON 이 아님", p)
+		}
+		abs, _ := filepath.Abs(name)
+		if r, ok := ov.Replace[abs]; ok {
+			name = r
+		} else if r, ok := ov.Replace[name]; ok {
+			name = r
+		}
+	}
+	b, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
