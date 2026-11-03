@@ -30,6 +30,11 @@
 // 노트가 온 슬라이드 보기에서만 「노트: 끔 | 오른쪽 | 아래」(기본 아래 — 폰)와 글자 A−/A+ 를 보인다. 노트 칸은 문서 창 미리보기와 같은
 // 부품이다(slides.js placeNotes·app.css .slide-note). 쪽·이어보기에는 노트가 없다. 고른 배치·글자 크기는 이 브라우저의 localStorage 에만
 // 둔다(못 쓰면 메모리 — notePrefs). 발표 슬라이드를 따라가는 중 노트가 아래면 그 슬라이드를 위에 붙여 아래 노트까지 보이게 한다(followSpot).
+// 확장(itda-hyve#617): share.js 보다 먼저 실행되는 스크립트가 window.HyveShareExt(api) 를 두면, 시작할 때 한 번 불러 화면 부품(api — 아래
+// 「확장을 시작한다」 절)을 넘기고 돌려받은 훅을 그리기 길에서 부른다 — flow(흐름 — 나누기 전, numberBlocks 뒤)·drawn(새 본문을 다 그린 뒤)·tick(목차
+// 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
+// 시작이나 훅이 던지면 콘솔에만 남기고 확장 없이처럼 이어 간다.
+// 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
 (function () {
   "use strict";
 
@@ -641,6 +646,14 @@
   const NOTE_W = 320, NOTE_GAP = 20, NOTE_NARROW = 520;
   const np = notePrefs(() => window.localStorage, window.HyveSlides.NOTE_FONTS);
 
+  // ext 는 확장이 돌려준 훅이다(시작할 때 window.HyveShareExt 가 돌려준 것 — 그 전에는 비어 있다). 훅이 던지면 콘솔에만 남기고 그리기 길을 이어 간다 — 확장 탓에
+  // 본문이 안 붙거나 목차 강조가 멈추지 않게(itda-hyve#617 리뷰 3회차 [2]).
+  let ext = {};
+  const hook = (name, ...args) => {
+    if (typeof ext[name] !== "function") return;
+    try { ext[name](...args); } catch (e) { console.error("share ext:", name, e); }
+  };
+
   let toastTimer = 0;
   function toast(msg) {
     const t = $("toast");
@@ -755,6 +768,7 @@
     $("doc-title").textContent = v.title || "";
     paintTOC(v);
     if (v.error) state.tableSort = null; // 본문을 비운다 — 아래 줄(시험이 글로 보는 자리)
+    if (v.error) hook("tick"); // 확장: 오류 view 는 본문을 다시 만들지 않는다 — 지난 본문 기준 그대로
     if (v.error) { closeTableMenu(); $("pages").textContent = ""; findHeading.refresh(); return; }
     state.landscape = v.paper === "a4-landscape";
     document.body.classList.toggle("paper-a4-landscape", state.landscape);
@@ -777,6 +791,7 @@
     stage.appendChild(flow);
     flow.innerHTML = v.html; // mdoc 이 만든 HTML(스크립트 없음). CSP 가 2차로 막는다
     window.HyvePager.numberBlocks(flow); // 내용 앵커(⑧) — 호스트와 같은 규칙으로 나누기 전에
+    hook("flow", flow); // 확장: 나누기 전 흐름(쪽·슬라이드 나눔이 쪼개거나 옮기기 전)
     await imagesSettled(flow, 5000);
     if (state.ended) { stage.textContent = ""; return; }
     const target = document.createElement("div");
@@ -834,6 +849,7 @@
     applyZoom();
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac); // 따라가는 중이면 읽던 자리 대신 발표자의 슬라이드·내용 위치로
     else viewer.scrollTop = top;
+    hook("drawn"); // 확장: 새 본문을 다 그렸다
     paintTocOn();
   }
 
@@ -925,18 +941,26 @@
     $("btn-toc").setAttribute("aria-expanded", String(l.open));
   }
 
-  // paintTocOn 은 지금 보이는 가장 위 제목의 항목에 .on 을 단다(currentHeading). 제목 위치는 배율(transform)이 걸린 화면에서 잰다.
-  // 공유가 끝났으면 아무것도 하지 않는다(끝나기 직전에 예약된 프레임 포함).
-  function paintTocOn() {
-    if (state.ended || !tocIds.length) return;
+  // headingNow 는 지금 보이는 가장 위 제목의 id 다(currentHeading — 목차가 없으면 ""). 제목 위치는 배율(transform)이 걸린 화면에서 잰다.
+  function headingNow() {
+    if (!tocIds.length) return "";
     const viewer = $("viewer"), vtop = viewer.getBoundingClientRect().top, st = viewer.scrollTop;
     const ix = findHeading.index(), positions = [];
     for (const id of tocIds) {
       const el = ix.get(id);
       if (el) positions.push({ id, top: el.getBoundingClientRect().top - vtop + st });
     }
-    const cur = currentHeading(positions, st, jumper.pin, viewer.clientHeight);
-    for (const a of $("side-toc").querySelectorAll("a")) a.classList.toggle("on", a.dataset.id === cur);
+    return currentHeading(positions, st, jumper.pin, viewer.clientHeight);
+  }
+  // paintTocOn 은 지금 제목(headingNow)의 항목에 .on 을 달고 확장의 tick 을 부른다.
+  // 공유가 끝났으면 아무것도 하지 않는다(끝나기 직전에 예약된 프레임 포함).
+  function paintTocOn() {
+    if (state.ended) return;
+    if (tocIds.length) {
+      const cur = headingNow();
+      for (const a of $("side-toc").querySelectorAll("a")) a.classList.toggle("on", a.dataset.id === cur);
+    }
+    hook("tick");
   }
   function scheduleTocOn() {
     if (tocFrame || state.ended) return;
@@ -1070,6 +1094,7 @@
     $("side-toc").textContent = "";
     paintTocPanel();
     $("load-err").hidden = true;
+    hook("ended"); // 확장: 끝난 화면(자기 칸을 숨기고 끝난 카드의 자리를 채운다)
     $("ended").hidden = false;
     document.title = $("ended-title").textContent + " — Itda Hyve Docs";
   }
@@ -1211,10 +1236,17 @@
   // 목차의 펼침 기본값은 화면(본문) 폭으로 고른다 — 경계(1024px)를 넘나들 때만 기본값으로 되돌린다(tocPanel)
   toc.width(document.body.clientWidth);
   paintTocPanel();
+  // 확장(itda-hyve#617)을 시작한다 — 목차 폭을 정한 뒤·첫 그리기(sync.refresh) 전. 넘기는 것은 이 화면의 부품 그대로다(같은 객체 — 확장이
+  // 읽는 state·toc 은 늘 지금 값). 확장이 던지면 확장 없이 계속한다.
+  if (typeof window.HyveShareExt === "function") {
+    try {
+      ext = window.HyveShareExt({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast }) || {};
+    } catch (e) { ext = {}; console.error("share ext:", e); }
+  }
   new ResizeObserver(() => {
     const was = toc.wide;
     toc.width(document.body.clientWidth);
-    if (toc.wide !== was) paintTocPanel();
+    if (toc.wide !== was) { paintTocPanel(); hook("wide"); }
   }).observe(document.body);
   let lastWide = window.innerWidth > NARROW;
   new ResizeObserver(() => {
@@ -1223,6 +1255,7 @@
     if (wide !== lastWide && !state.chosen && state.view) { lastWide = wide; draw(); return; }
     lastWide = wide;
     afterResize(fol, applyZoom, scrollToFollow); // 따라가는 중이면 새 배율의 자리로 다시 맞춘다(목차를 펼치고 접어도 여기로 온다)
+    hook("resized"); // 확장: 이어보기는 폭이 바뀌면 글이 다시 흐른다
     if (tocKeep >= 0 && !fol.active()) $("viewer").scrollTop = tocKeep * $("viewer").scrollHeight;
     tocKeep = -1;
     scheduleTocOn();

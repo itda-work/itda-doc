@@ -172,8 +172,15 @@ func rawLines(n ast.Node, src []byte) string {
 
 // ---- 그리기
 
+// renderTeX 는 수식 렌더러다. 수식을 그리는 길은 모두 state.math 를 거쳐 이것을 부른다(시험이 바꿔 끼워 호출 수를 센다).
+var renderTeX = texmath.Render
+
 // math 는 수식 하나를 그린다. 그리지 못하면 원문을 글자로 쓰고 경고를 남긴다.
+// Options.NoMath 면 렌더러를 부르지 않고 경고 없이 거짓이다 — 수식을 그리는 모든 길의 마지막 문이다.
 func (st *state) math(tex string, display bool, line int) (string, bool) {
+	if st.opts.NoMath {
+		return "", false
+	}
 	st.mathCount++
 	if st.mathCount > MaxMathPerDoc {
 		if st.mathCount == MaxMathPerDoc+1 {
@@ -181,7 +188,7 @@ func (st *state) math(tex string, display bool, line int) (string, bool) {
 		}
 		return "", false
 	}
-	out, err := texmath.Render(tex, display)
+	out, err := renderTeX(tex, display)
 	if err != nil {
 		st.warn(line, WarnMath, "수식을 그리지 않고 원문 그대로 둠: "+err.Error())
 		return "", false
@@ -229,6 +236,18 @@ func (r *htmlRenderer) mathInline(w util.BufWriter, src []byte, node ast.Node, e
 		return ast.WalkSkipChildren, nil
 	}
 	n := node.(*MathInline)
+	if r.st.opts.NoMath {
+		// 수식을 끈 렌더: 구분자를 포함한 원문을 코드 글자로(그리지 못한 수식의 오류 표시와 구별한다).
+		// 표 칸 안에서는 \| 가 | 다(GFM) — 보는 사람에게 원문에 없는 역슬래시를 보이지 않는다
+		raw := n.Raw
+		if inTableCell(n) {
+			raw = strings.ReplaceAll(raw, `\|`, `|`)
+		}
+		_, _ = w.WriteString(`<code>`)
+		_, _ = w.Write(util.EscapeHTML([]byte(raw)))
+		_, _ = w.WriteString(`</code>`)
+		return ast.WalkSkipChildren, nil
+	}
 	if out, ok := r.st.math(n.Tex, n.Display, n.Line); ok {
 		r.st.mathOut[n] = out
 		_, _ = w.WriteString(out)
@@ -245,6 +264,22 @@ func (r *htmlRenderer) mathBlock(w util.BufWriter, src []byte, node ast.Node, en
 		return ast.WalkSkipChildren, nil
 	}
 	n := node.(*MathBlock)
+	raw := func() string {
+		var rb strings.Builder
+		for _, seg := range n.raw {
+			rb.Write(seg.Value(src))
+		}
+		return strings.TrimRight(rb.String(), "\n")
+	}
+	if r.st.opts.NoMath {
+		// 수식을 끈 렌더: 읽은 줄 그대로(구분자 포함)를 ```math 의 원문과 같은 꼴의 코드 블록에
+		_, _ = w.WriteString(`<pre`)
+		dataAttrs(w, n)
+		_, _ = w.WriteString(`><code class="language-math">`)
+		_, _ = w.Write(util.EscapeHTML([]byte(raw())))
+		_, _ = w.WriteString("\n</code></pre>\n")
+		return ast.WalkSkipChildren, nil
+	}
 	line := r.st.lines.line(n.Pos())
 	if n.closed {
 		if out, ok := r.st.math(n.tex(src), true, line); ok {
@@ -257,12 +292,7 @@ func (r *htmlRenderer) mathBlock(w util.BufWriter, src []byte, node ast.Node, en
 	_, _ = w.WriteString(`<p class="math-error"`)
 	dataAttrs(w, n)
 	_ = w.WriteByte('>')
-	var rb strings.Builder
-	for _, seg := range n.raw {
-		rb.Write(seg.Value(src))
-	}
-	raw := strings.TrimRight(rb.String(), "\n")
-	_, _ = w.Write(util.EscapeHTML([]byte(raw)))
+	_, _ = w.Write(util.EscapeHTML([]byte(raw())))
 	_, _ = w.WriteString("</p>\n")
 	return ast.WalkSkipChildren, nil
 }

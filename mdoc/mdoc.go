@@ -40,6 +40,13 @@ type Options struct {
 	// 문서 창이 경로를 알아 읽어 넘긴다 — Render 는 경로를 모르는 순수 함수 그대로다. 이 값을 문서
 	// frontmatter 의 기본값으로 합친다(문서가 이긴다). 비면 상속이 없다(붙여넣은 원문 등).
 	FolderMeta []FolderMeta
+	// NoMath 가 참이면 수식을 그리지 않는다 — $…$·$$…$$·```math 의 어느 것도 수식 렌더러(texmath)를 부르지 않고(math.go state.math),
+	// 원문 글자를 이스케이프해 낸다: 글 안 수식은 구분자를 포함한 원문을 <code> 에, 블록 수식($$ 블록·```math)은
+	// <pre><code class="language-math"> 에. 그리지 않았다는 경고는 내지 않는다(일부러 끈 것이다) — 닫는 $$ 가 없다는 등 파싱 경고는 그대로다.
+	// 수식 결과 기억(texmath 의 cache)에도 들어가지 않고, 문서 모델의 Doc.Math 는 늘 ok 가 거짓이다.
+	// 남이 보낸 문서를 미리 보는 화면이 수식 비용을 원천에서 막을 때 쓴다(itda-hyve#617). 기본은 거짓 — 수식을 그린다.
+	// 수식만 끈다 — ```mermaid 그림·차트·코드 강조는 이 값과 상관없이 돈다(각자의 상한: diagram.go·render.go).
+	NoMath bool
 }
 
 // Result 는 렌더 결과다.
