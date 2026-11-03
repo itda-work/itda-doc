@@ -1,0 +1,2 @@
+# 문법 글(mdsyntax/topics)은 바이트 그대로 mdsyntax.Hash 에 들어간다 — OS 와 무관하게 LF(itda-work/itda-hyve#134·#577)
+mdsyntax/topics/*.md text eol=lf
