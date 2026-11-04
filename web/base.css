@@ -656,6 +656,13 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .page-body th code { background: color-mix(in srgb, currentColor 16%, transparent); }
 }
 .page-body th pre code { background: none; } /* 머리 칸 안 코드 블록(raw HTML pre)은 pre 상자 하나만 */
+/* 표지·장 슬라이드 큰 제목 안 인라인 코드: 같은 까닭으로 제목 글자색을 따르고 상자는 그 글자색을 옅게 깐다 — 강조색 면 위
+   흰 제목(bold·spine 의 표지·내용 없는 장 슬라이드)에서 옅은 --code-bg 위 흰 글자가 되지 않게. 특이도 (0,2,1)이라
+   .page-body code·.page-body a code 를 이긴다. 먹색 제목에서는 먹색을 옅게 깐 회색 상자다 */
+.page-body :is(.cover-title, .sc-title, .ss-title) code { color: inherit; background: transparent; }
+@supports (color: color-mix(in srgb, black 16%, transparent)) {
+  .page-body :is(.cover-title, .sc-title, .ss-title) code { background: color-mix(in srgb, currentColor 16%, transparent); }
+}
 
 /* 코드 줄 번호(itda-hyve#435 — codelines.js): 펜스 코드 블록(2줄 이상)의 왼쪽에 1부터 줄 번호. codelines.js 가 code 안을
    줄마다 span.ln(data-n)으로 감싸고, 번호 글자는 ::before(content: attr(data-n))로만 그린다 — 선택·복사·검색·

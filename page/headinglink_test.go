@@ -114,3 +114,24 @@ func TestTableHeadCodeColor(t *testing.T) {
 		t.Error("표 머리 코드 규칙이 인라인 코드 기본 규칙보다 앞에 있음")
 	}
 }
+
+// 표지·장 슬라이드 큰 제목 안 인라인 코드도 제목 글자색을 따른다 — bold 장 슬라이드의 강조색 면 위 흰 제목에서
+// 옅은 --code-bg 위 흰 글자가 되지 않게. 실제 엔진의 계산값은 보지 않는다(미검증).
+func TestDisplayTitleCodeColor(t *testing.T) {
+	b, err := web.FS.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
+	sel := ".page-body :is(.cover-title, .sc-title, .ss-title) code"
+	rule := strings.Index(css, sel+" { color: inherit; background: transparent; }")
+	if rule < 0 {
+		t.Fatal("큰 제목 안 인라인 코드가 제목 글자색을 따르는 규칙이 없음")
+	}
+	if !strings.Contains(css, sel+" { background: color-mix(in srgb, currentColor 16%, transparent); }") {
+		t.Error("큰 제목 안 인라인 코드 상자가 글자색(currentColor) 기반이 아님")
+	}
+	if code := strings.Index(css, ".page-body code {"); code < 0 || rule < code {
+		t.Error("큰 제목 코드 규칙이 인라인 코드 기본 규칙보다 앞에 있음")
+	}
+}
