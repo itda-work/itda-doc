@@ -397,3 +397,70 @@ func TestMathLongInline(t *testing.T) {
 		t.Errorf("상한 길이의 수식: %+v", r.Warnings)
 	}
 }
+
+// itda-hyve#591: 열린 \text{…} 안의 주석 % 가 닫는 } 를 가려 수식이 닫히지 않으면, $ 를 글자로 두되(Pandoc 규칙 그대로) 그 % 의 줄에서
+// math 경고 하나를 낸다. 같은 % 를 여러 시도가 지나도 한 번이다. 닫힌 수식(R3 꼴)은 itda-hyve#180 경고만, 금액·\% 는 경고 없음.
+// $$ 블록이 같은 까닭으로 닫히지 않으면 「닫는 $$ 가 없어」 경고 하나에 까닭을 싣는다.
+func TestMathTextPercentUnclosed(t *testing.T) {
+	type want struct {
+		line  int
+		has   []string // 메시지에 든 글
+		lacks []string // 메시지에 없어야 할 글
+	}
+	for _, c := range []struct {
+		src   string
+		math  bool // 수식이 그려지는가
+		warns []want
+	}{
+		{"앞 $\\text{증가 10%}$ 뒤", false, []want{{1, []string{"「%}$ 뒤」", "닫는 }", `\%`}, nil}}},
+		{"첫 줄\n$\\text{10%}$ 와 $\\text{20%}$", false, []want{{2, []string{"「%}$ 와 $\\text{20%}$」"}, nil}, {2, []string{"「%}$」"}, nil}}},
+		{"$x\\text{a $\\text{10%}$", false, []want{{1, []string{"「%}$」"}, nil}}},                       // 두 시도가 같은 % 를 지난다 — 한 번
+		{"$\\text{a % $b\nc}$", true, []want{{1, []string{"「% $b」(% 부터 줄 끝)는 TeX 주석이라 그리지 않음"}, nil}}}, // 닫힘 — itda-hyve#180
+		{"$\\text{10\\%}$", true, nil},
+		{"계약금 $30 와 잔금 $40", false, nil},
+		{"$50% 증가", false, nil}, // \text 밖의 주석 — 닫히지 않은 $ 는 금액 규칙대로 경고 없음
+		{"$$\n\\text{증가 10%}\n$$\n\n뒤", false, []want{{1, []string{"닫는 $$ 가 없어", "「%}」", `\%`}, nil}}},
+		{"$$\n\\text{증가 10\\%}\n$$", true, nil},
+		{"$\\text{a % b}$", false, []want{{1, []string{"「% b}$」"}, nil}}}, // 명세의 깨지는 입력
+		{"$\\text{a % b\nc} $", false, nil},                               // \text 는 뒤 줄에서 닫혔다 — 실패 까닭(공백 뒤 $)은 % 가 아니다
+		{"$$\n\\text{a % b\nc}\n\n뒤", false, []want{{1, []string{"닫는 $$ 가 없어"}, []string{"주석"}}}},
+		// 앞 줄에서 닫힌 \text 의 % 가 아니라 지금 열린 \text 의 % 를 탓한다
+		{"$\\text{a % b\nc} \\text{d % e}$", false, []want{{2, []string{"「% e}$」"}, []string{"% b"}}}},
+		{"$$\n\\text{a % b\nc} \\text{d % e}\n\n뒤", false, []want{{1, []string{"닫는 $$ 가 없어", "「% e}」"}, []string{"% b"}}}},
+		// 같은 \text 안의 첫 % 가 아니라 실제로 닫는 } 를 가린 % 를 탓한다 — 앞 % 의 줄에는 } 가 없다
+		{"$\\text{a % b\nc % d}$", false, []want{{2, []string{"「% d}$」"}, []string{"% b"}}}},
+		{"$$\n\\text{a % b\nc % d}\n\n뒤", false, []want{{1, []string{"닫는 $$ 가 없어", "「% d}」", "가림, 퍼센트 기호면 \\%"}, []string{"% b"}}}},
+		// 주석 안의 { } 가 짝이 맞으면 \text 의 } 를 가리지 않았다 — 닫힌 꼴은 그려지고, 닫는 } 가 빠진 꼴은 까닭이 % 가 아니다
+		{"$\\text{a % {b}\nc}$", true, []want{{1, []string{"「% {b}」"}, []string{"닫는 }"}}}},
+		{"$\\text{a % {b}\nc$", false, nil},
+		// 중첩 — 안쪽 { 안의 % 줄에 } 가 없다
+		{"$\\text{a {b % c\nd} e}$", true, []want{{1, []string{"「% c」"}, []string{"닫는 }"}}}},
+		{"$\\text{a {b % c\nd} e$", false, nil},
+		// 깊이 2 에서 짝 없는 } 를 가린 % 도 탓한다 — 명세 「짝 없는 } 를 처음 가린 %」
+		{"$\\text{a {b % c}\nd} e$", false, []want{{1, []string{"「% c}」"}, nil}}},
+	} {
+		r := render(t, c.src)
+		if got := strings.Contains(r.HTML, "<math"); got != c.math {
+			t.Errorf("%q: 수식 %v (기대 %v)\n%s", c.src, got, c.math, r.HTML)
+		}
+		if len(r.Warnings) != len(c.warns) {
+			t.Errorf("%q: 경고 %d (기대 %d)\n%+v", c.src, len(r.Warnings), len(c.warns), r.Warnings)
+			continue
+		}
+		for i, w := range r.Warnings {
+			if w.Code != WarnMath || w.Line != c.warns[i].line {
+				t.Errorf("%q: 경고 %d = %+v (기대 math·줄 %d)", c.src, i, w, c.warns[i].line)
+			}
+			for _, s := range c.warns[i].has {
+				if !strings.Contains(w.Message, s) {
+					t.Errorf("%q: 경고 %d 에 %q 없음: %s", c.src, i, s, w.Message)
+				}
+			}
+			for _, s := range c.warns[i].lacks {
+				if strings.Contains(w.Message, s) {
+					t.Errorf("%q: 경고 %d 에 %q 가 있음: %s", c.src, i, s, w.Message)
+				}
+			}
+		}
+	}
+}

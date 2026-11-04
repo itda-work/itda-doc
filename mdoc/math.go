@@ -49,6 +49,9 @@ type MathBlock struct {
 	closed bool
 	raw    []text.Segment // 읽은 줄(여는 $$·닫는 $$ 포함, 인용·목록 표지 뺌) — 그리지 못하면 이 원문을 그대로 낸다(리뷰 R1 P2)
 	sc     texScanner
+	// pctText 는 지금 열린 \text{…} 의 } 를 가린 주석의 줄의 % 부터다(sc.hasTextPct 일 때만, 원문 줄을 가리킴) — 닫히지 않으면 그 까닭으로
+	// 알린다(itda-hyve#591).
+	pctText []byte
 }
 
 var KindMathBlock = ast.NewNodeKind("MathBlock")
@@ -118,7 +121,11 @@ func (p *mathBlockParser) Open(parent ast.Node, reader text.Reader, pc parser.Co
 func (n *MathBlock) scanLine(line []byte) (at int, trailing bool) {
 	n.sc.newline()
 	for i := 0; i < len(line); {
+		had := n.sc.hasTextPct
 		next, tok := n.sc.step(line, i)
+		if !had && n.sc.hasTextPct {
+			n.pctText = line[n.sc.textPct:]
+		}
 		if tok == tokDollar && next < len(line) && line[next] == '$' {
 			return i, len(bytes.TrimSpace(line[i+2:])) > 0
 		}
@@ -150,7 +157,11 @@ func (p *mathBlockParser) Continue(node ast.Node, reader text.Reader, pc parser.
 
 func (p *mathBlockParser) Close(node ast.Node, reader text.Reader, pc parser.Context) {
 	if n := node.(*MathBlock); !n.closed {
-		p.st.warn(p.st.lines.line(n.Pos()), WarnMath, "닫는 $$ 가 없어 수식을 그리지 않고 원문 그대로 둠")
+		msg := "닫는 $$ 가 없어 수식을 그리지 않고 원문 그대로 둠"
+		if n.sc.hasTextPct { // 그 \text 가 닫혔으면 step 이 지웠다 — % 가 까닭이 아니다
+			msg += fmt.Sprintf(" — \\text{…} 안의 「%s」(%% 부터 줄 끝)는 TeX 주석이라 닫는 } 를 가림, 퍼센트 기호면 \\%%", clipLost(string(n.pctText)))
+		}
+		p.st.warn(p.st.lines.line(n.Pos()), WarnMath, msg)
 	}
 }
 
@@ -199,6 +210,15 @@ func (st *state) math(tex string, display bool, line int) (string, bool) {
 	return out, true
 }
 
+// clipLost 는 경고에 실을 사라진 글이다 — 앞뒤 공백을 떼고 20자가 넘으면 줄인다.
+func clipLost(s string) string {
+	s = strings.TrimSpace(s)
+	if r := []rune(s); len(r) > 20 {
+		s = string(r[:20]) + "…"
+	}
+	return s
+}
+
 // percentLoss 는 TeX 주석(이스케이프하지 않은 %)이 보일 글을 조용히 지우는 첫 자리를 돌려준다(itda-hyve#180). 없으면 "".
 // 그런 자리는 둘이다: 숫자 바로 뒤의 %(「50%」 — 퍼센트로 쓴 것이다. 그리면 % 가 사라진다), 그리고 같은 줄에서 앞뒤로 글이 있는
 // %(「a % b」 — 뒤의 글이 사라진다). 줄 머리(공백 뒤)부터 시작하는 주석 줄과 줄 끝에 홀로 남은 % 는 일부러 쓴 주석으로 보고 둔다.
@@ -219,11 +239,7 @@ func percentLoss(tex string) string {
 			rest := strings.TrimSpace(line[i+1:])
 			afterDigit := i > 0 && line[i-1] >= '0' && line[i-1] <= '9'
 			if afterDigit || (before != "" && rest != "") {
-				lost := strings.TrimSpace(line[i:])
-				if r := []rune(lost); len(r) > 20 {
-					lost = string(r[:20]) + "…"
-				}
-				return lost
+				return clipLost(line[i:])
 			}
 			break // 이 줄의 나머지는 주석이다
 		}

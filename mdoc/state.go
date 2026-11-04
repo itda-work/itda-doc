@@ -46,9 +46,10 @@ type state struct {
 	diagramFull  bool // 합 상한에 닿음(경고는 한 번)
 	diagramDone  map[ast.Node]bool
 	// 글 안 수식 탐색 예산의 남은 양(문단마다) — math.go
-	mathBudget map[ast.Node]int
-	delims     map[ast.Node]int // 블록마다 읽은 강조·취소선 구분자 수 — cjk.go 의 상한
-	closers    map[ast.Node]int // 블록마다 링크로 닫아 본 ] 의 수 — linkclose.go
+	mathBudget    map[ast.Node]int
+	textPctWarned map[int]bool     // 경고한 \text{…} 속 주석 % 의 원문 자리(textPctLoss — 같은 % 를 여러 시도가 지나도 한 번, itda-hyve#591)
+	delims        map[ast.Node]int // 블록마다 읽은 강조·취소선 구분자 수 — cjk.go 의 상한
+	closers       map[ast.Node]int // 블록마다 링크로 닫아 본 ] 의 수 — linkclose.go
 	// 블록 중첩 상한 — nesting.go. nestingLimit 은 시험만 바꾼다(상한 없는 파서로 실제 깊이를 잴 때)
 	nestingLimit int
 	nestingGated int // 상한을 건 블록 파서 수(시험이 본다)
@@ -60,24 +61,25 @@ type state struct {
 
 func newState(src []byte, meta Meta, opts Options) *state {
 	st := &state{
-		src:         src,
-		lines:       newLineIndex(src),
-		meta:        meta,
-		opts:        opts,
-		headings:    map[*ast.Heading]*headingInfo{},
-		images:      map[*ast.Image]*imageInfo{},
-		links:       map[ast.Node]linkInfo{},
-		rawOK:       map[*ast.RawHTML]string{},
-		brBlocks:    map[*ast.HTMLBlock]string{},
-		fenceCloses: map[*ast.FencedCodeBlock]int{},
-		mathDone:    map[ast.Node]bool{},
-		mathOut:     map[ast.Node]string{},
-		diagramPics: map[ast.Node]DiagramPic{},
-		codeHL:      map[*ast.FencedCodeBlock]codeHLDirective{},
-		diagramDone: map[ast.Node]bool{},
-		mathBudget:  map[ast.Node]int{},
-		delims:      map[ast.Node]int{},
-		closers:     map[ast.Node]int{},
+		src:           src,
+		lines:         newLineIndex(src),
+		meta:          meta,
+		opts:          opts,
+		headings:      map[*ast.Heading]*headingInfo{},
+		images:        map[*ast.Image]*imageInfo{},
+		links:         map[ast.Node]linkInfo{},
+		rawOK:         map[*ast.RawHTML]string{},
+		brBlocks:      map[*ast.HTMLBlock]string{},
+		fenceCloses:   map[*ast.FencedCodeBlock]int{},
+		mathDone:      map[ast.Node]bool{},
+		mathOut:       map[ast.Node]string{},
+		diagramPics:   map[ast.Node]DiagramPic{},
+		codeHL:        map[*ast.FencedCodeBlock]codeHLDirective{},
+		diagramDone:   map[ast.Node]bool{},
+		mathBudget:    map[ast.Node]int{},
+		textPctWarned: map[int]bool{},
+		delims:        map[ast.Node]int{},
+		closers:       map[ast.Node]int{},
 		// 상한을 넘는 겹을 받아들이면 파싱을 멈춘다 — nesting.go
 		nestingLimit: MaxNestingDepth,
 	}

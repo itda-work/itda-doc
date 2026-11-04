@@ -2,6 +2,7 @@ package mdoc
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 
 	"github.com/yuin/goldmark/ast"
@@ -41,6 +42,13 @@ const (
 type texScanner struct {
 	text    int  // \text{ 안의 { 깊이. 0 이면 수식 안
 	comment bool // % 주석 안(줄 끝까지)
+	// textPct 는 지금 열린 \text{…} 안에서 짝 없는 } 를 처음 가린 주석 % 의 줄 안 자리다(\text 안 깊이와 상관없이)(hasTextPct 일 때만 뜻이 있다 — 그 \text 가 닫히면 지운다).
+	// 주석이 아니었으면 \text 의 깊이를 줄였을 } 가 주석 안에 있으면 \text 가 열린 채로 남고, 그 안의 $ 는 글자라 수식이 닫히지 않을 수 있다
+	// (itda-hyve#591). 표의 상태 바꿈에는 들지 않는다 — 기록만 한다.
+	textPct    int
+	hasTextPct bool
+	pctCand    int // 지금 주석을 연 % 의 줄 안 자리(후보 — 그 주석이 } 를 가리면 textPct 가 된다)
+	pctHidden  int // 그 주석 안에서 짝이 맞는 } 를 기다리는 { 의 수 — 이것이 0 일 때의 } 만 \text 의 } 를 가린다
 }
 
 // newline 은 줄이 바뀔 때 부른다 — 주석은 줄 끝에서 끝난다.
@@ -58,14 +66,29 @@ func (s *texScanner) step(line []byte, i int) (next int, tok texTok) {
 		return min(i+2, len(line)), tokChar
 	case c == '%' && !s.comment:
 		s.comment = true
+		s.pctCand, s.pctHidden = i, 0 // 주석은 이 % 로만 시작하므로 줄이 바뀔 때 따로 지우지 않아도 된다
 		return i + 1, tokChar
 	case s.text > 0:
-		if !s.comment {
+		if s.comment { // 기록만 — text·comment 는 그대로
+			switch c {
+			case '{':
+				s.pctHidden++
+			case '}':
+				if s.pctHidden > 0 {
+					s.pctHidden--
+				} else if !s.hasTextPct {
+					s.textPct, s.hasTextPct = s.pctCand, true
+				}
+			}
+		} else {
 			switch c {
 			case '{':
 				s.text++
 			case '}':
 				s.text--
+				if s.text == 0 {
+					s.hasTextPct = false // 그 \text 가 닫혔다 — 그 안의 % 는 이제 까닭이 아니다(기록만, 판정은 그대로)
+				}
 			}
 		}
 		return i + 1, tokChar
@@ -85,6 +108,10 @@ type mathCursor struct {
 	i     int // line 안의 자리
 	read  int
 	sc    texScanner
+	// pctAt·pctText 는 sc.textPct 의 % 의 원문 자리와 그 줄의 나머지다(sc.hasTextPct 일 때만 — 그 % 와 가린 } 는 같은 줄). pctText 는 원문 줄을
+	// 복사하지 않고 가리킨다 — 경고할 때만 clipLost 로 자른다.
+	pctAt   int
+	pctText []byte
 }
 
 // take 는 n 바이트를 지난다(같은 줄 안).
@@ -101,7 +128,11 @@ func (c *mathCursor) next() (tok texTok, b []byte, eof bool) {
 		c.i = 0
 		c.sc.newline()
 	}
+	had := c.sc.hasTextPct
 	n, tok := c.sc.step(c.line, c.i)
+	if !had && c.sc.hasTextPct {
+		c.pctAt, c.pctText = c.seg.Start+c.sc.textPct, c.line[c.sc.textPct:]
+	}
 	b = c.line[c.i:n]
 	c.take(n - c.i)
 	return tok, b, false
@@ -167,6 +198,9 @@ func (p *mathInlineParser) Parse(parent ast.Node, block text.Reader, pc parser.C
 	c := &mathCursor{block: block, line: line, seg: seg}
 	c.take(opener)
 	fail := func() ast.Node {
+		if c.sc.hasTextPct { // 그 \text 가 닫혔으면 step 이 지웠다 — % 가 까닭이 아니다
+			p.st.textPctLoss(c.pctAt, c.pctText)
+		}
 		p.spend(parent, c.read, p.st.lines.line(start))
 		block.SetPosition(savedLine, savedPos)
 		return nil
@@ -200,4 +234,15 @@ func (p *mathInlineParser) Parse(parent ast.Node, block text.Reader, pc parser.C
 		tex.Write(b)
 	}
 	return fail() // 남은 예산을 다 읽음
+}
+
+// textPctLoss 는 열린 \text{…} 안의 주석 % 때문에 수식이 닫히지 않아 $ 를 글자로 둘 때 경고한다(itda-hyve#591). 주석이 닫는 } 를 가리면
+// \text 가 열린 채로 남고 그 안의 $ 는 글자라 닫는 $ 를 찾지 못한다 — 그대로면 「닫히지 않은 $ 는 경고 없이 글자」(금액 규칙)에
+// 묻혀 아무 말 없이 수식이 사라진다. at 은 % 의 원문 자리(같은 % 를 여러 시도가 지나도 한 번만), rest 는 그 줄의 % 부터다.
+func (st *state) textPctLoss(at int, rest []byte) {
+	if st.textPctWarned[at] {
+		return
+	}
+	st.textPctWarned[at] = true
+	st.warn(st.lines.line(at), WarnMath, fmt.Sprintf("\\text{…} 안의 「%s」(%% 부터 줄 끝)는 TeX 주석이라 닫는 } 를 가려 수식으로 읽지 않고 글자로 둠 — 퍼센트 기호면 \\%%", clipLost(string(rest))))
 }
