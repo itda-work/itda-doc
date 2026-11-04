@@ -968,6 +968,35 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .page.slide > .slide-panel img { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; /* 블록을 고치지 않고 옮긴다 — width 속성(CSP 가 막는 style)이 남아도 패널 폭 */ max-width: none; max-height: none; object-fit: contain; }
 .page.slide > .slide-panel img.img-fill { object-fit: cover; }
 .page.slide > .slide-panel figcaption { flex: none; padding: 6pt 12pt 8pt; font-size: calc(13pt * var(--slide-scale)); color: var(--muted); text-align: center; line-height: 1.4; }
+/* YouTube 블록(mdoc youtube.go — <a class="yt"><img 대표 그림></a>, 누르면 화면 JS(호스트 부품 — share.js 머리 주석 「호스트 부품」)가 a 를 숨기고 바로 뒤에 .yt-play(iframe)를 둔다).
+   배치 class·data-split·width 는 안의 img 에 있어 위 그림 배치 규칙이 그대로 고른다. ▶ 는 링크 위 가운데에 그린다(그림이 아니라 글자).
+   yt-ph 는 원격 그림을 끈 문서의 자리표시다 — 대표 그림(img)을 불러오지 않으므로 링크가 16:9 상자에 ▶·「YouTube 영상」·주소를 그린다.
+   재생 중 상자: 패널은 패널을 채우고(.fill 이어도 플레이어는 칸 안 레터박스), 그 밖은 화면이 대표 그림 크기를 걸어 둔다. */
+a.yt[hidden] { display: none !important; } /* 위 display 가 UA 의 [hidden] 을 이기므로 다시 건다 */
+a.yt { position: relative; display: inline-block; max-width: 100%; vertical-align: top; color: inherit; text-decoration: none; }
+.page-body figure > a.yt { display: block; }
+a.yt::after { content: "\25B6\FE0E"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 44px; border-radius: 12px;
+  background: rgba(0, 0, 0, 0.66); color: #fff; font: 22px/44px var(--font-body); text-align: center; pointer-events: none; }
+a.yt:hover::after, a.yt:focus-visible::after { background: #e00; }
+a.yt.yt-ph { display: block; width: min(100%, 480px); aspect-ratio: 16 / 9; margin: 0 auto; background: #1d1d1f; border-radius: var(--img-radius); overflow: hidden; }
+a.yt.yt-ph > img { position: absolute; inset: 0; width: 100% !important; height: 100% !important; visibility: hidden; }
+a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolute; left: 8px; right: 8px; bottom: 8px; color: #d0d0d0; font: 11px/1.3 var(--font-body);
+  text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page.slide .page-body a.yt.yt-ph:has(> img.img-fit) { width: 100%; max-height: calc(var(--body-h, 200mm) - 16px); }
+.yt-play { position: relative; display: inline-block; vertical-align: top; max-width: 100%; background: #000; }
+.page-body figure > .yt-play { display: block; margin: 0 auto; }
+.yt-play > iframe { display: block; width: 100%; height: 100%; border: 0; }
+.yt-close { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border: 0; border-radius: 13px; background: rgba(0, 0, 0, 0.6); color: #fff;
+  font: 16px/26px var(--font-body); cursor: pointer; padding: 0; }
+.page.slide > .slide-panel > * > a.yt { position: relative; }
+.page.slide > .slide-panel > * > a.yt.yt-ph { aspect-ratio: auto; width: auto; margin: 0; border-radius: 0; }
+.page.slide > .slide-panel > * > .yt-play { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; height: auto !important; }
+@media print {
+  .yt-play { display: none !important; }
+  a.yt[hidden] { display: inline-block !important; }
+  .page-body figure > a.yt[hidden] { display: block !important; }
+  .page.slide > .slide-panel > * > a.yt[hidden] { display: flex !important; }
+}
 /* 배경 그림(itda-hyve#569): mdoc 이 표시한(data-slide-bg) 맨 위 블록을 쪽의 첫 자식 .slide-bg 로 통째로 옮겨 슬라이드 전체(제목 띠 포함)를 채운다.
    머리·본문·바닥은 DOM 차례로 그 위에 그려진다. 배경 장에는 테마 장식(.slide-deco)을 넣지 않는다(slides.js).
    .full 은 비율 유지(contain — 남는 자리는 슬라이드 바탕), .full .fill 은 cover(잘림) + 스크림(--slide-scrim)·밝은 글(--slide-scrim-ink·

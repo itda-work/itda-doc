@@ -106,3 +106,46 @@ func TestShareNoAppName(t *testing.T) {
 		t.Errorf("share.js 의 탭 제목이 docTitle 을 지나지 않음(%d 곳)", n)
 	}
 }
+
+// YouTube 블록(mdoc youtube.go)의 공유 화면 쪽: 따라가기 중 정지 문지기 ytFollowGate 는 발표 슬라이드(kind "slide")의 번호가 직전에
+// 따라간 번호와 다를 때만 참이다 — 같은 번호 재적용(조각 넘김·다시 맞춤)·내용 위치(kind "pos")는 멈추지 않고, pos 는 기억한 번호도
+// 바꾸지 않는다. 화면 배선은 글로 본다: 재생은 호스트 부품 YT(pick — ItdaYT·HyveYT)를 쓰고, 틀 주소는 youtube-nocookie·referrerpolicy
+// strict-origin, 따라가기(scrollToFollow)는 문지기가 참일 때만, 다시 그리기(render)·끝난 화면(showEnded)은 늘 멈춘다.
+func TestShareYouTubeFollowGate(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const g = ctx.window.ItdaShare.ytFollowGate();
+  const got = [g(3, "slide"), g(3, "slide"), g(7, "pos"), g(3, "slide"), g(4, "slide"), g(3, "slide"), g(3, "pos"), g(3, "slide")];
+  const want = [true, false, false, false, true, true, false, false];
+  process.stdout.write(JSON.stringify(got) === JSON.stringify(want) ? "GATE OK" : "GATE FAIL " + JSON.stringify(got));
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "GATE OK" {
+		t.Fatalf("ytFollowGate: %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	for _, want := range []string{
+		`const YT = hostPart("YT");`,
+		`const YT_EMBED = "https://www.youtube-nocookie.com/embed/";`,
+		`referrerPolicy: "strict-origin",`,
+		`inScope: a => $("viewer").contains(a),`,
+		"    if (ytFollowChanged(i, kind)) ytStop();",
+		"    if (state.ended) return;\n    ytStop();",
+		"    state.ended = true;\n    linked.stop();\n    ytStop();",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("share.js 에 %q 없음", want)
+		}
+	}
+	html, _ := os.ReadFile("share.html")
+	if !strings.Contains(string(html), `<script src="{{BASE}}/_/yt.js"></script>`) {
+		t.Error("share.html 이 호스트 부품 yt.js 자리를 싣지 않음")
+	}
+}

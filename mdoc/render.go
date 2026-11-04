@@ -302,8 +302,13 @@ func (r *htmlRenderer) image(w util.BufWriter, src []byte, node ast.Node, enteri
 		info = &imageInfo{kind: urlBlocked}
 	}
 	dest := util.EscapeHTML(util.URLEscape(n.Destination, true))
+	if info.yt != nil {
+		r.ytOpen(w, info)
+	}
 	_, _ = w.WriteString("<img")
 	switch {
+	case info.yt != nil:
+		r.ytPoster(w, info.yt)
 	case info.kind == urlOK, info.kind == urlRemote && r.st.opts.AllowRemoteImages:
 		_, _ = w.WriteString(` src="`)
 		if info.kind == urlOK && r.st.opts.LocalImagePrefix != "" && !isDataURL(string(n.Destination)) {
@@ -335,7 +340,53 @@ func (r *htmlRenderer) image(w util.BufWriter, src []byte, node ast.Node, enteri
 		attr(w, "style", "width:"+info.width)
 	}
 	_ = w.WriteByte('>')
+	if info.yt != nil {
+		_, _ = w.WriteString("</a>")
+	}
 	return ast.WalkSkipChildren, nil
+}
+
+// ytOpen 은 YouTube 블록(youtube.go)의 여는 링크다: <a class="yt" href="정규화한 watch 주소" data-yt-id data-yt-start>. 대표 그림이
+// 불러오지 않는 원격 그림이면 class 에 yt-ph(자리표시 — base.css 가 ▶·글자·주소를 그린다)를 더한다. 배치 class·data-split·width 는
+// 안의 img 에 보통 그림과 똑같이 단다(슬라이드 배치 itda-hyve#550 의 규칙이 그대로 고른다). 스크립트·iframe 은 내지 않는다 — 플레이어는 화면 JS 몫이다.
+//
+// 자리표시는 안의 img 를 그리지 않고 링크가 상자를 그리므로, 배치 class 가 없는 그림의 width 를 링크에도 같은 값으로 단다(style 은 여전히
+// width 에서만 — 슬라이드 배치 그림(.fit·.left·.right)은 원래 width 를 쓰지 않는다).
+func (r *htmlRenderer) ytOpen(w util.BufWriter, info *imageInfo) {
+	v := info.yt
+	ph := v.poster == "" && !r.st.opts.AllowRemoteImages
+	cls := "yt"
+	if ph {
+		cls = "yt yt-ph"
+	}
+	_, _ = w.WriteString(`<a class="` + cls + `"`)
+	attr(w, "href", v.watchURL())
+	attr(w, "data-yt-id", v.id)
+	if v.start > 0 {
+		attr(w, "data-yt-start", strconv.Itoa(v.start))
+	}
+	if ph && info.width != "" && info.place == "" {
+		attr(w, "style", "width:"+info.width) // cssLength 를 통과한 숫자+단위뿐이다
+	}
+	_ = w.WriteByte('>')
+}
+
+// ytPoster 는 YouTube 블록 대표 그림의 src 다: poster= 가 있으면 로컬 그림 규칙(LocalImagePrefix — data: 는 그대로), 없으면 원격 그림을
+// 켠 문서에서만 i.ytimg.com 대표 그림, 끈 문서에서는 data-remote-src(불러오지 않음)다.
+func (r *htmlRenderer) ytPoster(w util.BufWriter, v *ytVideo) {
+	switch {
+	case v.poster != "":
+		_, _ = w.WriteString(` src="`)
+		if r.st.opts.LocalImagePrefix != "" && !isDataURL(v.poster) {
+			_, _ = w.Write(util.EscapeHTML([]byte(r.st.opts.LocalImagePrefix)))
+		}
+		_, _ = w.Write(util.EscapeHTML(util.URLEscape([]byte(v.poster), true)))
+		_ = w.WriteByte('"')
+	case r.st.opts.AllowRemoteImages:
+		attr(w, "src", v.thumbURL())
+	default:
+		attr(w, "data-remote-src", v.thumbURL())
+	}
 }
 
 func (r *htmlRenderer) container(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
