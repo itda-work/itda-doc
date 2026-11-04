@@ -84,7 +84,7 @@ func TestRenderPageUnknownTheme(t *testing.T) {
 	if err == nil || errors.Is(err, errWarnings) || out != "" {
 		t.Fatalf("모르는 테마를 받음: %v", err)
 	}
-	if msg := err.Error(); !strings.Contains(msg, `"nope"`) || !strings.Contains(msg, "bold, classic, compact, mono, spine") || strings.Contains(msg, "\n") {
+	if msg := err.Error(); !strings.Contains(msg, `"nope"`) || !strings.Contains(msg, "bold, classic, compact, mono, slate, spine") || strings.Contains(msg, "\n") {
 		t.Errorf("메시지: %s", msg)
 	}
 }
@@ -150,7 +150,7 @@ func TestThemes(t *testing.T) {
 	if strings.Contains(out, "경고: ") {
 		t.Errorf("경고가 없어야 할 목록에 경고가 있음:\n%s", out)
 	}
-	for _, n := range []string{"bold", "classic", "compact", "mono", "spine"} {
+	for _, n := range []string{"bold", "classic", "compact", "mono", "slate", "spine"} {
 		if !strings.Contains(out, n+"\t내장\t") {
 			t.Errorf("내장 테마 %s 가 없음:\n%s", n, out)
 		}

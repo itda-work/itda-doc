@@ -1,0 +1,66 @@
+/* 슬레이트: 남색(--accent) 주조에 청록(--highlight) 강조 한 가지, 나머지는 회색으로 죽인다. 결론을 앞세운 굵은 제목,
+   가로줄만 남긴 표, 장식 없음. 문서 구조(표지·머리글·제목 번호·목차)는 바탕 classic 을 물려받고,
+   여기서는 classic 의 굵은 띠·막대·□ 기호를 걷어 가는 선 몇 줄과 짧은 청록 막대 하나만 남긴다.
+   청록 --highlight 는 흰 바탕 4.98:1 이라 글자·선·면 어디에나 쓴다.
+   숫자 고정폭(tabular-nums)은 쓰지 않는다 — 문서 CSS 의 금지선(TestNoNumericFontFeatures — PDF 숫자 복사·검색). */
+
+/* ---- 표지: 위 가는 남색 선 + 짧은 청록 막대, 제목은 왼쪽 선 없이 굵은 남색 */
+.cover::before { height: 2.4mm; }
+.cover::after { top: 2.4mm; width: 26mm; height: 1.4mm; background: var(--highlight); }
+.cover-top { color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+.cover-main { border-left: none; padding-left: 0; }
+.page-body .cover-title { font-weight: 800; letter-spacing: -0.025em; }
+.page-body .cover-meta { border-top: 1pt solid var(--accent); }
+.page-body .cover-meta dt { color: var(--muted); }
+
+/* ---- 머리글·바닥글: 작은 글자는 먹색 계열(--muted 4.83:1) */
+.page-header, .page-footer { color: var(--muted); }
+.page-footer .slot.center { color: var(--ink); }
+
+/* ---- 제목: 장(h1)은 아래 가는 남색 선, 절·항은 장식 없이 굵기·색으로만. 번호는 장만 청록 */
+.page-body h1 { border-bottom-width: 1pt; letter-spacing: -0.02em; }
+.page-body h1 .header-section-number { color: var(--highlight); }
+.page-body h2 { padding-left: 0; letter-spacing: -0.01em; }
+.page-body h2::before { content: none; }
+.page-body h2 .header-section-number, .page-body h3 .header-section-number { color: var(--muted); }
+.page-body h3:not(:has(.header-section-number))::before { content: none; }
+.toc-title { border-bottom-width: 1pt; letter-spacing: 0.12em; }
+
+/* ---- 표: 세로줄 없이 가로줄만. 머리 아래 남색 선, 맨 아래 닫는 남색 선 */
+.page-body th, .page-body td { border-left: none; border-right: none; }
+.page-body thead th { border-bottom: 1pt solid var(--accent); font-weight: 700; }
+.page-body table { border-bottom: 1pt solid var(--accent); }
+/* 칸의 0.5pt 선은 화면 배율 1 에서 표의 위·아래 선과 같은 1px 로 반올림돼 겹친 선 다툼(border-collapse)에서 칸 색이 이긴다 —
+   머리 칸 위·마지막 줄 아래의 칸 선을 없애 표의 남색 선이 보이게 한다 */
+.page-body thead th { border-top: none; }
+.page-body table > :last-child > tr:last-child > td { border-bottom: none; }
+
+/* ---- 요약문·인용·상자: 모서리 없이 */
+.lead { border-radius: 0; }
+.page-body blockquote { border-radius: 0; }
+
+/* ---- 슬라이드: 위 띠 없이 왼쪽 위 짧은 청록 막대 하나, 제목(결론 문장) 아래 가는 선, 바닥에 가는 선과 쪽 번호.
+   제목 슬라이드는 위 가는 남색 띠 + 청록 막대, 구역 슬라이드는 classic 의 왼쪽 남색 면에 청록 띠·청록 큰 번호 */
+.slide-deco::before { left: var(--slide-pad-x); right: auto; top: 0; width: 46pt; height: 5pt; background: var(--highlight); }
+.slide-deco::after { content: none; }
+.slide-title { padding-left: 0; padding-bottom: 8pt; border-bottom: 0.75pt solid var(--rule); letter-spacing: -0.02em; font-weight: 800; }
+.slide-title::before { content: none; }
+.slide-title .header-section-number { color: var(--highlight); }
+.slide-foot { border-top: 0.5pt solid var(--rule); padding-top: 7pt; }
+.sf-num { color: var(--ink); }
+.page-body.k-content h2 { color: var(--accent); }
+.page-body.k-content h3 { color: var(--ink); }
+/* 제목 슬라이드 */
+.slide-deco.k-title::before { left: 0; right: 0; width: auto; height: 10pt; background: var(--accent); }
+.slide-deco.k-title::after { content: ""; position: absolute; left: 86pt; top: 10pt; width: 96pt; height: 5pt; background: var(--highlight); }
+.sc-top { color: var(--muted); font-weight: 600; }
+.sc-main { border-left: none; padding-left: 0; }
+.page-body .sc-title { letter-spacing: -0.025em; }
+.sc-meta { border-top: 0.75pt solid var(--rule); color: var(--muted); }
+/* 구역 슬라이드 — 띠의 자리·폭은 classic 그대로(본문 left 계산도 classic 의 것) */
+/* 남색 면과 청록 띠는 바닥글 줄 위(--slide-pad-bottom — 본문 아래 끝과 같은 줄)에서 함께 끝난다. 바닥글(조직·로고·쪽 번호)은
+   base 자리 그대로라 바닥글이 세 줄까지 꺾이는 배치에서는 흰 바탕 위다(조직 --muted 4.83:1·쪽 번호 --ink — 면 위면 --muted 3.01:1).
+   더 긴 바닥글은 면에 닿을 수 있다 — 면 끝이 고정 여백이라 바닥글 높이를 따라가지 않는다(itda-doc#33 리뷰). */
+.slide-deco.k-section::before { left: 0; bottom: var(--slide-pad-bottom); background: var(--accent); }
+.slide-deco.k-section::after { content: ""; position: absolute; bottom: var(--slide-pad-bottom); height: auto; background: var(--highlight); }
+.page-body .ss-num { color: var(--highlight); }
