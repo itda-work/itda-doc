@@ -886,6 +886,38 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 :where(body.list-gongmun .page-body ol.ol-d7:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 5.72em); }
 :where(body.list-gongmun .page-body ol.ol-d8:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 6.38em); }
 :where(body.list-gongmun .page-body ol.ol-d9:not(nav ol, .footnotes ol)) { padding-left: max(var(--list-indent-gongmun), 7.04em); }
+
+/* 회의록·절차 어휘(표준 어휘 — itda-doc#28): decisions(결정 사항 상자, 항목마다 ✔)·actions(할 일 표)·steps(절차 단계 — 번호 원 +
+   세로 줄)·result(단계의 결과 한 줄). 모든 테마에서 이 기본 모양이고, 색은 --accent·--accent-soft·--accent-ink·--rule 만 쓴다.
+   선택자 전체가 :where() 라 특이도 0(::before·::after 만 0,0,1) — 테마 CSS 가 같은 속성을 정하면 언제나 이긴다(compact·spine 은
+   제 모양으로 덮는다). 위의 번호 목록 들여쓰기(.ol-d*·공문 사다리)도 특이도 0 이라 그보다 뒤에 둔다 — 열 단계 넘는 :::steps 에서
+   들여쓰기가 되살아나지 않게. 같은 까닭으로 .page-body ul·li·p·table 의 여백(0,1,1)은 여기서 이기지 못하므로 여백 대신 안쪽 여백으로 맞춘다.
+   할 일 표는 칸 순서를 가정하지 않는다(첫 칸 ☐·담당·기한 칸 굵게는 compact 고유) — 머리 칸 색만 토큰으로 바꾼다 */
+:where(.decisions) { border-left: 4pt solid var(--accent); background: var(--accent-soft); border-radius: 0 var(--box-radius) var(--box-radius) 0;
+  padding: 7pt 11pt max(1pt, calc(7pt - var(--paragraph-gap))); margin: 8pt 0 10pt; }
+:where(.decisions :is(ul, ol)) { padding-left: 0; list-style: none; }
+:where(.decisions li) { position: relative; padding-left: 15pt; font-weight: 600; }
+:where(.decisions li)::before { content: "✔"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 800; }
+:where(.actions) { --table-head-bg: var(--accent); --table-head-ink: var(--accent-ink); --table-top-rule: none; margin: 8pt 0 10pt; }
+:where(.steps) { margin: 6pt 0 10pt; }
+:where(.steps > ol) { list-style: none; padding-left: 0; }
+:where(.steps > ol > li) { position: relative; padding: 0 0 5pt 11mm; min-height: 7.4mm; }
+:where(.steps > ol > li)::before { content: counter(list-item); position: absolute; left: 0; top: 0.05em; width: 6.6mm; height: 6.6mm;
+  border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 9.5pt; line-height: 6.6mm; text-align: center; }
+:where(.steps > ol > li)::after { content: ""; position: absolute; left: 3.2mm; top: 7.4mm; bottom: 1mm; width: 0.9pt; background: var(--rule); }
+:where(.steps > ol > li:last-child)::after { display: none; }
+:where(.steps > ol > li > p:first-child) { font-weight: 600; }
+/* 단계 모양은 :::steps 바로 아래 번호 목록에만 — 단계 안 하위 목록은 보통 목록 규칙(기호 사다리·.ol-d* 들여쓰기)을 그대로 받는다.
+   쪽을 넘어 이어지는 단계 조각(div.steps.cont > ol.cont > li.cont)은 번호 원을 다시 그리지 않는다 */
+:where(.steps > ol > li.cont)::before { content: none; }
+/* 슬라이드: 번호 원·세로 줄을 본문 글자(em)에 맞춘다 — mm·pt 고정이면 슬라이드의 큰 글자 옆에서 원이 작고 위로 뜬다.
+   em 이라 --slide-scale·font-scale 을 본문과 함께 받는다. 특이도 0 이라 테마(spine 의 .steps ol 규칙)가 이긴다 */
+:where(.page.slide .steps > ol > li) { padding-left: 1.9em; min-height: 1.5em; }
+:where(.page.slide .steps > ol > li)::before { top: 0.08em; width: 2.25em; height: 2.25em; line-height: 2.25em; font-size: 0.6em; }
+:where(.page.slide .steps > ol > li)::after { left: 0.65em; top: 1.5em; bottom: 0.2em; }
+:where(.result) { border-left: 3pt solid var(--accent); background: var(--accent-soft); padding: 3pt 8pt; margin: 2pt 0 6pt; font-size: 0.92em; }
+:where(.result)::before { content: "결과 "; font-weight: 800; color: var(--accent); }
+:where(.result > p) { display: inline; margin: 0; }
 .page.slide .page-body li { margin: 6pt 0; }
 /* 하위 목록(itda-hyve#430): 단계마다 작게·촘촘하게 — 2단계 0.88em·항목 간격 3pt, 3·4단계 0.92em(바로 위 단계 기준)·2pt, 5단계부터는 더
    줄이지 않는다(하한 = 바깥 목록 글자의 0.88×0.92×0.92 ≈ 0.74). em 이라 표·각주 안의 목록도 그 글자에 비례하고 들여쓰기(em)도

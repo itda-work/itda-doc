@@ -131,8 +131,12 @@ organization: 잇다
 | `incremental` | 발표에서 목록을 하나씩 — [발표 안내서](slides.md) |
 | `nonincremental` | 발표에서 하나씩 나타내기를 끔 — [발표 안내서](slides.md) |
 | `notes` | 발표자 노트(문서·슬라이드에 안 보임) — [발표 안내서](slides.md) |
+| `decisions` | 결정 사항 상자 — 안의 목록 항목마다 ✔ |
+| `actions` | 할 일 표 — 안에 표를 쓴다 |
+| `steps` | 절차 단계 — 안의 번호 목록을 번호 원 단계로 |
+| `result` | 단계의 결과 한 줄 — 절차 단계 안에 |
 
-모르는 이름도 `<div class="이름">` 으로 나간다 — 회사 테마가 자기 어휘로 쓴다. 내장 테마의 자기 어휘: `compact` 의 `decisions`(결정 사항)·`actions`(할 일 표), `spine` 의 `steps`(절차 단계)·`result`(단계의 결과).
+모르는 이름도 `<div class="이름">` 으로 나간다 — 회사 테마가 자기 어휘로 쓴다. 회의록·절차 어휘 `decisions`·`actions`·`steps`·`result` 는 표준 어휘라 모든 테마에서 기본 모양이 있고, `compact`(`decisions`·`actions`)와 `spine`(`steps`·`result`)은 고유 모양으로 그린다.
 강조 상자는 `note`·`warning` 컨테이너가 아니라 알림(`> [!NOTE]`)으로 쓴다.
 
 ```markdown

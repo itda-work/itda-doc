@@ -426,10 +426,17 @@ func TestSampleCompanyTheme(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	acmeInMenu := false
 	for _, i := range ts.List() {
 		if i.Error != "" {
 			t.Errorf("견본 %s: %s", i.Name, i.Error)
 		}
+		if i.Name == "acme" {
+			acmeInMenu = i.HasTemplate // 회사 테마의 서식은 「새 문서」 메뉴에 보인다(내장 중립 테마에는 없다 — itda-doc#28)
+		}
+	}
+	if !acmeInMenu {
+		t.Error("견본 acme 의 template.md 가 새 문서 메뉴(HasTemplate)에 없음")
 	}
 	th, ok := ts.Get("acme")
 	if !ok {

@@ -1,6 +1,7 @@
 /* 컴팩트: 표지 없이 한 장에 빨리 읽힌다. 맨 위 회의 정보 표(양식처럼 칸이 있는 표), 안건별 논의는 가볍게,
    결정 사항(:::decisions)과 할 일 표(:::actions)는 초록 강조로 눈에 띄게. 색은 모두 --accent 에서 나온다.
-   자기 어휘: decisions(결정 사항 상자 — 안의 목록에 ✔), actions(할 일 표 — 담당·기한 칸이 굵게). */
+   표준 어휘 decisions·actions 의 기본 모양(base.css)을 덮는 고유 모양: decisions(초록 테두리 상자 — 안의 목록에 ✔),
+   actions(진한 초록 머리, 첫 칸 앞 ☐, 담당·기한 칸이 굵게). */
 
 /* 제목 블록: 제목, 그리고 회의 정보 표 */
 .title-block { margin: 0 0 12pt; position: relative; }
