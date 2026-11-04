@@ -1,0 +1,46 @@
+/* 버던트: 숲색(--accent #1e5631, 흰 바탕 8.64:1)과 잎색(--highlight #3e7d22, 5.05:1), 모래색 면(--accent-soft #e9e2d0)에 흙색·물색.
+   구조(책등 표지·「제 n 장」·번호 원 단계·장마다 새 쪽)는 바탕 spine 을 물려받고 색만 바꾼다. 흔한 연두·겨자는 흰 바탕 3:1 에 못 미쳐
+   잎색·황토는 짙게 골랐다 — 차트 8색은 흰 바탕 4.5:1 이상(page/styletheme_test.go 의 쌍, 값은 theme.json).
+   spine 은 호박색(밝은) --highlight 위에 먹색 글자를 얹는 꼬리표가 있는데, 잎색은 어두워 숲색 글자가 1.71:1 이 된다 —
+   아래에서 꼬리표 글자만 흰색(--accent-ink, 잎색 위 5.05:1)으로 바꾼다. */
+
+/* ---- 잎색 꼬리표 위 글자: 장 머리 「제 n 장」, 슬라이드 제목 번호, 맨 구역 장 번호 */
+.page-body h1 > .header-section-number { color: var(--accent-ink); }
+.slide-title .header-section-number { color: var(--accent-ink); }
+.page-body.bare .ss-num { color: var(--accent-ink); }
+
+/* ---- 숲색 면 안의 링크·각주 번호·인라인. 숲색(--accent) 면에 글이 놓이는 자리는 둘이고, 아래 선택자 목록(:is)이 그 둘이다:
+   (1) 표 머리 칸 — spine 이 --table-head-bg 를 --accent 로 둔다(:::actions 도 base 가 --accent). 단 결재란(:::approval)의 머리는
+       base 가 투명 바탕·먹 글자로 덮어(web/base.css 의 .page-body .approval th) 흰 종이 위라 뺀다.
+   (2) 맨 구역 장(슬라이드)의 제목 — spine 이 .bare 구역 장의 면을 슬라이드 전체로 넓히고 제목을 흰색으로 둔다.
+       .bare 는 본문 없는 구역 장에만 붙는다(web/slides.js — 배경 그림 장에는 붙지 않는다). 본문이 붙은 구역 장의 제목은 흰 바탕이다.
+   그 면 위에서 base 의 링크색(물색 #276b7c)은 1.43:1 이다 — 링크·각주·가리킴을 흰색(--accent-ink 8.64:1)·면 없음으로.
+   base 가 색·바탕을 주는 인라인(web/base.css 의 code·mark·del 규칙, spine 의 kbd 규칙):
+   - code: 글자는 면의 글자색, 상자는 그 글자색 16%(base 의 표 머리 code 와 같은 꼴) — 흰 / #427152 5.65:1.
+     제목 안 code 는 base 의 밝은 --code-bg 위 흰 글자(1.11:1)가 되므로 이 꼴로 맞춘다
+   - mark: 노랑 #fff1a8 위에 흰 글자가 상속돼 1.14:1 — 그 안 글자·링크·각주는 먹색(11.94:1, 시험 쌍). 그 안 code 는 먹 / 먹 16% 섞은 노랑 8.88:1
+   - del: --muted 가 숲색 위 1.44:1 — 면의 글자색 그대로(취소선이 뜻을 알린다)
+   - kbd: spine 이 흰 바탕·숲색 글자로 그린다 — 그 흰 면 안의 링크·각주는 숲색(8.64:1)으로 되돌린다. 그 안 code 는 숲색 / 숲색 16% 섞은 흰색 6.65:1
+   면 밖(흰 바탕 본문·표 몸·결재란 머리)의 같은 요소는 base·spine 그대로다 */
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) {
+  --link: var(--accent-ink); --link-hover-ink: var(--accent-ink); --link-hover-bg: transparent; --link-hover-line: var(--accent-ink); }
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) code { color: inherit; background: transparent; }
+@supports (color: color-mix(in srgb, black 16%, transparent)) {
+  :is(.page-body th:not(.approval th), .page-body.bare .ss-title) code { background: color-mix(in srgb, currentColor 16%, transparent); }
+}
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) mark {
+  color: var(--ink); --link: var(--ink); --link-hover-ink: var(--ink); --link-hover-line: var(--ink); }
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) del { color: inherit; }
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) kbd {
+  --link: var(--accent); --link-hover-ink: var(--accent); --link-hover-line: var(--accent); }
+/* kbd·mark 안 각주 번호: sup 과 .footnote-ref 가 함께 올려(브라우저 기본 sup 과 base 의 .footnote-ref, vertical-align: super 두 번)
+   숫자 윗부분이 kbd 흰 상자·mark 노랑 상자 위 숲색 면으로 삐져나온다(숲색·먹 글자가 그 면에 묻힘, PNG) — 한 번만, 덜 올려 상자 안에 둔다 */
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) :is(kbd, mark) sup { vertical-align: 0.3em; line-height: 0; }
+:is(.page-body th:not(.approval th), .page-body.bare .ss-title) :is(kbd, mark) .footnote-ref { vertical-align: baseline; }
+
+/* ---- decisions: base 의 ✔ 자리 들여쓰기는 15pt 고정이라 슬라이드 글자 크기에서 ✔ 와 글이 붙는다(spine 도 같다, PNG) — 글자 크기에 비례하게 */
+.decisions li { padding-left: 1.4em; }
+
+/* ---- 맨 구역 장(슬라이드): spine 은 숲색 면이 슬라이드 전체를 덮어 바닥글(조직 --muted·쪽 번호 --accent)이 그 면 위에 놓인다 —
+   --muted 는 숲색 위 1.44:1, 쪽 번호는 같은 색이라 보이지 않는다. 그 장의 바닥글만 흰색(8.64:1)으로 */
+.slide-deco.k-section.bare ~ .slide-foot, .slide-deco.k-section.bare ~ .slide-foot .sf-num { color: var(--accent-ink); }

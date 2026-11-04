@@ -44,5 +44,11 @@
     "--chart-8": "#395a53",
     "--chart-grid": "#e5e7eb",
     "--chart-axis": "#6b7280"
+  },
+  "derived": {
+    "--accent-2": "oklch(from var(--accent) calc(l + 0.18) c h)",
+    "--accent-3": "oklch(from var(--accent) calc(l + 0.37) calc(c * 0.65) h)",
+    "--accent-soft": "oklch(from var(--accent) 0.955 calc(c * 0.14) h)",
+    "--lead-bg": "oklch(from var(--accent) 0.972 calc(c * 0.09) h)"
   }
 }
