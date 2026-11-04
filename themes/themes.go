@@ -1,4 +1,4 @@
-// Package themes 는 내장 중립 테마 다섯(classic·bold·compact·mono·spine)이다. 폴더마다 theme.json·theme.css·template.md.
+// Package themes 는 내장 중립 테마 다섯(classic·bold·compact·mono·spine)이다. 폴더마다 theme.json·theme.css(새 문서 서식 template.md 는 없다 — 앱의 서식 갤러리가 맡는다).
 package themes
 
 import "embed"

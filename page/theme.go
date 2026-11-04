@@ -139,7 +139,7 @@ type Theme struct {
 	CSS string
 	// Fonts 는 theme.css 에서 꺼낸 @font-face 규칙이다(@scope 안에 둘 수 없어 따로 낸다).
 	Fonts string
-	// Template 은 "새 문서" 의 시작 글(template.md)이다. 없으면 물려받은 테마의 것.
+	// Template 은 "새 문서" 의 시작 글(template.md)이다. 없으면 물려받은 테마의 것. 내장 중립 테마에는 없다(itda-doc#28).
 	Template string
 	// groupWarn 은 어휘 밖 group 값의 경고 문장이다(GroupWarning).
 	groupWarn string

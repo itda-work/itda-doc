@@ -345,7 +345,11 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 문서는 `:::이름` 컨테이너로 뜻을 적는다(설계 1.5). 모든 테마가 그려야 하는 **표준 어휘**는 `base.css` 가 기본 모양을 준다:
 `center`·`right`(정렬), `columns`·`column`(다단), `box`(테두리 상자), `lead`(요약문), `keep`(쪽 사이에서 쪼개지 않음), `signature`(서명란),
-`approval`(결재란 — 안에 표). 테마는 이것을 다시 그려도 된다.
+`approval`(결재란 — 안에 표), 회의록·절차 어휘 `decisions`(결정 사항 상자, 항목마다 ✔)·`actions`(할 일 표 — 머리 칸이 강조색)·`steps`(절차 단계 — 번호 원 + 세로 줄)·`result`(단계의 결과 한 줄).
+테마는 이것을 다시 그려도 된다. 회의록·절차 어휘 넷의 기본 모양은 선택자 전체가 `:where()` 라 특이도 0 이다 — 테마 CSS 가 같은 속성을 정하면 언제나 이긴다(정하지 않은 속성은 기본 모양이 남는다).
+`steps` 의 단계 모양은 `:::steps` 바로 아래 번호 목록에만 걸린다 — 단계 안 하위 목록은 보통 목록처럼 기호 사다리(4장)·들여쓰기를 받는다.
+할 일 표의 머리색은 표 토큰(`--table-head-bg`·`--table-head-ink`)이 아니라 `--accent`·`--accent-ink` 를 따른다(`.actions` 가 그 블록 안에서 표 토큰을 다시 정한다) — 바꾸려면 `.actions th` 를 정한다.
+할 일 표 머리·단계 번호 원의 글자는 `--accent-ink` on `--accent` 다 — 글자 대비(4.5:1)는 테마의 몫이다(base.css 는 계산하지 않는다).
 
 **자기 어휘**: 모르는 이름도 `<div class="이름">` 으로 나간다. 테마가 클래스에 모양을 주면 그 테마의 어휘가 된다.
 다른 테마에서는 보통 문단으로 보이므로 뜻이 깨지지 않는다. 예(견본 `acme`):
@@ -361,7 +365,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 .confidential::before { content: "배포 제한"; background: var(--accent); color: #fff; padding: 1pt 5pt; margin-right: 7pt; }
 ```
 
-내장 테마의 자기 어휘: `compact` 의 `decisions`(결정 사항 상자, 항목마다 ✔)·`actions`(할 일 표), `spine` 의 `steps`(절차 단계)·`result`(단계의 결과).
+내장 테마의 고유 모양: `compact` 는 `decisions`(초록 테두리 상자)·`actions`(첫 칸 앞 ☐, 담당·기한 칸 굵게)를, `spine` 은 `steps`·`result`(호박색 결과 상자)를 자기 `theme.css` 로 덮어 그린다. `spine` 은 `:::steps` 없이도 맨 위 번호 목록을 단계 모양으로 그린다(`spine` 고유).
 쪽 나눔기는 `.keep`·그림·알림·`box`·결재란을 들어갈 쪽으로 통째로 옮긴다. 자기 어휘를 쪼개지 않으려면 문서에서 `:::keep` 으로 감싼다.
 
 ## 6. theme.css 에서 할 수 있는 것과 없는 것
@@ -397,8 +401,11 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 ## 8. template.md — 새 문서 서식
 
-있으면 **새 문서 ▾** 메뉴에 테마 이름으로 보인다. frontmatter 에 `theme: <이 테마>` 와 채울 자리를, 본문에 그 문서의 흔한 구성을 둔다.
-64KB 까지. 서식은 경고 없이 렌더돼야 한다(내장 테마는 `TestTemplatesRenderClean` 이 확인한다).
+회사 테마의 `template.md` 는 **새 문서 ▾** 메뉴에 테마 이름으로 보인다(「우리 회사 양식」). 내장 테마에는 없다 — 서식은 앱의 서식 갤러리가 맡는다(`TestBuiltinThemesHaveNoTemplate`).
+`extends` 로 물려받은 테마에 `template.md` 가 있으면 그것을 물려받는다(`page/theme.go`, `TestTemplateInheritsFromCompanyTheme`).
+바탕(`extends`)이 내장 테마인 회사 테마는 이 판부터 새 문서 메뉴에 보이지 않는다 — 전에는 바탕의 서식을 물려받아 보였다. 자기 `template.md` 를 두면 보인다(itda-doc#28).
+frontmatter 에 `theme: <이 테마>` 와 채울 자리를, 본문에 그 문서의 흔한 구성을 둔다.
+64KB 까지. 서식은 경고 없이 렌더돼야 한다(견본 회사 테마 `acme` 의 서식은 `TestSampleCompanyTheme`(`page/usertheme_test.go`)이 확인한다).
 
 ## 9. 글꼴 넣기
 
@@ -481,7 +488,7 @@ go test ./page/ -run TestScratchDerived -v
 
 식은 `evalRelColor` 가 아는 꼴만 계산한다 — `oklch(from var(--x) L C h)` 에서 L 은 `l`·수·`calc(l ± n)`, C 는 `c`·`calc(c * n)`. 바탕 테마의 식을 그대로 베껴 쓴다.
 
-**`theme.css`** — 슬라이드 장식 절을 중심으로 쓴다(4장의 슬라이드 구조 — `.slide-deco`·`.slide-cover`·`.slide-section`·`--slide-*`). 문서 절은 최소로 바탕을 물려받는다. `template.md`(선택)은 그 회사 무드의 발표 서식으로 둔다.
+**`theme.css`** — 슬라이드 장식 절을 중심으로 쓴다(4장의 슬라이드 구조 — `.slide-deco`·`.slide-cover`·`.slide-section`·`--slide-*`). 문서 절은 최소로 바탕을 물려받는다. `template.md` 는 두지 않는다 — 내장 테마에는 서식이 없다(8장). 그 무드의 발표 서식은 앱의 서식 갤러리 몫이다.
 
 **문서·시험 연동** — 테마 하나를 만들 때 함께 손대는 곳:
 
@@ -491,7 +498,7 @@ go test ./page/ -run TestScratchDerived -v
 | `page/usertheme_test.go` | `TestUserThemeFolder` 의 목록 접두사(내장 순서·이름)와 내장 수 기대값을 새 테마에 맞춘다(빠지면 `go test ./page/` 가 실패한다) |
 | 테마를 넣는 앱의 기능 목록 | 테마 소개 덧붙이기(그 앱 저장소의 몫) |
 | 이 문서 1장 | 내장 테마를 나열하는 문장에 이름 넣기 |
-| `template.md` | 경고 없이 렌더된다 — `TestTemplatesRenderClean`(`save_test.go`)이 확인한다 |
+| `template.md` | 두지 않는다 — `TestBuiltinThemesHaveNoTemplate`(`page/vocab_test.go`)이 이 저장소의 내장 테마 전부에 막는다(회사 테마의 서식은 8장) |
 
 앱 쪽 검사(내장·견본 테마 × 견본의 PDF, 옛 엔진 흉내 정합성, 발표 견본 눈 검수)는 테마를 넣는 앱 저장소의 몫이다.
 
