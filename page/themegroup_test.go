@@ -22,6 +22,13 @@ func TestBuiltinThemeGroups(t *testing.T) {
 			t.Errorf("%s: Group %q, 경고 %q — basic 이고 경고가 없어야 함", n, th.Group, th.GroupWarning())
 		}
 	}
+	// 중립 스타일 테마는 구조 테마를 extends 하고 자기 무드의 묶음을 적는다(group 은 물려받지 않는다)
+	for n, want := range map[string]string{"slate": "formal"} {
+		th, ok := ts.Get(n)
+		if !ok || th.Group != want || th.GroupWarning() != "" || th.Extends != "classic" {
+			t.Errorf("%s: Group %q(바란 값 %q), 경고 %q, extends %q", n, th.Group, want, th.GroupWarning(), th.Extends)
+		}
+	}
 }
 
 // 인수 조건 2·3: group 은 extends 로 물려받지 않고, 어휘 밖 값은 거부하지 않고 "" + 경고다.

@@ -140,12 +140,12 @@ func TestUserThemeFolder(t *testing.T) {
 			}
 		}
 	}
-	if !strings.HasPrefix(strings.Join(order, ","), "bold,classic,compact,mono,spine,good,좋은회사,") || broken != len(want) {
+	if !strings.HasPrefix(strings.Join(order, ","), "bold,classic,compact,mono,slate,spine,good,좋은회사,") || broken != len(want) {
 		t.Errorf("목록 순서·수: %v (쓸 수 없음 %d)", order, broken)
 	}
 	// 폴더가 없으면 내장만(처음 쓰는 사람)
 	ts2, err := LoadThemeSet(builtinFS(t), filepath.Join(dir, "none"))
-	if err != nil || len(ts2.List()) != 5 {
+	if err != nil || len(ts2.List()) != 6 {
 		t.Errorf("없는 폴더: %v %d", err, len(ts2.List()))
 	}
 	// 메모리에 읽어 두었으므로 고른 뒤 디스크가 바뀌어도 내주는 내용은 그대로다(다시 읽을 때까지)
