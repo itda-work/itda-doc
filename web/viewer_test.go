@@ -233,14 +233,16 @@ func TestViewerPageMatchesScreen(t *testing.T) {
 }
 
 // 뷰어 스크립트 둘(viewer.js·itda-doc.js)의 요청 글자 세기: wasm 받기(itda-doc.js load)와 견본 목록·견본 글(viewer.js)의 GET 뿐이고,
-// XMLHttpRequest·sendBeacon·WebSocket·EventSource·Image()·method·body·location·window.open 을 쓰지 않는다. 글자 세기라 「보내지 않음」의
+// XMLHttpRequest·sendBeacon·WebSocket·EventSource·Image()·method·body·location·window.open·history.·document.title 을 쓰지 않는다
+// (폴더 열기·문서 바꾸기도 요청을 내지 않는다 — 폴더 안 파일은 File 로만 읽는다). 글자 세기라 「보내지 않음」의
 // 충분한 근거는 아니다 — 그림으로 새는 길은 CSP(img-src 는 data:·blob: 만 — 같은 출처·원격 그림 요청을 막음)와 viewer.cjs 의 「show 가 받은 html 에 원격·상대 src 없음」이
 // 함께 막는다. pager.js·slides.js·share.js 는 세지 않는다(share.js 의 요청은 hostSource 안 — TestShareScreenHasNoHostIO).
 func TestViewerNoSend(t *testing.T) {
 	want := map[string]int{"viewer/itda-doc.js": 0, "viewer/viewer.js": 2}
 	for f, n := range want {
 		code := stripComments(readText(t, f))
-		for _, bad := range []string{"XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource", "Image(", "method:", "body:", "location", "window.open"} {
+		for _, bad := range []string{"XMLHttpRequest", "sendBeacon", "WebSocket", "EventSource", "Image(", "method:", "body:", "location", "window.open",
+			"history.", "document.title"} { // 탭 제목·브라우저 기록에 문서·폴더 이름을 넣지 않는다(탭 제목은 share.js docTitle 이 고정 글로)
 			if strings.Contains(code, bad) {
 				t.Errorf("%s 에 %q 가 있음", f, bad)
 			}

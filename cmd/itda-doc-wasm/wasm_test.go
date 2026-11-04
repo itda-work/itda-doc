@@ -43,6 +43,18 @@ type renderCase struct {
 	theme    string
 	allow    bool
 	drop     bool
+	folder   []mdoc.FolderMeta // 네이티브에 넘길 폴더 기본값(Opts 의 folderMeta 와 같은 내용)
+	// wantFolder: 네이티브와 같고, View.folder_meta(적용된 폴더 파일 — 가까운 것부터)가 이것이어야 한다(폴더 경로를 실제로 지났는지)
+	wantFolder []string
+}
+
+// folderOpt 는 mdoc.FolderMeta 를 render 옵션 folderMeta 의 꼴({rel, yaml, err})로 옮긴다.
+func folderOpt(fs []mdoc.FolderMeta) []map[string]string {
+	out := []map[string]string{}
+	for _, f := range fs {
+		out = append(out, map[string]string{"rel": f.Rel, "yaml": string(f.YAML), "err": f.Err})
+	}
+	return out
 }
 
 type cssCase struct {
@@ -84,6 +96,19 @@ func cases(t *testing.T) []renderCase {
 		renderCase{Name: "원격 그림 기본", Src: "# 제목\n\n![그림](https://example.com/a.png)\n"},
 		renderCase{Name: "노트 빼기", Src: "---\nslides: true\n---\n\n# 하나\n\n본문 $a+b$\n\n:::notes\n노트 $c^2$\n:::\n", Opts: map[string]any{"dropNotes": true}, drop: true},
 		renderCase{Name: "모르는 테마", Src: "---\ntheme: nope\n---\n\n본문\n"},
+		// 폴더 기본값(folderMeta — 웹 뷰어의 폴더 열기, itda-doc#27): 먼 폴더 → 가까운 폴더 순. 테마 출처·적용 목록·폴더 slides 안내·값 경고
+		folderCase("폴더 기본값(객체 옵션)", "# 제목\n\n본문\n", false, []mdoc.FolderMeta{
+			{Rel: "../_metadata.yml", YAML: []byte("theme: mono\norganization: 잇다\nlist-style: gaejosik\n")},
+			{Rel: "_metadata.yml", YAML: []byte("slides:\n  ratio: \"4:3\"\npaper-size: a5\n")},
+		}, []string{"_metadata.yml", "../_metadata.yml"}),
+		// 읽지 못한 파일(err)·깨진 YAML·매핑 아님은 그 파일만 건너뛰고 경고, 나머지는 적용. 문서 frontmatter 가 폴더 값을 덮는다
+		folderCase("폴더 기본값(JSON 옵션, 건너뛰는 파일)", "---\ntheme: spine\n---\n\n# 제목\n", true, []mdoc.FolderMeta{
+			{Rel: "../../_metadata.yml", Err: "파일이 너무 큼(64KB 넘음)"},
+			{Rel: "../_metadata.yml", YAML: []byte("theme: [\n")},
+			{Rel: "sub/../_metadata.yml", YAML: []byte("- a\n")},
+			{Rel: "_metadata.yml", YAML: []byte("theme: mono\nauthor: 홍길동\n")},
+		}, []string{"_metadata.yml"}),
+		folderCase("폴더 기본값 빈 목록", "# 제목\n", false, []mdoc.FolderMeta{}, nil),
 		// 수식 오류 사례 — 엔진(Temml)이 던지는 것과 앞(check.go)에서 막는 것
 		renderCase{Name: "Temml 실행 오류(엔진 문장)", Src: "위첨자 없음 $x^$ 와 $\\operatorname{__proto__}$ 와 $y_$\n", internal: true},
 		renderCase{Name: "수식 오류", Src: strings.Join([]string{
@@ -109,9 +134,19 @@ func cases(t *testing.T) []renderCase {
 	return cs
 }
 
+// folderCase 는 폴더 기본값 사례다 — asJSON 이면 옵션을 JSON 문자열로 넘긴다(두 꼴 다 받는지).
+func folderCase(name, src string, asJSON bool, folder []mdoc.FolderMeta, want []string) renderCase {
+	var opts any = map[string]any{"folderMeta": folderOpt(folder)}
+	if asJSON {
+		b, _ := json.Marshal(opts)
+		opts = string(b)
+	}
+	return renderCase{Name: name, Src: src, Opts: opts, folder: folder, wantFolder: want}
+}
+
 func nativeView(t *testing.T, ts *page.Themes, c renderCase) string {
 	t.Helper()
-	v := page.RenderViewOpts([]byte(c.Src), "", ts, c.theme, mdoc.Options{AllowRemoteImages: c.allow, DropNotes: c.drop})
+	v := page.RenderViewOpts([]byte(c.Src), "", ts, c.theme, mdoc.Options{AllowRemoteImages: c.allow, DropNotes: c.drop, FolderMeta: c.folder})
 	b, err := json.Marshal(v)
 	if err != nil {
 		t.Fatal(err)
@@ -240,6 +275,8 @@ func TestWasmMatchesNative(t *testing.T) {
 		renderCase{Name: "ParseError 꼴", Src: "$q_{7}$\n", Temml: "throwParse", wantWarn: "지원하지 않는 명령 \\zzparse"},
 		// render 인자·옵션 오류는 View.error
 		renderCase{Name: "모르는 옵션 키", Src: "본문\n", Opts: map[string]any{"thme": "mono"}, wantErr: "옵션을 읽지 못함"},
+		renderCase{Name: "folderMeta 안의 모르는 키", Src: "본문\n", Opts: map[string]any{"folderMeta": []any{map[string]any{"rel": "_metadata.yml", "yml": "theme: mono"}}}, wantErr: "옵션을 읽지 못함"},
+		renderCase{Name: "folderMeta 꼴 틀림", Src: "본문\n", Opts: map[string]any{"folderMeta": "theme: mono"}, wantErr: "옵션을 읽지 못함"},
 		renderCase{Name: "깨진 JSON 옵션", Src: "본문\n", Opts: "{", wantErr: "옵션을 읽지 못함"},
 		renderCase{Name: "JSON 뒤 글자", Src: "본문\n", Opts: `{"theme":"mono"} 쓰레기`, wantErr: "JSON 값 뒤에 글자가 남음"},
 		renderCase{Name: "숫자 옵션", Src: "본문\n", Opts: 5, wantErr: "옵션은 객체나 JSON 문자열이다"},
@@ -302,6 +339,17 @@ func TestWasmMatchesNative(t *testing.T) {
 		}
 		if gs != ns {
 			t.Errorf("%s: wasm View 가 네이티브와 다름\n%s", c.Name, firstDiff(nm, gm))
+		}
+		if c.folder != nil {
+			fm, _ := json.Marshal(gm["folder_meta"])
+			want := "null"
+			if c.wantFolder != nil {
+				w, _ := json.Marshal(c.wantFolder)
+				want = string(w)
+			}
+			if string(fm) != want {
+				t.Errorf("%s: folder_meta %s, 바란 것 %s", c.Name, fm, want)
+			}
 		}
 		t.Logf("%s: %d 바이트, wasm %.1f ms", c.Name, len(gs), g.MS)
 	}

@@ -3,7 +3,9 @@
 //
 //   ItdaDocLoader.load(opts) → Promise<doc>   opts: { wasm(주소 — 기본 "itda-doc.wasm"), fetch(기본 globalThis.fetch), timeoutMs(기본 5000) }
 //   ItdaDocLoader.wrap(itdaDoc) → doc         이미 올린 itdaDoc 을 감싼다(node 시험이 쓴다)
-//   doc.render(src, opts) → View 객체          opts: { theme(글자), allowRemoteImages(참거짓), dropNotes(참거짓) } — 생략 가능
+//   doc.render(src, opts) → View 객체          opts: { theme(글자), allowRemoteImages(참거짓), dropNotes(참거짓),
+//                                              folderMeta([{rel(글자), yaml(글자), err(글자)}] — 폴더 _metadata.yml, 먼 폴더 →
+//                                              가까운 폴더 순. 항목의 키도 이 셋뿐이고 rel 은 빠질 수 없다) } — 생략 가능
 //   doc.themes() → [ThemeInfo]                 page.Themes.List
 //   doc.themeCSS(name, opts) → 글자 | null      opts: { unscoped(참거짓) }. 없는 테마 이름이면 null
 //   doc.version → {commit, go}
@@ -17,7 +19,8 @@
 (function (g) {
   "use strict";
 
-  const RENDER_KEYS = { theme: "string", allowRemoteImages: "boolean", dropNotes: "boolean" };
+  const RENDER_KEYS = { theme: "string", allowRemoteImages: "boolean", dropNotes: "boolean", folderMeta: "folderMeta" };
+  const FOLDER_META_KEYS = { rel: "string", yaml: "string", err: "string" };
   const CSS_KEYS = { unscoped: "boolean" };
   const LOAD_KEYS = { wasm: "string", fetch: "function", timeoutMs: "number" };
 
@@ -30,10 +33,22 @@
       if (!Object.prototype.hasOwnProperty.call(keys, k)) throw new TypeError(where + ": 모르는 옵션 " + JSON.stringify(k));
       const v = opts[k];
       if (v === undefined) continue;
+      if (keys[k] === "folderMeta") { out[k] = checkFolderMeta(where, v); continue; }
       if (typeof v !== keys[k]) throw new TypeError(where + ": 옵션 " + k + " 은 " + keys[k] + " 이다(받은 것: " + typeof v + ")");
       out[k] = v;
     }
     return out;
+  }
+
+  // checkFolderMeta 는 render 의 folderMeta 를 본다 — 배열이고, 항목은 rel(글자, 꼭)·yaml·err(글자)만 가진 객체다. 받은 순서 그대로 넘긴다.
+  function checkFolderMeta(where, v) {
+    if (!Array.isArray(v)) throw new TypeError(where + ": 옵션 folderMeta 는 배열이다(받은 것: " + typeof v + ")");
+    return v.map((f, i) => {
+      const at = where + ": folderMeta[" + i + "]";
+      const o = checkOpts(at, f, FOLDER_META_KEYS);
+      if (f === null || f === undefined || typeof o.rel !== "string") throw new TypeError(at + ": rel 이 없다");
+      return o;
+    });
   }
 
   function wrap(raw) {
