@@ -37,9 +37,11 @@
 // 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
 // 앱 이름(itda-hyve#625): 탭 제목 접미 「 — <앱 이름>」 은 모듈에 박지 않는다 — 서버가 share.html 의 <meta name="application-name"> 자리를
 // 채우면 그 이름을 붙이고, 비우거나 채우지 않으면(자리 글자 그대로) 접미 없이 문서 제목만 쓴다(appName·docTitle).
-// 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
-// ItdaTableSort·ItdaCodeCopy·ItdaCodeLines)로 찾고, 없으면 옛 이름 window.Hyve* 로 물러선다(hostPart·extInit — 둘 다 pick). 이 파일은 window.ItdaShare 로
+// 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄·YouTube 재생(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
+// ItdaTableSort·ItdaCodeCopy·ItdaCodeLines·ItdaYT)로 찾고, 없으면 옛 이름 window.Hyve* 로 물러선다(hostPart·extInit — 둘 다 pick). 이 파일은 window.ItdaShare 로
 // 내보내고 옛 이름 window.HyveShare 도 같은 객체다. 호스트 부품이 없으면(설치 없는 뷰어 — web/viewer) 그 기능만 빠지고 그리기는 이어 간다.
+// YouTube 재생 부품(ItdaYT)의 꼴: init(o)(o = { inScope(a), src(id, start), referrerPolicy, noSrc() } — 누른 블록 a 를 그 자리 틀로 바꾼다)·
+// stop()(지금 틀을 떼고 대표 그림을 되살린다). 부품이 없으면 YouTube 블록은 보통 링크다.
 // View 원천(itda-hyve#577 2b): 받은 View 를 그리는 것(아래 「화면」 — render·draw·보기 꼴·목차·노트·표 정렬·쪽 넘김 키)과 View 를 어디서
 // 받는지(원천)를 가른다. body 에 data-base 가 있으면(공유 화면 — share.html) 원천은 hostSource(view.json·SSE syncer·follower 에 넘길 이벤트·
 // 끝남·kick·테마 CSS link·다시 불러오기) 하나로 정해지고 다른 것으로 바꿀 수 없다. data-base 가 없으면 share.js 보다 먼저 실행된 스크립트가 둔
@@ -339,6 +341,19 @@
     if (kind !== "slide") return "scroll";
     if (look === "slides") return "scroll";
     return lookFor(v, width, "slides") === "slides" ? "redraw" : "none";
+  }
+
+  // ytFollowGate 는 따라가기로 맞출 때 재생 중인 YouTube 를 멈출지 정하는 문지기를 만든다. 발표 슬라이드(kind "slide")는 직전에 따라간
+  // 슬라이드 번호와 다를 때만 참 — 같은 슬라이드 안 조각 넘김·같은 번호 재적용(그리기 뒤 다시 맞춤 등)은 멈추지 않는다. 내용 위치(kind "pos")는
+  // 늘 거짓이고 기억한 번호도 바꾸지 않는다 — 그 이동으로 플레이어가 화면 밖으로 나가면 호스트 부품 YT 가 정리한다.
+  function ytFollowGate() {
+    let last = null;
+    return (i, kind) => {
+      if (kind !== "slide") return false;
+      const changed = i !== last;
+      last = i;
+      return changed;
+    };
   }
 
   // pickBlock 은 블록 n 이 그려지지 않았을 때(가로줄·노트 등 그 꼴에 없는 블록) 쓸 번호다: ns 는 그려진 블록 번호(오름차순). n 이 있으면
@@ -740,7 +755,7 @@
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
-    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot,
+    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
@@ -875,6 +890,7 @@
   // 갱신(version)·꼴 바꾸기·화면 폭 변경으로 다시 그리면 넘기지 않으므로 풀린다.
   async function render(v, sort) {
     if (state.ended) return;
+    ytStop(); // 다시 그리면 플레이어가 놓인 쪽도 새로 만든다
     if (!v.error && !(await applyTheme(v))) return; // 다시 불러오는 중
     if (state.ended) return;
     $("load-err").hidden = !v.error && !state.themeFailed;
@@ -1094,8 +1110,10 @@
   //  - slide: 슬라이드 보기에서 i 번째 슬라이드를 보기 영역 가운데로.
   //  - pos: 보기 꼴 그대로. 슬라이드 보기면 블록 i 가 든 슬라이드를 가운데로, 쪽·이어보기면 블록 i 의 조각들(쪽 나눔이 쪼갠 것) 가운데
   //    비율 frac 이 닿는 지점(fragAt)을 보기 영역 맨 위 + 1px(호스트의 기준선과 같다)에. 그 꼴에 없는 블록이면 가까운 앞 블록(pickBlock).
+  const ytFollowChanged = ytFollowGate();
   function scrollToFollow(i, kind, frac) {
     const root = $("pages"), viewer = $("viewer"), vr = viewer.getBoundingClientRect();
+    if (ytFollowChanged(i, kind)) ytStop(); // 따라간 슬라이드 번호가 바뀌면 소리가 남지 않게(같은 슬라이드 안 조각·내용 위치는 그대로)
     for (const x of root.querySelectorAll(".following")) x.classList.remove("following");
     const center = el => placeSlide(el); // 아래 노트가 붙어 보이면 위에 붙인다(itda-hyve#344)
     if (kind === "slide") {
@@ -1175,6 +1193,7 @@
   function showEnded(reason) {
     state.ended = true;
     linked.stop();
+    ytStop();
     if (reason === "kicked") {
       $("ended-title").textContent = "이 화면의 공유가 끝났습니다";
       $("ended-msg").textContent = "공유한 사람이 이 화면의 연결을 끊었습니다.";
@@ -1215,6 +1234,25 @@
     if (pg) pg.scrollIntoView({ block: "center" });
     else x.scrollIntoView({ block: "start" });
   }
+
+  // YouTube 블록(mdoc youtube.go — <a class="yt" data-yt-id …><img 대표 그림></a>). 재생은 호스트 부품 YT(window.ItdaYT, 옛 이름 HyveYT —
+  // 머리 주석 「호스트 부품」)가 한다. 이 화면이 정하는 것은 셋이다: 누를 수 있는 자리(보기 영역 #viewer 안), 틀 주소
+  // https://www.youtube-nocookie.com/embed/<ID>, referrerpolicy="strict-origin"(이 화면 주소의 경로 없이 출처만 간다 — 문서 Referrer-Policy
+  // no-referrer 는 이 틀 요청만 덮인다). 누르기 전에는 YouTube 로 아무 요청도 가지 않는다(틀은 누를 때만 부품이 만든다). 노트 칸 안 블록은
+  // 부품이 빼므로 보통 링크(새 탭)다. 되돌리는 때: 다시 그리기(render — 갱신·꼴 바꾸기·폭 변경·발표자 따라가기의 꼴 바꾸기)·끝난 화면
+  // (showEnded)·따라간 슬라이드 번호가 바뀔 때(scrollToFollow — ytFollowGate), 화면 밖 이동(부품). 부품이 없으면(설치 없는 뷰어) 보통 링크다.
+  const YT_EMBED = "https://www.youtube-nocookie.com/embed/";
+  const YT = hostPart("YT");
+  if (YT) {
+    YT.init({
+      inScope: a => $("viewer").contains(a),
+      src: (id, start) => YT_EMBED + id + "?autoplay=1&rel=0&playsinline=1" + (start > 0 ? "&start=" + start : ""),
+      referrerPolicy: "strict-origin",
+      noSrc: () => false,
+    });
+  }
+  // ytStop 은 함수 선언이다 — 위의 render 가 이 줄보다 먼저 불려도 쓸 수 있게 부품을 부를 때 찾는다.
+  function ytStop() { const p = pick(window, "YT"); if (p) p.stop(); }
 
   // 문서 안 링크·목차 항목: #제목은 그 자리로, 바깥 http(s)·mailto·tel 은 새 탭(토큰 주소가 Referer 로 가지 않게 noreferrer), 그 밖(다른 md 등
   // 문서 폴더의 파일)은 열지 않는다 — 서버도 404 다. 목차 서랍에서 누르면 이동 뒤 서랍을 닫는다. 뷰어 원천은 그런 링크의 href 를

@@ -492,6 +492,8 @@ type imageInfo struct {
 	fill  bool
 	split string
 	noAlt bool
+	// yt 는 목적지가 YouTube 동영상 주소인 그림이다(youtube.go) — 대표 그림 + 링크 블록으로 낸다. 링크 안의 그림은 아니다(사용자 링크가 이긴다).
+	yt *ytVideo
 }
 
 // imagePlaceClasses 는 이미지 속성으로 받는 배치 클래스다(itda-hyve#550, .full 은 itda-hyve#569). 그 밖의 클래스·id 는 경고하고 버린다.
@@ -536,13 +538,33 @@ func (st *state) image(img *ast.Image) {
 	line := st.lines.line(img.Pos())
 	info := &imageInfo{kind: classifyImage(string(img.Destination))}
 	st.images[img] = info
+	if info.kind == urlRemote && !inLink(img) {
+		info.yt, _ = parseYouTube(string(img.Destination))
+	}
+	if info.yt != nil {
+		// YouTube 블록은 배경 그림(.full·Deckset fit 단독, itda-hyve#569)이 되지 않는다 — 글 아래 깔린 플레이어는 누를 수 없다. 배치를 다 읽은 뒤
+		// 경고하고 제자리 .fit 으로 둔다
+		defer func() {
+			if info.place == "full" {
+				st.warn(line, WarnBadAttribute, "YouTube 블록은 배경 그림(.full)이 되지 않아 제자리 .fit 으로 둠")
+				info.place, info.fill = "fit", false
+			}
+		}()
+	}
 	switch info.kind {
 	case urlBlocked:
 		st.warn(line, WarnUnsafeURL, "막은 이미지 주소: "+clip(string(img.Destination)))
 	case urlRemote:
-		if !st.opts.AllowRemoteImages {
-			st.warn(line, WarnRemoteImage, "불러오지 않은 원격 이미지: "+clip(string(img.Destination)))
-		}
+		// YouTube 블록은 대표 그림이 원격일 때만(poster= 가 없을 때) 알린다 — poster 는 아래 {…} 에서 읽으므로 끝에서 본다
+		defer func() {
+			if !st.opts.AllowRemoteImages && (info.yt == nil || info.yt.poster == "") {
+				msg := "불러오지 않은 원격 이미지: "
+				if info.yt != nil {
+					msg = "불러오지 않은 YouTube 대표 그림(i.ytimg.com — poster= 로 로컬 그림을 줄 수 있음): "
+				}
+				st.warn(line, WarnRemoteImage, msg+clip(string(img.Destination)))
+			}
+		}()
 	}
 	// Deckset 호환(itda-hyve#550): alt 가 지시 낱말로만 이루어졌으면 배치 지시다. 아래 {…} 의 배치 클래스가 있으면 그쪽이 이긴다.
 	if alt := plainText(img, st.src); alt != "" {
@@ -594,6 +616,13 @@ func (st *state) image(img *ast.Image) {
 		}
 	}
 	st.imagePlace(line, info, a)
+	if p, ok := a.get("poster"); ok && info.yt != nil {
+		if classifyImage(p) == urlOK {
+			info.yt.poster = p
+		} else {
+			st.warn(line, WarnBadAttribute, fmt.Sprintf("YouTube poster %q 는 로컬 그림(상대 경로·data:image)이 아니라 버림", clip(p)))
+		}
+	}
 	unknown := a.ID != "" || a.Unnumbered
 	for _, c := range a.Classes {
 		if !imagePlaceClasses[c] {
@@ -601,14 +630,24 @@ func (st *state) image(img *ast.Image) {
 		}
 	}
 	for _, kv := range a.Data {
-		if kv[0] != "width" && kv[0] != "split" {
+		if kv[0] != "width" && kv[0] != "split" && (kv[0] != "poster" || info.yt == nil) {
 			unknown = true
 		}
 	}
 	if unknown {
-		st.warn(line, WarnBadAttribute, "이미지 속성은 width·split 과 클래스 .fit·.fill·.left·.right·.full 만 받아 나머지는 버림")
+		st.warn(line, WarnBadAttribute, "이미지 속성은 width·split(YouTube 그림은 poster 도)과 클래스 .fit·.fill·.left·.right·.full 만 받아 나머지는 버림")
 	}
 	cutFront(img.Parent(), t, start+end+1)
+}
+
+// inLink 는 그림이 링크 안에 있는지다 — 링크 안의 YouTube 주소 그림은 사용자 링크가 이기므로 YouTube 블록으로 만들지 않는다.
+func inLink(n ast.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if _, ok := p.(*ast.Link); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // imagePlace 는 이미지 속성의 배치 클래스·split 을 읽는다(itda-hyve#550·itda-hyve#569). 배치 클래스(.fit·.left·.right·.full)가 있으면 Deckset alt
@@ -734,19 +773,26 @@ func (st *state) slideSplits(doc ast.Node) {
 // fitRow 는 맨 위 문단 p 가 .fit 그림 2장 이상만으로 되어 있으면(그림 하나만 감싼 링크도 그림 한 장, 사이에는 빈 글자·줄바꿈만)
 // class fit-row 를 단다(itda-hyve#569 — slides.js·pager.js 가 같은 높이로 가로에 늘어놓는다. 문서에는 규칙이 없어 지금과 같은 문단이다).
 // .fit 그림이 2장 이상인데 다른 것(글·서식·다른 배치의 그림·.fit 아닌 그림)이 섞였으면 경고하고 그대로 둔다(각 그림은 제자리 .fit).
+// .fit 그림 가운데 YouTube 블록이 있어도 경고하고 그대로 둔다.
 func (st *state) fitRow(p *ast.Paragraph) {
 	isFit := func(n ast.Node) bool {
 		img, ok := n.(*ast.Image)
 		return ok && st.images[img] != nil && st.images[img].place == "fit"
 	}
-	fits := 0
+	fits, yt := 0, false
 	_ = ast.Walk(p, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if entering && isFit(n) {
 			fits++
+			yt = yt || st.images[n.(*ast.Image)].yt != nil
 		}
 		return ast.WalkContinue, nil
 	})
 	if fits < 2 {
+		return
+	}
+	if yt {
+		// YouTube 블록은 가로 배치에 넣지 않는다 — 누르면 대표 그림 자리가 플레이어로 바뀌어 줄의 같은 높이가 깨진다
+		st.warn(st.lines.line(p.Pos()), WarnBadAttribute, "가로 배치에는 YouTube 블록을 넣지 않음 — 각 그림을 제자리 .fit 으로 둠")
 		return
 	}
 	pure := true

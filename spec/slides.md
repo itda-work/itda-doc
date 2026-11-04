@@ -217,6 +217,21 @@ mermaid 그림([그림 안내서](diagrams.md))이 그대로 나온다. 차트 �
 - **Deckset 호환**: 대체 글(alt)이 지시 낱말로만 이루어졌으면 배치 지시로 읽고 대체 글은 비운다 — `![left](a.png)`·`![right](a.png)` 은 `.left .fill`·`.right .fill`, `![left fit](a.png)`·`![right fit](a.png)` 은 `.left`·`.right`, `![fit](a.png)` 은 `.full`(배경 contain), `![inline](a.png)` 은 보통 그림. 그 밖의 지시(`filtered`·`original`·`50%` 등)는 경고하고 보통 그림으로 둔다. 낱말은 소문자만 지시다(`![Left](a.png)`·`![Fit](a.png)` 는 대체 글). 뒤에 `{.fit}`·`{.left}`·`{.right}`·`{.full}` 을 함께 적으면 그쪽이 이긴다. 대체 글이 없는 그림 하나 `![](a.png)` 를 배경으로 읽는 Deckset 규칙은 따르지 않는다 — 지금처럼 크게 그린 그림이다.
 - **`.left`·`.right`·`.full` 을 함께 적으면** 먼저 적은 쪽을 쓰고 경고한다. 그 셋 가운데 하나와 `.fit` 을 함께 적으면 `.fit` 은 경고 없이 버린다.
 
+**YouTube 영상**: 그림 문법의 주소가 YouTube 동영상이면 「대표 그림 + ▶」 블록이 된다 — 누르면 동영상으로 가는 링크이고, 재생 부품을 둔 화면(호스트 앱)은 누를 때 그 자리에 플레이어를 띄운다. 위 그림 배치(`.fit`·`.left`·`.right`·`.fill`·`split`·`width`, Deckset alt)를 그대로 받는다. 배경(`.full`·`![fit]`)과 가로 배치는 받지 않는다 — 배경으로 적으면 경고하고 제자리 `.fit` 으로, `.fit` 그림 여러 장 문단에 섞으면 경고하고 각 그림을 제자리 `.fit` 으로 둔다.
+
+```markdown
+## 데모 영상
+
+![](https://www.youtube.com/watch?v=9Luu4itC-Zs&t=90){.right split=1:2 poster=images/demo.jpg}
+
+- 1분 30초부터 재생
+```
+
+- 받는 주소: `http(s)://` 의 `youtube.com/watch?v=…`·`youtu.be/…`·`youtube.com/shorts/…`·`youtube.com/embed/…`(`www.`·`m.` 포함, 동영상 ID 11자). 사용자 정보·포트가 붙은 주소와 다른 호스트(`youtube.com.evil.example` 등)는 보통 그림이다. 시작 시각은 주소의 `t=`·`start=`(초, `90s`, `1m30s`, `1h2m3s` — 하루를 넘거나 꼴이 틀리면 시작 시각만 버린다). 링크로 감싼 YouTube 그림(`[![](유튜브 주소)](다른 주소)`)은 보통 그림이다(`mdoc/youtube.go` `parseYouTube`, `mdoc/transform.go` `inLink`).
+- 대표 그림: 속성 `poster=` 로 문서 폴더의 그림(상대 경로·`data:image`)을 주면 늘 그것이 보인다. 그 밖의 `poster=` 값은 경고하고 버린다. `poster=` 가 없으면 YouTube 대표 그림(`i.ytimg.com`)이라 원격 그림을 켠 문서에서만 불러오고, 끈 문서는 ▶·「YouTube 영상」·주소 자리표시에 경고 `remote-image` 를 낸다. 자리표시는 배치 class 가 없을 때 `width=` 를 따른다(`mdoc/render.go` `ytOpen`·`ytPoster`).
+- 렌더 결과는 링크 `<a class="yt" href="https://www.youtube.com/watch?v=ID[&t=Ns]" data-yt-id data-yt-start>` 와 그 안의 대표 그림뿐이다 — 스크립트·이벤트 속성·iframe 은 내지 않는다. 플레이어(틀)를 언제 어디서 띄울지는 화면이 정한다(8장). PDF·인쇄는 대표 그림(또는 자리표시)과 ▶ 만 찍힌다(`web/base.css` `@media print`).
+- 이 어휘(YouTube 주소의 그림·`poster=`)를 모르는 옛 판은 YouTube 주소를 보통 원격 그림으로 다루고 `poster=` 를 모르는 속성으로 경고하고 버린다.
+
 ## 7. 흔한 실수
 
 - **문단 바로 아래의 `---`**: 빈 줄 없이 글 다음 줄에 `---` 를 쓰면 가로줄이 아니라 그 글이 제목(`##`)이 된다. 슬라이드를 나누는 `---` 는 앞뒤를 빈 줄로 띄운다.
@@ -232,6 +247,7 @@ mermaid 그림([그림 안내서](diagrams.md))이 그대로 나온다. 차트 �
 ## 8. 화면과 검증 범위
 
 - 미리보기·발표 화면·노트 칸·발표 키·넣기 도구처럼 문서를 보이고 발표하는 화면은 **호스트 앱이 정한다**(이 명세의 범위가 아니다 — 참조 구현의 화면은 그 앱의 안내서, 예: Itda Hyve 의 `docs/GUIDE-markdown-slides.md`). 문서 쪽 약속은 1\~7장이다 — frontmatter `slides:` 가 있으면 슬라이드로 연다(3장), 노트는 그 장에 붙는다(5장).
+- **YouTube 블록의 재생**(6장): 공유 보기 화면(`web/share.js`)은 호스트가 재생 부품(`window.ItdaYT` — share.js 머리 주석 「호스트 부품」)을 둘 때만 보기 영역 안 블록을 누르면 그 자리에 `https://www.youtube-nocookie.com/embed/ID` 틀(`referrerpolicy="strict-origin"`)을 띄우고, 다시 그리기·끝난 화면·따라간 발표 슬라이드 번호가 바뀔 때(`ytFollowGate` — 같은 슬라이드 안 조각 넘김·내용 위치 따라가기는 그대로) 대표 그림으로 되돌린다. 부품이 없는 화면(설치 없는 뷰어 `web/viewer`)에서는 보통 링크다. 누르기 전에는 YouTube 로 요청이 가지 않는다(대표 그림을 `poster=` 로 준 경우·원격 그림을 끈 경우). 틀을 허락하는 콘텐츠 보안 정책은 화면을 내는 호스트가 정한다.
 - 움직임(전환, 차트)은 화면에서만이다. 전환은 기본으로 없다(`none`) — 넘기면 다음 슬라이드가 움직임 없이 바로 바뀐다. 운영체제의 "동작 줄이기" 설정이면 전환·차트 움직임을 끈다(차례로 나타내기의 흐림·숨김은 그대로 한다).
 - **슬라이드 그림 배치의 검증 범위**(Itda Hyve 문서 창 실측 2026-11-02):
   - 슬라이드 PDF(16:9)를 그 앱의 내장 테마 9개(중립 다섯 + 브랜드 넷)로 뽑았다. 패널이 제목 띠·바닥글·쪽 번호·장식과 겹치거나 잘리지 않는다. 구역 슬라이드에 왼쪽 패널(`{.left}`·Deckset `![left]`)을 두면 장식은 패널 오른쪽으로 옮겨지고, 구역 제목은 테마가 구역 장 본문을 장식 옆으로 민 만큼 그 장식 오른쪽에서 시작한다(`web/base.css` `.page.slide.panel-left > .page-body` 의 `margin-left` — 이전에는 classic 의 구역 제목 앞부분이 띠에 묻혔다). 9개 테마 슬라이드 PDF(16:9, split 1:1)로 확인했다(2026-11-03). 좁은 분할에서는 그 들여쓰기만큼 제목 폭이 더 준다 — 4:3 + `split=3:1` 왼쪽 패널 구역 장은 본문 폭이 80pt 남짓이라 구역 제목이 꺾이고, 구역 장을 들여쓰는 테마(classic·daangn·kakao·naver·toss)는 한 글자씩 꺾일 수 있다(classic·daangn 렌더 확인, 나머지는 같은 폭이라 추정). 그런 장은 분할을 1:1·1:2 로 둔다.
