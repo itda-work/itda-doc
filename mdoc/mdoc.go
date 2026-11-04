@@ -95,7 +95,7 @@ const (
 	WarnUnclosedContainer  = "unclosed-container"   // 문서 끝에서 닫힌 ::: 컨테이너
 	WarnDuplicateID        = "duplicate-id"         // 직접 적은 id 가 겹침
 	WarnTooComplex         = "too-complex"          // 너무 많은 강조·링크 표시를 글자로 둠, 또는 블록 중첩이 너무 깊어 문서 전체를 원문 글자로 보임(렌더 시간 상한 — DropNotes 면 원문 대신 안내만, nesting.go withheldRaw)
-	WarnMath               = "math"                 // 그리지 않은 수식(원문 그대로) — 미지원·막은 명령·문법 오류·상한·닫히지 않은 $$. 또는 그린 수식에서 TeX 주석(%)이 지운 글(percentLoss, itda-hyve#180)
+	WarnMath               = "math"                 // 그리지 않은 수식(원문 그대로) — 미지원·막은 명령·문법 오류·상한·닫히지 않은 $$. 또는 그린 수식에서 TeX 주석(%)이 지운 글(percentLoss, itda-hyve#180)·\text{…} 안의 주석이 } 를 가려 닫히지 않은 수식(textPctLoss, itda-hyve#591)
 	WarnDiagram            = "diagram"              // 그리지 않은 mermaid 그림(코드 그대로) 또는 그림에서 쓰지 않은 줄(style·click …)
 	WarnTildeRange         = "tilde-range"          // 범위로 보이는 단일 ~ 가 취소선이 됨(3~5명 … 10~20명) — 렌더는 그대로(itda-hyve#140)
 	WarnDateList           = "date-list"            // 줄 머리 날짜(2026. 10. 14.)가 번호 목록이 됨 — 렌더는 그대로(itda-hyve#140)
