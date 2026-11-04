@@ -74,3 +74,9 @@
   background: var(--accent); color: var(--accent-ink); font-size: calc(44pt * var(--slide-scale)); }
 .page-body .ss-title { color: var(--accent-dark); }
 .slide-bg.fill ~ .page-body { --box-bg: var(--paper); --lead-bg: var(--paper); } /* 배경 그림 스크림 위(itda-hyve#569) — 바탕 투명 상자·요약문의 먹색 글이 묻힌다, 종이색 판 */
+
+/* ---- 보드(itda-work/itda-hyve#362): 슬라이드의 위 초록 띠와 머리 밑줄, 타일 머리의 ■ */
+.board-deco::before { left: 0; right: 0; width: auto; height: 5pt; }
+.board-head { border-bottom: 2pt solid var(--accent); }
+.page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6)::before { content: "■"; color: var(--accent); font-size: 0.62em; margin-right: 0.4em; vertical-align: 0.14em; }
+.page-body.board-grid .tile { border-color: var(--accent-soft); }

@@ -11,7 +11,7 @@ import (
 )
 
 // Topics 는 주제 이름이다. 차례는 "all" 로 이을 때의 차례다.
-var Topics = []string{"index", "core", "charts", "math", "diagrams", "slides"}
+var Topics = []string{"index", "core", "charts", "math", "diagrams", "slides", "dashboard"}
 
 // Sources 는 단일본을 모으는 안내서다(spec 아래). 이 차례로 읽고, 한 주제의 구간이 여럿이면 이 차례·문서 안 차례로 잇는다.
 var Sources = []string{
@@ -20,6 +20,7 @@ var Sources = []string{
 	"math.md",
 	"diagrams.md",
 	"slides.md",
+	"dashboard.md",
 }
 
 var (

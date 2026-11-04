@@ -19,7 +19,7 @@ import (
 //     폴더 파일이 하나도 적용되지 않으면 정리를 돌리지 않는다 — 폴더 없는 문서의 처리는
 //     main(e65d27c) 과 완전히 같다(parseFrontmatter).
 //  2. 파일 사이 합치기(mergeFolderInto) — 정리된 노드를 먼 폴더 → 가까운 폴더 → 문서 순으로 얹는다.
-//     slides·code 가 양쪽 다 맵이면 하위 키 단위(정규 이름으로 견준다), 그 밖의 모든 값(모르는 키의
+//     slides·code·dashboard 가 양쪽 다 맵이면 하위 키 단위(정규 이름으로 견준다), 그 밖의 모든 값(모르는 키의
 //     맵 포함)은 통째로 바꾼다.
 //
 // 경고 계약(itda-hyve#504 — frontmatterCore):
@@ -30,8 +30,9 @@ import (
 //     가까운 폴더가 덮은 키, 같은 파일 안 앞 값의 경고는 내지 않는다. 키 이름은 그 파일에 적힌 표기다.
 //   - 폴더 파일 자체의 오류(읽기·YAML·모양)는 Line 0, 문구 "<rel>: … 건너뜀" 이다.
 //   - 문서에 slides 키가 없어 폴더의 slides 설정(맵·true·빈 값)을 버리면 안내 경고 하나를 낸다(itda-hyve#543 —
-//     folder-slides-unused, Line 0, 문구 앞머리 "<rel>: " — slides 를 정한 가장 가까운 파일, 줄 없음).
-//   - 순서: 폴더 파일 오류 → 폴더 slides 안내 → 폴더 값 경고 → 문서 경고(Render 는 Line 으로 안정 정렬한다 — Line 0 이 앞).
+//     folder-slides-unused, Line 0, 문구 앞머리 "<rel>: " — slides 를 정한 가장 가까운 파일, 줄 없음). dashboard 도 같은
+//     규칙이다(folder-dashboard-unused — itda-work/itda-hyve#362).
+//   - 순서: 폴더 파일 오류 → 폴더 slides·dashboard 안내 → 폴더 값 경고 → 문서 경고(Render 는 Line 으로 안정 정렬한다 — Line 0 이 앞).
 
 // FolderMeta 는 문서 위 폴더의 `_metadata.yml` 하나다. 호스트 앱(page.ReadFolderMeta 등)이 읽어 Options.FolderMeta 로 넘긴다.
 type FolderMeta struct {
@@ -48,7 +49,7 @@ type FolderMeta struct {
 type metaSrc map[string]string
 
 // knownGroups 는 파일 사이 합치기에서 하위 키 단위로 얹는 맵 키다.
-var knownGroups = map[string]bool{"slides": true, "code": true}
+var knownGroups = map[string]bool{"slides": true, "code": true, "dashboard": true}
 
 // tidyMetaNode 는 매핑 노드에서 같은 키를 마지막 하나로 줄인다(폴더 파일이 적용될 때만 쓴다).
 //   - 같은 키(별칭은 정규 이름으로 견준 뒤)는 마지막 하나만 남긴다 — 값이 틀려도 그 값이 이기고,
@@ -224,24 +225,13 @@ func unregisterSrc(srcs metaSrc, n *yaml.Node) {
 	}
 }
 
-// docSlidesValue 는 정리를 마친 문서 노드의 slides 값이다(키가 하나뿐이다 — 없으면 nil).
-func docSlidesValue(doc *yaml.Node) *yaml.Node {
-	if doc == nil {
-		return nil
-	}
-	if j := mappingIndex(doc.Content, "slides"); j >= 0 {
-		return doc.Content[j+1]
-	}
-	return nil
-}
-
-// folderHasSlideMap 은 합친 폴더 노드에 slides 맵이 있는지다(있어야 문서의 slides: true 스칼라를 빼고
+// folderHasGroupMap 은 합친 폴더 노드에 그룹(slides·dashboard) 맵이 있는지다(있어야 문서의 true 스칼라를 빼고
 // 폴더 맵으로 채운다).
-func folderHasSlideMap(merged *yaml.Node) bool {
+func folderHasGroupMap(merged *yaml.Node, group string) bool {
 	if merged == nil {
 		return false
 	}
-	j := mappingIndex(merged.Content, "slides")
+	j := mappingIndex(merged.Content, group)
 	return j >= 0 && merged.Content[j+1].Kind == yaml.MappingNode
 }
 
@@ -250,8 +240,14 @@ func folderHasSlideMap(merged *yaml.Node) bool {
 // 맵이거나 슬라이드를 켜는 값(true·빈 값)일 때만 낸다 — 폴더의 slides: false·틀린 스칼라는 버려도
 // 잃는 설정이 없다. 경로는 slides 를 정한 가장 가까운 폴더 파일이다(srcs). 줄은 싣지 않는다 — 여러
 // 파일의 slides 맵을 합치면 키 노드는 먼 파일 것이라 줄이 경로와 어긋난다.
+//
+// dashboard 도 같은 꼴이다(folder-dashboard-unused, itda-work/itda-hyve#362 — 「보드로 열지」 도 문서 자신의 dashboard: 만 정한다).
 func folderSlidesUnused(merged *yaml.Node, srcs metaSrc) (Warning, bool) {
-	j := mappingIndex(merged.Content, "slides")
+	return folderGroupUnused(merged, srcs, "slides", WarnFolderSlidesUnused, "슬라이드")
+}
+
+func folderGroupUnused(merged *yaml.Node, srcs metaSrc, group, code, look string) (Warning, bool) {
+	j := mappingIndex(merged.Content, group)
 	if j < 0 {
 		return Warning{}, false
 	}
@@ -260,8 +256,8 @@ func folderSlidesUnused(merged *yaml.Node, srcs metaSrc) (Warning, bool) {
 	if !(v.Kind == yaml.MappingNode || isNull(v) || v.Kind == yaml.ScalarNode && v.Decode(&b) == nil && b) {
 		return Warning{}, false
 	}
-	return Warning{Line: 0, Code: WarnFolderSlidesUnused,
-		Message: srcs["slides"] + ": 폴더의 slides 설정은 문서 frontmatter 에 slides: true 가 있어야 적용됨 — 이 문서는 슬라이드로 열리지 않음"}, true
+	return Warning{Line: 0, Code: code,
+		Message: fmt.Sprintf("%s: 폴더의 %s 설정은 문서 frontmatter 에 %s: true 가 있어야 적용됨 — 이 문서는 %s로 열리지 않음", srcs[group], group, group, look)}, true
 }
 
 // folderWarnPrefix 는 폴더 파일에서 온 키의 경고 앞머리다(예: "../_metadata.yml 3줄: "). 문서 줄이

@@ -14,6 +14,11 @@ import "strings"
 
 // typoSuggest 는 묶음 group(""·"slides"·"code") 의 모르는 키 key 와 가까운 아는 키의 정본 이름을 돌려준다.
 func typoSuggest(group, key string) (string, bool) {
+	return typoSuggestIn(schemaNames(group), func(name string) string { return normalizeAlias(group, name) }, key)
+}
+
+// typoSuggestIn 은 names(정본·별칭) 가운데 key 와 가까운 이름의 정본(canon)을 돌려준다 — 스키마 표 밖의 묶음(dashboard)도 쓴다.
+func typoSuggestIn(names []string, canon func(string) string, key string) (string, bool) {
 	for i := 0; i < len(key); i++ {
 		if key[i] >= 0x80 {
 			return "", false
@@ -24,7 +29,7 @@ func typoSuggest(group, key string) (string, bool) {
 		return "", false
 	}
 	best, bestD := "", -1
-	for _, name := range schemaNames(group) {
+	for _, name := range names {
 		nn := typoNorm(name)
 		limit := typoLimit(min(len(nk), len(nn)))
 		if abs(len(nk)-len(nn)) > limit { // 거리는 길이 차 이상 — 긴 키에 표를 만들지 않는다
@@ -35,7 +40,7 @@ func typoSuggest(group, key string) (string, bool) {
 			continue
 		}
 		if bestD < 0 || d < bestD {
-			best, bestD = normalizeAlias(group, name), d
+			best, bestD = canon(name), d
 		}
 	}
 	return best, bestD >= 0
@@ -97,4 +102,25 @@ func abs(n int) int {
 		return -n
 	}
 	return n
+}
+
+// dashboardKeys 는 dashboard: 아래 아는 키·별칭이다(parseDashboard 의 case 와 같다 — guidemd_test 가 명세 표와 맞춘다).
+// 스키마 표(FrontmatterSchema)에 두지 않는다: 이름이 slides 하위 키(ratio·level …)와 겹치고(TestSchemaKeysUnique), 폴더 기본값
+// 편집 화면이 다루지 않는다(폴더 파일에 적으면 slides: 와 같은 규칙으로 물려받는다 — frontmatterCore).
+var dashboardKeys = []string{"cols", "rows", "ratio", "aspect", "aspectratio", "level", "sources", "refresh"}
+
+// normalizeDashboardKey 는 dashboard 하위 키의 정규 이름이다(aspect·aspectratio → ratio).
+func normalizeDashboardKey(key string) string {
+	if key == "aspect" || key == "aspectratio" {
+		return "ratio"
+	}
+	return key
+}
+
+// dashboardTypoHint 는 dashboard 안 모르는 키 경고 문구에 넣는 덧말이다(typoHint 와 같은 꼴).
+func dashboardTypoHint(key string) string {
+	if s, ok := typoSuggestIn(dashboardKeys, normalizeDashboardKey, key); ok {
+		return " — " + s + " 의 오타?"
+	}
+	return ""
 }

@@ -39,6 +39,10 @@ func TestSlidesMeta(t *testing.T) {
 		{"slides:\n  ratio: 16/9", &SlidesMeta{Ratio: "16:9"}, 0},
 		{"slides:\n  ratio: \"21:9\"\n  level: 9\n  transition: zoom\n  incremental: 예\n  theme: dark", &SlidesMeta{}, 5},
 		{"slides: 발표", nil, 1},
+		// 소수·따옴표 숫자는 정수가 아니다 — 잘라 받지 않는다(yamlInt, itda-work/itda-hyve#362)
+		{"slides:\n  level: 2.9", &SlidesMeta{}, 1},
+		{"slides:\n  slide-level: 6.5", &SlidesMeta{}, 1},
+		{"slides:\n  level: \"2\"", &SlidesMeta{}, 1},
 		{"slides: [a, b]", nil, 1},
 		// 글자 배율(itda-hyve#430): 0.6~1.5 의 숫자. 경계는 받고, 밖·숫자 아님·글자·목록은 경고하고 0(기본)
 		{"slides:\n  font-scale: 0.8", &SlidesMeta{FontScale: 0.8}, 0},

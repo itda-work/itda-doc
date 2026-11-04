@@ -64,7 +64,7 @@ type Result struct {
 	Warnings  []Warning
 	// SlideLevel 은 발표에서 슬라이드를 여는 제목 단계다(Pandoc 규칙: 바로 아래에 제목이 아닌 내용이 오는 가장 높은 단계).
 	// 제목이 없으면 0. frontmatter slides.level 이 있으면 화면이 그것을 쓴다. DropNotes 와 상관없이 같은 값이다 — 뺀 노트는 빈
-	// 컨테이너로 자리에 남는다(transform.go notes).
+	// 컨테이너로 자리에 남는다(transform.go notes). 보드(dashboard:)의 타일 단계도 같은 규칙이라 이 값을 쓴다(dashboard.level 이 앞선다).
 	SlideLevel int
 	// FolderMeta 는 이 문서에 적용된 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(itda-hyve#474 — 가까운 것부터).
 	// 문서 창이 출처 표시에 쓴다. 깨져서 건너뛴 파일은 여기 없고 경고로만 알린다.
@@ -85,23 +85,27 @@ type Warning struct {
 
 // 경고 코드. 화면은 코드로 묶고, 문장은 사람에게 보여 준다.
 const (
-	WarnRawHTML            = "raw-html"             // 렌더하지 않은 HTML
-	WarnFrontmatterInvalid = "frontmatter-invalid"  // YAML 이 깨져 본문으로 렌더함
-	WarnFrontmatterValue   = "frontmatter-value"    // 아는 키의 값 형식이 틀려 무시함
-	WarnFrontmatterTypo    = "frontmatter-typo"     // 아는 키와 아주 가까운 모르는 키 — 오타일 수 있음, 값은 Extra 에 그대로(typo.go, itda-doc#14)
-	WarnUnsafeURL          = "unsafe-url"           // 막은 링크·이미지 주소
-	WarnRemoteImage        = "remote-image"         // 불러오지 않은 원격 이미지
-	WarnBadAttribute       = "bad-attribute"        // 알아보지 못한 {…} 속성
-	WarnUnclosedContainer  = "unclosed-container"   // 문서 끝에서 닫힌 ::: 컨테이너
-	WarnDuplicateID        = "duplicate-id"         // 직접 적은 id 가 겹침
-	WarnTooComplex         = "too-complex"          // 너무 많은 강조·링크 표시를 글자로 둠, 또는 블록 중첩이 너무 깊어 문서 전체를 원문 글자로 보임(렌더 시간 상한 — DropNotes 면 원문 대신 안내만, nesting.go withheldRaw)
-	WarnMath               = "math"                 // 그리지 않은 수식(원문 그대로) — 미지원·막은 명령·문법 오류·상한·닫히지 않은 $$. 또는 그린 수식에서 TeX 주석(%)이 지운 글(percentLoss, itda-hyve#180)·\text{…} 안의 주석이 } 를 가려 닫히지 않은 수식(textPctLoss, itda-hyve#591)
-	WarnDiagram            = "diagram"              // 그리지 않은 mermaid 그림(코드 그대로) 또는 그림에서 쓰지 않은 줄(style·click …)
-	WarnTildeRange         = "tilde-range"          // 범위로 보이는 단일 ~ 가 취소선이 됨(3~5명 … 10~20명) — 렌더는 그대로(itda-hyve#140)
-	WarnDateList           = "date-list"            // 줄 머리 날짜(2026. 10. 14.)가 번호 목록이 됨 — 렌더는 그대로(itda-hyve#140)
-	WarnListMarker         = "list-marker"          // 목록 항목에 기호(□ ○)·항목 번호(가. (1))를 글자로 적음 — list-style 로(itda-hyve#141)
-	WarnIndentedClose      = "indented-close"       // 닫히지 않은 ::: 안의 4칸 이상 들여쓴 닫는 줄 — 그 컨테이너의 unclosed-container 대신, Fix 를 싣는다(indentclose.go, itda-hyve#494)
-	WarnFolderSlidesUnused = "folder-slides-unused" // 폴더 _metadata.yml 의 slides 설정을 문서에 slides: 가 없어 쓰지 않음 — 렌더는 그대로(inherit.go folderSlidesUnused, itda-hyve#543)
+	WarnRawHTML               = "raw-html"                // 렌더하지 않은 HTML
+	WarnFrontmatterInvalid    = "frontmatter-invalid"     // YAML 이 깨져 본문으로 렌더함
+	WarnFrontmatterValue      = "frontmatter-value"       // 아는 키의 값 형식이 틀려 무시함
+	WarnFrontmatterTypo       = "frontmatter-typo"        // 아는 키와 아주 가까운 모르는 키 — 오타일 수 있음, 값은 Extra 에 그대로(typo.go, itda-doc#14)
+	WarnUnsafeURL             = "unsafe-url"              // 막은 링크·이미지 주소
+	WarnRemoteImage           = "remote-image"            // 불러오지 않은 원격 이미지
+	WarnBadAttribute          = "bad-attribute"           // 알아보지 못한 {…} 속성
+	WarnUnclosedContainer     = "unclosed-container"      // 문서 끝에서 닫힌 ::: 컨테이너
+	WarnDuplicateID           = "duplicate-id"            // 직접 적은 id 가 겹침
+	WarnTooComplex            = "too-complex"             // 너무 많은 강조·링크 표시를 글자로 둠, 또는 블록 중첩이 너무 깊어 문서 전체를 원문 글자로 보임(렌더 시간 상한 — DropNotes 면 원문 대신 안내만, nesting.go withheldRaw)
+	WarnMath                  = "math"                    // 그리지 않은 수식(원문 그대로) — 미지원·막은 명령·문법 오류·상한·닫히지 않은 $$. 또는 그린 수식에서 TeX 주석(%)이 지운 글(percentLoss, itda-hyve#180)·\text{…} 안의 주석이 } 를 가려 닫히지 않은 수식(textPctLoss, itda-hyve#591)
+	WarnDiagram               = "diagram"                 // 그리지 않은 mermaid 그림(코드 그대로) 또는 그림에서 쓰지 않은 줄(style·click …)
+	WarnTildeRange            = "tilde-range"             // 범위로 보이는 단일 ~ 가 취소선이 됨(3~5명 … 10~20명) — 렌더는 그대로(itda-hyve#140)
+	WarnDateList              = "date-list"               // 줄 머리 날짜(2026. 10. 14.)가 번호 목록이 됨 — 렌더는 그대로(itda-hyve#140)
+	WarnListMarker            = "list-marker"             // 목록 항목에 기호(□ ○)·항목 번호(가. (1))를 글자로 적음 — list-style 로(itda-hyve#141)
+	WarnIndentedClose         = "indented-close"          // 닫히지 않은 ::: 안의 4칸 이상 들여쓴 닫는 줄 — 그 컨테이너의 unclosed-container 대신, Fix 를 싣는다(indentclose.go, itda-hyve#494)
+	WarnFolderDashboardUnused = "folder-dashboard-unused" // 폴더 _metadata.yml 의 dashboard 설정을 문서에 dashboard: 가 없어 쓰지 않음 — 렌더는 그대로(inherit.go folderGroupUnused, itda-work/itda-hyve#362)
+	WarnFolderSlidesUnused    = "folder-slides-unused"    // 폴더 _metadata.yml 의 slides 설정을 문서에 slides: 가 없어 쓰지 않음 — 렌더는 그대로(inherit.go folderSlidesUnused, itda-hyve#543)
+	WarnDashboardSources      = "dashboard-sources"       // dashboard.sources·refresh — 이 판은 실시간 소스를 지원하지 않아 표를 그대로 그림(meta.go parseDashboard, itda-work/itda-hyve#362)
+	WarnKPIAmbiguous          = "kpi-ambiguous"           // :::kpi 안에 정의 목록과 3열 표가 함께 — 정의 목록이 KPI, 표는 그대로(kpi.go)
+	WarnKPIEmpty              = "kpi-empty"               // 보드 문서의 :::kpi 안에 정의 목록·3열 표가 없어 KPI 로 그리지 않음(kpi.go)
 )
 
 // Render 는 마크다운 원문을 렌더한다. 오류는 내부 렌더 실패뿐이다 — 문법 문제는 Warnings 로 알린다.

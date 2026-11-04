@@ -41,6 +41,11 @@ type Meta struct {
 	// Code 는 frontmatter code: 다(itda-hyve#435 — 코드 블록 표시). 없으면 nil.
 	Code *CodeMeta
 
+	// Dashboard 는 frontmatter dashboard: 다(itda-work/itda-hyve#362). 있으면 보기 화면이 보드로 연다(slides: 보다 앞선다). 없으면 nil.
+	// 폴더 기본값(_metadata.yml)의 dashboard 는 slides 와 같은 규칙이다 — 보드로 여는지는 문서 자신의 dashboard: 가 정하고, 문서가
+	// true(또는 빈 값)면 폴더 맵이 하위 설정을 채운다(frontmatterCore).
+	Dashboard *DashboardMeta
+
 	// Extra 는 모르는 키다. 공문의 수신·참조·시행일처럼 테마가 표지·머리글에 쓴다.
 	Extra []MetaField
 }
@@ -53,6 +58,15 @@ type SlidesMeta struct {
 	Incremental bool   `json:"incremental"` // 모든 목록을 차례로
 	// FontScale 은 슬라이드 글자 배율(0.6~1.5)이다. 0 이면 기본(0.9 — base.css --slide-scale). 1 이면 글자 토큰 그대로(본문 23pt)
 	FontScale float64 `json:"font_scale"`
+}
+
+// DashboardMeta 는 보드 설정이다(itda-work/itda-hyve#362). 모두 선택이고, 0 값은 "정하지 않음" 이다(화면이 기본을 쓴다 — page.BoardView).
+// 실시간 소스(sources·refresh)는 이 판이 해석하지 않는다 — 경고(WarnDashboardSources) 한 줄로만 알린다.
+type DashboardMeta struct {
+	Cols  int    `json:"cols"`  // 격자 열 수 2~6(기본 4)
+	Rows  int    `json:"rows"`  // 판 하나의 행 수 2~4(기본 3)
+	Ratio string `json:"ratio"` // 판 비율 "16:9"(기본) · "4:3" — slides.ratio 와 같은 값·별칭
+	Level int    `json:"level"` // 타일을 여는 제목 단계(1~6). 0 이면 문서에서 정한다(Result.SlideLevel — 슬라이드와 같은 규칙)
 }
 
 // CodeMeta 는 코드 블록 표시 설정이다(itda-hyve#435). 모두 선택이고, nil 은 "정하지 않음" 이다(화면이 기본을 쓴다).
@@ -153,20 +167,26 @@ func frontmatterCore(src []byte, folder []FolderMeta) (Meta, map[string]Frontmat
 	//     스칼라를 빼고 폴더 맵을 살린다 — 소스도 폴더로 남아 폴더 파일 경고가 난다). 폴더 맵이 없으면
 	//     문서 스칼라 그대로(fill 이 빈 SlidesMeta 를 만든다 — 단일 문서 동작 그대로).
 	//   틀린 스칼라(예: slides: 발표)·맵 → 문서 값 그대로(fill 이 경고를 내거나 맵을 폴더 맵 위에 얹는다).
-	if sl := docSlidesValue(docNode); sl != nil {
-		var b bool
-		slideOn := isNull(sl) || sl.Kind == yaml.ScalarNode && sl.Decode(&b) == nil && b
-		slideOff := sl.Kind == yaml.ScalarNode && !isNull(sl) && sl.Decode(&b) == nil && !b
-		if slideOn && folderHasSlideMap(merged) {
-			dropKey(docNode, "slides")
-		} else if slideOff {
-			dropKey(merged, "slides") // 문서가 슬라이드 아님을 정했다 — 폴더 하위 값을 억제한다(suppressedGroups 도 참고)
+	// 보드로 열지(dashboard:)도 같은 규칙이다(itda-work/itda-hyve#362, 사용자 결정 2026-11-04 — slides: 와 똑같이): 폴더 파일
+	// 하나가 그 아래 문서를 보드로 바꾸지 않고, 문서가 dashboard: true 로 보드임을 정하면 폴더 맵이 cols·rows… 를 채운다.
+	for _, g := range []struct{ key, code, look string }{
+		{"slides", WarnFolderSlidesUnused, "슬라이드"}, {"dashboard", WarnFolderDashboardUnused, "보드"},
+	} {
+		if sl := docGroupValue(docNode, g.key); sl != nil {
+			var b bool
+			on := isNull(sl) || sl.Kind == yaml.ScalarNode && sl.Decode(&b) == nil && b
+			off := sl.Kind == yaml.ScalarNode && !isNull(sl) && sl.Decode(&b) == nil && !b
+			if on && folderHasGroupMap(merged, g.key) {
+				dropKey(docNode, g.key)
+			} else if off {
+				dropKey(merged, g.key) // 문서가 그 꼴이 아님을 정했다 — 폴더 하위 값을 억제한다(suppressedGroups 도 참고)
+			}
+		} else {
+			if w, ok := folderGroupUnused(merged, srcs, g.key, g.code, g.look); ok { // 버리는 폴더 값을 알린다(itda-hyve#543)
+				warns = append(warns, w)
+			}
+			dropKey(merged, g.key)
 		}
-	} else {
-		if w, ok := folderSlidesUnused(merged, srcs); ok { // 버리는 폴더 slides 값을 알린다(itda-hyve#543)
-			warns = append(warns, w)
-		}
-		dropKey(merged, "slides")
 	}
 
 	final := mergeFolderInto(merged, docNode) // 문서 노드가 마지막에 이긴다(여기서 merged 는 nil 이 아니다)
@@ -194,7 +214,7 @@ func frontmatterCore(src []byte, folder []FolderMeta) (Meta, map[string]Frontmat
 // 쓰이지 않는다). slides 는 위 판단에서, code 는 문서 스칼라가 폴더 맵을 통째로 이기는 ① 규칙에서 온다.
 func suppressedGroups(docNode *yaml.Node) map[string]bool {
 	out := map[string]bool{}
-	for _, g := range []string{"slides", "code"} {
+	for _, g := range []string{"slides", "code", "dashboard"} {
 		v := docGroupValue(docNode, g)
 		if v == nil || v.Kind != yaml.ScalarNode || isNull(v) {
 			continue
@@ -398,6 +418,10 @@ func (m *Meta) fill(n *yaml.Node, srcs metaSrc) []Warning {
 			cm, ws := parseCode(v, srcs)
 			m.Code = cm
 			warns = append(warns, ws...)
+		case "dashboard":
+			dm, ws := parseDashboard(v, srcs)
+			m.Dashboard = dm
+			warns = append(warns, ws...)
 		default:
 			m.Extra = append(m.Extra, extraField(k.Value, v))
 			// 아는 키와 아주 가까운 모르는 키는 오타일 수 있어 알린다 — 값은 위처럼 Extra 에 그대로(itda-doc#14, typo.go).
@@ -541,15 +565,15 @@ func parseSlides(v *yaml.Node, srcs metaSrc) (*SlidesMeta, []Warning) {
 		s = strings.ToLower(strings.TrimSpace(s))
 		switch kk.Value {
 		case "ratio", "aspect", "aspectratio":
-			switch s {
-			case "16:9", "16/9", "4:3", "4/3":
-				sm.Ratio = strings.ReplaceAll(s, "/", ":")
-			default:
+			if r, ok := parseRatio(s); ok {
+				sm.Ratio = r
+			} else {
 				bad(vv, kk.Value, `"16:9" 또는 "4:3"`)
 			}
 		case "level", "slide-level":
-			var n int
-			if vv.Kind != yaml.ScalarNode || vv.Decode(&n) != nil || n < 1 || n > 6 {
+			// YAML 정수(!!int)만 — 2.9 같은 소수를 잘라 받지 않는다(yamlInt, itda-work/itda-hyve#362)
+			n, ok := yamlInt(vv)
+			if !ok || n < 1 || n > 6 {
 				bad(vv, kk.Value, "1~6 의 정수")
 				continue
 			}
@@ -650,4 +674,101 @@ func parseCode(v *yaml.Node, srcs metaSrc) (*CodeMeta, []Warning) {
 		}
 	}
 	return cm, warns
+}
+
+// yamlInt 는 YAML 정수 값(!!int)만 읽는다. Decode(&int) 는 2.9 같은 소수를 경고 없이 잘라 받으므로(yaml.v3) 꼬리표를 먼저 본다 —
+// 따옴표 숫자("2", !!str)도 받지 않는다(itda-work/itda-hyve#362).
+func yamlInt(n *yaml.Node) (int, bool) {
+	var v int
+	if n.Kind != yaml.ScalarNode || n.ShortTag() != "!!int" || n.Decode(&v) != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+// parseRatio 는 판 비율 글자(소문자로 다듬은 것)를 읽는다 — slides.ratio 와 dashboard.ratio 가 같이 쓴다.
+func parseRatio(s string) (string, bool) {
+	switch s {
+	case "16:9", "16/9", "4:3", "4/3":
+		return strings.ReplaceAll(s, "/", ":"), true
+	}
+	return "", false
+}
+
+// parseDashboard 는 dashboard: 를 읽는다(itda-work/itda-hyve#362 — parseSlides 와 같은 받기·경고 규칙). true(또는 빈 값)·매핑을 받는다.
+// false 면 없는 것과 같다. 틀린 값은 그 키만 버리고 경고한다(나머지 설정은 쓴다). 실시간 소스 키(sources·refresh)는 이 판이
+// 해석하지 않는다 — 있으면 WarnDashboardSources 경고 한 줄(처음 나온 키의 줄)로 알리고 표는 그대로 그린다.
+// 폴더 값은 slides 와 같은 규칙으로 들어온다(frontmatterCore — 문서에 dashboard: 가 있을 때 하위 키 단위로 합침) — 폴더에서 온
+// 키의 경고는 srcs 로 폴더 출처 앞머리(folderWarnPrefix, Line 0)를 달고, 문서 키는 문서 줄이다.
+func parseDashboard(v *yaml.Node, srcs metaSrc) (*DashboardMeta, []Warning) {
+	var warns []Warning
+	// warn 은 경고 하나를 단다 — 폴더 파일에서 온 키면 slides: 와 같이 Line 0·「<rel> <n>줄: 」 앞머리(folderWarnPrefix), 문서 키면 문서 줄.
+	warn := func(path string, n *yaml.Node, code, key, msg string) {
+		if p, ok := folderWarnPrefix(srcs, path, n); ok {
+			warns = append(warns, Warning{Line: 0, Code: code, Key: key, Message: p + msg})
+			return
+		}
+		warns = append(warns, Warning{Line: n.Line + 1, Code: code, Key: key, Message: msg})
+	}
+	bad := func(n *yaml.Node, key, want string) {
+		k := "dashboard." + normalizeDashboardKey(key)
+		warn(k, n, WarnFrontmatterValue, k, fmt.Sprintf("frontmatter dashboard.%s: %s 이어야 해서 무시함", key, want))
+	}
+	whole := func() (*DashboardMeta, []Warning) {
+		warn("dashboard", v, WarnFrontmatterValue, "dashboard", "frontmatter dashboard: true 또는 설정 목록이어야 해서 무시함")
+		return nil, warns
+	}
+	dm := &DashboardMeta{}
+	switch {
+	case isNull(v):
+		return dm, nil
+	case v.Kind == yaml.ScalarNode:
+		var b bool
+		if v.Decode(&b) != nil {
+			return whole()
+		}
+		if !b {
+			return nil, nil
+		}
+		return dm, nil
+	case v.Kind != yaml.MappingNode:
+		return whole()
+	}
+	intIn := func(kk, vv *yaml.Node, lo, hi int, dst *int) {
+		n, ok := yamlInt(vv)
+		if !ok || n < lo || n > hi {
+			bad(vv, kk.Value, fmt.Sprintf("%d~%d 의 정수", lo, hi))
+			return
+		}
+		*dst = n
+	}
+	live := false
+	for i := 0; i+1 < len(v.Content); i += 2 {
+		kk, vv := v.Content[i], v.Content[i+1]
+		switch kk.Value {
+		case "cols":
+			intIn(kk, vv, 2, 6, &dm.Cols)
+		case "rows":
+			intIn(kk, vv, 2, 4, &dm.Rows)
+		case "ratio", "aspect", "aspectratio":
+			s, _ := scalar(vv)
+			if r, ok := parseRatio(strings.ToLower(strings.TrimSpace(s))); ok {
+				dm.Ratio = r
+			} else {
+				bad(vv, kk.Value, `"16:9" 또는 "4:3"`)
+			}
+		case "level":
+			intIn(kk, vv, 1, 6, &dm.Level)
+		case "sources", "refresh":
+			if !live {
+				live = true
+				warn("dashboard."+kk.Value, kk, WarnDashboardSources, "",
+					fmt.Sprintf("frontmatter dashboard.%s: 이 판은 실시간 소스를 지원하지 않음 — 표를 그대로 그린다", kk.Value))
+			}
+		default:
+			warn("dashboard."+kk.Value, kk, WarnFrontmatterValue, "dashboard."+kk.Value,
+				fmt.Sprintf("frontmatter dashboard.%s 는 모르는 키라 무시함(cols·rows·ratio·level%s)", kk.Value, dashboardTypoHint(kk.Value)))
+		}
+	}
+	return dm, warns
 }

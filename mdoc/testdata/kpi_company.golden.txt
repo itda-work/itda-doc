@@ -1,0 +1,3 @@
+meta: {Present:true Title:회사 어휘 kpi — 구조 없음 Subtitle: Author:[] Date: Lang: TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme:acme Cover:false DocNo: Version: Classification: Organization: ListStyle: Slides:<nil> Code:<nil> Extra:[]}
+toc-placed: false
+toc: h1 #분기-지표 [] 분기 지표

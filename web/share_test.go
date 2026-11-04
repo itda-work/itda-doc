@@ -149,3 +149,119 @@ func TestShareYouTubeFollowGate(t *testing.T) {
 		t.Error("share.html 이 호스트 부품 yt.js 자리를 싣지 않음")
 	}
 }
+
+// 발표 꼴 따라가기의 화면 연결(itda-work/itda-hyve#362 리뷰 1회차 [2]): share.js 의 fol 선언(align·release)을 그대로 떼어 node 로
+// 돌린다 — follower 는 받은 선택을 돌려주는 가짜이고 followAction·restoreOwnLook 은 같은 파일의 진짜다. 보는 것 셋:
+// align 이 호스트의 발표 꼴(want)을 followAction 에 넘기는지(이미 보드면 다시 그리지 않고 맞춘다), redraw 가 그 꼴을 고르는지
+// (state.chosen = "dashboard"), release 가 슬라이드·보드 문서를 제 꼴로 되돌리는지(restoreOwnLook).
+func TestShareFollowerWiring(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	a := strings.Index(src, "  const fol = follower({\n")
+	z := strings.Index(src[max(a, 0):], "\n  });\n")
+	if a < 0 || z < 0 {
+		t.Fatal("share.js 에서 fol 선언을 찾지 못함")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	decl := src[a : a+z+len("\n  });\n")]
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(process.env.SRC, ctx);
+  const S = ctx.window.ItdaShare;
+  const make = new Function("follower", "followAction", "restoreOwnLook", "state", "$", "window", "draw", "scrollToFollow", "paintLookSwitch",
+    ` + "`" + `${process.env.DECL}; return fol;` + "`" + `);
+  function rig(view, look, chosen) {
+    const r = { draws: 0, scrolls: 0 };
+    r.state = { ended: false, look, view, chosen };
+    const el = { hidden: true, textContent: "", classList: { remove() {} }, querySelectorAll: () => [] };
+    r.fol = make(o => o, S.followAction, S.restoreOwnLook, r.state, () => el, { innerWidth: 1200 },
+      () => { r.draws++; }, () => { r.scrolls++; }, () => {});
+    return r;
+  }
+  const bad = [];
+  const doc = {}, board = { board: { present: true } };
+  // 쪽 문서를 보드 발표로 따라가면 보드로 다시 그린다
+  let r = rig(doc, "doc", "");
+  r.fol.align(0, "slide", 0, "dashboard");
+  if (r.state.chosen !== "dashboard" || r.draws !== 1) bad.push("보드 발표 → chosen " + r.state.chosen + " · 그리기 " + r.draws);
+  // 이미 보드로 보고 있으면 다시 그리지 않고 번호로 맞춘다(want 가 빠지면 슬라이드로 다시 그린다)
+  r = rig(board, "dashboard", "");
+  r.fol.align(0, "slide", 0, "dashboard");
+  if (r.draws !== 0 || r.scrolls !== 1) bad.push("보드 위 보드 발표 → 그리기 " + r.draws + " · 맞춤 " + r.scrolls);
+  // 보드 문서를 슬라이드로 따라갔다가 풀리면 제 꼴(보드)로 되돌린다
+  r = rig(board, "slides", "slides");
+  r.fol.release();
+  if (r.state.chosen !== "" || r.draws !== 1) bad.push("풀림 → chosen " + JSON.stringify(r.state.chosen) + " · 그리기 " + r.draws);
+  process.stdout.write(bad.length ? "FOL FAIL " + bad.join(" / ") : "FOL OK");
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "FOL OK" {
+		t.Fatalf("발표 꼴 따라가기 연결: %v\n%s", err, out)
+	}
+}
+
+// 보드를 그릴 수 없는 화면(itda-work/itda-hyve#362 — 웹 뷰어는 dashboard.js 를 싣지 않는다, scripts/build-web.sh): boardOK 가 거짓이면
+// 보드 문서도 발표 꼴 "dashboard" 도 보드를 고르지 않고 쪽 문서와 같이 고른다(lookFor). 따라가기는 보드로 다시 그리지 않고(followAction
+// "none"), 꼴 단추도 숨기지 않는다(lookSwitchHidden). 참이면(공유 화면 — 기본값) 종전대로 보드다. 화면 연결은 share.js 가 화면을 시작할 때
+// window.ItdaBoard 로 setBoardOK 를 부르는지를 글로 본다 — 첫 그리기(linked.start) 전에. 실제 화면은 Chrome 헤드리스 실측(처리 보고).
+func TestShareBoardUnavailable(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	at := strings.Index(src, "\n  setBoardOK(!!window.ItdaBoard);")
+	if at < 0 || at < strings.Index(src, "\n  if (!source) return;\n") || at > strings.Index(src, "\n  linked.start();") {
+		t.Error("share.js 가 화면 시작(원천을 고른 뒤·첫 그리기 전)에 setBoardOK(!!window.ItdaBoard) 를 부르지 않음")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(process.env.SRC, ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { if (got !== want) bad.push(name + ": " + JSON.stringify(got) + " ≠ " + JSON.stringify(want)); };
+  const doc = {}, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
+  // 기본값(참) — 공유 화면
+  eq("참: 보드 문서", S.lookFor(board, 1400, ""), "dashboard");
+  eq("참: 발표 꼴 dashboard", S.lookFor(doc, 1400, "dashboard"), "dashboard");
+  eq("참: 보드 발표로 다시 그림", S.followAction("slide", "doc", doc, 1400, "dashboard"), "redraw");
+  eq("참: 꼴 단추 숨김", S.lookSwitchHidden(board, "dashboard", false), true);
+  S.setBoardOK(false);
+  eq("거짓: 보드 문서(넓음) → 쪽", S.lookFor(board, 1400, ""), "doc");
+  eq("거짓: 보드 문서(좁음) → 이어보기", S.lookFor(board, 390, ""), "flow");
+  eq("거짓: 보드+슬라이드 문서 → 슬라이드", S.lookFor(both, 1400, ""), "slides");
+  eq("거짓: 발표 꼴 dashboard → 쪽", S.lookFor(doc, 1400, "dashboard"), "doc");
+  eq("거짓: 보드 발표 → 다시 그리지 않음", S.followAction("slide", "doc", board, 1400, "dashboard"), "none");
+  eq("거짓: 슬라이드 발표는 그대로", S.followAction("slide", "doc", board, 1400, "slides"), "redraw");
+  eq("거짓: 꼴 단추 보임", S.lookSwitchHidden(board, "doc", false), false);
+  eq("거짓: 고른 꼴(쪽)", S.lookFor(board, 1400, "flow"), "flow");
+  S.setBoardOK(true);
+  eq("다시 참: 보드 문서", S.lookFor(board, 1400, ""), "dashboard");
+  process.stdout.write(bad.length ? "BOARD FAIL " + bad.join("; ") : "BOARD OK");
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "SRC="+src)
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "BOARD OK" {
+		t.Fatalf("보드를 그릴 수 없는 화면: %v\n%s", err, out)
+	}
+}

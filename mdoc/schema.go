@@ -61,6 +61,10 @@ var FrontmatterSchema = []MetaKey{
 		Input: "list-style", Values: []string{ListGaejosik, ListGongmun, ListGaejosik + " " + ListGongmun, ListPlain}},
 	{Key: "slides", Kind: "매핑 또는 참·거짓", Default: "없음", Desc: "발표 자료 — 슬라이드로 여는지는 문서의 이 키만 정한다"},
 	{Key: "code", Kind: "매핑 또는 참·거짓", Default: "줄 번호 켬", Desc: "코드 블록 표시"},
+	// dashboard 하위 키(cols·rows·ratio·level)는 이 표에 두지 않는다 — slides 하위 키와 이름이 겹친다(TestSchemaKeysUnique, typo.go
+	// dashboardKeys). 폴더 값은 slides 와 같은 규칙으로 들어온다(frontmatterCore) — 이 항목에 Input 이 없어 폴더 설정 편집 화면에는
+	// 줄이 없다(itda-work/itda-hyve#362).
+	{Key: "dashboard", Kind: "매핑 또는 참·거짓", Default: "없음", Desc: "보드(대시보드) — 보드로 여는지는 문서의 이 키가 정한다(폴더 값은 문서에 dashboard: true 가 있을 때 하위 설정만 채움)"},
 
 	{Key: "ratio", Group: "slides", Kind: "열거", Range: `"16:9"·"4:3"(16/9 꼴도 받음)`, Default: "16:9",
 		Desc: "화면 비율", Aliases: []string{"aspect", "aspectratio"},
@@ -107,6 +111,9 @@ var metaAlias = func() map[string]string {
 
 // normalizeAlias 는 키를 묶음 경로(group "slides"|"code"|"") 의 정규 이름으로 바꾼다. 별칭이 아니면 그대로.
 func normalizeAlias(group, key string) string {
+	if group == "dashboard" { // dashboard 하위 키는 스키마 밖이다(schema.go dashboard 항목 주석) — 별칭은 typo.go 가 정한다
+		return normalizeDashboardKey(key)
+	}
 	if canon, ok := metaAlias[group+"."+key]; ok {
 		return canon[len(group)+1:]
 	}

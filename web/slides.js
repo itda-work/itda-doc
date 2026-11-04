@@ -5,7 +5,7 @@
 //   - 슬라이드 단계의 제목 → 새 슬라이드(그 제목이 슬라이드 제목)
 //   - 가로줄(---)·쪽 나눔 → 그 자리에서 새 슬라이드(제목 없이)
 //   - 넘치면 쪽 나눔기(pager.js)가 나눠 같은 제목 + "(계속 k/n)" 슬라이드로 잇는다 — 잘리는 슬라이드가 없다
-//   - 그림·차트·표·요약문 하나만 있는 슬라이드는 그것을 크게(k-single)
+//   - 그림·차트·표·요약문·KPI(구조 게이트를 지난 :::kpi) 하나만 있는 슬라이드는 그것을 크게(k-single)
 //   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, itda-hyve#550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takeSlot)
 //   - 배경 그림(mdoc 이 배경으로 표시한 맨 위 블록 — data-slide-bg, itda-hyve#569)은 묶음의 배경으로 빼 슬라이드 전체(제목 띠 포함)를 채운다(takeSlot)
 //   - .fit 그림만 든 문단(mdoc 이 class fit-row 를 단 맨 위 문단, itda-hyve#569)은 같은 높이로 가로에 늘어놓는다(rowCaptions·pager.js placeFit)
@@ -19,7 +19,7 @@
   const SIZE = { "16:9": [1280, 720], "4:3": [960, 720] };
   const isHeading = n => /^H[1-6]$/.test(n.tagName);
   const level = n => Number(n.tagName.slice(1));
-  const SINGLE = n => n.matches("figure, table, .lead, blockquote");
+  const SINGLE = n => n.matches("figure, table, .lead, blockquote, .kpi-tiles"); // .kpi-tiles — 구조 게이트를 지난 :::kpi 만(mdoc/kpi.go)
 
   function lang() { return (document.documentElement.lang || "ko").startsWith("ko"); }
 
