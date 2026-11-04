@@ -8,7 +8,8 @@
      share.js 가 찾는 자리다 — share.html 과 같게 둔다.
      CSP 는 공유 화면처럼 default-src 'none' 에 쓰는 것만 연다. 제3자 출처로 가는 요청(connect·그림·글꼴·스크립트·스타일)은 막는다.
      그림(img-src)은 data:·blob: 만 열어 같은 출처(뷰어를 낸 서버)로 가는 그림 요청도 막는다 — 상대 경로 그림의 파일 이름이 서버로 가지
-     않게(viewer.js localImages 가 src 를 먼저 옮기고, 놓친 것은 CSP 가 막는다). 원격 그림도 막힌다(img-src 에 https: 없음). 같은 출처로
+     않게(viewer.js localImages·folderImages 가 src 를 먼저 옮기고, 놓친 것은 CSP 가 막는다). 폴더로 열면 그 폴더의 그림은 blob: URL 로
+     그린다(브라우저 안의 파일 — 요청이 아니다). 원격 그림도 막힌다(img-src 에 https: 없음). 같은 출처로
      가는 다른 요청(connect·스크립트·글꼴)은 막지 않으므로, 같은 출처에 원문을 보내지 않는 것은 코드가 지킨다.
      링크 이동은 CSP 가 막지 않는다 — 문서 안 상대 링크(#조각·http(s)·mailto·tel 이 아닌 href)는 viewer.js localLinks 가 href 를
      data-local-href 로 옮겨 같은 출처로 이동하지 않게 한다(가운데 단추·새 탭도). 테마 CSS 와 인쇄 쪽 크기(@page)는 viewer.js 가 blob: URL 의
@@ -47,6 +48,9 @@
   <div class="viewer-tools">
     <button class="btn" id="btn-open" title="md 파일 열기(이 브라우저 안에서만 읽는다)">열기</button>
     <input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
+    <button class="btn" id="btn-folder" title="문서 폴더 열기 — 폴더 설정(_metadata.yml)과 상대 경로 그림을 쓴다(이 브라우저 안에서만 읽는다)">폴더</button>
+    <input type="file" id="dir" webkitdirectory hidden>
+    <select id="doc-pick" class="vsel" title="폴더 안의 문서" aria-label="폴더 안의 문서" hidden></select>
     <button class="btn" id="btn-paste" title="원문 붙여넣기">붙여넣기</button>
     <select id="sample" class="vsel" title="견본 열기" aria-label="견본"><option value="">견본…</option></select>
     <select id="theme" class="vsel" title="테마(이 화면에서만)" aria-label="테마"><option value="">문서의 테마</option></select>
@@ -68,6 +72,7 @@
     <button class="gbtn" data-look="flow" title="이어보기 — 쪽 나눔 없이">이어보기</button>
     <button class="gbtn" data-look="slides" title="슬라이드 — 제목으로 나눠 보기">슬라이드</button>
   </div>
+  <span class="open-state" id="open-state" hidden></span>
   <button class="btn warn-btn" id="btn-warn" title="경고 목록" aria-controls="warn-panel" aria-expanded="false" hidden>경고 <span id="warn-count">0</span></button>
   <button class="btn" id="btn-print" title="브라우저 인쇄(PDF 로 저장 포함)">인쇄</button>
 </header>
@@ -82,7 +87,7 @@
     <div id="viewer-empty" class="viewer-empty">
       <div class="viewer-empty-card">
         <h2>itda-doc 뷰어</h2>
-        <p>md 파일을 여기에 끌어 놓거나 「열기」·「붙여넣기」·「견본」으로 엽니다. 문서는 이 브라우저 안에서만 그려지고 어디로도 보내지 않습니다.</p>
+        <p>md 파일이나 문서 폴더를 여기에 끌어 놓거나 「열기」·「폴더」·「붙여넣기」·「견본」으로 엽니다. 폴더로 열면 폴더 설정(_metadata.yml)과 상대 경로 그림이 적용됩니다. 문서는 이 브라우저 안에서만 그려지고 어디로도 보내지 않습니다.</p>
       </div>
     </div>
     <div id="ended" class="share-ended" hidden>
