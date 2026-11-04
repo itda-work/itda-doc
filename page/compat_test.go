@@ -19,6 +19,38 @@ func TestDerivedTokensMatchStatic(t *testing.T) {
 	builtinProblems(t, checkDerived)
 }
 
+// 내장 테마는 바탕(extends)의 파생 식을 잃지 않는다. 자식이 파생 대상 토큰에 정적 값을 주면 물려받은 식이 지워진다
+// (theme.go 의 delete(derived, k)) — 그러면 위 시험이 그 정적 값을 보지 않고, 그 테마를 extends 한 회사 테마가 --accent 등을
+// 바꿔도 지원 엔진에서 파생 색이 따라가지 않는다. 정적 값을 준 테마는 바탕의 식을 자기 derived 에 그대로 다시 적는다(spec/themes.md 11장).
+// 정적 값을 주지 않은 토큰은 식을 그대로 물려받으므로, 합친 결과의 Derived 가 바탕의 Derived 를 모두 품는지만 보면 된다.
+func TestBuiltinDerivedKeptFromBase(t *testing.T) {
+	ts := builtin(t)
+	n := 0
+	for _, i := range ts.List() {
+		th, _ := ts.Get(i.Name)
+		if th.Extends == "" {
+			continue
+		}
+		base, ok := ts.Get(th.Extends)
+		if !ok {
+			t.Fatalf("%s: 바탕 %s 가 없음", th.Name, th.Extends)
+		}
+		own := map[string]string{}
+		for _, kv := range th.Derived {
+			own[kv[0]] = kv[1]
+		}
+		for _, kv := range base.Derived {
+			n++
+			if own[kv[0]] != kv[1] {
+				t.Errorf("%s: 바탕 %s 의 파생 식 %s 가 빠짐(또는 다름) — 정적 값을 줬다면 derived 에 %q 를 그대로 다시 적어라", th.Name, th.Extends, kv[0], kv[1])
+			}
+		}
+	}
+	if n == 0 {
+		t.Error("바탕의 파생 식을 하나도 보지 않음 — extends 한 내장 테마가 없음")
+	}
+}
+
 // 엔진에 맞춘 CSS 꼴: 파생 토큰은 @supports 안(시험 흉내면 늘 거짓인 조건), @scope 를 모르는 엔진이면 내장만 가두지 않는다.
 func TestStyleSheetModes(t *testing.T) {
 	ts, err := LoadThemeSet(builtinFS(t), "../themes/samples")

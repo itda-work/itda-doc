@@ -47,5 +47,8 @@
     "--chart-8": "#7a7a7a",
     "--chart-grid": "#e5e5e5",
     "--chart-axis": "#111111"
+  },
+  "derived": {
+    "--accent-soft": "oklch(from var(--accent) 0.965 calc(c * 0.16) h)"
   }
 }

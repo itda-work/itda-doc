@@ -31,8 +31,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 - 폴더 이름이 테마 이름이다. 문서는 frontmatter 에 `theme: acme` 로 고른다. 이름은 **소문자 영문·숫자·한글(완성형)·`-`·`_`**, 40자까지.
   대문자는 받지 않는다(대소문자를 가리지 않는 파일 시스템에서 `Acme` 와 `acme` 가 한 폴더가 된다).
-- 내장 구조 테마 다섯(`classic`·`bold`·`mono`·`compact`·`spine`)은 색이 모두 `--accent` 에서 나온다. 그 위에 `extends` 로 얹은 내장 중립 스타일 테마(`slate`·`swiss`·`contrast`)는
-  `--accent` 밖에 자기 색(`slate` 의 청록 `--highlight`, `swiss` 의 글자용 빨강 `--accent-strong`·회색 면 `--panel`, `contrast` 의 알림 색 `--alert-*`·코드 강조 색 `--code-*`)과 차트 색을 따로 둔다 —
+- 내장 구조 테마 다섯(`classic`·`bold`·`mono`·`compact`·`spine`)은 색이 모두 `--accent` 에서 나온다. 그 위에 `extends` 로 얹은 내장 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`)는
+  `--accent` 밖에 자기 색(`slate` 의 청록 `--highlight`, `swiss` 의 글자용 빨강 `--accent-strong`·회색 면 `--panel`, `contrast` 의 알림 색 `--alert-*`·코드 강조 색 `--code-*`, `verdant` 의 잎색 `--highlight`·링크 물색 `--link`)과 차트 색을 따로 둔다 —
   `--accent` 를 바꾸면 그 파생 색만 따라 바뀐다. `--accent` 하나만 바꿔도
   제목·표 머리·띠·요약문이 그 색 계열로 바뀐다(`mono` 는 흑백이라 강조색을 쓰지 않는다). 옅은 면·제목 번호 같은 파생 색은
   상대 색을 아는 엔진에서만 따라 바뀐다 — 옛 WebKit 에서는 바탕 테마의 색이 남는다(12장). 창의 "회사 테마 만들기" 는 파생 색을
@@ -90,7 +90,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `basic` | 기본 | 중립 — 내장 다섯(`classic`·`bold`·`compact`·`mono`·`spine`) |
 | `formal` | 단정·격식 | 차분하고 격식 있는 — 내장 `slate`·`swiss`·`contrast` |
 | `vivid` | 선명·브랜드 | 브랜드색이 앞에 서는 |
-| `editorial` | 감성·에디토리얼 | 잡지·감성 무드 |
+| `editorial` | 감성·에디토리얼 | 잡지·감성 무드 — 내장 `verdant` |
 | `dark` | 다크 | 어두운 바탕 |
 <!-- theme-groups:end -->
 
@@ -439,7 +439,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 
 ## 11. 빌드 때 넣기(내장 테마로)
 
-내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`)다.
+내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`)다.
 중립 스타일 테마는 아래 「스타일 테마」 레시피를 브랜드 없이 따른 것이다 — 상표·「비공식」 머리말이 없고, 묶음은 그 무드로 고른다.
 
 ### 스타일 테마 — 남의 디자인 시스템에서 테마 만들기
@@ -462,6 +462,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 문서용 토큰(`--ink`·`--paper`·`--rule` 등)은 바탕을 물려받는 게 보통이다.
 
 **`derived` 정적값 계산** — 강조색을 바꾼 테마는 바탕 테마의 파생 식을 새 색으로 미리 계산해 `tokens` 에 정적 값으로 함께 적는다 — 옛 WebKit 에서 바탕 색이 섞이지 않고, 지원하는 엔진에서도 같은 값이다(12장). 파생 식은 바탕마다 다르니 물려받은 `derived` 그대로를 계산한다(`classic` 의 넷 `--accent-2`·`--accent-3`·`--accent-soft`·`--lead-bg` 는 모두 `var(--accent)` 기반이고, `spine` 의 `--highlight-soft` 는 `--highlight` 기반이다). 창의 "회사 테마 만들기" 는 `var(--accent)` 식만 골라 계산한다(`page/usertheme.go` `createUserTheme`).
+정적 값을 준 토큰은 물려받은 식이 지워진다(`page/theme.go` — 물려받은 식이 그 정적 값을 덮지 않게). 그래서 내장 테마는 바탕의 `derived` 식을 자기 `derived` 에 그대로 다시 적는다 — 그래야 정적 값 = 식의 값을 시험이 보고(`TestDerivedTokensMatchStatic`), 그 테마를 `extends` 한 테마가 색을 바꾸면 지원 엔진에서 파생 색이 따라간다. 빠지면 `TestBuiltinDerivedKeptFromBase` 가 실패한다.
 
 값은 `page/compat.go` 의 `evalRelColor`(OKLab 계산 — WebKit 이 그린 값과 같다, 내장 8개 실측)로 구한다. 패키지 안에서만 부를 수 있어 일회용 시험 파일을 잠깐 넣어 돌리고, 확인 뒤 지운다.
 

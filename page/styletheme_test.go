@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
+// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37 · verdant itda-doc#35)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
 // 그 바탕 4.5:1(contrast 는 7:1 — 무드의 목표. 보장은 아래 쌍에 적은 조합까지), 차트 계열은 흰 바탕 3:1 이다. 조합은 테마마다 실제로 쓰는 것만 적는다(theme.css 와 base.css 의 어휘 규칙).
 // contrast 의 차트 6~8번(Okabe-Ito 주황·하늘·노랑)은 3:1 에 못 미쳐 이 기준에서 빼고, 대신 그 면을 두르는 테두리 색(--ink)이 3:1 인지 본다 —
 // 테두리가 실제로 그려지는지는 배치와 같이 PNG 로 확인한다.
@@ -53,6 +53,24 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--code-num", "--code-bg"}, {"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"},
 			{"--code-title-fg", "--paper"},
 		}, chartEdged: map[int]bool{6: true, 7: true, 8: true}},
+		// verdant(spine 바탕): 숲색 --accent 면은 표 머리(결재란 머리는 투명이라 빼고)와 맨 구역 장이고, 잎색 --highlight 는 꼬리표 면(「제 n 장」·슬라이드 제목 번호·맨 구역 장 번호)과
+		// 절 번호·목차 번호 글자에 함께 쓴다. 차트 칸 안 값은 base 의 흰 글자(--chart-on)라 계열 색과의 직접 대비를 본다(테두리 보정 전).
+		// 숲색 면(표 머리·맨 구역 장 제목) 안 code 의 상자(흰색 16% + 숲색 = 5.65:1)와 mark·kbd 안 code 상자는 합성 색이라 여기 넣지 않았다 — 계산과 PNG 로 확인한다.
+		// 그 면 안 규칙(theme.css 의 선택자 목록)이 실제로 그 요소에 걸리는지는 이 시험이 묶지 못한다 — 브라우저 계산값·PNG 로 확인한다.
+		"verdant": {min: 4.5, pairs: []pair{
+			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--highlight", "--paper"}, // 절·목차 번호 글자, --accent 는 숲색 면 안 kbd(흰 바탕)의 링크도
+			{"--link", "--paper"}, {"--link", "--link-hover-bg"},
+			{"--alert-note", "--paper"}, {"--alert-tip", "--paper"}, {"--alert-important", "--paper"},
+			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, // 알림 면(9% 섞음) 위 값은 보고서에 따로
+			{"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, // decisions 면과 ✔, 표지 정보 표 머리
+			{"--ink", "--highlight-soft"}, {"--accent", "--highlight-soft"}, // 요약문·result 면과 「결과」
+			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"}, {"--ink", "--box-bg"},
+			{"--accent-ink", "--accent"},    // 숲색 면(표 머리·steps 번호 원·맨 구역 장 제목과 그 바닥글) 위 흰 글자·링크·각주(--link 재정의), 면 안 del
+			{"--accent-ink", "--highlight"}, // 잎색 꼬리표 위 흰 글자(theme.css)
+			{"--ink", "@base-mark"},         // 숲색 면 안 mark: 노랑 바탕 위 먹 글자·링크(theme.css)
+			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
+			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
+		}},
 	}
 	ts := builtin(t)
 	for name, c := range cases {
@@ -60,7 +78,7 @@ func TestStyleThemeContrast(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s 가 없음", name)
 		}
-		vals := map[string]string{"--paper": "#ffffff", "--accent-ink": "#ffffff", "@base-mark": baseMarkBg(t)} // base.css 기본값(테마가 주지 않으면)
+		vals := map[string]string{"--paper": "#ffffff", "--accent-ink": "#ffffff", "--chart-on": "#ffffff", "@base-mark": baseMarkBg(t)} // base.css 기본값(테마가 주지 않으면)
 		for _, kv := range th.Tokens {
 			vals[kv[0]] = kv[1]
 		}
