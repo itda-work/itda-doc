@@ -320,6 +320,41 @@
     return apply;
   }
 
+  // fontGate 는 쪽·슬라이드를 나누기 전의 글꼴 기다림을 만든다(itda-doc#62). fonts 는 document.fonts, deps 는 setTimer(f, ms)·late()다. fonts.ready 만으로는
+  // 모자란다 — 본문을 넣기 전에는 받는 글꼴이 없어 곧바로 풀린다. 그래서 선언된 face 를 load 한다. 끝남은 성공과 실패를 함께 뜻한다. 돌려주는 것:
+  //  - wait(): 끝나지 않은 face 를 받기 시작하고, 끝나면(남은 face 가 없으면 fonts.ready 까지) 풀린다. ms 를 넘기면 그대로 풀린다. 이미 끝났으면 타이머 없이 풀린다.
+  //    behind() 가 적어 둔 face 는 기다리지 않는다 — 끝나지 않는 글꼴이 다시 그릴 때마다 ms 씩 늦추지 않게. 새 face 가 섞이면 새 face 만 기다린다.
+  //  - behind(): 지금 끝나지 않은 face 가 있으면 true 다. 그 face 를 적어 두고, 하나씩 도착할 때마다 late() 를 예약한다. 몰린 도착은 FONT_GATHER 안에서 한 번으로 합친다.
+  //    실패한 face 는 나눔을 바꾸지 않으므로 late() 를 부르지 않는다.
+  const FONT_GATHER = 100;
+  function fontGate(fonts, ms, deps) {
+    const open = () => [...fonts].filter(f => f.status !== "loaded" && f.status !== "error");
+    const overdue = new WeakSet();
+    let gathering = false;
+    const arrived = () => {
+      if (gathering) return;
+      gathering = true;
+      deps.setTimer(() => { gathering = false; deps.late(); }, FONT_GATHER);
+    };
+    return {
+      wait() {
+        const fresh = open().filter(f => !overdue.has(f));
+        // 적어 둔 face 가 남아 있으면 fonts.ready 는 풀리지 않는다 — 그때는 ready 를 보지 않는다
+        const all = Promise.allSettled(fresh.map(f => f.load())).then(() => open().length ? null : fonts.ready).catch(() => {});
+        return fresh.length ? Promise.race([all, new Promise(r => deps.setTimer(r, ms))]) : all;
+      },
+      behind() {
+        const left = open();
+        for (const f of left) {
+          if (overdue.has(f)) continue;
+          overdue.add(f);
+          f.load().then(arrived, () => {});
+        }
+        return left.length > 0;
+      },
+    };
+  }
+
   // syncer 는 view.json 다시 받기다(refresh — 처음·hello·version·연결 복구). deps:
   //   fetch() → Promise<{status, view, missing}>(view 는 200·문서 부재일 때만, missing 은 문서 부재), current()(지금 그린 view 또는 null), pageKey()(이 페이지가 넣은 테마
   //   CSS 의 키 — 아직 없으면 ""), apply(v)(view 를 바꾸고 그린다 — Promise), gate(reloadGate), ended(), end(reason)(공유 끝),
@@ -924,7 +959,7 @@
   }
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
-  window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
+  window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
@@ -950,7 +985,9 @@
     // 지금 화면에 걸린 표 정렬 지정(itda-hyve#349 2단계 — 이 화면만). 없으면 null
     tableSort: null,
     // 첫 view 를 받았는가(firstView)·폴더의 문서 목록({docs, rev, truncated}, 폴더 공유가 아니면 null)·첫 그리기 뒤 옮겨 갈 #제목
-    seen: false, files: null, hash: "" };
+    seen: false, files: null, hash: "",
+    // 지금 화면이 끝나지 않은 글꼴을 빼고 나뉘었는가(fontsLate 가 글꼴이 온 뒤 다시 그린다)
+    fontStale: false };
   const NOTE_W = 320, NOTE_GAP = 20, NOTE_NARROW = 520;
   // nav 는 폴더 공유의 주소 쪽 일이다(원천이 api.nav 로 넘긴다 — 폴더 공유가 아니면 null). firstView 는 첫 view 로 한 번 정하는 것이다 — 처음 보기 꼴, 폴더 공유면 주소의 #제목.
   let nav = null;
@@ -1011,6 +1048,14 @@
       Promise.all(imgs.map(im => im.complete ? null : new Promise(r => { im.addEventListener("load", r, { once: true }); im.addEventListener("error", r, { once: true }); }))),
       new Promise(r => setTimeout(r, ms)),
     ]);
+  }
+
+  const fontWait = fontGate(document.fonts, 5000, { setTimer: (f, ms) => setTimeout(f, ms), late: () => fontsLate() });
+  // fontsLate 는 지금 화면이 도착한 글꼴을 빼고 나뉘었으면 다시 나눈다. render 는 시작할 때 fontStale 을 내리고 나누기 직전에야 올리므로 도는 중에는 할 일이 없다 —
+  // 그 글꼴은 도는 render 가 나눌 때 쓴다(draw 의 「한 번 더」 로 표 정렬이 풀리지 않는다). 공유가 끝났으면 draw 가 그리지 않는다. 내용이 바뀐 그리기가 아니므로 표 정렬은
+  // 잇고, viewer.scrollTop 수치는 render 가 되돌린다 — 다시 나눈 뒤 같은 내용이 보인다는 뜻은 아니다.
+  function fontsLate() {
+    if (state.fontStale) draw(state.tableSort);
   }
 
   function lookClasses(el, look) {
@@ -1085,6 +1130,7 @@
   async function render(v, sort) {
     if (state.ended) return;
     ytStop(); // 다시 그리면 플레이어가 놓인 쪽도 새로 만든다
+    state.fontStale = false; // 이 그리기가 글꼴을 다시 본다 — 그동안 도착한 글꼴로 다시 그릴 일이 없다(fontsLate)
     if (!v.error && !(await applyTheme(v))) return; // 다시 불러오는 중
     if (state.ended) return;
     $("load-err").hidden = !v.error && !state.themeFailed;
@@ -1102,7 +1148,7 @@
     document.body.classList.toggle("list-gaejosik", lists.includes("gaejosik"));
     document.body.classList.toggle("list-gongmun", lists.includes("gongmun"));
     document.documentElement.lang = v.lang || "ko";
-    await document.fonts.ready;
+    await fontWait.wait(); // 테마 CSS(applyTheme)가 선언한 face 까지 본다
     if (state.ended) return;
     const sv = v.slides || {}, bv = v.board || {};
     state.look = lookFor(v, window.innerWidth, state.chosen);
@@ -1119,6 +1165,7 @@
     hook("flow", flow); // 확장: 나누기 전 흐름(쪽·슬라이드 나눔이 쪼개거나 옮기기 전)
     await imagesSettled(flow, 5000);
     if (state.ended) { stage.textContent = ""; return; }
+    state.fontStale = fontWait.behind(); // 여기부터 render 끝까지 await 가 없다 — 이 판단과 나누기 사이에 글꼴이 끼어들지 않는다
     const target = document.createElement("div");
     target.className = "pages-inner";
     stage.appendChild(target);
