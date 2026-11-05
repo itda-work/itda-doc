@@ -3,7 +3,7 @@
 // 갱신 스트림(<base>/events, SSE)은 hello·reload·version·kick·stop 을 받는다: hello·version(파일 저장)은 지금 판·테마를 싣고, 제 view 와
 // 다르면 view.json 을 다시 받아 테마가 같으면 제자리에서 다시 그리고 다르면 화면을 다시 불러온다(syncer). reload(호스트가 테마를 바꿈·
 // 다른 이름으로 저장)면 화면을 처음부터 다시 불러오고, stop 이면 「공유가 끝났습니다」, kick(이 화면을 끊음)이면 「이 화면의 공유가
-// 끝났습니다」 로 바꾸고 더 요청하지 않는다. 스트림이 끊기면(폰 Safari 가 뒤로 갔다 오면 끊긴다) 공유가 살아 있는지 본 뒤
+// 끝났습니다」 로 바꾸고 더 요청하지 않는다. 스트림이 끊기면(폰 Safari 가 뒤로 갔다 오면 끊긴다) 지금 문서(와 폴더면 목록)를 다시 받아 상태를 본 뒤
 // 1·2·4…30초 간격으로 다시 붙는다. 테마 CSS 는 화면을 불러올 때 한 번 받는다(정책 D — themeApplier).
 // 편집·저장·테마 바꾸기·링크 열기 바인딩은 없다. 보기 꼴은 슬라이드 문서면 슬라이드, 아니면 좁은 화면(768px 이하)은 이어보기, 넓으면 쪽.
 // ③ 발표자 따라가기: slide 이벤트(hello 에도 slide·slide_total·follow)로 호스트의 발표 슬라이드를 받아, 따라가기가 켜져 있고 이 화면이
@@ -46,6 +46,14 @@
 // 받는지(원천)를 가른다. body 에 data-base 가 있으면(공유 화면 — share.html) 원천은 hostSource(view.json·SSE syncer·follower 에 넘길 이벤트·
 // 끝남·kick·테마 CSS link·다시 불러오기) 하나로 정해지고 다른 것으로 바꿀 수 없다. data-base 가 없으면 share.js 보다 먼저 실행된 스크립트가 둔
 // window.ItdaViewSource 를 쓴다(web/viewer 의 wasm 원천). 둘 다 없으면 화면을 시작하지 않는다(pickSource). 원천의 꼴은 hostSource 머리 주석.
+// 처음 보기 꼴(itda-hyve#673): view.json 에 look(doc·flow·slides)이 오면 처음 한 번 chosen 으로 쓴다(initialLook). 보는 사람이 단추로 바꾸면 그쪽이 이긴다.
+// 필드가 없으면 지금처럼 폭으로 고른다.
+// 폴더 공유(itda-hyve#673): view.json 에 doc(폴더 안 상대 경로)이 올 때만 <base>/files.json 을 받아 사이드바 목차 위에 파일 목록을 그린다(mountFiles — share.html 에
+// 자리가 없고 여기서 만든다). 필드가 없으면(단일 파일·문서 창·뷰어) 요청도 DOM 도 지금과 같다. 문서를 고르면 ?doc= 주소로 화면을 처음부터 불러온다 — 뒤로 가기·새 로고침이
+// 통하고, 문서별 테마 CSS·메모 식별값이 그 화면의 것이 된다. 고른 보기 꼴만 이 탭의 sessionStorage 로 옮긴다. 문서 안 상대 링크는 목록에 있으면 그 문서로(docLink), 없으면
+// 지금처럼 열지 않는다. 갱신 스트림의 files(hello 에는 files_rev)가 오면 목록을 다시 받는다. 세션이 있는데 문서만 없으면 서버가 표시 머리(docMissing)를 단 404 에 오류 view 를
+// 담아 준다 — 공유 끝이 아니므로 오류 view 를 그리고 파일 목록을 남긴다. 표시가 없는 404 는 지금처럼 공유 끝이다. 그 문서의 스트림은 404 라 files 가 오지 않으므로, 다시 붙기를
+// 기다리는 동안의 재동기화(viewState·resync)가 목록을 잇고 문서가 돌아오면 본문을 되살린다.
 (function () {
   "use strict";
 
@@ -73,6 +81,84 @@
     return width <= NARROW ? "flow" : "doc";
   }
 
+  // initialLook 은 첫 view 로 정하는 chosen 이다: 이미 정해졌으면(발표자 따라가기) 그대로, 아니면 이 탭에서 사람이 고른 꼴(stored), 없으면 서버의 look. 아는 꼴이
+  // 아니면 ""(폭으로 고른다 — lookFor).
+  function initialLook(chosen, stored, look) {
+    if (chosen) return chosen;
+    for (const x of [stored, look]) if (x === "doc" || x === "flow" || x === "slides") return x;
+    return "";
+  }
+
+  // docLink 는 문서 cur(폴더 안 상대 경로) 안의 상대 링크 href 를 푼다: 목록 docs 에 있는 문서면 {doc, hash}, 아니면 null(폴더 밖·절대·스킴·풀 수 없는 % 꼴·목록에 없는 파일).
+  // 글자 꼴(NFC·NFD — macOS 파일 이름)이 달라도 같은 문서로 본다. doc 은 목록의 글자 그대로다.
+  function docLink(href, cur, docs) {
+    const m = /^([^?#]*)(?:\?[^#]*)?(#.*)?$/.exec(String(href));
+    if (!m || !m[1] || m[1][0] === "/" || /^[a-z][a-z0-9+.-]*:/i.test(m[1])) return null;
+    let p;
+    try { p = decodeURIComponent(m[1]); } catch (e) { return null; }
+    const parts = String(cur || "").split("/").slice(0, -1);
+    for (const seg of p.split("/")) {
+      if (seg === "" || seg === ".") continue;
+      if (seg === "..") { if (!parts.length) return null; parts.pop(); continue; }
+      parts.push(seg);
+    }
+    const want = parts.join("/").normalize("NFC");
+    const doc = (docs || []).find(d => d.normalize("NFC") === want);
+    return doc === undefined ? null : { doc, hash: m[2] || "" };
+  }
+
+  // fileTreeHTML 은 문서 목록(슬래시 상대 경로)을 폴더별로 묶은 HTML 이다 — ul > li > a[href="?doc=…"], 폴더는 li > span.dir + ul. 글자·경로는 이스케이프한다.
+  // cur 인 문서에 class on·aria-current 를 단다.
+  function fileTreeHTML(docs, cur) {
+    const root = { dirs: new Map(), files: [] };
+    for (const d of docs) {
+      const parts = d.split("/");
+      let n = root;
+      for (const p of parts.slice(0, -1)) {
+        if (!n.dirs.has(p)) n.dirs.set(p, { dirs: new Map(), files: [] });
+        n = n.dirs.get(p);
+      }
+      n.files.push({ name: parts[parts.length - 1], doc: d });
+    }
+    const list = n => {
+      let h = "<ul>";
+      for (const f of n.files) {
+        const on = f.doc === cur ? ' class="on" aria-current="page"' : "";
+        h += '<li><a href="?doc=' + esc(encodeURIComponent(f.doc)) + '"' + on + ">" + esc(f.name) + "</a></li>";
+      }
+      for (const [name, sub] of n.dirs) h += '<li><span class="dir">' + esc(name) + "</span>" + list(sub) + "</li>";
+      return h + "</ul>";
+    };
+    return list(root);
+  }
+
+  // mountFiles 는 사이드바 맨 위의 파일 목록을 data({docs, truncated})로 그린다. data 가 없으면 있던 목록을 떼고 아무것도 만들지 않는다 — 단일 파일·문서 창의 사이드바는 그대로다.
+  function mountFiles(doc, sidebar, data, cur) {
+    const old = sidebar.querySelector("#side-files");
+    if (!data || !Array.isArray(data.docs)) { if (old) old.remove(); return null; }
+    const box = old || doc.createElement("section");
+    if (!old) {
+      box.id = "side-files";
+      box.setAttribute("aria-label", "문서 목록");
+      sidebar.insertBefore(box, sidebar.firstChild);
+    }
+    box.innerHTML = '<div class="side-title">문서</div><nav>' + fileTreeHTML(data.docs, cur) + "</nav>" +
+      (data.truncated ? '<p class="files-more">폴더가 커서 목록 일부만 보입니다</p>' : "");
+    return box;
+  }
+
+  // docMissing 은 폴더 공유의 문서 부재 응답인가다(공유·세션은 살아 있다). 표시가 없는 404 는 공유 끝이다.
+  function docMissing(r) {
+    return r.status === 404 && !!r.headers && r.headers.get("X-Share-Doc") === "missing";
+  }
+
+  // viewState 는 view 응답 하나({status, missing})가 말하는 상태다 — 공유 생존과 문서 가용성을 가른다: "alive"(살아 있음)·"missing"(문서 없음 — 공유는 살아 있다)·
+  // "ended"(끝남)·"kicked"(끝남 — 이 화면을 끊음). 그 밖의 실패(429·5xx)는 공유가 끝났다는 말이 아니라 "alive" 다.
+  function viewState(r) {
+    if (r.missing) return "missing";
+    return r.status === 403 ? "kicked" : r.status === 404 ? "ended" : "alive";
+  }
+
   // backoff 는 n 번째(0부터) 다시 붙기 전의 대기다(ms) — 1·2·4·8·16·30·30…초.
   function backoff(n) { return Math.min(30000, 1000 * Math.pow(2, n)); }
 
@@ -80,9 +166,9 @@
   function parseData(e) { try { return JSON.parse(e && e.data) || {}; } catch (err) { return {}; } }
 
   // connect 는 갱신 스트림의 상태 기계다. 상태: connecting → open(hello) → waiting(끊김, 다시 붙기 전) → … / ended(stop·kick·공유 없음).
-  // deps: EventSource, probe()(공유가 살아 있으면 true, 404 면 false, 403(이 화면을 끊음)이면 "kicked"), setTimeout·clearTimeout,
+  // deps: EventSource, probe()(끊긴 뒤 부른다 — viewState 의 값을 돌려준다. "alive"·"missing" 이면 다시 붙고 "ended"·"kicked" 면 끝낸다), setTimeout·clearTimeout,
   // onHello(first, data), onReload(), onVersion(data), onSlide(data — {index, total, look, follow}), onPos(data — {block, frac, total, follow}, ⑧),
-  // onEnded(reason — kick·403 은 "kicked").
+  // onFiles()(폴더의 문서 목록이 바뀜 — 없어도 된다), onEnded(reason — kick·403 은 "kicked").
   function connect(base, deps) {
     const c = { state: "connecting", tries: 0, es: null, timer: 0, hellos: 0 };
     function end(reason) {
@@ -120,6 +206,10 @@
         if (c.es !== es || c.state === "ended" || !deps.onPos) return;
         deps.onPos(parseData(e));
       });
+      es.addEventListener("files", () => {
+        if (c.es !== es || c.state === "ended" || !deps.onFiles) return;
+        deps.onFiles();
+      });
       es.addEventListener("kick", () => {
         if (c.es !== es) return;
         end("kicked");
@@ -135,10 +225,10 @@
         es.close();
         c.es = null;
         c.state = "waiting";
-        Promise.resolve(deps.probe()).then(alive => {
+        Promise.resolve(deps.probe()).then(st => {
           if (c.state !== "waiting" || c.es) return;
-          if (alive === "kicked") { end("kicked"); return; }
-          if (!alive) { end(""); return; }
+          if (st === "kicked") { end("kicked"); return; }
+          if (st === "ended") { end(""); return; }
           c.timer = deps.setTimeout(open, backoff(c.tries++));
         });
       };
@@ -230,8 +320,8 @@
     return apply;
   }
 
-  // syncer 는 view.json 다시 받기다(refresh — 처음·hello·version·다시 붙음). deps:
-  //   fetch() → Promise<{status, view}>(view 는 200 일 때만), current()(지금 그린 view 또는 null), pageKey()(이 페이지가 넣은 테마
+  // syncer 는 view.json 다시 받기다(refresh — 처음·hello·version·연결 복구). deps:
+  //   fetch() → Promise<{status, view, missing}>(view 는 200·문서 부재일 때만, missing 은 문서 부재), current()(지금 그린 view 또는 null), pageKey()(이 페이지가 넣은 테마
   //   CSS 의 키 — 아직 없으면 ""), apply(v)(view 를 바꾸고 그린다 — Promise), gate(reloadGate), ended(), end(reason)(공유 끝),
   //   failed()(「문서를 받지 못했습니다」), setTimeout·clearTimeout.
   //  - 세대 번호: refresh 마다 하나씩 올리고, 응답이 왔을 때 더 뒤에 시작한 refresh 가 있으면 그 응답을 버린다 — 늦게 온 옛 응답이
@@ -239,7 +329,9 @@
   //  - 받은 view 의 판·테마 키가 지금 것과 같으면(force 가 아니면) 그리지 않는다. 테마 키가 이 페이지의 테마와 다르면 그리지 않고
   //    다시 불러온다(gate.server() — 서버가 알린 변경이라 reload 이벤트와 같은 길: 2초 보호 + 지연 한 번. CSS 실패용 once 의 10초
   //    보호는 쓰지 않는다 — 10초 안에 테마를 두 번 바꿔 저장해도 멈추지 않게), 같으면 제자리에서 다시 그린다.
-  //  - 404 면 공유 끝, 403 이면 이 화면을 끊음, 429 면 1·2·4…30초 뒤 다시(backoff), 그 밖의 실패는 안내.
+  //  - 404 면 공유 끝, 403 이면 이 화면을 끊음, 429 면 1·2·4…30초 뒤 다시(backoff), 그 밖의 실패는 안내. 문서 부재는 받은 오류 view 를 그린다.
+  //  - refresh 는 받은 응답의 상태(viewState)를 돌려준다. 망 실패는 "alive" 다.
+  //  - recovering(연결 복구 — hostSource resync): 받은 view 를 그리는 것은 같되 안내·끝내기·429 재시도는 하지 않고 상태만 돌려준다 — 끝내기와 다음 시도는 connect 의 몫이다.
   //  - check(data): hello·version 의 data({version, theme, theme_rev})가 지금 view 와 다르면 refresh. 같으면 아무것도 하지 않는다.
   function syncer(deps) {
     let gen = 0, tries = 0, timer = 0;
@@ -247,27 +339,28 @@
       const v = deps.current();
       return !v || !d || v.version !== d.version || themeKey(v) !== themeKey(d);
     }
-    async function refresh(force) {
-      if (deps.ended()) return false;
+    async function refresh(force, recovering) {
+      if (deps.ended()) return "ended";
       const my = ++gen;
       if (timer) { deps.clearTimeout(timer); timer = 0; }
       let r;
       try { r = await deps.fetch(); } catch (e) {
-        if (my === gen && !deps.ended()) deps.failed();
-        return false;
+        if (!recovering && my === gen && !deps.ended()) deps.failed();
+        return "alive";
       }
-      if (my !== gen || deps.ended()) return false; // 더 뒤의 refresh 가 있다 — 이 응답은 버린다
-      if (r.status === 404) { deps.end(""); return false; }
-      if (r.status === 403) { deps.end("kicked"); return false; }
-      if (r.status === 429) { timer = deps.setTimeout(() => { timer = 0; refresh(force); }, backoff(tries++)); return false; }
-      if (!r.view) { deps.failed(); return false; }
+      if (deps.ended()) return "ended";
+      const st = viewState(r);
+      if (my !== gen) return st; // 더 뒤의 refresh 가 있다 — 이 응답은 그리지 않는다
+      if (st === "ended" || st === "kicked") { if (!recovering) deps.end(st === "kicked" ? "kicked" : ""); return st; }
+      if (r.status === 429) { if (!recovering) timer = deps.setTimeout(() => { timer = 0; refresh(force); }, backoff(tries++)); return st; }
+      if (!r.view) { if (!recovering) deps.failed(); return st; }
       tries = 0;
       const v = r.view;
-      if (!force && !differs(v)) return false;
+      if (!force && !differs(v)) return st;
       const key = deps.pageKey();
-      if (key && !v.error && themeKey(v) !== key) { deps.gate.server(); return false; }
+      if (key && !v.error && themeKey(v) !== key) { deps.gate.server(); return st; }
       await deps.apply(v);
-      return true;
+      return st;
     }
     return {
       refresh,
@@ -720,7 +813,8 @@
   //  - attach(api) 는 화면이 시작할 때 한 번(첫 그리기 전) 부른다. api 는 화면 부품이다: $(id), ended()(공유가 끝남), current()(지금
   //    view 또는 null), show(v)(view 를 바꾸고 그린다 — Promise), redraw()(끝나지 않았고 view 가 있으면 다시 그림), look(name)(보기 꼴을
   //    골라 다시 그림 — Promise), failed(msg)(안내 줄), themeFailed()(「테마를 불러오지 못했습니다」), end(reason)(끝난 화면),
-  //    hello(d)·slide(d)·pos(d)(발표자 따라가기 — follower), toast(msg).
+  //    hello(d)·slide(d)·pos(d)(발표자 따라가기 — follower), toast(msg), files(d)(폴더의 문서 목록 {docs, rev, truncated})·
+  //    nav(n)(폴더 공유의 주소 쪽 일 { look(), setLook(look), hash(), open(doc, hash) } — 첫 show 전에 한 번). 뒤의 둘은 hostSource 만 부른다.
   //  - applyTheme(v): render 가 그리기 전에 부른다(오류 view 는 부르지 않는다). true(또는 Promise<true>)면 그리고, false 면 그리지 않는다.
   //  - start(): 화면 준비가 끝난 뒤 한 번 — 첫 view 를 받아 show 한다. stop(): 끝난 화면(showEnded)이 부른다 — 타이머·요청을 거둔다.
   function hostSource(base, w) {
@@ -742,18 +836,38 @@
           reload: why => gate.once(why), // CSS error 만
           changed: () => gate.server(),
         });
-        // fetchView 는 view.json 의 {status, view} 다(view 는 200 일 때만).
+        // fetchView 는 view.json 의 {status, view, missing} 이다. view 는 200 이거나 문서 부재(docMissing — 서버가 오류 view 를 담아 준다)일 때만 있다.
         async function fetchView() {
           const r = await w.fetch(base + "/view.json", { cache: "no-store", credentials: "same-origin" });
-          return { status: r.status, view: r.ok ? await r.json() : null };
+          const missing = docMissing(r);
+          return { status: r.status, missing, view: r.ok || missing ? await r.json() : null };
         }
+        // 폴더 공유: view 에 doc 이 올 때만 목록을 받는다 — 그 밖의 공유는 files.json 요청 자체가 없다
+        let filesOn = false, filesRev;
+        const loadFiles = () => w.fetch(base + "/files.json", { cache: "no-store", credentials: "same-origin" })
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d && !api.ended()) { filesRev = d.rev; api.files(d); } }, () => { /* 다음 알림·다시 붙기에서 다시 받는다 */ });
         let conn = null;
         // sync 는 view.json 다시 받기다(syncer — 처음·hello·version·다시 붙음). 공유가 끝난 뒤에는 요청하지 않는다.
         const sync = syncer({
           fetch: fetchView,
           current: () => api.current(),
           pageKey: () => applyTheme.key(),
-          apply: v => api.show(v),
+          apply: v => {
+            if (v.doc && !filesOn) {
+              filesOn = true;
+              // 고른 보기 꼴은 이 탭의 sessionStorage 로 문서를 옮겨도 잇는다(경로에 토큰이 있어 공유마다 따로)
+              const lookKey = "hs-look:" + w.location.pathname;
+              api.nav({
+                look() { try { return w.sessionStorage.getItem(lookKey) || ""; } catch (e) { return ""; } },
+                setLook(look) { try { w.sessionStorage.setItem(lookKey, look); } catch (e) { /* 이 화면에서만 */ } },
+                hash: () => w.location.hash,
+                open: (doc, hash) => w.location.assign("?doc=" + encodeURIComponent(doc) + hash),
+              });
+              loadFiles();
+            }
+            return api.show(v);
+          },
           gate,
           ended: () => api.ended(),
           end: reason => conn.end(reason),
@@ -761,17 +875,28 @@
           setTimeout: (f, ms) => w.setTimeout(f, ms),
           clearTimeout: t => w.clearTimeout(t),
         });
+        // resync 는 연결 복구의 한 절차다 — 스트림이 끊길 때마다(문서 없음이면 backoff 재시도마다) 지금 문서의 view 와 폴더면 목록을 다시 받아 맞추고 상태를 돌려준다. 받은 view 가
+        // 곧 생존 판정이라 따로 묻지 않는다. 폴더 공유가 아니면 filesOn 이 거짓이라 목록 요청이 없다.
+        const resync = async () => {
+          const st = await sync.refresh(false, true);
+          if (filesOn && (st === "alive" || st === "missing")) await loadFiles();
+          return st;
+        };
         return {
           applyTheme,
           start() {
             conn = connect(base, {
               EventSource: w.EventSource,
-              probe: () => w.fetch(base + "/view.json", { method: "HEAD", cache: "no-store", credentials: "same-origin" })
-                .then(r => r.status === 403 ? "kicked" : r.status !== 404, () => true),
+              probe: resync,
               setTimeout: (f, ms) => w.setTimeout(f, ms),
               clearTimeout: t => w.clearTimeout(t),
               // 처음이든 다시 붙었든 hello 의 판·테마가 제 view 와 다르면 다시 받는다 — 첫 구독 전·끊긴 사이의 저장을 따라잡는다
-              onHello: (first, data) => { api.hello(data); sync.check(data); },
+              onHello: (first, data) => {
+                api.hello(data);
+                sync.check(data);
+                if (filesOn && data.files_rev !== undefined && data.files_rev !== filesRev) loadFiles(); // 목록을 받은 뒤·복구의 목록 요청이 실패한 뒤의 변경
+              },
+              onFiles: () => { if (filesOn) loadFiles(); },
               onReload: () => gate.server(),
               onVersion: data => sync.check(data),
               onSlide: data => api.slide(data),
@@ -801,7 +926,7 @@
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK,
-    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate,
+    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
@@ -823,8 +948,18 @@
     // 발표자 노트(itda-hyve#344): 받은 view 의 슬라이드마다 노트(slideNotes — 원문 자리의 장, slides.js build itda-hyve#518)·노트가 하나라도 있는지(hasNotes)·지금 그린 배치(notesLayout)
     slideNotes: [], hasNotes: false, notesLayout: "off",
     // 지금 화면에 걸린 표 정렬 지정(itda-hyve#349 2단계 — 이 화면만). 없으면 null
-    tableSort: null };
+    tableSort: null,
+    // 첫 view 를 받았는가(firstView)·폴더의 문서 목록({docs, rev, truncated}, 폴더 공유가 아니면 null)·첫 그리기 뒤 옮겨 갈 #제목
+    seen: false, files: null, hash: "" };
   const NOTE_W = 320, NOTE_GAP = 20, NOTE_NARROW = 520;
+  // nav 는 폴더 공유의 주소 쪽 일이다(원천이 api.nav 로 넘긴다 — 폴더 공유가 아니면 null). firstView 는 첫 view 로 한 번 정하는 것이다 — 처음 보기 꼴, 폴더 공유면 주소의 #제목.
+  let nav = null;
+  function firstView(v) {
+    if (state.seen) return;
+    state.seen = true;
+    state.chosen = initialLook(state.chosen, nav ? nav.look() : "", v.look);
+    if (nav) state.hash = nav.hash();
+  }
   const np = notePrefs(() => window.localStorage, window.ItdaSlides.NOTE_FONTS);
 
   // ext 는 확장이 돌려준 훅이다(시작할 때 window.ItdaShareExt — 옛 이름 HyveShareExt — 가 돌려준 것 — 그 전에는 비어 있다). 훅이 던지면 콘솔에만 남기고 그리기 길을 이어 간다 — 확장 탓에
@@ -850,7 +985,7 @@
     $,
     ended: () => state.ended,
     current: () => state.view,
-    show: v => { state.view = v; return draw(); },
+    show: v => { firstView(v); state.view = v; return draw(); },
     redraw: () => { if (!state.ended && state.view) draw(); },
     look: name => { state.chosen = name; return draw(); },
     failed: msg => { $("load-err").hidden = false; $("load-err").textContent = msg; },
@@ -865,6 +1000,8 @@
     slide: d => { fol.onSlide(d); zoomCheck(); },
     pos: d => fol.onPos(d),
     toast: msg => toast(msg),
+    files: d => { state.files = d; paintFiles(); },
+    nav: n => { nav = n; },
   });
   const applyTheme = v => linked.applyTheme(v);
 
@@ -1042,6 +1179,7 @@
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac); // 따라가는 중이면 읽던 자리 대신 발표자의 슬라이드·내용 위치로
     else viewer.scrollTop = top;
     hook("drawn"); // 확장: 새 본문을 다 그렸다
+    if (state.hash) { const h = state.hash; state.hash = ""; jumper.jump(h, false); } // 다른 문서의 #제목 링크로 왔다
     paintTocOn();
   }
 
@@ -1118,12 +1256,19 @@
     $("side-toc").innerHTML = html; // 글자는 tocHTML 이 이스케이프한다
     tocIds = html ? tocIDs(v.toc) : [];
     if (!tocIds.includes(jumper.pin)) jumper.clear();
+    paintFiles();
+  }
+
+  // paintFiles 는 폴더의 파일 목록을 그린다(폴더 공유가 아니면 아무것도 만들지 않는다). 제목이 없는 문서면 「목차」 머리만 숨긴다.
+  function paintFiles() {
+    mountFiles(document, $("sidebar"), state.files, state.view && state.view.doc);
+    if (state.files) $("sidebar").querySelector(":scope > .side-title").hidden = !tocIds.length;
     paintTocPanel();
   }
 
   // paintTocPanel 은 목차 단추·사이드바·서랍 가림막을 tocLayout 대로 둔다. 공유가 끝났으면 숨긴다.
   function paintTocPanel() {
-    const l = tocLayout(tocIds.length > 0 && !state.ended, toc);
+    const l = tocLayout((tocIds.length > 0 || !!state.files) && !state.ended, toc);
     $("btn-toc").hidden = l.hidden;
     $("sidebar").hidden = l.hidden;
     $("toc-back").hidden = !l.back;
@@ -1274,6 +1419,8 @@
     tocIds = [];
     jumper.clear();
     $("side-toc").textContent = "";
+    state.files = null;
+    mountFiles(document, $("sidebar"), null);
     paintTocPanel();
     $("load-err").hidden = true;
     hook("ended"); // 확장: 끝난 화면(자기 칸을 숨기고 끝난 카드의 자리를 채운다)
@@ -1323,6 +1470,7 @@
   function onClick(e) {
     const a = e.target.closest && e.target.closest("a[href], a[data-local-href]");
     if (!a) return;
+    if (a.closest("#side-files")) return; // 파일 목록 — 브라우저가 ?doc= 주소로 옮긴다
     const inToc = $("sidebar").contains(a);
     if (!inToc && !$("viewer").contains(a)) return;
     const href = a.getAttribute("href") || "";
@@ -1338,6 +1486,12 @@
       return;
     }
     e.preventDefault();
+    const to = state.files && state.view ? docLink(href, state.view.doc, state.files.docs) : null; // 폴더 안 문서 링크
+    if (to) {
+      if (to.doc !== state.view.doc) nav.open(to.doc, to.hash);
+      else if (to.hash) { jumper.jump(to.hash, false); scheduleTocOn(); }
+      return;
+    }
     toast(source.linkMsg || "문서 안의 파일 링크는 공유 화면에서 열지 않습니다");
   }
 
@@ -1345,7 +1499,11 @@
   for (const b of document.querySelectorAll("[data-note-font]")) b.addEventListener("click", () => stepNoteFont(Number(b.dataset.noteFont)));
   applyNoteFont();
   for (const b of document.querySelectorAll("[data-look]")) {
-    b.addEventListener("click", () => { state.chosen = b.dataset.look; if (state.look !== state.chosen) draw(); });
+    b.addEventListener("click", () => {
+      state.chosen = b.dataset.look;
+      if (nav) nav.setLook(state.chosen); // 폴더 공유 — 다음 문서에도 이 꼴로
+      if (state.look !== state.chosen) draw();
+    });
   }
   document.addEventListener("click", onClick);
   // 보는 사람이 직접 움직이면 따라가기가 이 화면에서 잠시 풀린다 — 휠·터치·넘기는 키·굴림 막대(보기 영역 자체를 누름). 따라가기가 굴린

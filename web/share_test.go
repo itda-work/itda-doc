@@ -265,3 +265,226 @@ func TestShareBoardUnavailable(t *testing.T) {
 		t.Fatalf("보드를 그릴 수 없는 화면: %v\n%s", err, out)
 	}
 }
+
+// 처음 보기 꼴(itda-hyve#673): 필드가 없으면 chosen 은 비어 지금처럼 폭으로 고르고, look 은 처음 값일 뿐이라 이미 고른 꼴(따라가기·이 탭에서 사람이 고른 꼴)이 이긴다.
+// 폴더 공유: 상대 링크 풀기(docLink)·목록 그리기(fileTreeHTML)·목록이 없으면 사이드바를 건드리지 않음(mountFiles).
+func TestShareFolderParts(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  eq("필드 없음", S.initialLook("", "", undefined), "");
+  eq("서버 값", S.initialLook("", "", "flow"), "flow");
+  eq("사람이 고른 꼴", S.initialLook("", "doc", "flow"), "doc");
+  eq("이미 정해짐", S.initialLook("slides", "doc", "flow"), "slides");
+  eq("모르는 값", S.initialLook("", "x", "y"), "");
+  eq("폭으로 고름은 그대로", S.lookFor({}, 500, S.initialLook("", "", undefined)), "flow");
+  eq("look 이 폭을 이김", S.lookFor({}, 500, S.initialLook("", "", "doc")), "doc");
+  const docs = ["README.md", "a/b.md", "a/다른 문서.md", "c.md", "\u1112\u1161\u11ab.md"];
+  eq("같은 폴더", S.docLink("b.md", "a/x.md", docs), { doc: "a/b.md", hash: "" });
+  eq("위 폴더", S.docLink("../c.md#머리", "a/x.md", docs), { doc: "c.md", hash: "#머리" });
+  eq("퍼센트 꼴", S.docLink("%EB%8B%A4%EB%A5%B8%20%EB%AC%B8%EC%84%9C.md", "a/x.md", docs), { doc: "a/다른 문서.md", hash: "" });
+  eq("NFC 링크 → NFD 파일", S.docLink("한.md", "README.md", docs), { doc: "\u1112\u1161\u11ab.md", hash: "" });
+  eq("폴더 밖", S.docLink("../../c.md", "a/x.md", docs), null);
+  eq("뿌리에서 위로", S.docLink("../c.md", "README.md", docs), null);
+  eq("절대", S.docLink("/c.md", "a/x.md", docs), null);
+  eq("스킴", S.docLink("file:///c.md", "a/x.md", docs), null);
+  eq("목록에 없음", S.docLink("없음.md", "a/x.md", docs), null);
+  eq("md 가 아닌 파일", S.docLink("c.pdf", "README.md", docs), null);
+  eq("풀 수 없는 꼴", S.docLink("%E0%A4%A.md", "README.md", docs), null);
+  eq("숨김 경로는 목록에 없다", S.docLink(".git/x.md", "README.md", docs), null);
+  const html = S.fileTreeHTML(["z.md", "d/<b>.md"], "d/<b>.md");
+  eq("이스케이프·현재 문서", html, '<ul><li><a href="?doc=z.md">z.md</a></li><li><span class="dir">d</span><ul><li><a href="?doc=d%2F%3Cb%3E.md" class="on" aria-current="page">&lt;b&gt;.md</a></li></ul></li></ul>');
+  // 목록이 없으면 요소를 만들지도 넣지도 않는다
+  let made = 0, put = 0, gone = 0;
+  const doc = { createElement() { made++; return { setAttribute() {} }; } };
+  const side = { firstChild: null, insertBefore() { put++; }, querySelector() { return null; } };
+  eq("없음", S.mountFiles(doc, side, null), null);
+  eq("빈 응답", S.mountFiles(doc, side, {}), null);
+  eq("DOM 그대로", [made, put], [0, 0]);
+  S.mountFiles(doc, { firstChild: null, insertBefore() { put++; }, querySelector() { return { remove() { gone++; } }; } }, null);
+  eq("끝나면 뗀다", gone, 1);
+  eq("있으면 넣는다", S.mountFiles(doc, side, { docs: ["a.md"] }, "a.md").id, "side-files");
+  eq("하나", [made, put], [1, 1]);
+  // 목록 요청은 view 에 doc 이 있을 때만 — 단일 파일·문서 창은 files.json 을 부르지 않는다
+  const run = async (view) => {
+    const urls = []; let files = null, shown = 0, handlers = {}, nav = 0;
+    const w = { sessionStorage: {}, location: {}, setTimeout: () => 0, clearTimeout() {}, addEventListener() {}, document: { addEventListener() {} },
+      fetch: async (u) => { urls.push(u); return { ok: true, status: 200, json: async () => u.endsWith("files.json") ? { docs: ["a.md"], rev: 1 } : view }; },
+      EventSource: class { constructor() {} addEventListener(n, f) { handlers[n] = f; } close() {} } };
+    const link = { addEventListener() {}, setAttribute() {} };
+    const api = { $: () => link, ended: () => false, current: () => null, show: async () => { shown++; }, failed() {}, themeFailed() {}, end() {}, hello() {}, slide() {}, pos() {}, redraw() {}, files: d => { files = d; }, nav: () => { nav++; } };
+    S.hostSource("/b", w).attach(api).start();
+    await new Promise(r => setImmediate(r));
+    await new Promise(r => setImmediate(r));
+    return { urls, files, shown, handlers, nav };
+  };
+  (async () => {
+    const one = await run({ version: 1, theme: "t", html: "" });
+    eq("단일: 요청", one.urls, ["/b/view.json"]);
+    eq("단일: 목록 없음", [one.files, one.nav], [null, 0]);
+    const many = await run({ version: 1, theme: "t", html: "", doc: "a.md" });
+    eq("폴더: 요청", many.urls, ["/b/view.json", "/b/files.json"]);
+    eq("폴더: 목록", [many.files && many.files.docs, many.nav], [["a.md"], 1]);
+    many.handlers.files({});
+    await new Promise(r => setImmediate(r));
+    await new Promise(r => setImmediate(r));
+    eq("files 알림이면 다시 받음", many.urls.length, 3);
+    // 문서 부재(표시 머리가 든 404)는 공유 끝이 아니다 — 오류 view 를 그리고 목록을 받는다. 표시가 없는 404 는 지금처럼 공유 끝
+    const gone = async (head) => {
+      const urls = []; let ended = 0, shown = null, files = null, timers = 0, es = null;
+      const reply = { ok: false, status: 404, headers: { get: n => n === "X-Share-Doc" ? head : null }, json: async () => ({ version: 2, theme: "", error: "문서를 읽지 못했습니다", doc: "a.md" }) };
+      const w = { sessionStorage: {}, location: {}, setTimeout: () => { timers++; return 1; }, clearTimeout() {}, addEventListener() {}, document: { addEventListener() {} },
+        fetch: async (u) => { urls.push(u); return u.endsWith("files.json") ? { ok: true, status: 200, json: async () => ({ docs: ["b.md"], rev: 1 }) } : reply; },
+        EventSource: class { constructor() { es = this; } addEventListener() {} close() {} } };
+      const link = { addEventListener() {}, setAttribute() {} };
+      const api = { $: () => link, ended: () => ended > 0, current: () => null, show: async v => { shown = v; }, failed() {}, themeFailed() {}, end() { ended++; }, hello() {}, slide() {}, pos() {}, redraw() {}, files: d => { files = d; }, nav() {} };
+      S.hostSource("/b", w).attach(api).start();
+      for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r));
+      const first = ended;
+      if (es && es.onerror) es.onerror(); // 스트림이 끊겨 살아 있나 묻는다
+      for (let i = 0; i < 6; i++) await new Promise(r => setImmediate(r));
+      return { first, ended, shown, files, timers };
+    };
+    const miss = await gone("missing");
+    eq("부재: 끝나지 않음", [miss.first, miss.ended], [0, 0]);
+    eq("부재: 오류 view", miss.shown && miss.shown.error, "문서를 읽지 못했습니다");
+    eq("부재: 목록 남음", miss.files && miss.files.docs, ["b.md"]);
+    eq("부재: 다시 붙기", miss.timers, 1);
+    const over = await gone(null);
+    eq("표시 없는 404 는 공유 끝", [over.first > 0, over.shown, over.files], [true, null, null]);
+    eq("머리 없는 응답", S.docMissing({ status: 404 }), false);
+    eq("200 은 부재가 아님", S.docMissing({ status: 200, headers: { get: () => "missing" } }), false);
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "FOLDER OK");
+  })();
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "FOLDER OK" {
+		t.Fatalf("폴더 공유 부품: %v\n%s", err, out)
+	}
+}
+
+// 연결 복구는 공유 생존과 문서 가용성을 가른다: 끊길 때마다 지금 문서의 view 와 폴더면 목록을 다시 받고(resync), 문서 없음이면 오류 view 와 최신 목록을, 표시 없는 404·403 이면 끝남을
+// 보인다. 문서 없음이면 스트림이 404 라 알림이 오지 않으므로 backoff 재시도가 목록과 본문을 잇는다. 단일 파일은 같은 절차에서 목록을 건드리지 않는다.
+func TestShareFolderRecovery(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  // page 는 가짜 서버(srv)에 이어진 한 화면이다. srv.mode: ok·missing·gone(표시 없는 404)·kicked(403)·down(망 실패)
+  const page = async (srv) => {
+    const p = { reqs: [], streams: [], timers: [], ended: [], fails: 0, cur: null, shows: 0, files: null, nav: null, assigned: [] };
+    const reply = (status, head, body) => ({ ok: status === 200, status, headers: { get: n => n === "X-Share-Doc" ? head : null }, json: async () => body });
+    const w = { sessionStorage: {}, addEventListener() {}, document: { addEventListener() {} },
+      location: { pathname: "/b", hash: "", assign: u => p.assigned.push(u) },
+      setTimeout: f => { p.timers.push({ f, off: false }); return p.timers.length; },
+      clearTimeout: id => { if (id && p.timers[id - 1]) p.timers[id - 1].off = true; },
+      fetch: async (u, o) => {
+        p.reqs.push(((o && o.method) || "GET") + " " + u);
+        if (srv.mode === "down") throw new Error("망");
+        if (srv.mode === "gone") return reply(404, null, null);
+        if (srv.mode === "kicked") return reply(403, null, null);
+        if (u.endsWith("files.json")) return reply(200, null, { docs: srv.docs, rev: srv.rev });
+        if (srv.mode === "missing") return reply(404, "missing", { version: ++srv.stamp, theme: "", error: "문서를 읽지 못했습니다", doc: srv.doc });
+        return reply(200, null, { version: srv.version, theme: "t", html: srv.html, doc: srv.doc });
+      },
+      EventSource: class { constructor(u) { this.u = u; this.on = {}; p.streams.push(this); } addEventListener(n, f) { this.on[n] = f; } close() { this.closed = true; } } };
+    const link = { addEventListener() {}, setAttribute() {} };
+    const api = { $: () => link, ended: () => p.ended.length > 0, current: () => p.cur, show: async v => { p.cur = v; p.shows++; }, failed() { p.fails++; }, themeFailed() {},
+      end(r) { p.ended.push(r); }, hello() {}, slide() {}, pos() {}, redraw() {}, files: d => { p.files = d.docs; }, nav: n => { p.nav = n; } };
+    S.hostSource("/b", w).attach(api).start();
+    await settle();
+    p.drop = async () => { p.reqs.length = 0; p.streams[p.streams.length - 1].onerror(); await settle(); };
+    p.retry = async () => { const t = p.timers.filter(x => !x.off).pop(); t.off = true; p.reqs.length = 0; t.f(); await settle(); };
+    p.hello = async d => { p.streams[p.streams.length - 1].on.hello({ data: JSON.stringify(d) }); await settle(); };
+    return p;
+  };
+  const folder = () => ({ mode: "ok", version: 1, stamp: 100, html: "OLD CONTENT", doc: "a.md", docs: ["a.md", "b.md"], rev: 1 });
+  const VIEW = "GET /b/view.json", FILES = "GET /b/files.json";
+  (async () => {
+    eq("상태: 표시", S.viewState({ status: 404, missing: true }), "missing");
+    eq("상태: 표시 없는 404", S.viewState({ status: 404, missing: false }), "ended");
+    eq("상태: 403", S.viewState({ status: 403 }), "kicked");
+    eq("상태: 429 는 끝이 아니다", S.viewState({ status: 429 }), "alive");
+
+    // 정상 → 끊김 → 문서 없음 복구
+    let srv = folder(), p = await page(srv);
+    eq("정상: 본문", p.cur.html, "OLD CONTENT");
+    srv.mode = "missing"; srv.docs = ["b.md"]; srv.rev = 2;
+    await p.drop();
+    eq("복구: 요청", p.reqs, [VIEW, FILES]);
+    eq("복구: 옛 본문이 남지 않음", [p.cur.error, p.cur.html], ["문서를 읽지 못했습니다", undefined]);
+    eq("복구: 최신 목록", p.files, ["b.md"]);
+    eq("복구: 끝나지 않고 다시 붙기를 기다림", [p.ended, p.timers.filter(x => !x.off).length, p.fails], [[], 1, 0]);
+
+    // 문서 없음 → 목록 변경 반영(스트림은 404 — 재시도가 잇는다)
+    srv.docs = ["b.md", "c.md"]; srv.rev = 3;
+    await p.retry();
+    eq("문서 없음: 스트림을 다시 엶", p.streams[p.streams.length - 1].u, "/b/events");
+    await p.drop();
+    eq("문서 없음: 재시도의 요청", p.reqs, [VIEW, FILES]);
+    eq("문서 없음: 목록 따라옴", p.files, ["b.md", "c.md"]);
+
+    // 문서 없음 → 문서 복귀
+    srv.mode = "ok"; srv.version = 5; srv.html = "NEW CONTENT"; srv.docs = ["a.md", "b.md", "c.md"]; srv.rev = 4;
+    await p.retry();
+    await p.drop();
+    eq("복귀: 본문", [p.cur.error, p.cur.html], [undefined, "NEW CONTENT"]);
+    eq("복귀: 목록", p.files, ["a.md", "b.md", "c.md"]);
+    await p.retry();
+    await p.hello({ version: 5, theme: "t", files_rev: 4 });
+    eq("복귀: 스트림이 붙은 뒤 더 묻지 않음", [p.reqs, p.ended], [[], []]);
+
+    // 판이 같은 복구는 다시 그리지 않는다
+    const shows = p.shows;
+    await p.drop();
+    eq("같은 판: 그리지 않음", p.shows, shows);
+    eq("같은 판: 동기화는 함", p.reqs, [VIEW, FILES]);
+
+    // 문서 없음 → 다른 문서 선택: 화면을 새로 불러 정상 스트림으로 돌아간다
+    srv = folder(); p = await page(srv);
+    srv.mode = "missing"; await p.drop();
+    p.nav.open("b.md", "");
+    eq("다른 문서: 주소", p.assigned, ["?doc=b.md"]);
+    srv = folder(); srv.doc = "b.md"; p = await page(srv);
+    await p.hello({ version: 1, theme: "t", files_rev: 1 });
+    eq("다른 문서: 정상 스트림", [p.cur.doc, p.cur.error, p.reqs, p.timers.length], ["b.md", undefined, [VIEW, FILES], 0]);
+
+    // 끊김 뒤 표시 없는 404·403 은 끝남 — 그 뒤 목록 요청도, 다시 붙기도 없다
+    srv = folder(); p = await page(srv);
+    srv.mode = "gone"; await p.drop();
+    eq("표시 없는 404: 끝남", [p.ended, p.reqs, p.timers.length], [[""], [VIEW], 0]);
+    srv = folder(); p = await page(srv);
+    srv.mode = "kicked"; await p.drop();
+    eq("403: 끊김", [p.ended, p.reqs, p.timers.length], [["kicked"], [VIEW], 0]);
+
+    // 망 실패는 끝이 아니다 — 안내 없이 다시 붙는다(본문을 지우지 않는다)
+    srv = folder(); p = await page(srv);
+    srv.mode = "down"; await p.drop();
+    eq("망 실패", [p.ended, p.fails, p.timers.filter(x => !x.off).length, p.cur.html], [[], 0, 1, "OLD CONTENT"]);
+
+    // 단일 파일: 같은 절차, 목록 요청 없음. 끝남도 그대로
+    srv = folder(); srv.doc = undefined; p = await page(srv);
+    eq("단일: 처음", p.reqs, [VIEW]);
+    srv.version = 2; srv.html = "SAVED";
+    await p.drop();
+    eq("단일: 복구 요청", p.reqs, [VIEW]);
+    eq("단일: 본문·목록", [p.cur.html, p.files, p.nav], ["SAVED", null, null]);
+    srv.mode = "gone"; await p.retry(); await p.drop();
+    eq("단일: 표시 없는 404 는 끝남", [p.ended, p.reqs], [[""], [VIEW]]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "RECOVERY OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "RECOVERY OK" {
+		t.Fatalf("연결 복구: %v\n%s", err, out)
+	}
+}

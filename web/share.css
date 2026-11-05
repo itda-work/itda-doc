@@ -30,6 +30,16 @@
 .share-view .main { position: relative; }
 .share-view #side-toc a.on { font-weight: 600; }
 body.toc-drawer .sidebar { position: absolute; top: 0; bottom: 0; left: 0; z-index: 16; width: min(300px, 84vw); box-shadow: 4px 0 18px rgba(0, 0, 0, .22); }
+/* 폴더 공유의 파일 목록(itda-hyve#673): share.js mountFiles 가 사이드바 맨 위에 만든다 — 단일 파일·문서 창에는 없다 */
+#side-files { margin-bottom: 14px; }
+#side-files ul { list-style: none; margin: 0; padding: 0; }
+#side-files ul ul { padding-left: 12px; }
+#side-files a, #side-files .dir { display: block; padding: 5px 8px; border-radius: 6px; font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; }
+#side-files a { color: var(--ui-text); text-decoration: none; }
+#side-files a:hover { background: var(--ui-hover); }
+#side-files a.on { background: var(--ui-active); color: var(--ui-accent); font-weight: 600; }
+#side-files .dir { color: var(--ui-muted); }
+#side-files .files-more { margin: 6px 8px 0; font-size: 12px; color: var(--ui-muted); }
 .toc-back { position: absolute; inset: 0; z-index: 15; background: rgba(0, 0, 0, .28); }
 body.toc-drawer #side-toc a { padding: 8px 8px; font-size: 14px; }
 @media (max-width: 600px) {
