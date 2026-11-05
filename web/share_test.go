@@ -488,3 +488,259 @@ func TestShareFolderRecovery(t *testing.T) {
 		t.Fatalf("연결 복구: %v\n%s", err, out)
 	}
 }
+
+// 글꼴을 받은 뒤 나누기(itda-doc#62): share.js 의 render·draw·fontWait·fontsLate 정의를 그대로 떼어 node 로 돌린다. 화면 부품은 가짜(이름을 모르면 빈 함수)이고
+// 나누기는 ItdaSlides.build 호출로 센다. 글꼴·타이머는 시험이 손으로 끝낸다.
+func TestShareFontsBeforeSplit(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	cut := func(head, tail string) string {
+		a := strings.Index(src, head)
+		if a < 0 {
+			t.Fatalf("share.js 에서 %q 를 찾지 못함", head)
+		}
+		z := strings.Index(src[a:], tail)
+		if z < 0 {
+			t.Fatalf("share.js 에서 %q 의 끝을 찾지 못함", head)
+		}
+		return src[a : a+z+len(tail)]
+	}
+	decl := cut("  const fontWait = fontGate(", ";\n") + cut("  function fontsLate() {", "\n  }\n") +
+		cut("  async function render(v, sort) {", "\n  }\n") + cut("  async function draw(sort) {", "\n  }\n")
+	node := needNode(t)
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(process.env.SRC, ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  const noop = () => {};
+  // face 는 끝나지 않은 글꼴이다. arrive·fail 로 끝낸다. load 를 부르기 전에는 끝낼 수 없다 — load 를 안 하면 글꼴은 오지 않는다
+  const face = (log, name, status) => {
+    const f = { status: status || "unloaded", loads: 0 };
+    const p = new Promise((ok, no) => { f.arrive = () => { f.status = "loaded"; ok(f); }; f.fail = () => { f.status = "error"; no(new Error("404")); }; });
+    p.catch(noop);
+    f.load = () => { f.loads++; log.push("load " + name); return p; };
+    return f;
+  };
+  // el 은 어떤 메서드를 불러도 되는 가짜 요소다
+  const element = () => new Proxy({ querySelectorAll: () => [], querySelector: () => null, firstChild: null, childElementCount: 0, scrollTop: 0, textContent: "", style: {}, dataset: {} }, {
+    get: (t, k) => k in t ? t[k] : k === "classList" || k === "style" ? { toggle: noop, add: noop, remove: noop, setProperty: noop, removeProperty: noop } : noop,
+    set: (t, k, val) => { t[k] = val; return true; },
+  });
+  const load = new Function("env", "with (env) { " + process.env.DECL + " return { render, draw, fontsLate }; }");
+  function rig(faces) {
+    const log = [], r = { log, timers: [], builds: [], sorts: [], ticks: 0, imgs: null };
+    r.faces = faces(log);
+    const set = r.faces; set.ready = Promise.resolve();
+    const el = element();
+    r.state = { view: null, look: "", chosen: "", ratio: "16:9", ended: false, rendering: null, again: false, slideNotes: [], hasNotes: false, tableSort: null, fontStale: false };
+    const env = { state: r.state, fontGate: S.fontGate, applyTheme: async () => true, $: () => el, docTitle: () => "", app: "", source: {}, fol: { active: () => false },
+      findHeading: { refresh: noop }, jumper: { jump: noop }, TableSort: { mark: noop, apply: (f, sort) => { r.sorts.push(sort); return true; } }, CodeLines: null, CodeCopy: null, boardZoom: null, hook: name => { if (name === "tick") r.ticks++; }, imagesSettled: () => r.imgs ? r.imgs.done : null,
+      lookFor: (v, w, chosen) => v.look || chosen || "slides",
+      document: { fonts: set, title: "", body: el, documentElement: el, createElement: () => element(), createDocumentFragment: () => element(), querySelectorAll: () => [] },
+      setTimeout: (f, ms) => { r.timers.push({ f, ms }); return r.timers.length; },
+      window: { innerWidth: 1200, ItdaPager: { numberBlocks: noop, prepareTOC: noop, adoptWidths: () => { r.builds.push("flow"); log.push("build"); }, paginate: (f, t, o) => { r.builds.push("page"); log.push("build"); } },
+        ItdaSlides: { SIZE: { "16:9": [960, 540], "4:3": [960, 720] }, placeNotes: noop, build: () => { r.builds.push("slides"); log.push("build"); return {}; } },
+        ItdaBoard: { build: () => { r.builds.push("board"); log.push("build"); } } } };
+    const scope = new Proxy(env, { has: () => true, get: (t, k) => k === Symbol.unscopables ? undefined : k in t ? t[k] : k in globalThis ? globalThis[k] : noop });
+    Object.assign(r, load(scope));
+    r.show = v => { r.state.view = v; return r.draw(); };
+    r.expire = async () => { r.timers.splice(0).forEach(t => t.f()); await settle(); };
+    r.holdImages = () => { let open; r.imgs = { done: new Promise(ok => { open = ok; }) }; r.imgs.open = () => { open(); r.imgs = null; }; };
+    return r;
+  }
+  const v = { html: "" };
+  (async () => {
+    // build 전에 모든 face 의 load 가 끝난다 — 안 쓰는 face 까지
+    let r = rig(l => [face(l, "본문"), face(l, "테마")]);
+    r.show(v); await settle();
+    eq("끝나기 전에는 나누지 않음", r.builds, []);
+    eq("모든 face 를 받기 시작", r.faces.map(f => f.loads), [1, 1]);
+    eq("상한", r.timers.map(t => t.ms), [5000]);
+    r.faces[0].arrive(); await settle();
+    eq("하나만 왔을 때", r.builds, []);
+    r.faces[1].arrive(); await settle();
+    eq("다 오면 나눔", r.log, ["load 본문", "load 테마", "build"]);
+    await r.expire();
+    eq("끝난 뒤 지난 타이머는 할 일이 없음", r.builds.length, 1);
+    r.fontsLate(); await settle();
+    eq("끝난 뒤에는 다시 그리지 않음", r.builds.length, 1);
+
+    // 쪽·보드·이어보기도 같다 — 기다린 뒤 그리고, 상한을 넘기면 도착 뒤 다시 그린다(이어보기는 adoptWidths 로 센다)
+    for (const [look, kind] of [["doc", "page"], ["dashboard", "board"], ["flow", "flow"]]) {
+      r = rig(l => [face(l, "본문")]);
+      r.show({ html: "", look }); await settle();
+      eq(look + ": 기다림", r.builds, []);
+      r.faces[0].arrive(); await settle();
+      eq(look + ": 나눔", r.builds, [kind]);
+      r = rig(l => [face(l, "본문")]);
+      r.show({ html: "", look }); await settle(); await r.expire();
+      eq(look + ": 상한 뒤 먼저 그림", r.builds, [kind]);
+      r.faces[0].arrive(); await settle(); await r.expire();
+      eq(look + ": 도착 뒤 다시 그림", r.builds, [kind, kind]);
+    }
+
+    // fonts.ready 가 남아 있으면 끝날 때까지 기다린다
+    r = rig(l => [face(l, "본문")]);
+    let readyOK;
+    r.faces.ready = new Promise(ok => { readyOK = ok; });
+    r.show(v); await settle();
+    r.faces[0].arrive(); await settle();
+    eq("ready 전", r.builds, []);
+    readyOK(); await settle();
+    eq("ready 뒤", r.builds, ["slides"]);
+
+    // 실패한 face 는 막지 않는다
+    r = rig(l => [face(l, "깨짐"), face(l, "본문")]);
+    r.show(v); await settle();
+    r.faces[0].fail(); r.faces[1].arrive(); await settle();
+    eq("reject 된 face 가 있어도 진행", r.builds, ["slides"]);
+    eq("reject 뒤 다시 그리지 않음", [r.state.fontStale, r.timers.filter(t => t.ms !== 5000)], [false, []]);
+
+    // 이미 끝난 글꼴은 지연이 없다 — 타이머도 없다
+    r = rig(l => [face(l, "본문", "loaded"), face(l, "깨짐", "error")]);
+    r.faces[0].arrive(); r.faces[1].fail();
+    await r.show(v);
+    eq("끝난 글꼴: 바로 나눔", [r.builds, r.timers.length], [["slides"], 0]);
+
+    // 상한을 넘기면 먼저 그리고, 도착하면 한 번만 다시 그린다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle();
+    await r.expire();
+    eq("상한 뒤 먼저 그림", r.builds.length, 1);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("도착 뒤 한 번 다시 그림", r.builds.length, 2);
+    eq("다시 그린 뒤 표시 없음", [r.state.fontStale, r.timers.length], [false, 0]);
+    r.fontsLate(); await settle();
+    eq("두 번 다시 그리지 않음", r.builds.length, 2);
+
+    // 하나가 끝나지 않아도 도착한 face 마다 다시 나눈다
+    r = rig(l => [face(l, "본문"), face(l, "제목"), face(l, "안 끝남")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("끝나지 않는 face 가 있어도 다시 나눔", r.builds.length, 2);
+    eq("다시 나눈 뒤 남은 face 를 기다리지 않음", r.timers.length, 0);
+    r.faces[1].arrive(); await settle(); await r.expire();
+    eq("다시 그린 뒤 도착한 face 로 또 나눔", r.builds.length, 3);
+    eq("끝나지 않는 face 를 또 받지 않음", r.faces[2].loads, 2);
+
+    // 몰려 도착하면 합친다
+    r = rig(l => [face(l, "가"), face(l, "나"), face(l, "다"), face(l, "안 끝남")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].arrive(); r.faces[1].arrive(); await settle();
+    r.faces[2].arrive(); await settle();
+    eq("합치는 동안 그리지 않음", [r.builds.length, r.timers.length], [1, 1]);
+    await r.expire();
+    eq("몰린 도착은 한 번", r.builds.length, 2);
+
+    // 도착이 실패면 나눔이 바뀌지 않는다
+    r = rig(l => [face(l, "깨짐")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].fail(); await settle(); await r.expire();
+    eq("상한 뒤 실패는 다시 그리지 않음", r.builds.length, 1);
+
+    // 상한을 넘긴 글꼴은 다음 그리기를 또 늦추지 않고, 여러 번 그려도 도착 뒤 한 번만 다시 그린다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    await r.draw();
+    eq("상한을 넘긴 face 는 또 기다리지 않음", [r.builds.length, r.timers.length], [2, 0]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("여러 번 그렸어도 도착 뒤 한 번", r.builds.length, 3);
+
+    // 새 face(늦은 테마 CSS)는 그 face 만 기다린다
+    r = rig(l => [face(l, "안 끝남")]);
+    r.faces.ready = new Promise(noop); // 끝나지 않는 face 가 있는 동안 브라우저의 ready 는 풀리지 않는다
+    r.show(v); await settle(); await r.expire();
+    r.faces.push(face(r.log, "테마"));
+    r.draw(); await settle();
+    eq("새 face 를 기다림", [r.builds.length, r.timers.map(t => t.ms)], [1, [5000]]);
+    eq("새 face 를 받기 시작", r.faces[1].loads, 1);
+    r.faces[1].arrive(); await settle();
+    eq("새 face 가 오면 상한을 또 쓰지 않고 나눔", r.builds.length, 2);
+    await r.expire();
+    eq("새 face 로 나눴으니 다시 그리지 않음", r.builds.length, 2);
+
+    // 나누는 동안 처음 나타난 face 도 도착하면 다시 나눈다
+    r = rig(l => []);
+    r.holdImages();
+    r.show(v); await settle();
+    r.faces.push(face(r.log, "늦은 선언"));
+    r.imgs.open(); await settle();
+    eq("늦은 선언: 먼저 그림", [r.builds.length, r.faces[0].loads], [1, 1]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("늦은 선언: 도착 뒤 다시 그림", r.builds.length, 2);
+
+    // 렌더 도중 도착: 나누기 전이면 그 렌더가 글꼴을 쓴다 — 추가 렌더도, 정렬 풀림도 없다
+    r = rig(l => [face(l, "본문")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.holdImages();
+    const sorting = r.draw({ col: 1 }); await settle();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    r.imgs.open(); await sorting; await settle(); await r.expire();
+    eq("렌더 도중 도착: 정렬", [r.sorts, r.state.tableSort], [[{ col: 1 }], { col: 1 }]);
+    eq("렌더 도중 도착: 추가 렌더 없음", [r.builds.length, r.state.again, r.state.fontStale], [2, false, false]);
+
+    // 렌더 도중 일부만 왔으면 다음 도착이 정렬을 이어 다시 나눈다
+    r = rig(l => [face(l, "본문"), face(l, "제목")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.holdImages();
+    const part = r.draw({ col: 2 }); await settle();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    r.imgs.open(); await part; await settle();
+    eq("일부 도착: 표시 남음", [r.builds.length, r.state.fontStale], [2, true]);
+    r.faces[1].arrive(); await settle(); await r.expire();
+    eq("일부 도착: 정렬 이음", [r.builds.length, r.sorts, r.state.tableSort], [3, [{ col: 2 }, { col: 2 }], { col: 2 }]);
+
+    // 공유가 끝났으면 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.state.ended = true;
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("끝난 공유", r.builds.length, 1);
+
+    // 문서가 바뀌어 새 그리기가 글꼴을 받고 나눴으면 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces.push(face(r.log, "새 문서"));
+    r.show({ html: "새 판" }); await settle();
+    r.faces[1].arrive(); r.faces[0].arrive(); await settle(); await r.expire();
+    eq("바뀐 문서", r.builds.length, 2);
+
+    // 오류 view 로 바뀌었으면 글꼴이 와도 그 화면을 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.show({ error: "문서 없음" }); await settle();
+    eq("오류 view 그림", [r.builds.length, r.ticks], [1, 1]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("오류 view 를 다시 그리지 않음", [r.builds.length, r.ticks], [1, 1]);
+
+    // 바뀐 문서도 대체 글꼴로 나눴으면 그 문서를 다시 나눈다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.show({ html: "새 판" }); await settle();
+    eq("바뀐 문서 먼저 그림", r.builds.length, 2);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("바뀐 문서를 한 번 다시 나눔", r.builds.length, 3);
+
+    // 다시 그려도 사람이 고른 표 정렬은 잇는다
+    r = rig(l => [face(l, "본문")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.state.tableSort = { col: 1 };
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("다시 그린 뒤 표 정렬", [r.sorts, r.state.tableSort], [[{ col: 1 }], { col: 1 }]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "FONTS OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "FONTS OK" {
+		t.Fatalf("글꼴을 받은 뒤 나누기: %v\n%s", err, out)
+	}
+}
