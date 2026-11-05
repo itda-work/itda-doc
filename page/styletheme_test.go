@@ -184,3 +184,26 @@ func TestBoldFootContrast(t *testing.T) {
 		t.Error("맨 구역 장 바닥글·쪽 번호가 면 위 글자색이 아님")
 	}
 }
+
+// 구역 장 바닥글은 바탕 위에 놓이고(강조색 띠는 바닥글 줄 위에서 끊긴다) 작은 글자 4.5:1 이상이다(#38).
+func TestClassicSectionFootContrast(t *testing.T) {
+	th, ok := builtin(t).Get("classic")
+	if !ok {
+		t.Fatal("classic 없음")
+	}
+	for _, want := range []string{
+		".slide-deco.k-section::before { top: 0; bottom: var(--slide-pad-bottom);",
+		".slide-deco.k-section::after { left: 24%; top: 0; bottom: var(--slide-pad-bottom);",
+	} {
+		if !strings.Contains(th.CSS, want) {
+			t.Errorf("classic CSS 에 %q 가 없음 — 띠가 바닥글 줄까지 내려오면 작은 글자가 면에 묻힌다", want)
+		}
+	}
+	vals := map[string]string{"--paper": "#ffffff"} // base.css 기본값
+	for _, kv := range th.Tokens {
+		vals[kv[0]] = kv[1]
+	}
+	if r := contrastRatio(strings.ToLower(vals["--muted"]), vals["--paper"]); r < 4.5 {
+		t.Errorf("--muted on --paper = %.2f:1 — 4.5:1 이상이어야 함", r)
+	}
+}
