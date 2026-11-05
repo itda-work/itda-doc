@@ -272,6 +272,25 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   eq("다시 그림: 떨어진 뒤 굴림(fit)도 열린 상태를 버린다", z.current(), null);
 }
 
+// YouTube 플레이어(호스트 부품)가 다른 타일에 있으면 크게 보기를 열 때 멈춘다 — 가려진 타일에서 소리만 남지 않게. 그 타일 안이면 그대로
+{
+  let stops = 0;
+  GRID.appendChild(A); // 위 다시 그리기 시험이 떼어 둔 타일
+  WIN.ItdaYT = { stop() { stops++; } };
+  const box = bA.appendChild(new El("span", "yt-play"));
+  click(hA.children[0]);
+  eq("YouTube: 재생 타일을 크게 보면 멈추지 않는다", [z.current() === A, stops], [true, 0]);
+  key("Escape");
+  click(hB.children[0]);
+  eq("YouTube: 다른 타일을 크게 보면 멈춘다", [z.current() === B, stops], [true, 1]);
+  key("Escape");
+  box.remove();
+  click(hA.children[0]);
+  eq("YouTube: 플레이어가 없으면 부르지 않는다", stops, 1);
+  key("Escape");
+  delete WIN.ItdaYT;
+}
+
 // ---- 빌드(build): 판 없이 한 장 — 구역 줄·줄 나눔·머리 제목은 groups·pack 을 지나 격자 자리로 나타난다
 {
   ctx.window.ItdaSlides = { SIZE: { "16:9": [1280, 720], "4:3": [960, 720] } };

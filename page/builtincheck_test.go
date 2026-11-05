@@ -199,7 +199,7 @@ func TestBaseBoardSelectorShape(t *testing.T) {
 	}
 }
 
-// 내장 테마 다섯의 보드 격자 규칙은 .page-body.board-grid 로 시작한다 — .board-grid .tile 꼴은 base 에 져서 보드 절이 죽는다.
+// 내장 테마의 보드 격자 규칙은(extends 로 물려받은 것 포함) .page-body.board-grid 로 시작한다 — .board-grid .tile 꼴은 base 에 져서 보드 절이 죽는다.
 // 이 어휘가 쪽 문서 규칙에 우연히 쓰여도 같은 검사로 드러난다. 이 시험도 꼴 검사다 — 렌더가 아니다(Chrome 실측, WebKit 미검증).
 func TestBuiltinThemeBoardSelectorShape(t *testing.T) {
 	ts := builtin(t)

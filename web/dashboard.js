@@ -327,6 +327,9 @@
     function open(tile) {
       if (o.blocked && o.blocked()) return false;
       if (cur) shut(false);
+      // 재생 중 YouTube 플레이어(호스트 부품)가 다른 타일에 있으면 그 타일이 가려져 소리만 남는다 — 멈춘다. 이 타일 안이면 그대로 크게 본다
+      const yt = win.ItdaYT || win.HyveYT, player = root.querySelector(".yt-play");
+      if (yt && player && !tile.contains(player)) yt.stop();
       reveal(tile); // 제자리에서 보이게 굴린 뒤 띄운다 — 닫으면 그 타일이 화면에 있다
       cur = tile;
       tile.classList.add("tile-zoomed");
