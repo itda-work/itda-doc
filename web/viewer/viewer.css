@@ -115,6 +115,7 @@ body.look-slides #pages .page { border-radius: 2px; }
   border-radius: 12px; padding: 28px 24px; box-shadow: var(--ui-shadow); }
 .viewer-empty-card h2 { font-size: 18px; margin: 0 0 10px; }
 .viewer-empty-card p { margin: 0; line-height: 1.6; color: var(--ui-muted); }
+.viewer-limits { margin: 14px 0 0; padding: 12px 0 0 18px; border-top: 1px solid var(--ui-line); text-align: left; font-size: 13px; line-height: 1.6; color: var(--ui-muted); }
 body.dropping .viewer { outline: 3px dashed var(--ui-accent); outline-offset: -8px; }
 .warn-panel { position: absolute; top: 8px; right: 8px; z-index: 18; width: min(420px, 92vw); max-height: 60vh; overflow: auto;
   background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 10px; box-shadow: var(--ui-shadow); padding: 8px 12px 12px; }
