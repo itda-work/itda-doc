@@ -234,8 +234,10 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
 .page-body a code { color: var(--ink); }
 .page-body :where(h1, h2, h3, h4, h5, h6) a code { color: inherit; }
 .page-body strong { font-weight: 700; }
-.page-body mark { background: #fff1a8; color: inherit; padding: 0 1pt; }
-.page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--rule); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
+/* mark 글자색·kbd 테두리·del 글자색(아래)·각주 번호 위치는 --mark-ink·--kbd-line·--del-ink·--footnote-align 을 먼저 본다. 평소엔 값이 없어 뒤의 기본값이고,
+   값을 주는 곳은 강조색 면 표 머리뿐이다(아래 회의록·절차 어휘 블록의 .actions th). 까닭은 그 블록의 주석 */
+.page-body mark { background: #fff1a8; color: var(--mark-ink, inherit); padding: 0 1pt; }
+.page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--kbd-line, var(--rule)); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
 .page-body hr { border: 0; border-top: 0.75pt solid var(--rule); margin: 10pt 0; }
 .page-body img { max-width: 100%; max-height: var(--img-max-h, 200mm); }
 /* 본문 그림 테두리: 흰 바탕 스크린샷이 쪽과 섞이지 않게 테마의 가는 선(--rule)을 바탕 쪽으로 옅게 두른다.
@@ -299,7 +301,7 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
 .page-body input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
 .page-body input[type="checkbox"]:checked::after { content: ""; position: absolute; left: 31%; top: 10%; width: 28%; height: 55%;
   border: solid var(--accent-ink); border-width: 0 0.12em 0.12em 0; transform: rotate(45deg); }
-.page-body del { color: var(--muted); }
+.page-body del { color: var(--del-ink, var(--muted)); }
 
 /* 문서 규칙은 쪽 안에만 건다 — 창 틀(빈 창 안내 등)의 제목까지 문서 글꼴을 받으면 글꼴이 오기 전 글자가 안 보였다 */
 .page h1, .page h2, .page h3, .page h4, .page h5, .page h6 { font-family: var(--font-heading); line-height: 1.35; break-after: avoid; }
@@ -651,11 +653,15 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 /* 표 머리 안 인라인 코드: 글자색은 머리 글자색(--table-head-ink, 머리 안 링크면 그 링크 색)을 따르고, 상자는 그 글자색을 옅게 깐다 —
    진한 머리(bold·spine)에서 옅은 --code-bg 위 흰 글자가 되지 않게(itda-doc#19). 특이도 (0,1,2)라 본문 링크 안 코드 규칙
    (.page-body a code)과 같고 뒤에 있어 이긴다. color-mix 를 모르는 엔진은 상자 없이 글자만이다 */
-.page-body th code { color: inherit; background: transparent; }
+.page-body th code { color: inherit; background: var(--head-code-bg, transparent); }
 @supports (color: color-mix(in srgb, black 16%, transparent)) {
-  .page-body th code { background: color-mix(in srgb, currentColor 16%, transparent); }
+  .page-body th code { background: var(--head-code-bg, color-mix(in srgb, currentColor 16%, transparent)); }
 }
 .page-body th pre code { background: none; } /* 머리 칸 안 코드 블록(raw HTML pre)은 pre 상자 하나만 */
+/* 머리 칸 안 kbd·mark 의 각주 번호: sup 과 .footnote-ref 가 함께 올려(브라우저 기본 sup + super) 숫자가 상자 위로 삐져나와 면에 묻힌다 —
+   sup 만 덜 올린다. 머리 칸이면 면 색과 무관하게 같다(각주가 없으면 걸릴 것이 없다) */
+:where(.page-body th :is(kbd, mark)) { --footnote-align: baseline; }
+:where(.page-body th :is(kbd, mark) sup) { vertical-align: 0.3em; line-height: 0; }
 /* 표지·장 슬라이드 큰 제목 안 인라인 코드: 같은 까닭으로 제목 글자색을 따르고 상자는 그 글자색을 옅게 깐다 — 강조색 면 위
    흰 제목(bold·spine 의 표지·내용 없는 장 슬라이드)에서 옅은 --code-bg 위 흰 글자가 되지 않게. 특이도 (0,2,1)이라
    .page-body code·.page-body a code 를 이긴다. 먹색 제목에서는 먹색을 옅게 깐 회색 상자다 */
@@ -773,7 +779,7 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .footnotes ol:where(.ol-d4) { padding-left: 3.24em; } .footnotes ol:where(.ol-d5) { padding-left: 3.9em; }
 .footnotes ol:where(.ol-d6) { padding-left: 4.56em; } .footnotes ol:where(.ol-d7) { padding-left: 5.22em; }
 .footnotes ol:where(.ol-d8) { padding-left: 5.88em; } .footnotes ol:where(.ol-d9) { padding-left: 6.54em; }
-.footnote-ref { font-size: 0.75em; vertical-align: super; line-height: 0; }
+.footnote-ref { font-size: 0.75em; vertical-align: var(--footnote-align, super); line-height: 0; }
 .footnote-backref { display: none; }
 
 /* 목차 — 쪽번호는 쪽 나눔 뒤 화면이 채운다(.toc-pno) */
@@ -903,9 +909,24 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 :where(.decisions) { border-left: 4pt solid var(--accent); background: var(--accent-soft); border-radius: 0 var(--box-radius) var(--box-radius) 0;
   padding: 7pt 11pt max(1pt, calc(7pt - var(--paragraph-gap))); margin: 8pt 0 10pt; }
 :where(.decisions :is(ul, ol)) { padding-left: 0; list-style: none; }
-:where(.decisions li) { position: relative; padding-left: 15pt; font-weight: 600; }
+/* ✔ 자리: 문서 글자 크기(11pt 까지 — 1.35em 이 15pt 를 넘지 않는다)에서는 15pt, 슬라이드처럼 큰 글자에서는 글자에 비례해 ✔ 와 글이 붙지 않는다 */
+:where(.decisions li) { position: relative; padding-left: max(15pt, 1.35em); font-weight: 600; }
 :where(.decisions li)::before { content: "✔"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 800; }
 :where(.actions) { --table-head-bg: var(--accent); --table-head-ink: var(--accent-ink); --table-top-rule: none; margin: 8pt 0 10pt; }
+/* 할 일 표 머리(강조색 면) 안 인라인(itda-doc#41): 면 위에서 읽히게 머리 글자색을 따른다.
+   - 링크·각주·가리킴: currentColor — --table-head-ink 나 --accent-ink 를 박지 않아 compact 처럼 color 를 직접 정한 테마, 어두운 --accent-ink 의
+     kakao, 그리고 mark·kbd 안(그 안 글자색)까지 한 값으로 맞는다. 가리킴은 면을 깔지 않고 밑줄(--link-hover-line)만 굵어진다
+   - code: 투명 바탕 + 글자색 안쪽 테두리. 다른 머리처럼 글자색 16% 를 깔면 빠듯한 면에서 대비가 깨진다(swiss 흰 / #e72e39 4.33:1, 면 그대로면 4.88:1)
+   - mark: 노랑 바탕 고정이라 글자는 먹색, del: --muted 대신 머리 글자색, kbd: 테두리를 글자색으로
+   값만 토큰으로 주고 그 토큰을 기존 규칙(.page-body mark 등)이 읽는다. 어휘 규칙은 특이도 0 이라 color·background 를 직접 정하면
+   .page-body mark (0,1,1)·.page-body th code (0,1,2)를 이기지 못하고, 그 규칙들을 .actions 로 올리면 같은 특이도의 회사 테마 규칙을 이기게 된다.
+   회사 테마는 .page-body mark 같은 제 규칙이나 .actions th 의 같은 토큰으로 덮는다. 단 .actions 에 --link 를 두면 이 규칙이 th 에서 다시 정해 닿지 않는다.
+   결재란 머리(투명 바탕)에는 걸지 않는다. 다른 자리의 진한 표 머리는 테마의 일이다(bold·spine 의 theme.css).
+   code 의 안쪽 테두리만은 box-shadow 를 여기서 선언한다 — base 에 경쟁할 선언이 없고, .page-body th code 에 두면 일반 표·결재란 머리까지 선언이 생겨
+   회사 테마의 .page-body code 장식을 지운다(itda-doc#41 리뷰 1회차). 특이도 0 이라 회사 테마의 box-shadow 규칙이나 .actions th 의 --head-code-line 이 덮는다 */
+:where(.actions th:not(.approval th)) { --link: currentColor; --link-hover-ink: currentColor; --link-hover-bg: transparent; --link-hover-line: currentColor;
+  --mark-ink: var(--ink); --del-ink: currentColor; --kbd-line: currentColor; --head-code-bg: transparent; --head-code-line: inset 0 0 0 0.75pt currentColor; }
+:where(.actions th:not(.approval th) code:not(pre code)) { box-shadow: var(--head-code-line); }
 :where(.steps) { margin: 6pt 0 10pt; }
 :where(.steps > ol) { list-style: none; padding-left: 0; }
 :where(.steps > ol > li) { position: relative; padding: 0 0 5pt 11mm; min-height: 7.4mm; }

@@ -42,7 +42,7 @@
 .decisions { border: 1pt solid var(--accent); border-left-width: 4pt; background: var(--accent-soft); border-radius: 0 3pt 3pt 0; padding: 7pt 11pt 6pt; margin: 8pt 0 10pt; }
 .decisions > :last-child { margin-bottom: 0; }
 .decisions ul, .decisions ol { padding-left: 0; list-style: none; margin: 0; }
-.decisions li { position: relative; padding-left: 15pt; font-weight: 600; margin: 2pt 0; }
+.decisions li { position: relative; padding-left: max(15pt, 1.35em); font-weight: 600; margin: 2pt 0; }
 .decisions li::before { content: "✔"; position: absolute; left: 0; top: 0; color: var(--accent); font-weight: 800; }
 
 /* 할 일 표 — 진한 초록 머리, 담당·기한 칸은 굵게, 첫 칸 앞에 빈 확인 상자 */

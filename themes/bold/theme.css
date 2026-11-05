@@ -78,3 +78,9 @@ nav.toc .toc-section-number { color: var(--accent); font-weight: 800; }
   border-bottom: 1.4mm solid var(--accent-2); }
 .page-body.flow-view .cover-meta { margin-top: 8mm; padding: 0 clamp(16px, 7.5%, 15mm); }
 .page-body.flow-view .cover-bottom { margin-top: 0; padding: 6mm clamp(16px, 7.5%, 15mm) 9mm; }
+
+/* ---- 진한 표 머리 안 링크·각주·인라인(먹 면 #1b1f27): base 가 할 일 표 머리에 주는 것과 같게 머리 글자색을 따른다(web/base.css 의 .actions th 주석).
+   --link 는 이 면 위 3.84:1, mark 는 흰 글자가 상속돼 노랑 위 1.14:1 안팎이다. 표 머리 안 code 는 base 의 글자색 16% 상자 그대로다.
+   결재란 머리는 투명 바탕이라 뺀다. 이 테마를 물려받는 테마의 표 머리가 투명이면 되돌려야 한다(swiss 가 그렇게 한다) */
+:where(.page-body th:not(.approval th)) { --link: currentColor; --link-hover-ink: currentColor; --link-hover-bg: transparent; --link-hover-line: currentColor;
+  --mark-ink: var(--ink); --del-ink: currentColor; }

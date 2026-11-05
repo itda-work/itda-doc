@@ -52,9 +52,12 @@
    바닥글 글자·쪽 번호를 흰색(4.88:1)으로. 이 규칙은 장식이 있는 장에서만 맞는다(배경 그림 장은 장식이 없다 — slides.js) */
 .slide-deco.k-section.bare ~ .slide-foot, .slide-deco.k-section.bare ~ .slide-foot .sf-num { color: #fff; }
 
-/* ---- 빨강 면 안의 링크·각주 번호: --link(--accent-strong)는 빨강 면 위 1.20:1 이라, 빨강 면 안에서만 --link 를 --accent-ink(흰색, 4.88:1)로 바꾼다.
-   링크·각주가 들어갈 수 있는 빨강 면은 둘이다 — 할 일 표(:::actions) 머리 칸(base 가 --table-head-bg 를 --accent 로), 맨 구역 장(bare)의 제목
-   (slides.js sectionHead 가 제목 안 링크·각주를 옮긴다 — 각주 번호는 제목 색을 물려받지 않고 --link 다).
+/* ---- 맨 구역 장(bare) 제목 안 링크·각주 번호: --link(--accent-strong)는 빨강 면 위 1.20:1 이라 --accent-ink(흰색, 4.88:1)로 바꾼다
+   (slides.js sectionHead 가 제목 안 링크·각주를 옮긴다 — 각주 번호는 제목 색을 물려받지 않고 --link 다). 다른 빨강 면인 할 일 표 머리는 base 가 맡는다(web/base.css 의 .actions th).
    표지·제목 장의 글은 글자로만 넣고(page/view.go writeEl, slides.js titleSlide), steps 번호 원·체크 상자는 가상 요소라 링크가 없다.
    화면에서 가리키면 base 의 hover(--accent-soft 면 + --ink 글자, 16.44:1)가 그대로 덮는다 */
-.page-body .actions th, .page-body.bare .ss-title { --link: var(--accent-ink); }
+.page-body.bare .ss-title { --link: var(--accent-ink); }
+
+/* ---- 표 머리는 투명 바탕이라(theme.json) 바탕 bold 의 진한 표 머리 규칙을 되돌린다 — 할 일 표 머리는 빼고(base 규칙이 남아야 한다) */
+:where(.page-body th:not(.actions th)) { --link: inherit; --link-hover-ink: inherit; --link-hover-bg: inherit; --link-hover-line: inherit;
+  --mark-ink: inherit; --del-ink: inherit; }
