@@ -1,0 +1,96 @@
+/* 제목 세리프: Noto Serif KR Bold 한 굵기(OFL — assets/README.md·OFL-NotoSerifKR.md). 한글 11172자·라틴·문장 부호만 남긴 subset 이고,
+   없는 글자는 --font-heading 의 다음 글꼴을 순서대로 시도하며, 내장 Pretendard 에도 없는 한자는 시스템 serif·시스템 대체 글꼴에
+   의존한다(플랫폼별 모습은 미검증). 제목이 700·800 을 청해도 이 700 한 벌을 쓴다 */
+@font-face { font-family: "Noto Serif KR"; src: url(assets/noto-serif-kr-bold.woff2) format("woff2"); font-weight: 700; font-display: block; }
+
+/* 에디토리얼: 크림 바탕(--paper #faf7f2)에 먹 글자, 진한 빨강(--accent #a4161a, 크림 위 7.26:1) 강조 하나, 가는 괘선(--rule #c9b79c, 선 전용).
+   대비는 크림 바탕 기준이다 — 작은 글자 색은 크림과 4.5:1 이상(page/styletheme_test.go 의 쌍, 값은 theme.json).
+   구조(표지·머리글·제목 번호·목차·구역 장 자리)는 바탕 classic 을 물려받고, classic 의 굵은 남색 띠·막대·□ 기호를 가는 선으로 바꾼다.
+   classic 의 파생 색 --accent-2(제목 번호)·--accent-3(옅은 띠)은 빨강에서 나오면 크림 위 글자로 약하다(--accent-2 #e35850) —
+   번호·띠는 여기서 --accent 로 바꾸고, 파생 토큰은 정적값=식으로만 둔다(theme.json). */
+
+/* ---- 표지: 위 가는 빨강 선 두 줄, 세리프 큰 제목, 왼쪽 굵은 선 없음 */
+.cover::before { height: 1.2mm; }
+.cover::after { left: 26mm; top: 2.6mm; width: auto; right: 26mm; height: 0.3mm; background: var(--accent); }
+.cover-top { color: var(--accent); font-weight: 700; letter-spacing: 0.18em; font-size: 9.5pt; }
+.cover-main { border-left: none; padding-left: 0; }
+.page-body .cover-title { color: var(--ink); font-size: 34pt; letter-spacing: -0.01em; line-height: 1.2; }
+.cover-subtitle { color: var(--muted); }
+.page-body .cover-meta { border-top: 0.75pt solid var(--ink); border-bottom: 0.75pt solid var(--rule); }
+.page-body .cover-meta dt, .page-body .cover-meta dd { border-bottom-color: #e6dccb; }
+.cover-bottom .cover-org { color: var(--ink); }
+
+/* ---- 머리글·바닥글: 작은 글자는 --muted(크림 위 5.03:1). 보안 등급(classic 의 빨강 #b42318)은 크림 위 6.15:1 */
+.page-header, .page-footer { color: var(--muted); }
+.page-header .slot.left { color: var(--accent); }
+
+/* ---- 제목: 세리프(--font-heading), 장은 아래 가는 먹 선, 절·항은 장식 없이. 번호는 빨강 */
+.page-body h1 { border-bottom-width: 0.75pt; border-bottom-color: var(--ink); letter-spacing: -0.01em; }
+.page-body :is(h1, h2, h3) .header-section-number { color: var(--accent); }
+.page-body h2 { padding-left: 0; }
+.page-body h2::before { content: none; }
+.page-body h3:not(:has(.header-section-number))::before { content: none; }
+.toc-title { font-family: var(--font-heading); border-bottom: 0.75pt solid var(--ink); letter-spacing: 0.12em; }
+nav.toc > ul > li > a { color: var(--ink); }
+nav.toc .toc-section-number { color: var(--accent); }
+
+/* ---- 표: 세로줄 없이 가로줄만, 머리 아래·맨 아래 먹 선(머리 면은 투명 — theme.json --table-head-bg) */
+.page-body th, .page-body td { border-left: none; border-right: none; }
+.page-body thead th { border-bottom: 0.75pt solid var(--ink); border-top: none; }
+.page-body table { border-bottom: 0.75pt solid var(--ink); }
+
+/* ---- 큰 인용(풀 쿼트): 세리프 굵게, 위아래 가는 빨강 선, 왼쪽 막대 없음 */
+.page-body blockquote { font-family: var(--font-heading); font-weight: 700; font-size: 1.18em; line-height: 1.55; border: none;
+  border-top: 0.75pt solid var(--accent); border-bottom: 0.75pt solid var(--accent); border-radius: 0; padding: 8pt 4pt; margin: 12pt 0; }
+/* 요약문: 면 없이 왼쪽 가는 빨강 선(--lead-bar) */
+.lead { background: transparent; border-radius: 0; }
+/* 그림·표 캡션은 작게(base 9pt → 8.5pt), 색은 --caption-color(크림 위 5.03:1) */
+.page-body figcaption, .page-body caption { font-size: 8.5pt; }
+
+/* ---- 강조색(빨강) 면 안의 링크·각주 번호·인라인. 빨강 면에 글이 놓이는 자리는 할 일 표(:::actions) 머리 하나다 —
+   base 가 .actions 의 --table-head-bg 를 --accent 로 둔다(web/base.css). 다른 표 머리는 투명(theme.json)이고 결재란 머리도 base 가
+   투명이다. 구역 장 면은 옅은 --accent-soft 라(아래) 여기 넣지 않는다. 선택자 목록은 그 자리 하나지만, 자리가 늘면 :is() 에 더한다.
+   그 면 위 링크색(남청 #3d5a80)은 1.10:1 이다 — 링크·각주·가리킴을 흰색(--accent-ink 7.75:1)·면 없음으로.
+   base 가 색·바탕을 주는 인라인(web/base.css 의 code·mark·del·kbd 규칙):
+   - code: 글자는 면 글자색, 상자는 그 글자색 16%(base 의 표 머리 code 와 같은 꼴) — 흰 / #b33b3f 5.81:1
+   - mark: 노랑 #fff1a8 위에 흰 글자가 상속돼 1.14:1 — 그 안 글자·링크·각주는 먹색(15.25:1, 시험 쌍)
+   - del: --muted 가 빨강 위 1.44:1 — 면 글자색 그대로(취소선이 뜻을 알린다)
+   - kbd: base 는 바탕 없이 --rule 테두리라 흰 글자가 상속된다 — 테두리를 글자색으로
+   - kbd·mark 안 각주 번호: sup 과 .footnote-ref 가 함께 올려 숫자가 상자 위로 삐져나온다(verdant 에서 확인) — 한 번만, 덜 올린다
+   면 밖(크림 본문·다른 표 머리·결재란 머리)의 같은 요소는 base 그대로다 */
+:is(.page-body .actions th) {
+  --link: var(--accent-ink); --link-hover-ink: var(--accent-ink); --link-hover-bg: transparent; --link-hover-line: var(--accent-ink); }
+:is(.page-body .actions th) code { color: inherit; background: transparent; }
+@supports (color: color-mix(in srgb, black 16%, transparent)) {
+  :is(.page-body .actions th) code { background: color-mix(in srgb, currentColor 16%, transparent); }
+}
+:is(.page-body .actions th) mark { color: var(--ink); --link: var(--ink); --link-hover-ink: var(--ink); --link-hover-line: var(--ink); }
+:is(.page-body .actions th) del { color: inherit; }
+:is(.page-body .actions th) kbd { border-color: currentColor; }
+:is(.page-body .actions th) :is(kbd, mark) sup { vertical-align: 0.3em; line-height: 0; }
+:is(.page-body .actions th) :is(kbd, mark) .footnote-ref { vertical-align: baseline; }
+
+/* ---- decisions: base 의 ✔ 자리 들여쓰기는 15pt 고정이라 슬라이드 글자 크기에서 ✔ 와 글이 붙는다(classic 도 같다, PNG) — 글자 크기에 비례하게 */
+.decisions li { padding-left: 1.4em; }
+
+/* ---- 슬라이드: 위 가는 빨강 선 하나, 세리프 먹 제목(왼쪽 막대 없음), 번호는 빨강 */
+.slide-deco::before { height: 2pt; }
+.slide-deco::after { content: none; }
+.slide-title { color: var(--ink); padding-left: 0; }
+.slide-title::before { content: none; }
+.slide-title .header-section-number { color: var(--accent); }
+.sf-num { color: var(--ink); }
+.page-body.k-content h2, .page-body.k-content h3 { color: var(--ink); }
+/* 제목 슬라이드: 위 가는 빨강 선과 그 아래 더 가는 선, 세리프 큰 제목, 왼쪽 굵은 선 없음 */
+.slide-deco.k-title::before { height: 4pt; }
+.slide-deco.k-title::after { content: ""; left: var(--slide-pad-x); right: var(--slide-pad-x); top: 10pt; width: auto; height: 0.75pt; background: var(--accent); }
+.sc-top { color: var(--accent); letter-spacing: 0.14em; }
+.sc-main { border-left: none; padding-left: 0; }
+.page-body .sc-title { color: var(--ink); }
+.sc-meta { border-top: 0.75pt solid var(--ink); color: var(--muted); }
+/* 구역 슬라이드: classic 의 왼쪽 24% 남색 면 자리를 옅은 --accent-soft(#ffeae7) 면 + 오른쪽 가는 빨강 선으로. 바닥글(조직 --muted·쪽 번호
+   --ink)은 base 자리 그대로라 이 면 위에 놓인다 — --muted 4.65:1·--ink 15.06:1(시험 쌍). 큰 번호는 빨강 세리프, 제목은 먹 세리프 */
+.slide-deco.k-section::before { background: var(--accent-soft); }
+.slide-deco.k-section::after { width: 1.5pt; background: var(--accent); }
+.page-body .ss-num { color: var(--accent); }
+.page-body .ss-title { color: var(--ink); }
