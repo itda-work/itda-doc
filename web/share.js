@@ -281,15 +281,16 @@
   // 슬라이드, -1 = 발표 아님)·pos·posFrac·posTotal(호스트가 발표가 아닌 보기로 보는 최상위 블록·그 안 비율·블록 수, -1 = 아님 — ⑧)·
   // paused(보는 사람이 직접 움직여 이 화면에서만 잠시 풀림).
   // 따라갈 위치는 하나다(kind·index·frac·total): slide ≥ 0 이면 "slide", 아니고 pos ≥ 0 이면 "pos", 둘 다 -1 이면 없음(kind "").
+  // 보드 발표(slideLook "dashboard")는 번호가 없는 굴림이라 slide(0 / 1)는 꼴만 붙들고, pos 가 있으면 "pos" 로 따라간다.
   // deps: align(i, kind, frac, look)(맞춘다 — look 은 호스트의 발표 보기 꼴(slides·dashboard) — 슬라이드는 보기 꼴을 그 꼴로 바꿔 가운데,
-  // 내용 위치는 꼴을 그대로 둔 채 — followAction),
+  // 내용 위치는 꼴을 그대로 둔 채 — 다만 보드 발표면 look 이 "dashboard" 라 보드로 바꿔 맞춘다 — followAction),
   // release()(따라가는 표시를 뗀다 — 보기 꼴은 되돌리지 않는다), button(label)(「발표자 위치로」 단추를 그 글로 보임 — "" 이면 숨김, backLabel),
   // changed()(상태가 바뀔 때마다 맨 끝에 한 번 — 화면은 쪽 | 이어보기 단추의 숨김을 고친다).
   //  - follow && !paused && 위치가 있으면 맞춘다(active). 단추는 숨긴다.
   //  - follow && paused && 위치가 있으면 맞추지 않고 단추를 보인다.
   //  - follow 가 꺼지거나 위치가 없어지면 단추를 숨기고 놓는다. 그때 풀림도 거둔다 — 다음 발표·읽기·다시 켬은 처음부터 따라간다.
   //    위치의 꼴이 바뀌어도(읽기 → 발표 시작, 발표 끝 → 읽기) 풀림을 거둔다 — 새 꼴은 처음부터 따라간다.
-  //  - onSlide(d): {index, total, look, follow}. onPos(d): {block, frac, total, follow} — 발표 중(slide ≥ 0)에 온 pos 는 저장만 한다(follow 가
+  //  - onSlide(d): {index, total, look, follow}. onPos(d): {block, frac, total, follow} — 슬라이드 발표 중(presentLook "slides")에 온 pos 는 저장만 한다(follow 가
   //    그대로면 맞추지 않는다).
   //  - moved(): 맞추는 중에 사람이 움직이면 풀린다. resume(): 단추 — 풀림을 거두고 바로 맞춘다.
   //  - hello(data): hello 의 slide·slide_total·slide_look·pos·pos_frac·pos_total·follow 로 맞춘다(늦게 들어온 화면·다시 붙음). 값이 없으면
@@ -301,26 +302,26 @@
   //   2. slide{index: -1}(발표 끝) → presentLook = null. release() 가 문서 자신의 꼴로 돌아가고(화면 — restoreOwnLook), 유효한 pos 가
   //      있으면 이어서 align(pos) — 화면은 다시 그린 뒤 render 끝에서 그 앵커로 맞춘다(fol.active()).
   //   3. 따라가기 끔 → 2 와 같다(release). 다시 켬 → 저장된 발표(slide ≥ 0)가 있으면 1, 없으면 pos.
-  //   4. pos → presentLook 이 있으면 저장만(발표가 붙들고 있다), null 이면 앵커로 맞춘다.
+  //   4. pos → presentLook 이 "slides" 면 저장만(발표가 붙들고 있다), null·"dashboard" 면 앵커로 맞춘다(보드 발표는 내용 위치가 곧 발표 위치다).
   //   꼴이 없는 slide(옛 호스트)는 "slides" 로 읽는다(lookName).
   function follower(deps) {
     const f = { follow: false, slide: -1, slideTotal: 0, slideLook: "", pos: -1, posFrac: 0, posTotal: 0, paused: false, kind: "", index: -1, frac: 0, total: 0,
       presentLook: null };
     function update() {
-      const kind = f.slide >= 0 ? "slide" : f.pos >= 0 ? "pos" : "";
-      if (kind !== f.kind) f.paused = false;
+      const kind = f.slide >= 0 && !(f.slideLook === "dashboard" && f.pos >= 0) ? "slide" : f.pos >= 0 ? "pos" : "";
+      const held = f.follow && f.slide >= 0 ? f.slideLook : null; // presentLook 규칙 1·2·3
+      if (kind !== f.kind || held !== f.presentLook) f.paused = false; // 위치의 꼴이나 발표가 붙든 꼴이 바뀌면 처음부터 따라간다
       f.kind = kind;
       f.index = kind === "slide" ? f.slide : kind === "pos" ? f.pos : -1;
       f.frac = kind === "pos" ? f.posFrac : 0;
       f.total = kind === "slide" ? f.slideTotal : kind === "pos" ? f.posTotal : 0;
-      const held = f.follow && f.slide >= 0 ? f.slideLook : null; // presentLook 규칙 1·2·3
       const freed = f.presentLook !== null && held === null;
       f.presentLook = held;
       const on = f.follow && !!kind;
       if (freed && on) deps.release(); // 규칙 2: 발표가 놓은 꼴을 먼저 되돌리고 아래에서 pos 로 맞춘다
       if (!on) { f.paused = false; deps.button(""); deps.release(); }
       else if (f.paused) deps.button(backLabel(kind, f.index, f.total));
-      else { deps.button(""); deps.align(f.index, kind, f.frac, kind === "slide" ? f.slideLook : ""); }
+      else { deps.button(""); deps.align(f.index, kind, f.frac, f.presentLook || ""); }
       if (deps.changed) deps.changed();
     }
     f.active = () => f.follow && !f.paused && !!f.kind;
@@ -341,7 +342,7 @@
       f.pos = d.block;
       f.posFrac = clampFrac(d.frac);
       f.posTotal = Number(d.total) || 0;
-      if (f.presentLook !== null && f.follow === was) return; // 규칙 4: 발표가 꼴을 붙들고 있으면 저장만
+      if (f.presentLook === "slides" && f.follow === was) return; // 규칙 4: 슬라이드 발표가 꼴을 붙들고 있으면 저장만
       update();
     };
     f.hello = d => {
@@ -368,13 +369,15 @@
   }
 
   // followAction 은 맞출 때 할 일이다: 발표 슬라이드는 지금 꼴이 호스트의 발표 꼴(want — "slides"·"dashboard", 없으면 "slides")이
-  // 아니면 그 꼴로 바꿔 다시 그린 뒤 맞추고("redraw" — 그 꼴로 그릴 수 없으면 "none"), 같으면 번호로 맞춘다("scroll" — 보드의 발표는
-  // 판을 넘기므로 판 번호가 곧 슬라이드 번호다). 내용 위치는 보기 꼴을 바꾸지 않고 지금 꼴에서 맞춘다("scroll" — ⑤처럼 쪽으로 바꾸지 않는다).
+  // 아니면 그 꼴로 바꿔 다시 그린 뒤 맞추고("redraw" — 그 꼴로 그릴 수 없으면 "none"), 같으면 번호로 맞춘다("scroll").
+  // 내용 위치는 보기 꼴을 바꾸지 않고 지금 꼴에서 맞춘다("scroll" — ⑤처럼 쪽으로 바꾸지 않는다). 다만 보드 발표의 내용 위치(want "dashboard")는
+  // 발표가 꼴을 붙들고 있어 슬라이드와 같이 그 꼴로 바꾼다 — 그릴 수 없는 화면(웹 뷰어)은 지금 꼴에서 맞춘다.
   function followAction(kind, look, v, width, want) {
-    if (kind !== "slide") return "scroll";
+    if (kind !== "slide" && want !== "dashboard") return "scroll";
     want = want === "dashboard" ? "dashboard" : "slides";
     if (look === want) return "scroll";
-    return lookFor(v, width, want) === want ? "redraw" : "none";
+    if (lookFor(v, width, want) === want) return "redraw";
+    return kind === "slide" ? "none" : "scroll";
   }
 
   // ytFollowGate 는 따라가기로 맞출 때 재생 중인 YouTube 를 멈출지 정하는 문지기를 만든다. 발표 슬라이드(kind "slide")는 직전에 따라간
@@ -858,8 +861,8 @@
       $("load-err").textContent = THEME_FAILED;
     },
     end: reason => showEnded(reason),
-    hello: d => fol.hello(d),
-    slide: d => fol.onSlide(d),
+    hello: d => { fol.hello(d); zoomCheck(); },
+    slide: d => { fol.onSlide(d); zoomCheck(); },
     pos: d => fol.onPos(d),
     toast: msg => toast(msg),
   });
@@ -874,7 +877,7 @@
   }
 
   function lookClasses(el, look) {
-    const slides = look === "slides", sized = slides || look === "dashboard"; // 보드의 판은 슬라이드와 같은 크기
+    const slides = look === "slides", sized = slides || look === "dashboard"; // 보드의 폭·기준 상자는 슬라이드와 같다
     el.classList.toggle("slides", slides);
     el.classList.toggle("boards", look === "dashboard");
     el.classList.toggle("flow-look", look === "flow");
@@ -904,10 +907,13 @@
     pg.classList.toggle("notes-right", layout === "right");
     pg.classList.toggle("notes-below", layout === "below");
     let w, z;
-    if (state.look === "slides" || state.look === "dashboard") {
+    if (state.look === "slides") {
       const [sw, sh] = window.ItdaSlides.SIZE[state.ratio];
       w = sw;
       z = slideZoom(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter);
+    } else if (state.look === "dashboard") {
+      w = window.ItdaSlides.SIZE[state.ratio][0]; // 보드는 긴 한 장이다 — 쪽처럼 너비에 맞춘다
+      z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
     } else {
       w = (state.landscape ? 297 : 210) * PX_PER_MM;
       z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
@@ -920,6 +926,7 @@
     pg.style.transform = "scale(" + z + ")";
     box.style.width = outW + "px";
     box.style.height = Math.ceil(pg.offsetHeight * z) + "px";
+    if (boardZoom) boardZoom.fit(); // 크게 보기 타일은 보이는 영역을 채운다
   }
 
   // 표 복사(itda-hyve#349) 메뉴가 고른 표의 조각들. render 가 본문을 바꾸거나 비우면 메뉴를 닫고 버린다 — 열린 메뉴가 화면에서 떨어진 옛 표를 복사하지 않게.
@@ -928,6 +935,11 @@
   const tmenu = tableMenu({ menu: $("table-ctx"), active: () => document.activeElement, view: () => ({ w: window.innerWidth, h: window.innerHeight }),
     now: () => Date.now(), onClose: () => { ctxTables = null; } });
   function closeTableMenu() { tmenu.close(); ctxTables = null; }
+
+  // 보드 크게 보기(itda-work/itda-hyve#362 — dashboard.js zoomer). 발표를 따라가는 동안(fol.holdsLook — 발표가 꼴을 붙듦, 잠시 풀린 동안 포함)은
+  // 열지 않고, 열려 있으면 다음 이벤트·발표 메시지(slide·hello)에서 닫는다. 보드를 그릴 수 없는 화면(웹 뷰어 — ItdaBoard 없음)에는 없다.
+  const boardZoom = window.ItdaBoard && window.ItdaBoard.zoomer ? window.ItdaBoard.zoomer($("pages"), { blocked: () => fol.holdsLook(), scroller: $("viewer") }) : null;
+  const zoomCheck = () => { if (boardZoom) boardZoom.current(); }; // current() 가 막힘(발표 따라가기)을 보고 닫는다
 
   // render 는 호스트 앱 보기 그리기의 보기 부분이다: 무대(화면 밖)에서 나눈 뒤 쪽을 한 번에 바꾼다.
   // 공유가 끝나면(state.ended) 각 await 뒤·DOM 쓰기 전에 멈춘다 — 늦게 끝난 그리기가 「공유가 끝났습니다」 를 덮지 않게.
@@ -1022,6 +1034,7 @@
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     // 쪽·이어보기·슬라이드(발표 공유) 모두.
     if (CodeCopy) CodeCopy.arm(pagesEl);
+    if (boardZoom && state.look === "dashboard") boardZoom.arm(); // 크게 보기 단추 — 새 보드의 타일마다(옛 보드는 떨어져 열린 상태도 버려진다)
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
     target.remove();
@@ -1165,7 +1178,7 @@
     for (const x of root.querySelectorAll(".following")) x.classList.remove("following");
     const center = el => placeSlide(el); // 아래 노트가 붙어 보이면 위에 붙인다(itda-hyve#344)
     if (kind === "slide") {
-      if (state.look !== "slides" && state.look !== "dashboard") return;
+      if (state.look !== "slides") return; // 보드 발표의 번호(0 / 1)는 꼴만 붙든다 — 위치는 내용 위치(pos)로 온다
       const pg = root.querySelectorAll(".page")[i];
       if (!pg) return;
       pg.classList.add("following");
@@ -1178,7 +1191,7 @@
     const n = pickBlock(ns, i);
     if (n < 0) return;
     const els = all.filter(el => Number(el.dataset.n) === n);
-    if (state.look === "slides" || state.look === "dashboard") {
+    if (state.look === "slides") {
       const pg = els[0].closest(".page");
       if (!pg) return;
       pg.classList.add("following");
@@ -1209,7 +1222,7 @@
 
   // fol 은 발표자 따라가기다(follower). 맞출 때 할 일은 followAction 이 정한다 — 발표 슬라이드는 보기 꼴이 호스트의 발표 꼴(want —
   // 슬라이드·보드)이 아니면 그 꼴로 바꿔 다시 그리고(render 가 끝에 맞춘다), 내용 위치는 보기 꼴을 그대로 둔 채 지금 꼴에서 맞춘다
-  // (⑧ — 원래 슬라이드 문서는 슬라이드로). 발표가 끝나거나 따라가기를 끄면 슬라이드·보드 문서는 자기 꼴로 돌아간다(release — restoreOwnLook).
+  // (⑧ — 원래 슬라이드 문서는 슬라이드로. 보드 발표의 내용 위치는 예외로 보기 꼴을 보드로 바꿔 맞춘다). 발표가 끝나거나 따라가기를 끄면 슬라이드·보드 문서는 자기 꼴로 돌아간다(release — restoreOwnLook).
   const fol = follower({
     align: (i, kind, frac, want) => {
       if (state.ended) return;
@@ -1275,12 +1288,12 @@
       const r = pg.getBoundingClientRect();
       return { top: r.top - vt + viewer.scrollTop, height: r.height };
     });
-    viewer.scrollTop = window.ItdaPager.pageNav(dir, state.look === "dashboard" ? "slides" : state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
+    viewer.scrollTop = window.ItdaPager.pageNav(dir, state.look === "dashboard" ? "flow" : state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
   }
 
-  // jumpScroll 은 #제목 이동의 굴림이다: 슬라이드 보기면 그 제목이 든 슬라이드를 가운데로, 그 밖은 제목을 맨 위로.
+  // jumpScroll 은 #제목 이동의 굴림이다: 슬라이드 보기면 그 제목이 든 슬라이드, 보드면 그 타일·구역 줄을 가운데로, 그 밖은 제목을 맨 위로.
   function jumpScroll(x) {
-    const pg = (state.look === "slides" || state.look === "dashboard") && x.closest(".page");
+    const pg = state.look === "slides" ? x.closest(".page") : state.look === "dashboard" ? x.closest(".tile, .board-section") : null;
     if (pg) pg.scrollIntoView({ block: "center" });
     else x.scrollIntoView({ block: "start" });
   }

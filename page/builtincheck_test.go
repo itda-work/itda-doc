@@ -131,7 +131,7 @@ func TestBuiltinThemesNoPageRoot(t *testing.T) {
 	}
 }
 
-// boardBaseSelOK 는 base.css 보드 절의 선택자 조각이 허용 꼴인가다 — 판 자신, 격자 안(.page-body.board-grid 뿌리), 판 머리·장식.
+// boardBaseSelOK 는 base.css 보드 절의 선택자 조각이 허용 꼴인가다 — 보드 자신, 격자 안(.page-body.board-grid 뿌리), 머리·장식.
 func boardBaseSelOK(p string) bool {
 	const scope = ":where(.page.board) "
 	if p == ".page.board" {
@@ -147,10 +147,10 @@ func boardBaseSelOK(p string) bool {
 	return strings.HasPrefix(rest, ".board-deco") || strings.HasPrefix(rest, ".board-head") || strings.HasPrefix(rest, ".bh-")
 }
 
-// boardThemeSelOK 는 테마 선택자 조각이 보드 격자 쪽 어휘(.tile·.tile-*·.kpi-item·.board-grid)를 쓰면 .page-body.board-grid 뿌리인가다.
-// 그 어휘가 없는 조각(판 머리·장식 .board-*·.bh-*, 쪽 문서 규칙)은 이 검사와 상관없다.
+// boardThemeSelOK 는 테마 선택자 조각이 보드 격자 쪽 어휘(.tile·.tile-*·.board-section·.kpi-item·.board-grid)를 쓰면 .page-body.board-grid 뿌리인가다.
+// 그 어휘가 없는 조각(머리·장식 .board-head·.board-deco·.bh-*, 쪽 문서 규칙)은 이 검사와 상관없다.
 func boardThemeSelOK(p string) bool {
-	if !strings.Contains(p, ".tile") && !strings.Contains(p, ".kpi-item") && !strings.Contains(p, ".board-grid") {
+	if !strings.Contains(p, ".tile") && !strings.Contains(p, ".kpi-item") && !strings.Contains(p, ".board-grid") && !strings.Contains(p, ".board-section") {
 		return true
 	}
 	return p == ".page-body.board-grid" || strings.HasPrefix(p, ".page-body.board-grid ")
@@ -209,11 +209,14 @@ func TestBuiltinThemeBoardSelectorShape(t *testing.T) {
 		if err != nil {
 			t.Fatalf("%s: %v", i.Name, err)
 		}
-		n := 0
+		n, sec := 0, 0
 		for _, r := range rules {
 			for _, p := range slideSelectorPieces(r.Prelude) {
 				if strings.HasPrefix(p, ".page-body.board-grid ") {
 					n++
+				}
+				if strings.HasPrefix(p, ".page-body.board-grid .board-section") {
+					sec++
 				}
 				if !boardThemeSelOK(p) {
 					t.Errorf("%s: %q — 보드 격자 규칙은 .page-body.board-grid 로 시작한다", i.Name, p)
@@ -223,10 +226,14 @@ func TestBuiltinThemeBoardSelectorShape(t *testing.T) {
 		if n == 0 {
 			t.Errorf("%s: 보드 격자 규칙이 0개 — 보드 절을 못 읽었을 수 있다", i.Name)
 		}
+		if sec == 0 {
+			t.Errorf("%s: 구역 제목 줄(.page-body.board-grid .board-section) 규칙이 없다", i.Name)
+		}
 	}
 	for p, want := range map[string]bool{
 		".page-body.board-grid .tile": true, ".board-head": true, ".bh-title": true, ".board-deco::before": true, ".page-body h2": true,
 		".board-grid .tile": false, ".tile": false, ".page-body .kpi-item": false, ".board-head .tile": false,
+		".page-body.board-grid .board-section": true, ".board-section": false,
 	} {
 		if boardThemeSelOK(p) != want {
 			t.Errorf("boardThemeSelOK(%q) != %v", p, want)

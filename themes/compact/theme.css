@@ -80,3 +80,4 @@
 .board-head { border-bottom: 2pt solid var(--accent); }
 .page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6)::before { content: "■"; color: var(--accent); font-size: 0.62em; margin-right: 0.4em; vertical-align: 0.14em; }
 .page-body.board-grid .tile { border-color: var(--accent-soft); }
+.page-body.board-grid .board-section { color: var(--accent); border-bottom: 0.75pt solid var(--accent-soft); }

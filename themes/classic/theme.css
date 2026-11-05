@@ -75,6 +75,6 @@ nav.toc > ul > li > a { color: var(--accent); }
 .board-deco::before { left: 0; right: 0; width: auto; height: 5pt; }
 .board-deco::after { content: ""; position: absolute; left: var(--board-pad); top: 5pt; width: 56pt; height: 2.5pt; background: var(--accent-3); }
 .bh-title { color: var(--accent); }
-.bh-num { color: var(--accent); }
 .page-body.board-grid .tile { border-top: 2.5pt solid var(--accent); }
 .page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6) { color: var(--accent); }
+.page-body.board-grid .board-section { color: var(--accent); border-bottom: 1pt solid var(--accent); }

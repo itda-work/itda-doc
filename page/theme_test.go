@@ -257,11 +257,11 @@ func TestTokenTableMatchesBaseCSS(t *testing.T) {
 		code[m[1]] = strings.TrimSpace(m[2])
 	}
 	for _, m := range regexp.MustCompile(`var\((--[a-z0-9-]+)`).FindAllStringSubmatch(css, -1) {
-		local := map[string]bool{"--c": true, "--d": true, "--panel-w": true, "--panel-gap": true, "--img-max-h": true, "--slide-head-h": true, "--body-h": true, "--kpi-fit": true,
+		local := map[string]bool{"--c": true, "--d": true, "--panel-w": true, "--panel-gap": true, "--img-max-h": true, "--slide-head-h": true, "--body-h": true, "--kpi-fit": true, "--board-rows": true, "--tz-left": true, "--tz-top": true, "--tz-width": true, "--tz-height": true,
 			"--mark-ink": true, "--del-ink": true, "--kbd-line": true, "--head-code-bg": true, "--head-code-line": true, "--footnote-align": true}
 		if _, ok := code[m[1]]; !ok && !local[m[1]] {
 			// --c·--d·--panel-w·--panel-gap 은 규칙 안의 지역 변수(알림 색·차트 항목 차례·분할 그림 패널 폭과 틈 itda-hyve#550),
-			// --img-max-h·--slide-head-h·--body-h·--kpi-fit 은 화면(쪽 나눔기·슬라이드 나눔기·보드 나눔기 dashboard.js fitKPI)이 재어 거는 값,
+			// --img-max-h·--slide-head-h·--body-h·--kpi-fit·--board-rows·--tz-* 는 화면(쪽 나눔기·슬라이드 나눔기·보드 나눔기 dashboard.js fitKPI·build·zoomer)이 재어 거는 값,
 			// --mark-ink·--del-ink·--kbd-line·--head-code-*·--footnote-align 은 표 머리 규칙 안에서만 값을 얻고 읽는 쪽이 var() 대체값을 갖는 지역 변수(itda-doc#41, page/actionshead_test.go)
 			t.Errorf("base.css 가 쓰는 %s 에 기본값이 없음", m[1])
 		}

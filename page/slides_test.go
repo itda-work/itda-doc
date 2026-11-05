@@ -51,7 +51,7 @@ func TestBoardView(t *testing.T) {
 		want BoardView
 	}{
 		{"# 장\n\n글\n", BoardView{Cols: 4, Rows: 3, Ratio: "16:9", Level: 1}},
-		{"---\ndashboard: true\n---\n\n# 판\n\n## 타일\n\n글\n", BoardView{Present: true, Cols: 4, Rows: 3, Ratio: "16:9", Level: 2}},
+		{"---\ndashboard: true\n---\n\n# 구역\n\n## 타일\n\n글\n", BoardView{Present: true, Cols: 4, Rows: 3, Ratio: "16:9", Level: 2}},
 		{"---\ndashboard: {cols: 2, rows: 4, ratio: \"4:3\", level: 3}\n---\n\n## 타일\n", BoardView{Present: true, Cols: 2, Rows: 4, Ratio: "4:3", Level: 3}},
 		// slides: 와 함께면 둘 다 Present — 처음 꼴은 보드(호스트 화면이 정한다), 슬라이드로 바꿔 볼 수 있다
 		{"---\nslides: true\ndashboard: true\n---\n\n## 타일\n\n글\n", BoardView{Present: true, Cols: 4, Rows: 3, Ratio: "16:9", Level: 2}},

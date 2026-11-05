@@ -114,8 +114,9 @@ nav.toc > ul > li > a .toc-section-number { min-width: 14mm; color: var(--highli
 :where(.page-body th:not(.approval th)) { --link: currentColor; --link-hover-ink: currentColor; --link-hover-bg: transparent; --link-hover-line: currentColor;
   --mark-ink: var(--ink); --del-ink: currentColor; }
 
-/* ---- 보드(itda-work/itda-hyve#362): 슬라이드의 왼쪽 책등(먹색 + 호박색 선), 판 제목은 먹색, 타일 머리 밑에 호박색 선 */
+/* ---- 보드(itda-work/itda-hyve#362): 슬라이드의 왼쪽 책등(먹색 + 호박색 선), 머리 제목은 먹색, 타일 머리 밑에 호박색 선 */
 .board-deco::before { left: 0; top: 0; bottom: 0; width: 10pt; height: auto; }
 .board-deco::after { content: ""; position: absolute; left: 10pt; top: 0; bottom: 0; width: 3pt; background: var(--highlight); }
 .bh-title { color: var(--accent); }
 .page-body.board-grid .tile-head { border-bottom: 2pt solid var(--highlight); padding-bottom: 3pt; }
+.page-body.board-grid .board-section { color: var(--accent); border-bottom: 2pt solid var(--highlight); }

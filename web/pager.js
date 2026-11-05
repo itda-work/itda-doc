@@ -745,7 +745,7 @@
     return hit;
   }
   function pageBands(pageNodes, look) {
-    if (look === "flow") return [];
+    if (look === "flow" || look === "dashboard") return []; // 이어보기·보드(긴 한 장, itda-work/itda-hyve#362)는 쪽 띠가 없다
     const list = [...pageNodes];
     const total = list.filter(p => p.dataset.page !== "0").length;
     let lastLine = 0;

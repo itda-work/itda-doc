@@ -31,7 +31,7 @@ func TestGuideThemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 내장 테마는 보드 절이 있다(itda-work/itda-hyve#362 — 판 장식·타일), 흑백 mono 는 KPI 오름·내림도 검정(기호 글자로만 가린다)
+	// 내장 테마는 보드 절이 있다(itda-work/itda-hyve#362 — 머리 장식·타일), 흑백 mono 는 KPI 오름·내림도 검정(기호 글자로만 가린다)
 	for _, info := range ts.List() {
 		th, _ := ts.Get(info.Name)
 		if !strings.Contains(th.CSS, ".board-deco::before") || !strings.Contains(th.CSS, ".page-body.board-grid .tile") {

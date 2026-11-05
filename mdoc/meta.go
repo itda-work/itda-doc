@@ -64,8 +64,8 @@ type SlidesMeta struct {
 // 실시간 소스(sources·refresh)는 이 판이 해석하지 않는다 — 경고(WarnDashboardSources) 한 줄로만 알린다.
 type DashboardMeta struct {
 	Cols  int    `json:"cols"`  // 격자 열 수 2~6(기본 4)
-	Rows  int    `json:"rows"`  // 판 하나의 행 수 2~4(기본 3)
-	Ratio string `json:"ratio"` // 판 비율 "16:9"(기본) · "4:3" — slides.ratio 와 같은 값·별칭
+	Rows  int    `json:"rows"`  // 기준 상자(ratio)에 들어가는 타일 행 수 2~4(기본 3) — 타일 높이를 정한다
+	Ratio string `json:"ratio"` // 보드 폭·기준 상자 비율 "16:9"(기본) · "4:3" — slides.ratio 와 같은 값·별칭
 	Level int    `json:"level"` // 타일을 여는 제목 단계(1~6). 0 이면 문서에서 정한다(Result.SlideLevel — 슬라이드와 같은 규칙)
 }
 
@@ -686,7 +686,7 @@ func yamlInt(n *yaml.Node) (int, bool) {
 	return v, true
 }
 
-// parseRatio 는 판 비율 글자(소문자로 다듬은 것)를 읽는다 — slides.ratio 와 dashboard.ratio 가 같이 쓴다.
+// parseRatio 는 비율 글자(소문자로 다듬은 것)를 읽는다 — slides.ratio 와 dashboard.ratio 가 같이 쓴다.
 func parseRatio(s string) (string, bool) {
 	switch s {
 	case "16:9", "16/9", "4:3", "4/3":
