@@ -28,6 +28,7 @@ func (st *state) transform(doc *ast.Document) {
 		images     []*ast.Image
 		links      []ast.Node
 		charts     []*Container
+		kpis       []*Container
 		fences     []*ast.FencedCodeBlock
 	)
 	seenParent := map[ast.Node]bool{}
@@ -58,8 +59,11 @@ func (st *state) transform(doc *ast.Document) {
 		case *ast.Link, *ast.AutoLink:
 			links = append(links, n)
 		case *Container:
-			if n.Name == "chart" {
+			switch n.Name {
+			case "chart":
 				charts = append(charts, n)
+			case "kpi":
+				kpis = append(kpis, n)
 			}
 		case *ast.List:
 			olDigits(n)
@@ -111,6 +115,9 @@ func (st *state) transform(doc *ast.Document) {
 	}
 	for _, c := range charts {
 		st.chart(c) // 표 캡션을 옮긴 뒤 — 캡션이 차트 캡션이 된다
+	}
+	for _, c := range kpis {
+		st.kpi(c) // 표 캡션을 옮긴 뒤 — 3열 표 꼴은 캡션을 쓰지 않는다(kpi.go)
 	}
 	st.processHeadings(headings)
 	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(itda-hyve#550)

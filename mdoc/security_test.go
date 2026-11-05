@@ -250,6 +250,8 @@ var securityInputs = []struct{ name, src string }{
 	{"그림 subgraph 제목 탈출", "```mermaid\nflowchart TD\nsubgraph s [\"</text><script>alert(1)</script>\"]\nA --> B\nend\n```"},
 	{"그림 accTitle 탈출", "```mermaid\nflowchart TD\naccTitle: a\" onload=\"alert(1)\naccDescr: </title><script>alert(1)</script>\nA --> B\n```"},
 	{"그림 원문 탈출(미지원 문장)", "```mermaid\nsequenceDiagram\n</code></pre><script>alert(1)</script>\n```"},
+	{"KPI 표 칸의 HTML", ":::kpi\n| a | b | c |\n|---|---|---|\n| <script>alert(1)</script> | <img src=x onerror=alert(1)> | ▲ [x](javascript:alert(1)) |\n:::"},
+	{"KPI 정의 목록의 HTML", "---\ndashboard: true\n---\n:::kpi\n<b onclick=alert(1)>매출</b>\n: \"><script>alert(1)</script>\n: ▼ <iframe src=x>\n:::"},
 	{"순서도 참여자·메시지 탈출", "```mermaid\nsequenceDiagram\nparticipant A as </text><script>alert(1)</script>\nA->>B: </text><img src=x onerror=alert(1)>\n```"},
 	{"순서도 제목·묶음·메모 탈출", "```mermaid\nsequenceDiagram\ntitle </text><script>alert(1)</script>\nalt </text><img src=x onerror=alert(1)>\nA->>B: x\nelse </text><script>alert(1)</script>\nend\nNote over A,B: </text><script>alert(1)</script>\n```"},
 	{"순서도 accTitle·accDescr 탈출", "```mermaid\nsequenceDiagram\naccTitle: 순서\" onload=\"alert(1)\naccDescr: </title><script>alert(1)</script>\nA->>B: x\n```"},

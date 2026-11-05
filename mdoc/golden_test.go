@@ -39,7 +39,15 @@ func TestGolden(t *testing.T) {
 // summary 는 HTML 밖의 결과(문서 정보·목차·경고)를 사람이 읽는 글로 적는다.
 func summary(r Result) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "meta: %+v\n", r.Meta)
+	// dashboard:(itda-work/itda-hyve#362)는 meta 줄에 넣지 않고 따로 적는다 — 포인터라 주소가 아니라 내용을 적어야 하고(실행마다
+	// 같은 글), dashboard 가 없는 기존 골든의 meta 줄이 그대로여야 한다(필드가 늘어도 바이트 동일)
+	m := r.Meta
+	dash := m.Dashboard
+	m.Dashboard = nil
+	fmt.Fprintf(&b, "meta: %s\n", strings.Replace(fmt.Sprintf("%+v", m), " Dashboard:<nil>", "", 1))
+	if dash != nil {
+		fmt.Fprintf(&b, "dashboard: %+v\n", *dash)
+	}
 	fmt.Fprintf(&b, "toc-placed: %v\n", r.TOCPlaced)
 	var toc func(items []TOCItem, depth int)
 	toc = func(items []TOCItem, depth int) {

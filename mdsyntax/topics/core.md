@@ -25,9 +25,10 @@
 | `list-style` | `gaejosik`·`gongmun`·`plain` 또는 `[gaejosik, gongmun]` | 테마가 정함 | 목록 기호 사다리(8장) |
 | `code` | `true`·`false` 또는 설정 매핑 | 줄 번호 켬 | 코드 블록 표시 — `line-numbers: false` 로 줄 번호를 끈다(8장) |
 | `slides` | `true` 또는 설정 매핑 | 없음 | 발표 자료 — 키는 [발표 안내서](slides.md) |
+| `dashboard` | `true` 또는 설정 매핑 | 없음 | 대시보드(보드로 연다, `slides` 보다 앞선다) — 키는 [대시보드 안내서](dashboard.md). 폴더 기본값은 `slides` 와 같은 규칙 |
 
 - 표에 없는 키도 버리지 않고 순서대로 테마에 넘긴다. `mono` 테마의 `수신`·`참조`·`시행일` 처럼 테마가 표지·머리글에 쓰는 값이다.
-- 표에 없는 키가 표의 키와 아주 가까우면(`slide` → `slides`, `toc_depth` → `toc-depth`) `frontmatter-typo` 경고를 낸다. 값은 위처럼 테마에 넘기고 그림도 같다. 한글 등 ASCII 밖 글자가 든 키는 견주지 않는다. `slides:`·`code:` 안 모르는 키는 `frontmatter-value` 경고 문구에 「… 의 오타?」를 붙인다.
+- 표에 없는 키가 표의 키와 아주 가까우면(`slide` → `slides`, `toc_depth` → `toc-depth`) `frontmatter-typo` 경고를 낸다. 값은 위처럼 테마에 넘기고 그림도 같다. 한글 등 ASCII 밖 글자가 든 키는 견주지 않는다. `slides:`·`code:`·`dashboard:` 안 모르는 키는 `frontmatter-value` 경고 문구에 「… 의 오타?」를 붙인다.
 - 아는 키의 값 꼴이 틀리면 그 키만 무시하고 `frontmatter-value` 경고를 낸다. YAML 이 깨졌으면 블록 전체를 본문으로 그리고 `frontmatter-invalid` 경고를 낸다.
 - `version: 1.10` 처럼 숫자로 읽히는 값도 이 앱은 적은 글자 그대로 쓴다. 다른 YAML 도구에서 숫자(`1.1`)로 바뀌지 않게 따옴표를 권한다.
 
@@ -43,8 +44,9 @@ theme: bold
 organization: 잇다
 ```
 
-- 문서 frontmatter 가 폴더 값보다 앞선다: **문서 > 같은 폴더 > 위 폴더 > 테마 기본**. 파일끼리 키 단위로 합치는 것은 `slides:`·`code:` 뿐이고(폴더에 `slides.ratio`, 문서에 `slides.font-scale` 이 있으면 둘 다 적용), 그 밖의 값 — 모르는 키의 맵 포함 — 은 문서에 있으면 통째로 문서 값을 쓴다. 옛 별칭 표기(`font_scale`)는 문서·폴더 파일 사이에서 같은 키로 견준다(경고는 적은 표기 그대로 `slides.font_scale` 로 난다). 폴더 파일이 적용되면 각 파일 안에서 같은 키가 겹칠 때 **마지막 값이 이긴다**(별칭 표기끼리도) — 앞 값이 옳고 뒤 값이 틀려도 틀린 값이 이기고 그 키는 경고와 함께 무시되니, 겹친 키는 정리하고 쓰라. 문서 frontmatter 의 경고는 폴더 파일이 있어도 없을 때와 같다(겹친 키의 앞 값 경고도 그 줄로 남는다). 폴더 파일이 하나도 적용되지 않으면 문서는 폴더 기능이 없을 때와 같이 처리된다(중복 키 해석도 그대로).
+- 문서 frontmatter 가 폴더 값보다 앞선다: **문서 > 같은 폴더 > 위 폴더 > 테마 기본**. 파일끼리 키 단위로 합치는 것은 `slides:`·`code:`·`dashboard:` 뿐이고(폴더에 `slides.ratio`, 문서에 `slides.font-scale` 이 있으면 둘 다 적용), 그 밖의 값 — 모르는 키의 맵 포함 — 은 문서에 있으면 통째로 문서 값을 쓴다. 옛 별칭 표기(`font_scale`)는 문서·폴더 파일 사이에서 같은 키로 견준다(경고는 적은 표기 그대로 `slides.font_scale` 로 난다). 폴더 파일이 적용되면 각 파일 안에서 같은 키가 겹칠 때 **마지막 값이 이긴다**(별칭 표기끼리도) — 앞 값이 옳고 뒤 값이 틀려도 틀린 값이 이기고 그 키는 경고와 함께 무시되니, 겹친 키는 정리하고 쓰라. 문서 frontmatter 의 경고는 폴더 파일이 있어도 없을 때와 같다(겹친 키의 앞 값 경고도 그 줄로 남는다). 폴더 파일이 하나도 적용되지 않으면 문서는 폴더 기능이 없을 때와 같이 처리된다(중복 키 해석도 그대로).
 - **문서가 슬라이드로 열리는지는 문서 자신의 `slides:` 값으로 정한다.** 폴더에 `slides:` 가 있어도 문서에 `slides:` 가 없으면 슬라이드로 열리지 않는다. 이때 `folder-slides-unused` 경고로 어느 폴더 파일의 `slides:` 를 쓰지 않았는지 알린다(문서가 `slides: false` 로 정했으면 내지 않는다). `slides: false` 는 「슬라이드 아님」을 정한 것이다(폴더의 `slides` 값도 쓰지 않는다). 문서가 `slides: true`(또는 빈 값)로 슬라이드임만 정했다면 하위 설정은 폴더 값으로 채워진다.
+- **`dashboard:` 도 `slides:` 와 같다.** 보드로 열리는지는 문서 자신의 `dashboard:` 가 정한다 — 폴더에 `dashboard:` 가 있어도 문서에 없으면 보드로 열리지 않고 `folder-dashboard-unused` 경고로 알린다. 문서가 `dashboard: true`(또는 빈 값)면 `cols`·`rows`… 는 폴더 값으로 채워지고, 문서 맵의 키가 폴더 키를 이긴다. `dashboard: false` 는 폴더 값도 쓰지 않는다. 폴더 값이 틀리면 다른 폴더 키처럼 그 파일 경로·줄로 경고한다([대시보드 안내서](dashboard.md) 3장).
 - 문서 폴더부터 위로 찾는다. 문서가 홈 아래면 **홈 폴더의 파일까지 읽고 그 위로는 가지 않는다**. 홈 밖(외장 디스크 등)의 문서는 볼륨 루트까지 — macOS 는 `/Volumes/<디스크>` 폴더의 파일까지 읽고 멈추고, Windows 는 드라이브 루트(`C:\`)까지다. 파일 하나는 64KB 까지이고, 심볼릭 링크는 따라간다.
 - 폴더 파일의 값 꼴이 틀리면 **그 키만 무시하고 나머지는 적용**한다. YAML 이 깨졌거나 키: 값 모양이 아니거나 읽지 못하면 **그 파일만 건너뛰고** 경고로 알린다 — 파일 건너뛰기 경고에는 그 파일의 상대 경로가 있고, 값 경고에는 상대 경로와 그 파일의 줄이 있다(`../_metadata.yml 3줄:` 처럼, 문서 줄 번호와는 다르게 줄이 0 으로 나온다). 문서 렌더는 멈추지 않는다. YAML 앵커·병합 키(`&a`·`*a`·`<<:`)는 문서 frontmatter 와 같이 풀지 않는다.
 - 문서를 다른 곳으로 보내면 폴더 값은 따라가지 않는다(문서에 적은 값만 있다). 공통 값을 문서마다 꼭 남겨야 할 때는 문서 frontmatter 에 직접 적는다.
@@ -133,6 +135,7 @@ organization: 잇다
 | `signature` | 서명란 |
 | `approval` | 결재란 — 안에 표를 쓴다 |
 | `chart` | 차트 — [차트 안내서](charts.md) |
+| `kpi` | 핵심 지표(이름·큰 값·증감) — 안에 정의 목록 또는 3열 표, [대시보드 안내서](dashboard.md) |
 | `incremental` | 발표에서 목록을 하나씩 — [발표 안내서](slides.md) |
 | `nonincremental` | 발표에서 하나씩 나타내기를 끔 — [발표 안내서](slides.md) |
 | `notes` | 발표자 노트(문서·슬라이드에 안 보임) — [발표 안내서](slides.md) |
@@ -357,7 +360,11 @@ Deckset 에서 가져온 덱은 고치지 않아도 된다 — 펜스 바로 앞
 | `tilde-range` | 범위로 보이는 `~` 가 취소선이 됨 | `\~` |
 | `date-list` | 줄 머리 날짜가 번호 목록이 됨 | `2026\.` |
 | `list-marker` | 목록 항목에 기호·항목 번호를 글자로 적음 | 기호를 빼고 `list-style` |
+| `dashboard-sources` | `dashboard:` 의 `sources`·`refresh` — 이 판은 실시간 소스를 지원하지 않아 표를 그대로 그림 | 키를 빼거나 그대로 둔다(경고만) — [대시보드 안내서](dashboard.md) |
+| `kpi-ambiguous` | `:::kpi` 안에 정의 목록과 3열 표가 함께 있어 정의 목록만 KPI 로 씀 | 한 꼴만 남긴다 |
+| `kpi-empty` | 대시보드 문서의 `:::kpi` 에 정의 목록·3열 표가 없어 보통 상자로 그림 | `이름` / `: 값` 정의 목록이나 3열 표로 |
 | `folder-slides-unused` | 폴더 `_metadata.yml` 에 `slides:` 설정이 있는데 문서에 `slides:` 가 없어 슬라이드로 열지 않음(`slides:` 를 둔 가장 가까운 폴더 파일의 경로를 알림) | 안내다 — 문서마다 일괄로 고치지 말고 의도를 확인한다. 슬라이드로 쓸 문서라면 frontmatter 에 `slides: true`(폴더에 `slides:` 맵이 있으면 그 하위 설정이 채워진다), 쪽 문서로 둘 거면 `slides: false` 로 정하면 경고가 사라진다 |
+| `folder-dashboard-unused` | 폴더 `_metadata.yml` 에 `dashboard:` 설정이 있는데 문서에 `dashboard:` 가 없어 보드로 열지 않음(`dashboard:` 를 둔 가장 가까운 폴더 파일의 경로를 알림) | 안내다 — 보드로 쓸 문서라면 frontmatter 에 `dashboard: true`(폴더 맵의 하위 설정이 채워진다), 아니면 `dashboard: false` 로 정하면 경고가 사라진다 |
 | `unknown-theme` | 모르는(또는 쓸 수 없는) 테마 — `classic` 등으로 보임 | 3장의 이름으로 |
 
 틀린 예 — 이렇게 쓰지 않는다. 글자만 남고 `raw-html`·`unsafe-url` 경고가 난다:

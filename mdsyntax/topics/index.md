@@ -59,6 +59,7 @@ number-sections: true
 | `math` | `$…$`·`$$…$$`·```` ```math ```` — 달러 기호 규칙, 지원 범위, 상한 | [math.md](math.md) |
 | `diagrams` | ```` ```mermaid ```` 흐름도 — 지원 문법, 그리지 않는 것, 상한 | [diagrams.md](diagrams.md) |
 | `slides` | 슬라이드 나눔, `slides:`, 차례로 나타내기, 발표자 노트 | [slides.md](slides.md) |
+| `dashboard` | 타일 나눔·자리·크기, `dashboard:`, KPI `:::kpi`, 넘침 | [dashboard.md](dashboard.md) |
 
 문서 작업 순서(사람이든 Claude 든): 필요한 주제의 문법을 읽는다 → 쓴다 → 문서 창의 경고 단추(또는 앱의 검사 도구·`itda-doc check`)로 경고를 본다 → 고친다.
 경고를 숨기려고 데이터를 지우지 않는다(차트 상한을 넘으면 차트를 나누거나 `table=below` 로 표를 함께 싣는다).

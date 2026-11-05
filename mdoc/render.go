@@ -44,6 +44,8 @@ func (r *htmlRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(KindPause, r.pause)
 	reg.Register(KindMathInline, r.mathInline)
 	reg.Register(KindMathBlock, r.mathBlock)
+	reg.Register(KindKPIList, r.kpiList)
+	reg.Register(KindKPIItem, r.kpiItem)
 }
 
 // attr 는 이스케이프한 속성 하나를 쓴다.

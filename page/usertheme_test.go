@@ -449,6 +449,10 @@ func TestSampleCompanyTheme(t *testing.T) {
 	if i := strings.Index(css, "@scope (.page) {"); i < 0 || !strings.Contains(css[i:], ".confidential {") {
 		t.Errorf("자기 어휘 confidential 이 @scope 안에 없음\n%s", css)
 	}
+	// 회사 테마는 바탕 테마(classic)의 보드 절을 물려받는다(itda-work/itda-hyve#362 — 새 코드 없이 extends 가 CSS 를 잇는다)
+	if i := strings.Index(css, "@scope (.page) {"); i < 0 || !strings.Contains(css[i:], ".board-deco::before") || !strings.Contains(css[i:], ".page-body.board-grid .tile {") {
+		t.Errorf("회사 테마가 바탕 테마의 보드 절을 물려받지 않음")
+	}
 	if t2, _ := ts.Get("에이크미"); t2 != th {
 		t.Error("별칭 에이크미")
 	}

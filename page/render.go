@@ -80,6 +80,7 @@ func renderViewOpts(src []byte, path string, ts *Themes, themeOverride string, o
 	}
 	v.Lang = r.Meta.Lang
 	v.Slides = slideView(r)
+	v.Board = boardView(r)
 	v.Code = codeView(r)
 	v.Logo = t.LogoURL
 	v.Info = map[string]string{}

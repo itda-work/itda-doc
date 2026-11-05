@@ -84,3 +84,11 @@ nav.toc .toc-section-number { color: var(--accent); font-weight: 800; }
    결재란 머리는 투명 바탕이라 뺀다. 이 테마를 물려받는 테마의 표 머리가 투명이면 되돌려야 한다(swiss 가 그렇게 한다) */
 :where(.page-body th:not(.approval th)) { --link: currentColor; --link-hover-ink: currentColor; --link-hover-bg: transparent; --link-hover-line: currentColor;
   --mark-ink: var(--ink); --del-ink: currentColor; }
+
+/* ---- 보드(itda-work/itda-hyve#362): 슬라이드처럼 장식 띠 없이, 머리 제목 밑 강조색 막대, 타일은 옅은 면 */
+.board-deco::before { display: none; }
+.board-head { border-bottom: 3pt solid var(--accent); }
+.page-body.board-grid .tile { border: 0; background: var(--accent-soft); }
+.page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6) { color: var(--accent-2); }
+.page-body.board-grid .board-section { color: var(--accent-2); }
+.page-body.board-grid .kpi-item + .kpi-item { border-left-color: #f3c6b1; }

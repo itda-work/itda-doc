@@ -1,0 +1,7 @@
+meta: {Present:true Title:KPI 견본 — 구조 게이트 Subtitle: Author:[] Date: Lang: TOC:false TOCDepth:3 NumberSections:false PaperSize:a4 Theme: Cover:false DocNo: Version: Classification: Organization: ListStyle: Slides:<nil> Code:<nil> Extra:[]}
+dashboard: {Cols:4 Rows:3 Ratio: Level:0}
+toc-placed: false
+toc: h1 #정의-목록-꼴 [] 정의 목록 꼴
+toc: h1 #3열-표-꼴 [] 3열 표 꼴
+toc: h1 #둘-다 [] 둘 다
+warning: 30 kpi-ambiguous :::kpi 안에 정의 목록과 3열 표가 함께 있어 정의 목록을 KPI 로 그리고 표는 그대로 둠

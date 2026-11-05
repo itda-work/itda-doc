@@ -31,6 +31,16 @@ func TestGuideThemes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// 내장 테마는 보드 절이 있다(itda-work/itda-hyve#362 — 머리 장식·타일), 흑백 mono 는 KPI 오름·내림도 검정(기호 글자로만 가린다)
+	for _, info := range ts.List() {
+		th, _ := ts.Get(info.Name)
+		if !strings.Contains(th.CSS, ".board-deco::before") || !strings.Contains(th.CSS, ".page-body.board-grid .tile") {
+			t.Errorf("%s 테마에 보드 절(.board-deco·.tile)이 없음", info.Name)
+		}
+	}
+	if th, _ := ts.Get("mono"); !slices.Contains(th.Tokens, [2]string{"--kpi-up", "var(--ink)"}) || !slices.Contains(th.Tokens, [2]string{"--kpi-down", "var(--ink)"}) {
+		t.Error("mono 테마의 KPI 오름·내림 색이 검정이 아님")
+	}
 	row := regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\| ([^|]+) \\|")
 	doc := map[string][]string{}
 	for _, m := range row.FindAllStringSubmatch(section("themes"), -1) {

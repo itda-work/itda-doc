@@ -250,6 +250,21 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--slide-scrim-shade` | 스크림의 위·아래를 더 어둡게 하는 안쪽 그림자(`box-shadow` 값, 없애려면 `none`) | `inset 0 -260px 220px -60px rgba(0, 0, 0, 0.6), inset 0 160px 140px -60px rgba(0, 0, 0, 0.35)` |
 | `--slide-scrim-ink` | 스크림 위 바탕 없는 글 색 — 슬라이드 제목, 본문 맨 위(`.page-body` 직접 자식) 제목·문단·목록·정의 목록·구역 제목과 그 안의 굵은 글·링크. 인용·알림·상자·표·코드는 맨 위든 목록 항목 안이든 테마 색 그대로(목록 안 블록은 base.css 가 `--ink` 로 되돌린다 — 특이도 0,1,0 이라 테마가 정한 글자 색이 이김) — 그래서 그 블록은 바탕이 있어야 한다: 맨 위·목록 안 표는 base.css 가 종이색 판을 깔고(테마 바탕이 이김), `--box-bg`·`--lead-bg` 가 투명인 테마는 `.slide-bg.fill ~ .page-body { --box-bg: …; --lead-bg: … }` 로 덮는다(내장 compact·mono·bold) | `#ffffff` |
 | `--slide-scrim-muted` | 스크림 위 바닥글·「(계속)」·캡션, 맨 위 목록의 기호·맨 위 글 링크 밑줄 색 | `rgba(255, 255, 255, 0.82)` |
+| `--board-pad` | 보드의 바깥 여백([대시보드 안내서](dashboard.md)) | `22pt` |
+| `--board-gap` | 머리띠와 격자·타일 사이 틈 | `9pt` |
+| `--board-head-h` | 머리띠(제목·조직·날짜) 높이 | `28pt` |
+| `--board-bg` | 보드 바탕 | `var(--slide-bg)` |
+| `--tile-radius` | 타일 모서리 | `5pt` |
+| `--tile-bg` | 타일 바탕 | `var(--paper)` |
+| `--tile-border` | 타일 테두리(`border` 값) | `0.75pt solid var(--rule)` |
+| `--tile-pad` | 타일 안 여백(`padding` 값) | `9pt 11pt` |
+| `--tile-head-size` | 타일 머리 제목 크기(보드 제목은 이것의 1.55배, 구역 제목 줄은 1.2배) | `12pt` |
+| `--tile-text-size` | 타일 본문 글자 크기(보드 안의 `--text-size`) | `10.5pt` |
+| `--kpi-size` | KPI 값(첫 `dd`) 글자 크기 — 문서(A4) 기준, 보드는 1.45배(슬라이드는 `--slide-kpi-size`) | `19pt` |
+| `--kpi-min-size` | 보드 타일에서 KPI 값을 줄이는 하한(`web/dashboard.js` `fitKPI`) | `12pt` |
+| `--slide-kpi-size` | 슬라이드의 KPI 값 글자 크기(슬라이드 배율 `--slide-scale` 을 곱한다) | `calc(var(--kpi-size) * 1.6)` |
+| `--kpi-up` | KPI 보조 글 오름(`▲`·`+`) 색 — 기호 글자와 함께 쓴다 | `#1a7f37` |
+| `--kpi-down` | KPI 보조 글 내림(`▼`·`−`·`-`) 색 | `#c62828` |
 | `--caption-size` | 그림·표 캡션 크기 | `9pt` |
 | `--caption-color` | 캡션 색 | `var(--muted)` |
 | `--figure-label` | 그림 번호 앞 글자(CSS 글자열) | `"그림"` |
@@ -322,7 +337,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 - 테마 CSS 가 목록 모양을 정하면 테마가 이긴다: 사다리와 보통 목록의 기본 꼴·들여쓰기는 특이도 0(`:where()`)이라 `.decisions ol { list-style: none }` 같은 규칙이 중첩 단계까지 그대로 맞는다. 목차·각주 안의 목록에는 사다리가 걸리지 않는다.
 - 옛 WebKit(Safari 17 미만)은 `@counter-style` 을 몰라 공문 사다리의 2단계 이하가 숫자로 보인다(개조식 기호는 보인다).
 
-### 차트·슬라이드·이어보기
+### 차트·슬라이드·보드·이어보기
 
 - **차트**(`:::chart`): `<figure class="chart chart-<종류>">` 안의 `<svg class="chart-svg t-<종류>">`. 색은 클래스 `s1`…`s8` 이 토큰 `--chart-1…8` 로 칠한다 — 테마는 토큰만 주면 된다(1번은 강조색이 좋다. 이웃한 색끼리 색약에도 구분되게). 글자는 `--chart-text`·`--chart-muted`, 선은 `--chart-grid`·`--chart-axis`. SVG 안 요소의 클래스: 막대 `col`(음수 `neg`)·쌓은 조각 `seg`·선 `line`·점 `dot`·면 `area`·원 조각 `slice`·값 `val`(색 면 위는 `val in`)·눈금 `tick`·항목 `cat`·범례 `legend`/`sw`/`lg`. 움직임은 앱이 하므로 테마가 `@keyframes` 를 둘 필요가 없다(둘 수도 없다).
 - **슬라이드**: 같은 쪽 상자(`.page`)가 슬라이드가 된다(1280×720 — 인쇄 960×540pt, 4:3 은 960×720). 테마 CSS 는 쪽 상자 자신을 고르지 못하므로 슬라이드 종류는 안쪽 요소의 클래스로 고른다: `k-title`(제목)·`k-section`(구역 — 뒤에 내용이 없고 배경 그림 장이 아니면 `bare` 도)·`k-content`(내용)·`k-single`(그림·차트·표·요약문 하나). 구조:
@@ -341,6 +356,17 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
   분할 그림 패널 장(`{.left}`·`{.right}`)은 쪽 직접 자식 `.slide-panel` 이 한쪽을 차지하고, `.slide-deco`·머리·본문·바닥은 반대쪽으로 좁아진다(`web/base.css` `panel-left`·`panel-right`). 왼쪽 패널 장에서 본문은 `left` 가 아니라 `margin-left` 로 밀린다 — 테마가 `.page-body` 의 `left` 를 정하면(구역 장을 장식 옆으로 미는 `.slide-deco.k-section ~ .page-body { left: … }` 꼴) 그 값은 그대로 남고, 패널 폭과 바깥 여백(`--slide-pad-x`)을 패널 간격(`--panel-gap`)으로 바꾼 차가 더해진다. 장식 상자 폭의 %로 그린 장식(classic 의 24% 띠)에 맞춘 본문 `left` 의 %는 쪽 폭 기준이라 패널만큼 넓게 잡히므로, 왼쪽 패널 장에서만 정해지는 `--slide-deco-x`(장식 상자 왼쪽 끝 = 패널 폭)로 `calc(24% - var(--slide-deco-x, 0%) * 0.24 + 60pt)` 처럼 뺀다(내장 classic). 패널 없는 장·오른쪽 패널 장에는 `--slide-deco-x` 가 없어 대체값(`0%`)이 쓰인다. 이 식은 테마 `left` 가 바깥 여백(`--slide-pad-x`)을 품는다고 보고 그 몫을 빼므로, `left` 가 `--slide-pad-x` 와 무관한 테마(classic 의 `24% + 60pt`)는 왼쪽 패널 장에서 들여쓰기가 `--slide-pad-x` 와 `--panel-gap` 의 차만큼 줄어든다 — 내장 classic(64pt)은 제목과 띠 선 사이가 25pt 로 남지만, 바깥 여백을 크게 잡은 회사 테마는 제목이 띠 선에 닿을 수 있다(계산, 미렌더). 이 보정이 없는 회사 테마의 왼쪽 패널 구역 장은 본문이 장식 상자 기준 자리보다 그 %×패널 폭만큼 더 오른쪽에서 시작한다(회사 테마로는 미검증). 오른쪽 패널 장은 본문 `left` 를 건드리지 않는다.
 
   크기·여백은 `--slide-*` 토큰이다. 슬라이드에서는 문서의 `--text-size`·`--h1-size`… 대신 `--slide-text-size`·`--slide-title-size` 에서 나온 값이 쓰인다. `--slide-scale`(기본 0.9)이 모든 `--slide-*-size` 글자에 곱해진다 — 테마가 이 토큰들을 덮어도 배율은 그대로 얹힌다. 슬라이드 전용 선택자(표지 `.sc-*`·구역 `.ss-*`·슬라이드 머리 `.slide-*`)의 `font-size` 는 `calc(Npt * var(--slide-scale))`·`calc(var(--slide-…-size) * 수 * var(--slide-scale))`·em·%·inherit 꼴만 쓴다(`font` 단축 속성은 금지) — 시험(`TestSlideFontSizeScaleGuard`, page/theme_test.go)이 이 허용 꼴만 통과시키고 다른 꼴(고정 pt·rem·var 참조 등)은 실패시킨다 — 내장 테마·base.css 에서 흔히 쓰는 꼴의 회귀를 잡는 검사다(완전한 CSS 해석기는 아니다). 관리 표시(선택자가 정확히 `.sc-class`·`.slide-foot`·`.sf-num`·`.sf-left`·`.sf-logo`)만 고정 크기를 쓸 수 있다. 본문 서식(`spine` 의 결과 상자·절차 번호처럼 쪽 문서와 함께 쓰는 것)의 고정 크기는 슬라이드에서도 그대로다. 내장 테마의 `theme.css` 끝에 슬라이드 절이 있다 — 표지의 띠·면, 장 머리의 꼴을 슬라이드로 옮긴 예다.
+- **보드**(`dashboard:` — [대시보드 안내서](dashboard.md)): 보드(`.page.board`)는 한 장이다 — 폭은 슬라이드와 같고 높이는 내용을 따른다. 머리띠 아래 격자에 타일과 구역 제목 줄을 놓는다(`web/dashboard.js` `ItdaBoard.build`). 구조:
+
+  ```
+  .page.board
+    .board-deco              장식 자리(테마가 ::before·::after 로 띠·면을 칠한다 — 기본은 위 왼쪽의 짧은 강조색 막대)
+    .board-head              머리띠: .bh-logo · .bh-title(문서 제목, 없으면 타일 앞의 첫 높은 제목 요소) · .bh-meta(조직 · 날짜)
+    .page-body.board-grid    격자. 칸은 section.tile(두 칸이면 .tile.w2) > header.tile-head(제목 요소, 잘리면 .tile-clip "…") + div.tile-body,
+                             전체 폭 줄은 div.board-section > 제목 요소(문서의 높은 제목)
+  ```
+
+  크기·여백은 `--board-*`·`--tile-*`·`--kpi-*` 토큰이다. 보드 격자 안(타일·타일 머리·구역 제목 줄·KPI)은 `.page-body.board-grid …` 로, 머리·장식은 `.board-head`·`.bh-*`·`.board-deco` 로 시작한다 — 그러면 base 기본 모양을 이긴다. 쪽 문서용 규칙은 `.page-body` 에 클래스·의사 클래스 하나까지만 더한 꼴이면 보드 구조에 닿지 않고, 그보다 높으면 보드 안에도 닿는다. `web/base.css` 의 격자 규칙은 `:where(.page.board) .page-body.board-grid …` 꼴이라 테마의 같은 선택자와 우선순위가 같고, 같으면 테마가 이긴다(`@scope` 가까움, 가두지 않는 엔진은 나중 순서). 쪽 문서용 일반 규칙이 보드 안에 닿는 것을 막는 약속은 위 문장까지이고, 그보다 높은 회사 테마 규칙은 테마 책임이다(예: `.page-body h3.foo:not(.bar)::before` 는 h3 타일 머리에도 닿는다). 타일 본문(`.tile-body`) 안의 제목·표는 쪽 문서 규칙을 그대로 받는다. 보드 규칙은 모두 판 안에 묶여 문서가 제 클래스로 `{.tile}` 을 달아도 쪽·슬라이드 모양이 바뀌지 않는다. 테마 CSS 는 `@scope (.page)` 안에 들어가 선택자가 쪽 상자의 자손으로 읽히므로 `.page.board .tile` 처럼 `.page` 로 시작하는 선택자는 아무것도 고르지 못한다(`page/builtincheck.go` `pageRootProblems` — 내장 테마는 `TestBuiltinThemesNoPageRoot` 가 본다, 회사 테마에 경고를 내지는 않는다). 이 약속은 꼴 검사(`page/builtincheck_test.go` `TestBaseBoardSelectorShape`·`TestBuiltinThemeBoardSelectorShape`)와 Chrome 계산 스타일 실측까지이고 WebKit 은 미검증이다. KPI(`:::kpi`)는 `.kpi.kpi-tiles > dl > .kpi-item > dt + dd(값) + dd(보조 글 — .kpi-up·.kpi-down)` 이고 문서·슬라이드에서도 같은 마크업이다. `kpi-tiles` 는 정의 목록·3열 표가 있어 KPI 로 그렸다는 표식이다 — 구조 없는 `.kpi`(회사 어휘)에는 붙지 않으니 KPI 모양은 `.kpi-tiles` 로 꾸민다. 내장 다섯 테마의 `theme.css` 끝에 보드 절이 있다(슬라이드 절의 띠·면을 옮긴 것 — `mono` 는 흑백이라 `--kpi-up`·`--kpi-down` 도 `var(--ink)`, `page/guidethemes_test.go`). 회사 테마는 바탕 테마의 보드 절을 물려받는다(`page/usertheme_test.go` `TestSampleCompanyTheme`).
 - **이어보기**: 쪽 나눔 없이 보는 꼴이다. 같은 쪽 상자 하나(`.page.page-flow`)에 문서 흐름이 통째로 들어가고 높이는 내용만큼이다 — 테마에게는 "아주 긴 쪽 하나" 라 같은 선택자가 그대로 맞는다. 머리글·바닥글은 없다. 표지(`cover: true`)는 종이 한 장이 아니라 맨 위의 제목 영역이 되고, 이어보기 전용 모양은 본문 상자의 클래스 **`.page-body.flow-view`** 로 고른다(예: `.page-body.flow-view .cover { … }`). 내장 `classic`·`bold`·`spine` 의 `theme.css` 끝에 그 예가 있다. 회사 테마는 바탕 테마의 것을 물려받는다. 출력(PDF·인쇄)은 이어보기에서도 쪽으로 나오므로 이어보기 모양은 화면에만 쓰인다.
 
 ## 5. 표준 어휘와 자기 어휘
@@ -458,7 +484,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 |---|---|
 | `--accent` | 대표 브랜드색(예: 카카오 옐로 `#FEE500` — 값은 테마 이슈에서 공식 문서로 실측) |
 | `--accent-ink` | 강조색 면 위 글자색 — 밝은 브랜드색(옐로 등)이면 어두운 글자색으로 대비를 맞춘다 |
-| `--chart-1..8` | 1번은 강조색. 디자인 시스템에 차트 팔레트가 있으면 그것을, 없으면 이웃한 색끼리 색약에도 구분되게 고른다(4장 "차트·슬라이드·이어보기") |
+| `--chart-1..8` | 1번은 강조색. 디자인 시스템에 차트 팔레트가 있으면 그것을, 없으면 이웃한 색끼리 색약에도 구분되게 고른다(4장 "차트·슬라이드·보드·이어보기") |
 | `--slide-*` | 슬라이드 장식이 바탕과 다를 때만(같은 절) |
 
 문서용 토큰(`--ink`·`--paper`·`--rule` 등)은 바탕을 물려받는 게 보통이다.

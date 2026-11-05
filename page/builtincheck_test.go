@@ -8,6 +8,7 @@ import (
 	"testing/fstest"
 
 	"github.com/itda-work/itda-doc/themes"
+	"github.com/itda-work/itda-doc/web"
 )
 
 // builtinProblems 는 내장 테마 묶음을 BuiltinThemeProblems 와 같은 검사로 돌려 갈래 k 의 문장(과 테마를 쓸 수 없음)을
@@ -102,4 +103,140 @@ func mustLoad(t *testing.T, fsys fs.FS) *Themes {
 		t.Fatal(err)
 	}
 	return ts
+}
+
+// 내장 테마의 규칙은 .page 로 시작하지 않는다 — @scope (.page) 안에서는 그런 선택자가 죽는다(itda-work/itda-hyve#362 리뷰 1회차 [1]).
+// 보드 절이 실제로 적용되는지(계산된 스타일)는 Chrome 헤드리스로 따로 확인했다 — 이 시험은 그 꼴이 되살아나는 것을 막는다.
+func TestBuiltinThemesNoPageRoot(t *testing.T) {
+	ts := builtin(t)
+	for _, i := range ts.List() {
+		th, _ := ts.Get(i.Name)
+		for _, p := range pageRootProblems(th.CSS) {
+			t.Errorf("%s: %s", i.Name, p)
+		}
+	}
+	// 부정·긍정: 잡을 꼴과 잡지 않을 꼴
+	for css, want := range map[string]int{
+		".page.board .tile { color: red }":                   1,
+		"@media print { .page .x, .y { color: red } }":       1,
+		".page { color: red }":                               1,
+		".page-body .tile, .board-grid .tile { color: red }": 0,
+		".pages .x { color: red } .board-deco::before { }":   0,
+		"@font-face { font-family: x; src: url(a.woff2) }":   0,
+		".x :is(.page.board, .y) { color: red }":             0, // 맨 앞이 아니면 자손 뜻이 다르다 — 검사 밖
+	} {
+		if got := len(pageRootProblems(css)); got != want {
+			t.Errorf("pageRootProblems(%q) = %d건, 바란 것 %d", css, got, want)
+		}
+	}
+}
+
+// boardBaseSelOK 는 base.css 보드 절의 선택자 조각이 허용 꼴인가다 — 보드 자신, 격자 안(.page-body.board-grid 뿌리), 머리·장식.
+func boardBaseSelOK(p string) bool {
+	const scope = ":where(.page.board) "
+	if p == ".page.board" {
+		return true
+	}
+	rest, ok := strings.CutPrefix(p, scope)
+	if !ok {
+		return false
+	}
+	if rest == ".page-body.board-grid" || strings.HasPrefix(rest, ".page-body.board-grid ") {
+		return true
+	}
+	return strings.HasPrefix(rest, ".board-deco") || strings.HasPrefix(rest, ".board-head") || strings.HasPrefix(rest, ".bh-")
+}
+
+// boardThemeSelOK 는 테마 선택자 조각이 보드 격자 쪽 어휘(.tile·.tile-*·.board-section·.kpi-item·.board-grid)를 쓰면 .page-body.board-grid 뿌리인가다.
+// 그 어휘가 없는 조각(머리·장식 .board-head·.board-deco·.bh-*, 쪽 문서 규칙)은 이 검사와 상관없다.
+func boardThemeSelOK(p string) bool {
+	if !strings.Contains(p, ".tile") && !strings.Contains(p, ".kpi-item") && !strings.Contains(p, ".board-grid") && !strings.Contains(p, ".board-section") {
+		return true
+	}
+	return p == ".page-body.board-grid" || strings.HasPrefix(p, ".page-body.board-grid ")
+}
+
+// 보드 선택자의 꼴(itda-work/itda-hyve#362 접근 방식 리뷰, 리뷰 2회차 [1]·[2]) — base.css 보드 절의 모든 조각이 허용 꼴이다.
+// 격자 안이 :where(.page.board) .page-body.board-grid 뿌리라야 테마 보드 절과 우선순위가 같고 쪽 문서용 일반 규칙을 이기며, 가둠이 없으면
+// 문서의 {.tile} 이 쪽·슬라이드로 샌다. 이 시험은 꼴 검사다 — 렌더가 아니다. 우선순위 결과(계산 스타일)는 Chrome 헤드리스로만 확인했고 WebKit 은 미검증이다.
+func TestBaseBoardSelectorShape(t *testing.T) {
+	b, err := web.FS.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	a := strings.Index(s, "/* ---- 보드(")
+	if a < 0 {
+		t.Fatal("base.css 에서 보드 절을 찾지 못함")
+	}
+	sec := s[a:]
+	if z := strings.Index(sec[1:], "/* ---- "); z >= 0 {
+		sec = sec[:z+1]
+	}
+	rules, err := slideCSSRules(sec)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := 0
+	for _, r := range rules {
+		for _, p := range slideSelectorPieces(r.Prelude) {
+			n++
+			if !boardBaseSelOK(p) {
+				t.Errorf("base.css 보드 절 %q — .page.board, :where(.page.board) .page-body.board-grid …, :where(.page.board) + .board-deco·.board-head·.bh-* 가운데 하나로 시작한다", p)
+			}
+		}
+	}
+	if n < 10 {
+		t.Errorf("보드 절 선택자 조각이 %d개 — 보드 절을 못 읽었을 수 있다", n)
+	}
+	for p, want := range map[string]bool{
+		".page.board": true, ":where(.page.board) .page-body.board-grid": true, ":where(.page.board) .page-body.board-grid .tile": true, ":where(.page.board) .bh-title": true,
+		".tile": false, ".board-grid .tile": false, ".page.board .tile": false, ":where(.page.board) .board-grid .tile": false, ":where(.page.board) .tile": false,
+	} {
+		if boardBaseSelOK(p) != want {
+			t.Errorf("boardBaseSelOK(%q) != %v", p, want)
+		}
+	}
+}
+
+// 내장 테마의 보드 격자 규칙은(extends 로 물려받은 것 포함) .page-body.board-grid 로 시작한다 — .board-grid .tile 꼴은 base 에 져서 보드 절이 죽는다.
+// 이 어휘가 쪽 문서 규칙에 우연히 쓰여도 같은 검사로 드러난다. 이 시험도 꼴 검사다 — 렌더가 아니다(Chrome 실측, WebKit 미검증).
+func TestBuiltinThemeBoardSelectorShape(t *testing.T) {
+	ts := builtin(t)
+	for _, i := range ts.List() {
+		th, _ := ts.Get(i.Name)
+		rules, err := slideCSSRules(th.CSS)
+		if err != nil {
+			t.Fatalf("%s: %v", i.Name, err)
+		}
+		n, sec := 0, 0
+		for _, r := range rules {
+			for _, p := range slideSelectorPieces(r.Prelude) {
+				if strings.HasPrefix(p, ".page-body.board-grid ") {
+					n++
+				}
+				if strings.HasPrefix(p, ".page-body.board-grid .board-section") {
+					sec++
+				}
+				if !boardThemeSelOK(p) {
+					t.Errorf("%s: %q — 보드 격자 규칙은 .page-body.board-grid 로 시작한다", i.Name, p)
+				}
+			}
+		}
+		if n == 0 {
+			t.Errorf("%s: 보드 격자 규칙이 0개 — 보드 절을 못 읽었을 수 있다", i.Name)
+		}
+		if sec == 0 {
+			t.Errorf("%s: 구역 제목 줄(.page-body.board-grid .board-section) 규칙이 없다", i.Name)
+		}
+	}
+	for p, want := range map[string]bool{
+		".page-body.board-grid .tile": true, ".board-head": true, ".bh-title": true, ".board-deco::before": true, ".page-body h2": true,
+		".board-grid .tile": false, ".tile": false, ".page-body .kpi-item": false, ".board-head .tile": false,
+		".page-body.board-grid .board-section": true, ".board-section": false,
+	} {
+		if boardThemeSelOK(p) != want {
+			t.Errorf("boardThemeSelOK(%q) != %v", p, want)
+		}
+	}
 }

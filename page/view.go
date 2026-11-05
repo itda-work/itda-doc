@@ -62,6 +62,9 @@ type View struct {
 	ScopeOK bool `json:"scope_ok"`
 	// Slides 는 발표 설정이다(frontmatter slides: + 문서에서 정한 슬라이드 단계). 늘 채운다 — 화면은 "문서 | 슬라이드" 를 언제나 바꿀 수 있다.
 	Slides SlideView `json:"slides"`
+	// Board 는 보드 설정이다(frontmatter dashboard: + 문서에서 정한 타일 단계, itda-work/itda-hyve#362). 늘 채운다 — 화면은 보드 꼴로
+	// 언제나 바꿀 수 있다.
+	Board BoardView `json:"board"`
 	// FolderMeta 는 이 문서에 적용된 폴더 `_metadata.yml` 의 문서 기준 상대 경로다(itda-hyve#474 — 가까운 것부터).
 	// 화면이 「폴더 설정 적용됨」 표시를 낸다. 경로 없는 렌더(붙여넣은 원문 등)에는 비어 있다.
 	FolderMeta []string `json:"folder_meta,omitempty"`
@@ -111,6 +114,36 @@ func slideView(r mdoc.Result) SlideView {
 		sv.FontScale = m.FontScale
 	}
 	return sv
+}
+
+// BoardView 는 화면이 보드(격자 한 장)를 놓을 때 쓰는 값이다(itda-work/itda-hyve#362 — web/dashboard.js).
+type BoardView struct {
+	Present bool   `json:"present"` // frontmatter 에 dashboard: 가 있다 — 보드로 연다(slides: 보다 앞선다)
+	Cols    int    `json:"cols"`    // 격자 열 수(2~6, 기본 4)
+	Rows    int    `json:"rows"`    // 기준 상자에 들어가는 타일 행 수(2~4, 기본 3) — 타일 높이를 정한다
+	Ratio   string `json:"ratio"`   // 비율 16:9 · 4:3 — 폭과 기준 상자는 슬라이드와 같다(web/slides.js SIZE)
+	Level   int    `json:"level"`   // 타일을 여는 제목 단계(dashboard.level 또는 문서에서 정한 것 — 슬라이드와 같은 규칙). 제목이 없으면 0
+}
+
+// boardView 는 frontmatter 와 렌더 결과로 보드 설정을 채운다. 빈 값은 기본(4×3·16:9·문서에서 정한 단계)이다.
+func boardView(r mdoc.Result) BoardView {
+	bv := BoardView{Cols: 4, Rows: 3, Ratio: "16:9", Level: r.SlideLevel}
+	if m := r.Meta.Dashboard; m != nil {
+		bv.Present = true
+		if m.Cols > 0 {
+			bv.Cols = m.Cols
+		}
+		if m.Rows > 0 {
+			bv.Rows = m.Rows
+		}
+		if m.Ratio != "" {
+			bv.Ratio = m.Ratio
+		}
+		if m.Level > 0 {
+			bv.Level = m.Level
+		}
+	}
+	return bv
 }
 
 // codeView 는 frontmatter 로 코드 블록 표시를 채운다. line-numbers 를 정하지 않았거나 code: 가 없으면 켬이다(itda-hyve#435).

@@ -75,3 +75,12 @@
    종이색 테두리(.line.halo)로 가린다. 토큰을 바꾸지 않으므로 다른 차트의 색은 그대로다. */
 .chart-svg path.line.cl { stroke: var(--chart-text); }
 .chart-svg circle.dot.cl, .chart-svg .sw.cl { fill: var(--chart-text); }
+
+/* ---- 보드(itda-work/itda-hyve#362): 흑백 — 머리 아래 이중선, 타일은 검은 가는 선·각진 모서리, 오름·내림도 검정(기호 글자로만 가린다 — theme.json) */
+.board-deco::before { display: none; }
+.board-head { border-bottom: 3.5pt double var(--ink); }
+.bh-title, .bh-meta { color: var(--ink); }
+.page-body.board-grid .board-section { color: var(--ink); border-bottom: 0.75pt solid var(--ink); }
+.page-body.board-grid .tile { border: 0.75pt solid var(--ink); border-radius: 0; }
+.page-body.board-grid .tile-head { border-bottom: 0.75pt solid var(--ink); padding-bottom: 3pt; }
+.page-body.board-grid .kpi-item + .kpi-item { border-left-color: var(--ink); }

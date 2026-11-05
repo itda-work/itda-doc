@@ -153,6 +153,24 @@
   --slide-scrim-ink: #ffffff;
   --slide-scrim-muted: rgba(255, 255, 255, 0.82);
 
+  /* 보드(itda-work/itda-hyve#362)·KPI. --kpi-size 는 문서(A4)의 값 글자이고 슬라이드·보드는 배수로 키운다. --kpi-min-size 는 보드 타일에서 값을 줄이는 하한
+     (dashboard.js fitKPI — 그 밑으로는 줄이지 않고 줄을 바꾸거나 보조 글을 숨긴다). 오름·내림 색은 기호(▲▼+−)와 함께 쓴다. */
+  --board-pad: 22pt;
+  --board-gap: 9pt;
+  --board-head-h: 28pt;
+  --board-bg: var(--slide-bg);
+  --tile-radius: 5pt;
+  --tile-bg: var(--paper);
+  --tile-border: 0.75pt solid var(--rule);
+  --tile-pad: 9pt 11pt;
+  --tile-head-size: 12pt;
+  --tile-text-size: 10.5pt;
+  --kpi-size: 19pt;
+  --kpi-min-size: 12pt;
+  --slide-kpi-size: calc(var(--kpi-size) * 1.6); /* 슬라이드의 KPI 값 — 슬라이드 배율(--slide-scale)을 곱한다 */
+  --kpi-up: #1a7f37;
+  --kpi-down: #c62828;
+
   --caption-size: 9pt;
   --caption-color: var(--muted);
   --figure-label: "그림";
@@ -1097,3 +1115,113 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 .page.slide .page-body table.slide-only { font-size: calc(var(--slide-table-size) * 1.3 * var(--slide-scale)); }
 .page.slide .page-body blockquote.slide-only { font-size: calc(var(--slide-text-size) * var(--slide-scale)); }
 .overflow-clipped { outline: 1pt dashed #c53030; }
+
+/* ---- KPI(표준 어휘 kpi, itda-work/itda-hyve#362). mdoc 이 요구 구조(정의 목록·3열 표)가 있을 때만 .kpi.kpi-tiles > dl > .kpi-item 을 낸다 — 없으면 종전 div.kpi
+   그대로(kpi-tiles 표식 없음)라 이 규칙이 닿지 않는다(회사 어휘 호환 — mdoc/kpi.go). 값(첫 dd)은 크게, 보조 글(둘째 이후 dd)은 작게, 오름·내림은 색 + 기호 글자. */
+.page-body .kpi-tiles > dl { display: flex; flex-wrap: wrap; gap: 8pt; margin: 6pt 0 var(--paragraph-gap); }
+.page-body .kpi-item { flex: 1 1 0; min-width: 30mm; display: flex; flex-direction: column; gap: 1pt; padding: 5pt 9pt;
+  border-left: 2.5pt solid var(--accent); break-inside: avoid; }
+.page-body .kpi-item > dt { grid-column: auto; font-weight: 600; font-size: 0.88em; color: var(--muted); }
+.page-body .kpi-item > dd { grid-column: auto; margin: 0; }
+.page-body .kpi-item > dd:first-of-type { font-size: var(--kpi-fit, var(--kpi-size)); font-weight: 700; line-height: 1.15; color: var(--ink);
+  white-space: nowrap; word-break: keep-all; overflow-wrap: normal; }
+.page-body .kpi-item > dd:first-of-type ~ dd { font-size: 0.88em; color: var(--muted); }
+.page-body .kpi-item > dd:first-of-type ~ dd.kpi-up { color: var(--kpi-up); }
+.page-body .kpi-item > dd:first-of-type ~ dd.kpi-down { color: var(--kpi-down); }
+.page-body .kpi-tiles.kpi-wrap .kpi-item > dd:first-of-type { white-space: normal; }
+.page-body .kpi-tiles.kpi-noaux .kpi-item > dd:first-of-type ~ dd { display: none; }
+.page.slide .page-body .kpi-item > dd:first-of-type { font-size: calc(var(--slide-kpi-size) * var(--slide-scale)); }
+.page.slide .page-body .kpi-item { padding: 8pt 14pt; }
+
+/* ---- 보드(명세 spec/dashboard.md, itda-work/itda-hyve#362). 보드(.page.board)는 한 장이다. 폭은 슬라이드와 같고(1280·960px) 높이는 내용을 따르되 기준 상자(720px)보다
+   작아지지 않는다. 머리띠(.board-head: 제목·조직·날짜) 아래 격자(.board-grid)에 타일(section.tile(.w2) > header.tile-head + div.tile-body)과 구역 제목 줄(.board-section)을 놓는다.
+   타일 행 높이(--board-row-h)는 기준 상자에 머리와 rows 줄(--board-rows)이 꼭 차는 높이다. 격자 칸 수와 타일 자리는 dashboard.js 가 정한다. 규칙은 모두 보드 안으로 가둔다 — 문서가 {.tile} 같은 클래스를 자기 어휘로 써도 쪽·슬라이드 모양이 바뀌지 않게.
+   격자 안 규칙은 :where(.page.board) .page-body.board-grid X 꼴이다. 테마 보드 절(.page-body.board-grid X)과 우선순위가 같아 테마가 이기고(@scope 가까움, 가두지 않는
+   엔진은 나중 순서), 쪽 문서용 테마 규칙은 .page-body 에 클래스·의사 클래스 하나까지 더한 꼴이면 이 규칙에 져서 보드 구조에 닿지 않는다(그보다 높으면 닿는다 — 테마 책임).
+   머리·장식(.board-head·.bh-*·.board-deco)은 .page-body 밖이라 쪽 문서용 규칙이 닿지 않아 :where(.page.board) X 로 낮게 둔다. 테마 CSS 는 @scope (.page) 안이라 .page 로
+   시작할 수 없다. 꼴은 page/builtincheck_test.go TestBaseBoardSelectorShape 가 보고, 우선순위 결과는 Chrome 계산 스타일로만 확인했다(WebKit 미검증). */
+.page.board {
+  --text-size: var(--tile-text-size); --line-height: 1.45; --paragraph-gap: 4pt; --table-size: calc(var(--tile-text-size) * 0.92);
+  --code-size: calc(var(--tile-text-size) * 0.9); --caption-size: 8.5pt; --h3-size: var(--tile-text-size); --h4-size: var(--tile-text-size);
+  background: var(--board-bg);
+  height: auto; min-height: calc(var(--page-h) - 1px); /* 1px — .page 와 같다(찍을 때 용지가 이보다 크다, 빈 쪽 방지) */
+  --board-row-h: calc((var(--page-h) - 1px - 2 * var(--board-pad) - var(--board-head-h) - var(--board-rows, 3) * var(--board-gap)) / var(--board-rows, 3));
+}
+:where(.page.board) .board-deco { position: absolute; inset: 0; pointer-events: none; }
+:where(.page.board) .board-deco::before { content: ""; position: absolute; left: var(--board-pad); top: 0; width: 46pt; height: 4pt; background: var(--accent); }
+:where(.page.board) .board-head { position: absolute; top: var(--board-pad); left: var(--board-pad); right: var(--board-pad); height: var(--board-head-h);
+  display: flex; align-items: center; gap: 12pt; min-width: 0; }
+:where(.page.board) .bh-logo { height: 18pt; max-width: 90pt; object-fit: contain; }
+:where(.page.board) .bh-title { flex: 1 1 auto; min-width: 0; font-family: var(--font-heading); font-size: calc(var(--tile-head-size) * 1.55); font-weight: 700;
+  color: var(--slide-title-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
+:where(.page.board) .bh-title > :is(h1, h2, h3, h4, h5, h6) { font: inherit; color: inherit; margin: 0; padding: 0; border: 0; display: inline; }
+:where(.page.board) .bh-title .header-section-number { color: var(--accent); margin-right: 0.35em; }
+:where(.page.board) .bh-meta { flex: none; font-size: 10.5pt; color: var(--muted); }
+:where(.page.board) .page-body.board-grid { position: relative; top: auto; bottom: auto; left: auto; right: auto; overflow: visible; display: grid; gap: var(--board-gap);
+  margin: calc(var(--board-pad) + var(--board-head-h) + var(--board-gap)) var(--board-pad) var(--board-pad); }
+:where(.page.board) .page-body.board-grid .tile { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; box-sizing: border-box; overflow: hidden;
+  padding: var(--tile-pad); border: var(--tile-border); border-radius: var(--tile-radius); background: var(--tile-bg); }
+:where(.page.board) .page-body.board-grid .tile-head { flex: none; display: flex; align-items: baseline; gap: 4pt; min-width: 0; margin: 0 0 5pt; }
+:where(.page.board) .page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6) { flex: 0 1 auto; min-width: 0; margin: 0; padding: 0; border: 0; font-size: var(--tile-head-size);
+  font-weight: 700; line-height: 1.3; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:where(.page.board) .page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6)::before, :where(.page.board) .page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6)::after { content: none; }
+:where(.page.board) .page-body.board-grid .tile-head .header-section-number { color: var(--accent); }
+:where(.page.board) .page-body.board-grid .tile-clip { flex: none; margin-left: auto; font-weight: 700; color: var(--muted); }
+:where(.page.board) .page-body.board-grid .tile-body { flex: 1 1 auto; min-height: 0; overflow: hidden; overflow: clip; }
+:where(.page.board) .page-body.board-grid .tile-body > :first-child { margin-top: 0; }
+:where(.page.board) .page-body.board-grid .tile-body > :last-child { margin-bottom: 0; }
+:where(.page.board) .page-body.board-grid .tile-body figure { margin: 0; }
+:where(.page.board) .page-body.board-grid .tile-body table { margin: 0; }
+:where(.page.board) .page-body.board-grid .tile-body .tile-more { margin: 2pt 0 0; font-size: 8.5pt; color: var(--muted); }
+/* 구역 제목 줄(문서의 높은 제목): 격자 전체 폭, 자기 높이. 제목 요소의 쪽 문서 꾸밈을 받지 않는다 — 내장 테마는 보드 절에서 꾸민다 */
+:where(.page.board) .page-body.board-grid .board-section { min-width: 0; padding: 5pt 0 1pt; font-family: var(--font-heading); font-size: calc(var(--tile-head-size) * 1.2); font-weight: 700; line-height: 1.3; color: var(--slide-title-color); }
+:where(.page.board) .page-body.board-grid .board-section > :is(h1, h2, h3, h4, h5, h6) { margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; letter-spacing: normal; text-transform: none; }
+:where(.page.board) .page-body.board-grid .board-section > :is(h1, h2, h3, h4, h5, h6)::before, :where(.page.board) .page-body.board-grid .board-section > :is(h1, h2, h3, h4, h5, h6)::after { content: none; }
+:where(.page.board) .page-body.board-grid .board-section .header-section-number { color: var(--accent); margin-right: 0.35em; }
+:where(.page.board) .page-body.board-grid .chart-pie .chart-svg, :where(.page.board) .page-body.board-grid .chart-donut .chart-svg { max-width: 70%; margin: 0 auto; }
+/* 보드의 KPI: 타일을 채우고 값은 문서보다 크게(넘치면 dashboard.js 가 하한까지 줄인다) */
+:where(.page.board) .page-body.board-grid .tile-body > .kpi-tiles { height: 100%; }
+:where(.page.board) .page-body.board-grid .kpi-tiles > dl { height: 100%; margin: 0; flex-wrap: nowrap; align-items: stretch; gap: 8pt; }
+:where(.page.board) .page-body.board-grid .kpi-item { min-width: 0; justify-content: center; border-left: 0; padding: 0 4pt; }
+:where(.page.board) .page-body.board-grid .kpi-item + .kpi-item { border-left: 0.75pt solid var(--rule); padding-left: 10pt; }
+:where(.page.board) .page-body.board-grid .kpi-item > dd:first-of-type { font-size: var(--kpi-fit, calc(var(--kpi-size) * 1.45)); }
+/* 크게 보기(itda-work/itda-hyve#362 — 보는 쪽 화면 동작, dashboard.js zoomer). 복제하지 않고 그 자리 타일(.tile-zoomed)을 지금 보이는 영역 크기로(--tz-*, zoomBox) 절대 위치에
+   띄운다 — 조상이 그대로라 테마 보드 절이 닿고, 보드와 함께 확대·축소된다(position: fixed 를 쓰지 않는다). 다른 타일·구역 줄·머리(.tile-under)는 숨긴다.
+   넘침 처리가 남긴 것(숨긴 행·「… n행 더」·「…」·인라인 --img-max-h·--kpi-fit·kpi-noaux)은 DOM 에 두고 여기서만 덮는다 — 닫으면 클래스만 떨어져 타일이 전과 같다.
+   모두 @media screen 안이라 인쇄·PDF 에는 닿지 않는다. 단추(.tile-zoom-btn·.tile-zoom-close)는 화면 부품이 그린 뒤 달고(arm) 인쇄에서 숨는다. */
+@media screen {
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn, :where(.page.board) .page-body.board-grid .tile-zoom-close {
+    position: absolute; top: 4pt; right: 4pt; z-index: 1; width: 17pt; height: 17pt; padding: 0; margin: 0; box-sizing: border-box;
+    border: 0.75pt solid var(--rule); border-radius: 3pt; background: var(--tile-bg); color: var(--muted); font: 700 12pt/1 var(--font-body); cursor: pointer; }
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn { opacity: 0; cursor: zoom-in; }
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn::before { content: ""; position: absolute; inset: 4.5pt; border: 1.25pt solid currentColor; border-radius: 1pt; }
+  :where(.page.board) .page-body.board-grid .tile:hover > .tile-zoom-btn, :where(.page.board) .page-body.board-grid .tile-zoom-btn:focus-visible { opacity: 1; }
+  :where(.page.board) .page-body.board-grid .tile-zoom-close::before { content: "×"; }
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn:focus-visible, :where(.page.board) .page-body.board-grid .tile-zoom-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  :where(.page.board) .page-body.board-grid .tile-head { cursor: zoom-in; }
+  :where(.page.board) .page-body.board-grid .tile-under, :where(.page.board) .board-head.tile-under { visibility: hidden; }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed {
+    position: absolute; left: var(--tz-left, 0); top: var(--tz-top, 0); width: var(--tz-width, 100%); height: var(--tz-height, 100%); z-index: 2;
+    grid-column: auto !important; grid-row: auto !important; /* 인라인 자리를 덮는다 — 격자 칸이 아니라 격자 상자가 기준이다 */
+    --text-size: calc(var(--tile-text-size) * 1.3); --table-size: calc(var(--tile-text-size) * 1.2); --code-size: calc(var(--tile-text-size) * 1.15);
+    --caption-size: 10.5pt; --h3-size: var(--text-size); --h4-size: var(--text-size);
+    font-size: var(--text-size); box-shadow: 0 6pt 22pt rgba(0, 0, 0, 0.22); }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed > .tile-head { cursor: auto; padding-right: 22pt; }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed > .tile-head > :is(h1, h2, h3, h4, h5, h6) { font-size: calc(var(--tile-head-size) * 1.35); }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed > .tile-zoom-btn,
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed .tile-clip,
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed .tile-more { display: none; }
+  /* 본문: 잘림 없이 굴린다(끝에서 바깥으로 번지지 않게). 그림·차트 높이 상한은 타일 높이에서 머리·여백을 뺀 만큼(인라인 --img-max-h 를 덮는다) */
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed > .tile-body { overflow: auto; overscroll-behavior: contain; --img-max-h: calc(var(--tz-height, var(--page-h)) - 90px) !important; }
+  /* 호스트가 [hidden] 을 !important 로 숨겨도(hyve app.css) 크게 보기 동안은 보인다 — 같은 !important 에서 명시도가 더 높다 */
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed > .tile-body tr[hidden] { display: table-row !important; }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed .kpi-tiles { --kpi-fit: initial !important; }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed .kpi-item > dd:first-of-type { font-size: calc(var(--kpi-size) * 2.2); }
+  :where(.page.board) .page-body.board-grid .tile.tile-zoomed .kpi-tiles.kpi-noaux .kpi-item > dd:first-of-type ~ dd { display: block; }
+}
+@media screen and (hover: none) {
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn { opacity: 0.75; }
+}
+@media print {
+  :where(.page.board) .page-body.board-grid .tile-zoom-btn, :where(.page.board) .page-body.board-grid .tile-zoom-close { display: none; }
+}

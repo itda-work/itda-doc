@@ -311,3 +311,30 @@ func slideGuardRuleErr(r cssBlock) string {
 	}
 	return ""
 }
+
+// pageRootSel — 선택자 조각이 쪽 상자(.page) 자신으로 시작하는가(.page-body 같은 다른 이름은 아니다).
+var pageRootSel = regexp.MustCompile(`^\.page(?:$|[^-_a-zA-Z0-9])`)
+
+// pageRootProblems 는 테마 CSS 한 벌에서 .page 로 시작하는 규칙을 찾는다(itda-work/itda-hyve#362 리뷰 1회차 [1]).
+// 테마 CSS 는 @scope (.page) 안에 들어가고(StyleSheet), 그 안의 선택자는 :scope 뿌리의 자손으로 읽히므로
+// .page.board .tile 은 「.page 안의 또 다른 .page.board」 를 찾아 아무것도 고르지 못한다(Chrome 실측).
+// 꼴마다 다른 모양은 그 안 요소(.board-deco·.board-head·.page-body.board-grid …)로 시작해 고른다.
+// BuiltinThemeProblems 에는 넣지 않았다 — 앱이 더한 테마(hyve 브랜드)에 같은 꼴(.page.slide …)이 있어 그 판단은 따로 한다.
+func pageRootProblems(css string) []string {
+	rules, err := slideCSSRules(css)
+	if err != nil {
+		return []string{fmt.Sprintf("CSS 파싱 실패: %v", err)}
+	}
+	var out []string
+	for _, r := range rules {
+		if strings.HasPrefix(strings.TrimSpace(r.Prelude), "@") {
+			continue // @font-face 같은 리프 @규칙
+		}
+		for _, p := range slideSelectorPieces(r.Prelude) {
+			if pageRootSel.MatchString(p) {
+				out = append(out, p+" — @scope (.page) 안에서 .page 로 시작하는 선택자는 아무것도 고르지 못한다")
+			}
+		}
+	}
+	return out
+}

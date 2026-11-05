@@ -52,11 +52,23 @@
   const NARROW = 768;
   const PX_PER_MM = 96 / 25.4;
 
-  // lookFor 는 그릴 보기 꼴이다(호스트 앱과 같은 이름 — "doc" 쪽·"flow" 이어보기·"slides").
-  // chosen 이 "slides" 면(발표자 따라가기가 바꿈) 슬라이드다. 쪽 따라가기는 chosen 을 "doc" 으로 바꾼다.
+  // boardOK 는 이 화면이 보드 꼴을 그릴 수 있는가다(itda-work/itda-hyve#362). 화면이 시작할 때 window.ItdaBoard(web/dashboard.js)가
+  // 있는지로 한 번 정한다(setBoardOK — 아래 「화면」). 공유 화면(호스트가 dashboard.js 를 싣는다)은 참, 웹 뷰어(싣지 않는다 —
+  // scripts/build-web.sh)는 거짓이라 보드 문서를 쪽 보기로 그린다. 화면을 시작하지 않는 쓰임(시험)은 기본값 참이다.
+  let boardOK = true;
+  function setBoardOK(ok) { boardOK = !!ok; }
+  // boardDoc 은 보드로 열 문서인가다 — 문서에 dashboard: 가 있고 이 화면이 보드를 그릴 수 있다(lookFor·lookSwitchHidden 이 같이 쓴다).
+  function boardDoc(v) { return boardOK && !!(v && v.board && v.board.present); }
+
+  // lookFor 는 그릴 보기 꼴이다(호스트 앱과 같은 이름 — "doc" 쪽·"flow" 이어보기·"slides"·"dashboard" 보드).
+  // chosen 이 "slides"·"dashboard" 면(발표자 따라가기가 호스트의 발표 꼴로 바꿈 — itda-work/itda-hyve#362) 그 꼴이 문서의 꼴보다 앞선다.
+  // 그 밖에는 보드 문서(board.present)는 보드(호스트의 처음 꼴과 같이 slides: 보다 앞선다), 슬라이드 문서는 슬라이드다.
+  // 쪽 따라가기는 chosen 을 "doc" 으로 바꾼다. 보드를 그릴 수 없는 화면(boardOK 거짓 — dashboard.js 를 싣지 않은 웹 뷰어)에서는 보드를
+  // 고르지 않는다 — board.present 와 chosen "dashboard" 를 없는 것으로 보고 아래 규칙으로 고른다(쪽 문서와 같이).
   function lookFor(v, width, chosen) {
+    if (chosen === "slides" || (chosen === "dashboard" && boardOK)) return chosen;
+    if (boardDoc(v)) return "dashboard";
     if (v && v.slides && v.slides.present) return "slides";
-    if (chosen === "slides") return "slides";
     if (chosen === "doc" || chosen === "flow") return chosen;
     return width <= NARROW ? "flow" : "doc";
   }
@@ -69,7 +81,7 @@
 
   // connect 는 갱신 스트림의 상태 기계다. 상태: connecting → open(hello) → waiting(끊김, 다시 붙기 전) → … / ended(stop·kick·공유 없음).
   // deps: EventSource, probe()(공유가 살아 있으면 true, 404 면 false, 403(이 화면을 끊음)이면 "kicked"), setTimeout·clearTimeout,
-  // onHello(first, data), onReload(), onVersion(data), onSlide(data — {index, total, follow}), onPos(data — {block, frac, total, follow}, ⑧),
+  // onHello(first, data), onReload(), onVersion(data), onSlide(data — {index, total, look, follow}), onPos(data — {block, frac, total, follow}, ⑧),
   // onEnded(reason — kick·403 은 "kicked").
   function connect(base, deps) {
     const c = { state: "connecting", tries: 0, es: null, timer: 0, hellos: 0 };
@@ -269,40 +281,58 @@
   // 슬라이드, -1 = 발표 아님)·pos·posFrac·posTotal(호스트가 발표가 아닌 보기로 보는 최상위 블록·그 안 비율·블록 수, -1 = 아님 — ⑧)·
   // paused(보는 사람이 직접 움직여 이 화면에서만 잠시 풀림).
   // 따라갈 위치는 하나다(kind·index·frac·total): slide ≥ 0 이면 "slide", 아니고 pos ≥ 0 이면 "pos", 둘 다 -1 이면 없음(kind "").
-  // deps: align(i, kind, frac)(맞춘다 — 슬라이드는 보기 꼴을 슬라이드로 바꿔 가운데, 내용 위치는 꼴을 그대로 둔 채 — followAction),
+  // 보드 발표(slideLook "dashboard")는 번호가 없는 굴림이라 slide(0 / 1)는 꼴만 붙들고, pos 가 있으면 "pos" 로 따라간다.
+  // deps: align(i, kind, frac, look)(맞춘다 — look 은 호스트의 발표 보기 꼴(slides·dashboard) — 슬라이드는 보기 꼴을 그 꼴로 바꿔 가운데,
+  // 내용 위치는 꼴을 그대로 둔 채 — 다만 보드 발표면 look 이 "dashboard" 라 보드로 바꿔 맞춘다 — followAction),
   // release()(따라가는 표시를 뗀다 — 보기 꼴은 되돌리지 않는다), button(label)(「발표자 위치로」 단추를 그 글로 보임 — "" 이면 숨김, backLabel),
   // changed()(상태가 바뀔 때마다 맨 끝에 한 번 — 화면은 쪽 | 이어보기 단추의 숨김을 고친다).
   //  - follow && !paused && 위치가 있으면 맞춘다(active). 단추는 숨긴다.
   //  - follow && paused && 위치가 있으면 맞추지 않고 단추를 보인다.
   //  - follow 가 꺼지거나 위치가 없어지면 단추를 숨기고 놓는다. 그때 풀림도 거둔다 — 다음 발표·읽기·다시 켬은 처음부터 따라간다.
   //    위치의 꼴이 바뀌어도(읽기 → 발표 시작, 발표 끝 → 읽기) 풀림을 거둔다 — 새 꼴은 처음부터 따라간다.
-  //  - onSlide(d): {index, total, follow}. onPos(d): {block, frac, total, follow} — 발표 중(slide ≥ 0)에 온 pos 는 저장만 한다(follow 가
+  //  - onSlide(d): {index, total, look, follow}. onPos(d): {block, frac, total, follow} — 슬라이드 발표 중(presentLook "slides")에 온 pos 는 저장만 한다(follow 가
   //    그대로면 맞추지 않는다).
   //  - moved(): 맞추는 중에 사람이 움직이면 풀린다. resume(): 단추 — 풀림을 거두고 바로 맞춘다.
-  //  - hello(data): hello 의 slide·slide_total·pos·pos_frac·pos_total·follow 로 맞춘다(늦게 들어온 화면). 값이 없으면 아무것도 하지 않는다.
+  //  - hello(data): hello 의 slide·slide_total·slide_look·pos·pos_frac·pos_total·follow 로 맞춘다(늦게 들어온 화면·다시 붙음). 값이 없으면
+  //    아무것도 하지 않는다.
+  // presentLook 은 「발표가 붙든 꼴」 이다(itda-work/itda-hyve#362 — "slides"·"dashboard"·null). 보기 꼴의 복귀는 이벤트 종류가 아니라 이
+  // 상태의 전이로만 가린다(slide·pos 는 호스트가 따로 합쳐 보내 순서가 보장되지 않는다):
+  //   1. slide{index ≥ 0, look}·hello 의 slide_look(따라가기 켜짐) → presentLook = look. align(번호, "slide", 0, look) 이 꼴이 다르면 그
+  //      꼴로 다시 그린 뒤 번호로 맞춘다(followAction "redraw").
+  //   2. slide{index: -1}(발표 끝) → presentLook = null. release() 가 문서 자신의 꼴로 돌아가고(화면 — restoreOwnLook), 유효한 pos 가
+  //      있으면 이어서 align(pos) — 화면은 다시 그린 뒤 render 끝에서 그 앵커로 맞춘다(fol.active()).
+  //   3. 따라가기 끔 → 2 와 같다(release). 다시 켬 → 저장된 발표(slide ≥ 0)가 있으면 1, 없으면 pos.
+  //   4. pos → presentLook 이 "slides" 면 저장만(발표가 붙들고 있다), null·"dashboard" 면 앵커로 맞춘다(보드 발표는 내용 위치가 곧 발표 위치다).
+  //   꼴이 없는 slide(옛 호스트)는 "slides" 로 읽는다(lookName).
   function follower(deps) {
-    const f = { follow: false, slide: -1, slideTotal: 0, pos: -1, posFrac: 0, posTotal: 0, paused: false, kind: "", index: -1, frac: 0, total: 0 };
+    const f = { follow: false, slide: -1, slideTotal: 0, slideLook: "", pos: -1, posFrac: 0, posTotal: 0, paused: false, kind: "", index: -1, frac: 0, total: 0,
+      presentLook: null };
     function update() {
-      const kind = f.slide >= 0 ? "slide" : f.pos >= 0 ? "pos" : "";
-      if (kind !== f.kind) f.paused = false;
+      const kind = f.slide >= 0 && !(f.slideLook === "dashboard" && f.pos >= 0) ? "slide" : f.pos >= 0 ? "pos" : "";
+      const held = f.follow && f.slide >= 0 ? f.slideLook : null; // presentLook 규칙 1·2·3
+      if (kind !== f.kind || held !== f.presentLook) f.paused = false; // 위치의 꼴이나 발표가 붙든 꼴이 바뀌면 처음부터 따라간다
       f.kind = kind;
       f.index = kind === "slide" ? f.slide : kind === "pos" ? f.pos : -1;
       f.frac = kind === "pos" ? f.posFrac : 0;
       f.total = kind === "slide" ? f.slideTotal : kind === "pos" ? f.posTotal : 0;
+      const freed = f.presentLook !== null && held === null;
+      f.presentLook = held;
       const on = f.follow && !!kind;
+      if (freed && on) deps.release(); // 규칙 2: 발표가 놓은 꼴을 먼저 되돌리고 아래에서 pos 로 맞춘다
       if (!on) { f.paused = false; deps.button(""); deps.release(); }
       else if (f.paused) deps.button(backLabel(kind, f.index, f.total));
-      else { deps.button(""); deps.align(f.index, kind, f.frac); }
+      else { deps.button(""); deps.align(f.index, kind, f.frac, f.presentLook || ""); }
       if (deps.changed) deps.changed();
     }
     f.active = () => f.follow && !f.paused && !!f.kind;
     f.following = () => f.follow && !!f.kind; // 따라갈 위치가 있고 따라가기가 켜짐(이 화면이 잠시 풀렸어도)
-    f.holdsLook = () => f.follow && f.kind === "slide"; // 보기 꼴을 붙드는 따라가기(발표 슬라이드 — 풀린 동안 포함)
+    f.holdsLook = () => f.presentLook !== null; // 보기 꼴을 붙드는 따라가기(발표가 붙든 꼴 — 풀린 동안 포함)
     f.onSlide = d => {
       if (!d || typeof d.index !== "number") return;
       f.follow = !!d.follow;
       f.slide = d.index;
       f.slideTotal = Number(d.total) || 0;
+      f.slideLook = lookName(d.look);
       update();
     };
     f.onPos = d => {
@@ -312,7 +342,7 @@
       f.pos = d.block;
       f.posFrac = clampFrac(d.frac);
       f.posTotal = Number(d.total) || 0;
-      if (f.slide >= 0 && f.follow === was) return; // 슬라이드가 우선 — 저장만
+      if (f.presentLook === "slides" && f.follow === was) return; // 규칙 4: 슬라이드 발표가 꼴을 붙들고 있으면 저장만
       update();
     };
     f.hello = d => {
@@ -320,6 +350,7 @@
       f.follow = !!d.follow;
       f.slide = d.slide;
       f.slideTotal = Number(d.slide_total) || 0;
+      f.slideLook = lookName(d.slide_look);
       if (typeof d.pos === "number") { f.pos = d.pos; f.posFrac = clampFrac(d.pos_frac); f.posTotal = Number(d.pos_total) || 0; }
       update();
     };
@@ -327,6 +358,8 @@
     f.resume = () => { if (f.following()) { f.paused = false; update(); } };
     return f;
   }
+  // lookName 은 발표 보기 꼴 값이다 — "dashboard" 가 아니면 "slides"(옛 호스트·빈 값은 슬라이드).
+  function lookName(x) { return x === "dashboard" ? "dashboard" : "slides"; }
   function clampFrac(x) { const v = Number(x); return v > 0 ? Math.min(1, v) : 0; }
 
   // backLabel 은 풀린 동안의 「발표자 위치로」 단추 글이다. 발표 슬라이드는 (n/N), 내용 위치는 숫자 없이 — 블록 번호는 사람에게 뜻이
@@ -335,12 +368,16 @@
     return kind === "slide" ? "발표자 위치로 (" + (index + 1) + "/" + total + ")" : "발표자 위치로";
   }
 
-  // followAction 은 맞출 때 할 일이다: 발표 슬라이드는 슬라이드 보기가 아니면 슬라이드로 바꿔 다시 그린 뒤 맞추고("redraw" — 그 꼴로
-  // 그릴 수 없으면 "none"), 내용 위치는 보기 꼴을 바꾸지 않고 지금 꼴에서 맞춘다("scroll" — ⑤처럼 쪽으로 바꾸지 않는다).
-  function followAction(kind, look, v, width) {
-    if (kind !== "slide") return "scroll";
-    if (look === "slides") return "scroll";
-    return lookFor(v, width, "slides") === "slides" ? "redraw" : "none";
+  // followAction 은 맞출 때 할 일이다: 발표 슬라이드는 지금 꼴이 호스트의 발표 꼴(want — "slides"·"dashboard", 없으면 "slides")이
+  // 아니면 그 꼴로 바꿔 다시 그린 뒤 맞추고("redraw" — 그 꼴로 그릴 수 없으면 "none"), 같으면 번호로 맞춘다("scroll").
+  // 내용 위치는 보기 꼴을 바꾸지 않고 지금 꼴에서 맞춘다("scroll" — ⑤처럼 쪽으로 바꾸지 않는다). 다만 보드 발표의 내용 위치(want "dashboard")는
+  // 발표가 꼴을 붙들고 있어 슬라이드와 같이 그 꼴로 바꾼다 — 그릴 수 없는 화면(웹 뷰어)은 지금 꼴에서 맞춘다.
+  function followAction(kind, look, v, width, want) {
+    if (kind !== "slide" && want !== "dashboard") return "scroll";
+    want = want === "dashboard" ? "dashboard" : "slides";
+    if (look === want) return "scroll";
+    if (lookFor(v, width, want) === want) return "redraw";
+    return kind === "slide" ? "none" : "scroll";
   }
 
   // ytFollowGate 는 따라가기로 맞출 때 재생 중인 YouTube 를 멈출지 정하는 문지기를 만든다. 발표 슬라이드(kind "slide")는 직전에 따라간
@@ -383,8 +420,16 @@
   // 않으므로 보인다. 발표가 끝나거나 따라가기가 꺼지면 보기 꼴은 그대로 두되 단추를 다시 보여 사람이 쪽·이어보기로 돌아갈 수 있다.
   // look 은 견주지 않는다(따라가는 꼴로 다시 그리는 중이어도 숨김).
   function lookSwitchHidden(v, look, holding) {
-    if (v && v.slides && v.slides.present) return true;
+    if ((v && v.slides && v.slides.present) || boardDoc(v)) return true;
     return !!holding;
+  }
+
+  // restoreOwnLook 은 follower 의 presentLook 규칙 2·3(발표 끝·따라가기 끔 — release)에서 문서 자신의 꼴로 돌아갈지다(itda-work/itda-hyve#362):
+  // 슬라이드·보드 문서는 꼴 단추가 숨어 있어 호스트가 다른 꼴로 발표한 뒤 그 꼴에 갇히지 않게, 따라가기가 고른 꼴(chosen)을 거두고
+  // 문서의 꼴로 다시 그린다. 그 밖의 문서는 종전처럼 꼴을 그대로 둔다(단추가 보인다).
+  function restoreOwnLook(v, chosen, width) {
+    if (!lookSwitchHidden(v, "", false) || (chosen !== "slides" && chosen !== "dashboard")) return false;
+    return lookFor(v, width, "") !== chosen;
   }
 
   // afterResize 는 보기 영역 크기가 바뀐 뒤다: 배율을 다시 적용하고(applyZoom), 따라가는 중이면(active — 풀린 화면은 아니다) 새 배율·폭의
@@ -755,12 +800,14 @@
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, syncer, follower, backLabel, followAction, pickBlock, fragAt,
+    restoreOwnLook, setBoardOK,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
   if (!source) return;
+  setBoardOK(!!window.ItdaBoard); // 보드를 그릴 부품(dashboard.js)이 없으면 보드 꼴을 고르지 않는다(boardOK — 웹 뷰어)
 
   // ---- 화면
 
@@ -814,8 +861,8 @@
       $("load-err").textContent = THEME_FAILED;
     },
     end: reason => showEnded(reason),
-    hello: d => fol.hello(d),
-    slide: d => fol.onSlide(d),
+    hello: d => { fol.hello(d); zoomCheck(); },
+    slide: d => { fol.onSlide(d); zoomCheck(); },
     pos: d => fol.onPos(d),
     toast: msg => toast(msg),
   });
@@ -830,12 +877,13 @@
   }
 
   function lookClasses(el, look) {
-    const slides = look === "slides";
+    const slides = look === "slides", sized = slides || look === "dashboard"; // 보드의 폭·기준 상자는 슬라이드와 같다
     el.classList.toggle("slides", slides);
+    el.classList.toggle("boards", look === "dashboard");
     el.classList.toggle("flow-look", look === "flow");
-    el.classList.toggle("r43", slides && state.ratio === "4:3");
-    el.classList.toggle("r169", slides && state.ratio !== "4:3");
-    if (slides) { const [w, h] = window.ItdaSlides.SIZE[state.ratio]; el.style.setProperty("--page-w", w + "px"); el.style.setProperty("--page-h", h + "px"); }
+    el.classList.toggle("r43", sized && state.ratio === "4:3");
+    el.classList.toggle("r169", sized && state.ratio !== "4:3");
+    if (sized) { const [w, h] = window.ItdaSlides.SIZE[state.ratio]; el.style.setProperty("--page-w", w + "px"); el.style.setProperty("--page-h", h + "px"); }
     else { el.style.removeProperty("--page-w"); el.style.removeProperty("--page-h"); }
   }
 
@@ -863,6 +911,9 @@
       const [sw, sh] = window.ItdaSlides.SIZE[state.ratio];
       w = sw;
       z = slideZoom(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter);
+    } else if (state.look === "dashboard") {
+      w = window.ItdaSlides.SIZE[state.ratio][0]; // 보드는 긴 한 장이다 — 쪽처럼 너비에 맞춘다
+      z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
     } else {
       w = (state.landscape ? 297 : 210) * PX_PER_MM;
       z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
@@ -875,6 +926,7 @@
     pg.style.transform = "scale(" + z + ")";
     box.style.width = outW + "px";
     box.style.height = Math.ceil(pg.offsetHeight * z) + "px";
+    if (boardZoom) boardZoom.fit(); // 크게 보기 타일은 보이는 영역을 채운다
   }
 
   // 표 복사(itda-hyve#349) 메뉴가 고른 표의 조각들. render 가 본문을 바꾸거나 비우면 메뉴를 닫고 버린다 — 열린 메뉴가 화면에서 떨어진 옛 표를 복사하지 않게.
@@ -883,6 +935,11 @@
   const tmenu = tableMenu({ menu: $("table-ctx"), active: () => document.activeElement, view: () => ({ w: window.innerWidth, h: window.innerHeight }),
     now: () => Date.now(), onClose: () => { ctxTables = null; } });
   function closeTableMenu() { tmenu.close(); ctxTables = null; }
+
+  // 보드 크게 보기(itda-work/itda-hyve#362 — dashboard.js zoomer). 발표를 따라가는 동안(fol.holdsLook — 발표가 꼴을 붙듦, 잠시 풀린 동안 포함)은
+  // 열지 않고, 열려 있으면 다음 이벤트·발표 메시지(slide·hello)에서 닫는다. 보드를 그릴 수 없는 화면(웹 뷰어 — ItdaBoard 없음)에는 없다.
+  const boardZoom = window.ItdaBoard && window.ItdaBoard.zoomer ? window.ItdaBoard.zoomer($("pages"), { blocked: () => fol.holdsLook(), scroller: $("viewer") }) : null;
+  const zoomCheck = () => { if (boardZoom) boardZoom.current(); }; // current() 가 막힘(발표 따라가기)을 보고 닫는다
 
   // render 는 호스트 앱 보기 그리기의 보기 부분이다: 무대(화면 밖)에서 나눈 뒤 쪽을 한 번에 바꾼다.
   // 공유가 끝나면(state.ended) 각 await 뒤·DOM 쓰기 전에 멈춘다 — 늦게 끝난 그리기가 「공유가 끝났습니다」 를 덮지 않게.
@@ -910,9 +967,9 @@
     document.documentElement.lang = v.lang || "ko";
     await document.fonts.ready;
     if (state.ended) return;
-    const sv = v.slides || {};
-    state.ratio = sv.ratio === "4:3" ? "4:3" : "16:9";
+    const sv = v.slides || {}, bv = v.board || {};
     state.look = lookFor(v, window.innerWidth, state.chosen);
+    state.ratio = (state.look === "dashboard" ? bv.ratio : sv.ratio) === "4:3" ? "4:3" : "16:9";
     paintLookSwitch();
     for (const b of document.querySelectorAll("[data-look]")) b.classList.toggle("on", b.dataset.look === state.look);
     const stage = $("stage");
@@ -930,14 +987,16 @@
     stage.appendChild(target);
     // 표 정렬(itda-hyve#349 2단계): 쪽·이어보기에서만, 나누기 전 흐름에(문서 창과 같다 — 쪽 나눔이 정렬된 표 전체를 다시 나눈다)
     let sorted = null;
-    if (state.look !== "slides" && TableSort) {
+    if (state.look !== "slides" && state.look !== "dashboard" && TableSort) {
       TableSort.mark(flow);
       if (sort && TableSort.apply(flow, sort)) sorted = sort;
     }
     // 코드 줄 번호(itda-hyve#435 — 호스트 부품 CodeLines): 쪽 나눔·슬라이드 나눔 전에 감싼다(호스트 앱 창과 같은 자리).
     // frontmatter code.line-numbers: false 면 줄 강조(itda-hyve#479 data-hl)·단 나누기(itda-hyve#487 data-cols) 블록만 번호 없이 감싼다. 스크립트가 404 여도(허용 목록 누락 — 리뷰 R1) 렌더는 깨지 않는다.
     if (CodeLines) CodeLines.wrap(flow, { numbers: (v.code || {}).line_numbers !== false });
-    if (state.look === "slides") {
+    if (state.look === "dashboard") {
+      window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info });
+    } else if (state.look === "slides") {
       const org = (flow.querySelector(".cover-org, .title-org") || {}).textContent || "";
       const r = window.ItdaSlides.build(flow, target, { ratio: state.ratio, level: sv.level, incremental: sv.incremental, fontScale: sv.font_scale, logo: v.logo, footer: org.trim(), info: v.info });
       // 노트는 호스트가 「노트 함께 보이기」 를 켰을 때만 온다 — 오지 않았으면 컨트롤을 숨기고 칸도 없다
@@ -965,6 +1024,7 @@
     const pagesEl = $("pages");
     lookClasses(pagesEl, state.look);
     document.body.classList.toggle("look-slides", state.look === "slides");
+    document.body.classList.toggle("look-board", state.look === "dashboard");
     document.body.classList.toggle("look-flow", state.look === "flow");
     const frag = document.createDocumentFragment();
     while (target.firstChild) frag.appendChild(target.firstChild);
@@ -974,6 +1034,7 @@
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     // 쪽·이어보기·슬라이드(발표 공유) 모두.
     if (CodeCopy) CodeCopy.arm(pagesEl);
+    if (boardZoom && state.look === "dashboard") boardZoom.arm(); // 크게 보기 단추 — 새 보드의 타일마다(옛 보드는 떨어져 열린 상태도 버려진다)
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
     target.remove();
@@ -1117,7 +1178,7 @@
     for (const x of root.querySelectorAll(".following")) x.classList.remove("following");
     const center = el => placeSlide(el); // 아래 노트가 붙어 보이면 위에 붙인다(itda-hyve#344)
     if (kind === "slide") {
-      if (state.look !== "slides") return;
+      if (state.look !== "slides") return; // 보드 발표의 번호(0 / 1)는 꼴만 붙든다 — 위치는 내용 위치(pos)로 온다
       const pg = root.querySelectorAll(".page")[i];
       if (!pg) return;
       pg.classList.add("following");
@@ -1159,17 +1220,19 @@
     try { await state.rendering; } finally { state.rendering = null; }
   }
 
-  // fol 은 발표자 따라가기다(follower). 맞출 때 할 일은 followAction 이 정한다 — 발표 슬라이드는 보기 꼴이 슬라이드가 아니면 슬라이드로
-  // 바꿔 다시 그리고(render 가 끝에 맞춘다), 내용 위치는 보기 꼴을 그대로 둔 채 지금 꼴에서 맞춘다(⑧ — 원래 슬라이드 문서는 슬라이드로).
+  // fol 은 발표자 따라가기다(follower). 맞출 때 할 일은 followAction 이 정한다 — 발표 슬라이드는 보기 꼴이 호스트의 발표 꼴(want —
+  // 슬라이드·보드)이 아니면 그 꼴로 바꿔 다시 그리고(render 가 끝에 맞춘다), 내용 위치는 보기 꼴을 그대로 둔 채 지금 꼴에서 맞춘다
+  // (⑧ — 원래 슬라이드 문서는 슬라이드로. 보드 발표의 내용 위치는 예외로 보기 꼴을 보드로 바꿔 맞춘다). 발표가 끝나거나 따라가기를 끄면 슬라이드·보드 문서는 자기 꼴로 돌아간다(release — restoreOwnLook).
   const fol = follower({
-    align: (i, kind, frac) => {
+    align: (i, kind, frac, want) => {
       if (state.ended) return;
-      const act = followAction(kind, state.look, state.view, window.innerWidth);
-      if (act === "redraw") { state.chosen = "slides"; draw(); return; }
+      const act = followAction(kind, state.look, state.view, window.innerWidth, want);
+      if (act === "redraw") { state.chosen = want === "dashboard" ? "dashboard" : "slides"; draw(); return; }
       if (act === "scroll") scrollToFollow(i, kind, frac);
     },
     release: () => {
       for (const x of $("pages").querySelectorAll(".following")) x.classList.remove("following");
+      if (!state.ended && restoreOwnLook(state.view, state.chosen, window.innerWidth)) { state.chosen = ""; draw(); }
     },
     // 따라가기 상태가 바뀔 때마다(발표·읽기 시작·끝, 켬·끔, 풀림·복귀, hello) 쪽 | 이어보기 단추를 고친다 — 발표가 끝나면 보이고,
     // 보기 꼴 그대로 다음 발표·다시 켬이 오면 다시 숨긴다(내용 위치 따라가기는 숨기지 않는다)
@@ -1225,12 +1288,12 @@
       const r = pg.getBoundingClientRect();
       return { top: r.top - vt + viewer.scrollTop, height: r.height };
     });
-    viewer.scrollTop = window.ItdaPager.pageNav(dir, state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
+    viewer.scrollTop = window.ItdaPager.pageNav(dir, state.look === "dashboard" ? "flow" : state.look, viewer.scrollTop, viewer.clientHeight, pages, viewer.scrollHeight - viewer.clientHeight);
   }
 
-  // jumpScroll 은 #제목 이동의 굴림이다: 슬라이드 보기면 그 제목이 든 슬라이드를 가운데로, 그 밖은 제목을 맨 위로.
+  // jumpScroll 은 #제목 이동의 굴림이다: 슬라이드 보기면 그 제목이 든 슬라이드, 보드면 그 타일·구역 줄을 가운데로, 그 밖은 제목을 맨 위로.
   function jumpScroll(x) {
-    const pg = state.look === "slides" && x.closest(".page");
+    const pg = state.look === "slides" ? x.closest(".page") : state.look === "dashboard" ? x.closest(".tile, .board-section") : null;
     if (pg) pg.scrollIntoView({ block: "center" });
     else x.scrollIntoView({ block: "start" });
   }
@@ -1334,7 +1397,7 @@
   // 발표자를 따라가는 중이면 render 가 따라가는 자리로 굴리므로 굴리지 않는다(블록 번호 data-n 은 정렬과 상관없이 같다). 키보드로 눌렀으면
   // 따라가는 중에도 새 머리 칸에 포커스를 돌려준다(settle — preventScroll).
   async function sortByHead(th) {
-    if (!TableSort || !TableCopy || state.ended || !state.view || state.look === "slides" || state.rendering) return;
+    if (!TableSort || !TableCopy || state.ended || !state.view || state.look === "slides" || state.look === "dashboard" || state.rendering) return;
     const S = TableSort, pagesEl = $("pages"), viewer = $("viewer");
     const spec = S.specFor(th), table = th.closest("table");
     const k = Math.max(0, TableCopy.pieces(table, pagesEl).indexOf(table));

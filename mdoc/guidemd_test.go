@@ -15,12 +15,12 @@ import (
 	"testing"
 )
 
-// 입구 안내서(spec/markdown.md)·발표 안내서(slides.md)를
+// 입구 안내서(spec/markdown.md)·발표 안내서(slides.md)·대시보드 안내서(dashboard.md)를
 // 코드와 맞춘다(itda-hyve#134) — 경고 코드 표는 코드의 경고 상수와, frontmatter 키 표는 meta.go 가 읽는 키와, slides 키 표는 parseSlides 와
 // 양방향으로. ```markdown 예제는 모두 그려 경고 0(경고 예제는 적은 코드 그대로). 상대 링크는 파일·제목이 있다.
 // 코드에 경고·키를 더하고 안내서를 안 고치면 여기서 실패한다.
 
-var entryGuides = []string{"markdown.md", "slides.md"}
+var entryGuides = []string{"markdown.md", "slides.md", "dashboard.md"}
 
 func readDoc(t *testing.T, name string) string {
 	t.Helper()
@@ -282,6 +282,22 @@ func TestSlidesGuideKeys(t *testing.T) {
 	sameSet(t, "slides 키·별칭", doc, caseKeys(t, "parseSlides"))
 }
 
+// 대시보드 안내서의 dashboard 키 표(itda-work/itda-hyve#362): 꼴은 slides 키 표와 같다. 코드 쪽 목록(typo.go dashboardKeys —
+// 오타 짐작이 쓴다)도 파서의 case 와 같다.
+func TestDashboardGuideKeys(t *testing.T) {
+	row := regexp.MustCompile("(?m)^\\| `([^`]+)` \\| ([^|]+) \\|")
+	alias := regexp.MustCompile("`([^`]+)`")
+	var doc []string
+	for _, m := range row.FindAllStringSubmatch(marked(t, readDoc(t, "dashboard.md"), "dashboard-keys"), -1) {
+		doc = append(doc, m[1])
+		for _, a := range alias.FindAllStringSubmatch(m[2], -1) {
+			doc = append(doc, a[1])
+		}
+	}
+	sameSet(t, "dashboard 키·별칭", doc, caseKeys(t, "parseDashboard"))
+	sameSet(t, "dashboardKeys", dashboardKeys, caseKeys(t, "parseDashboard"))
+}
+
 // mdExample 은 ```markdown 예제 하나다. warn 이 있으면 정확히 그 경고 코드들만 난다(없으면 경고 0).
 type mdExample struct {
 	line int
@@ -397,7 +413,7 @@ func TestEntryGuideLinks(t *testing.T) {
 		}
 	}
 	// 설계·기능·README 에서 새 안내서로 가는 제목 조각 링크도 맞아야 한다
-	into := regexp.MustCompile(`\]\((?:spec/)?((?:markdown|slides)\.md)#([^)\s]+)\)`)
+	into := regexp.MustCompile(`\]\((?:spec/)?((?:markdown|slides|dashboard)\.md)#([^)\s]+)\)`)
 	for _, f := range []string{"../README.md"} {
 		for _, m := range into.FindAllStringSubmatch(readDoc(t, f), -1) {
 			if !slices.Contains(headingSlugs(dropFences(readDoc(t, m[1]))), m[2]) {
@@ -407,7 +423,7 @@ func TestEntryGuideLinks(t *testing.T) {
 	}
 	entry := readDoc(t, "markdown.md")
 	for _, f := range []string{"charts.md", "math.md", "diagrams.md",
-		"slides.md", "themes.md"} {
+		"slides.md", "dashboard.md", "themes.md"} {
 		if !strings.Contains(entry, "("+f+")") {
 			t.Errorf("입구 안내서에 %s 링크가 없음", f)
 		}

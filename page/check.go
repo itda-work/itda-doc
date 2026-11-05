@@ -23,11 +23,12 @@ type CheckWarning struct {
 
 // CheckMeta 는 검사한 문서의 정보 몇 가지다. 값은 글자 그대로다(문서 내용은 데이터).
 type CheckMeta struct {
-	Title    string `json:"title,omitempty"`
-	Theme    string `json:"theme"`               // 실제로 보일 테마(모르면 classic)
-	DocTheme string `json:"doc_theme,omitempty"` // 문서가 적은 theme:(쓸 수 있을 때만)
-	Slides   bool   `json:"slides"`              // frontmatter slides: 가 있다
-	Headings int    `json:"headings"`            // 목차에 드는 제목 수
+	Title     string `json:"title,omitempty"`
+	Theme     string `json:"theme"`               // 실제로 보일 테마(모르면 classic)
+	DocTheme  string `json:"doc_theme,omitempty"` // 문서가 적은 theme:(쓸 수 있을 때만)
+	Slides    bool   `json:"slides"`              // frontmatter slides: 가 있다
+	Dashboard bool   `json:"dashboard"`           // frontmatter dashboard: 가 있다(itda-work/itda-hyve#362 — 보드로 연다)
+	Headings  int    `json:"headings"`            // 목차에 드는 제목 수
 }
 
 // CheckResult 는 Check 의 결과다. 같은 원문·같은 path(문서 위 폴더의 `_metadata.yml` 까지 같으면)이면 같은 결과다.
@@ -68,7 +69,7 @@ func Check(src []byte, path string, ts *Themes) (CheckResult, error) {
 	for _, w := range v.Warnings {
 		out.Warnings = append(out.Warnings, CheckWarning{Code: w.Code, Line: w.Line, Message: w.Message})
 	}
-	out.Meta = CheckMeta{Title: v.Title, Theme: v.Theme, DocTheme: v.DocTheme, Slides: v.Slides.Present, Headings: countHeadings(v.TOC)}
+	out.Meta = CheckMeta{Title: v.Title, Theme: v.Theme, DocTheme: v.DocTheme, Slides: v.Slides.Present, Dashboard: v.Board.Present, Headings: countHeadings(v.TOC)}
 	return out, nil
 }
 
