@@ -123,9 +123,7 @@ func TestActionsHeadThemeCSS(t *testing.T) {
 
 // 전 내장 테마의 할 일 표 머리 글자 / 면 대비. base 가 .actions 안에서 --table-head-* 를 --accent-ink·--accent 로 다시 정해(web/base.css),
 // 이 값이 곧 머리 글자·링크·각주·code·del·kbd 가 면 위에 놓이는 대비다. compact 는 같은 두 토큰을 color·background 로 직접 정한다.
-// bold 는 #41 전부터 4.30:1 로 기준 아래다 — 면 색을 바꾸면 표지·상자 모양이 바뀌어 #41 범위 밖이라 지금 값을 바닥으로 묶고 그대로 둔다.
 func TestActionsHeadContrastEveryBuiltinTheme(t *testing.T) {
-	below := map[string]float64{"bold": 4.3}
 	ts := builtin(t)
 	seen := 0
 	for _, info := range ts.List() {
@@ -143,12 +141,8 @@ func TestActionsHeadContrastEveryBuiltinTheme(t *testing.T) {
 			t.Fatalf("%s: 색 값을 풀지 못함 %q / %q", info.Name, ink, face)
 		}
 		r := contrastRatio(strings.ToLower(ink), strings.ToLower(face))
-		min := 4.5
-		if b, ok := below[info.Name]; ok {
-			min = b
-		}
-		if r < min-0.005 {
-			t.Errorf("%s: 할 일 표 머리 %s on %s = %.2f:1 — %.2f:1 이상이어야 함", info.Name, ink, face, r, min)
+		if r < 4.5-0.005 {
+			t.Errorf("%s: 할 일 표 머리 %s on %s = %.2f:1 — 4.5:1 이상이어야 함", info.Name, ink, face, r)
 		}
 	}
 	if seen < 10 {

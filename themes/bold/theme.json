@@ -15,7 +15,7 @@
   "tokens": {
     "--ink": "#1b1f27",
     "--muted": "#6b7280",
-    "--accent": "#d9480f",
+    "--accent": "#d2460f",
     "--accent-2": "#1b1f27",
     "--accent-soft": "#ffede5",
     "--rule": "#e2e4e9",

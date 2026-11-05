@@ -17,9 +17,9 @@
 .cover-bottom .cover-org { font-size: 15pt; font-weight: 800; letter-spacing: -0.01em; }
 .cover-bottom .cover-date { color: var(--muted); font-size: 10pt; }
 
-/* 머리글은 선 없이 옅게, 바닥글 쪽번호는 강조색 */
-.page-header { color: #9aa1ad; }
-.page-footer { color: #9aa1ad; }
+/* 머리글은 선 없이 옅게(--muted, 흰 바탕 4.83:1), 바닥글 쪽번호는 강조색(4.54:1, #40) */
+.page-header { color: var(--muted); }
+.page-footer { color: var(--muted); }
 .page-footer .slot.right { color: var(--accent); font-weight: 700; font-size: 8.5pt; letter-spacing: 0.04em; }
 
 /* 장 제목: 위에 강조색 큰 번호, 아래 굵은 짧은 선 */
@@ -50,7 +50,7 @@ nav.toc .toc-section-number { color: var(--accent); font-weight: 800; }
 .slide-title { letter-spacing: -0.02em; }
 .slide-title::after { content: ""; display: block; width: 54pt; height: 3.5pt; background: var(--accent); margin-top: 12pt; }
 .slide-title .header-section-number { color: var(--accent); }
-.slide-foot { color: #9aa1ad; }
+.slide-foot { color: var(--muted); }
 .sf-num { color: var(--accent); font-weight: 800; }
 /* 제목 슬라이드: 위 60% 강조색 면 + 경계의 검은 띠 */
 .slide-deco.k-title::before { display: block; left: 0; top: 0; right: 0; width: auto; height: 60%; }
@@ -66,6 +66,8 @@ nav.toc .toc-section-number { color: var(--accent); font-weight: 800; }
 .slide-deco.k-section.bare::before { display: block; inset: 0; width: auto; height: auto; }
 .page-body.bare .ss-num { color: #fff; font-size: calc(96pt * var(--slide-scale)); }
 .page-body.bare .ss-title { color: #fff; }
+/* 맨 구역 장은 장식 상자 전체가 강조색 면이라 바닥글이 면 위에 놓인다 — --muted·강조색 쪽 번호가 묻혀 면 위 글자색으로(#40) */
+.slide-deco.k-section.bare ~ .slide-foot, .slide-deco.k-section.bare ~ .slide-foot .sf-num { color: var(--accent-ink); }
 .page-body.k-section:not(.bare) .ss-title::after { content: ""; display: block; width: 54pt; height: 3.5pt; background: var(--accent); margin-top: 14pt; }
 .slide-bg.fill ~ .page-body { --lead-bg: var(--paper); } /* 배경 그림 스크림 위(itda-hyve#569) — 바탕 투명 요약문의 먹색 글이 묻힌다, 종이색 판 */
 

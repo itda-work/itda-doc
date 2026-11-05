@@ -157,3 +157,30 @@ func contrastRatio(a, b string) float64 {
 	}
 	return (x + 0.05) / (y + 0.05)
 }
+
+// bold 의 머리글·바닥글(--muted)과 쪽 번호(--accent)는 흰 바탕 위, 맨 구역 장 바닥글·쪽 번호는 강조색 면 위 --accent-ink 다(#40).
+// 바닥글이 어느 면 위에 놓이는지는 렌더로 확인했고 여기서는 CSS 규칙과 색 조합만 본다. 실제 계산값은 보지 않는다(미검증).
+func TestBoldFootContrast(t *testing.T) {
+	th, ok := builtin(t).Get("bold")
+	if !ok {
+		t.Fatal("bold 없음")
+	}
+	vals := map[string]string{"--accent-ink": "#ffffff", "--paper": "#ffffff"} // base.css 기본값
+	for _, kv := range th.Tokens {
+		vals[kv[0]] = kv[1]
+	}
+	for _, p := range [][2]string{{"--muted", "--paper"}, {"--accent", "--paper"}, {"--accent-ink", "--accent"}} {
+		if r := contrastRatio(strings.ToLower(vals[p[0]]), strings.ToLower(vals[p[1]])); r < 4.5 {
+			t.Errorf("%s on %s = %.2f:1 — 4.5:1 이상이어야 함", p[0], p[1], r)
+		}
+	}
+	css := th.CSS
+	for _, sel := range []string{".page-header", ".page-footer", ".slide-foot"} {
+		if !strings.Contains(css, sel+" { color: var(--muted); }") {
+			t.Errorf("%s 글자색이 --muted 가 아님", sel)
+		}
+	}
+	if !strings.Contains(css, ".slide-deco.k-section.bare ~ .slide-foot, .slide-deco.k-section.bare ~ .slide-foot .sf-num { color: var(--accent-ink); }") {
+		t.Error("맨 구역 장 바닥글·쪽 번호가 면 위 글자색이 아님")
+	}
+}
