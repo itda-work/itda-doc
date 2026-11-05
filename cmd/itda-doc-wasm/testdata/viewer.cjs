@@ -427,7 +427,7 @@ async function folderChecks(V, doc, api, shown) {
   badMeta.fail = true;
   const rm = await V.readFolderMeta([{ rel: "../../_metadata.yml", path: "big" }, { rel: "../_metadata.yml", path: "bad" }, { rel: "_metadata.yml", path: "ok" }],
     new Map([["big", bigMeta], ["bad", badMeta], ["ok", okMeta]]));
-  check("readFolderMeta 상한·실패·순서", rm[0].err === "파일이 너무 큼(64KB 넘음)" && rm[0].yaml === "" && rm[1].err === "읽지 못함" && rm[2].err === "" && rm[2].yaml.length === 65536 &&
+  check("readFolderMeta 상한·실패·순서", rm[0].err === "파일이 너무 큼(64KB 넘음)" && rm[0].yaml === "" && rm[1].err === "읽지 못함(연 뒤에 고쳤다면 「폴더」로 다시 열어 주세요)" && rm[2].err === "" && rm[2].yaml.length === 65536 &&
     rm.map(m => m.rel).join() === "../../_metadata.yml,../_metadata.yml,_metadata.yml", JSON.stringify(rm.map(m => [m.rel, m.err, m.yaml.length])));
 
   // 뷰어 원천의 폴더 열기: _metadata.yml 이 네이티브 규칙(=wasm render 의 folderMeta)대로 얹히고, 그림이 blob: 로 바뀐다
@@ -466,6 +466,12 @@ async function folderChecks(V, doc, api, shown) {
     sv.lines.some(l => l.code === "viewer-local-image" && l.text.includes("4개") && l.text.includes("폴더로 열면 그린다")), JSON.stringify(sv.lines));
   const rbig = await fsrc.openFolder({ files: new Map([["big.md", new FakeFile("big.md", "x".repeat((8 << 20) + 1))]]) }, "big.md");
   check("폴더 문서도 크기 상한(8 MB)", !rbig.ok && /너무 큽니다/.test(rbig.msg), JSON.stringify(rbig));
+  // 읽기가 거부된 문서(연 뒤 고치면 Chromium 은 NotReadableError): 앞 화면을 두고 다시 열라고 말한다
+  const staleDoc = new FakeFile("stale.md", "# 옛 글\n");
+  staleDoc.fail = true;
+  const seenBefore = views.length;
+  const rstale = await fsrc.openFolder({ files: new Map([["stale.md", staleDoc]]) }, "stale.md");
+  check("연 뒤 고친 문서는 다시 열라고 안내하고 앞 화면을 둠", !rstale.ok && !rstale.stale && /「폴더」로 다시 열어 주세요/.test(rstale.msg) && views.length === seenBefore, JSON.stringify(rstale));
 
   // 경합: 앞선 문서 읽기가 나중에 끝나도 이기지 않는다(openFolder 끼리, openFolder 뒤 open)
   let release;

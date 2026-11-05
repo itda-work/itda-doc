@@ -256,3 +256,13 @@ func TestViewerNoSend(t *testing.T) {
 		t.Errorf("itda-doc.js 의 요청이 %d 곳(wasm 받기 1 이어야 함)", got)
 	}
 }
+
+// 첫 화면은 뷰어의 한계를 말한다 — 서버로 보내지 않음, 자동 갱신 없음, 연 폴더 위는 못 읽음.
+func TestViewerLandingStatesLimits(t *testing.T) {
+	s := readText(t, "viewer/index.html")
+	for _, want := range []string{"서버로 보내지 않고", "저절로 바뀌지 않습니다", "연 폴더보다 위 폴더의 설정은 읽지 못합니다"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("첫 화면에 %q 가 없다", want)
+		}
+	}
+}

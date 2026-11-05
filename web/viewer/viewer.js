@@ -295,14 +295,19 @@
     return out;
   }
 
+  // 연 뒤 파일을 고치면 브라우저가 쥔 File 의 읽기가 거부될 수 있다(Chromium 실측: NotReadableError). 까닭을 가리지 않고 할 일을 말한다.
+  const DOC_READ_FAILED = "파일을 읽지 못했습니다 — 연 뒤에 고쳤거나 옮겼다면 「폴더」로 다시 열어 주세요";
+  const META_READ_FAILED = "읽지 못함(연 뒤에 고쳤다면 「폴더」로 다시 열어 주세요)";
+
   // readFolderMeta 는 metaChain 의 파일을 읽어 render 옵션 folderMeta 꼴([{rel, yaml, err}])로 돌려준다. 상한(64KB)을 넘거나 읽지 못하면
-  // err 만 채운다 — 문구는 page.ReadMetaFile 과 같다(「파일이 너무 큼(64KB 넘음)」·「읽지 못함」). 순서는 chain 그대로다.
+  // err 만 채운다 — 문구는 page.ReadMetaFile 과 같고(「파일이 너무 큼(64KB 넘음)」·「읽지 못함」), 내용 읽기 실패에만 다시 열라는 안내를 붙인다
+  // (브라우저가 쥔 File 은 연 뒤 고치면 읽기가 거부될 수 있다). 순서는 chain 그대로다.
   function readFolderMeta(chain, files) {
     return Promise.all(chain.map(m => {
       const f = files.get(m.path);
       if (!f) return { rel: m.rel, yaml: "", err: "읽지 못함" };
       if (f.size > LIMITS.metaBytes) return { rel: m.rel, yaml: "", err: "파일이 너무 큼(64KB 넘음)" };
-      return Promise.resolve().then(() => f.text()).then(t => ({ rel: m.rel, yaml: String(t), err: "" }), () => ({ rel: m.rel, yaml: "", err: "읽지 못함" }));
+      return Promise.resolve().then(() => f.text()).then(t => ({ rel: m.rel, yaml: String(t), err: "" }), () => ({ rel: m.rel, yaml: "", err: META_READ_FAILED }));
     }));
   }
 
@@ -411,7 +416,7 @@
           if (my !== seq) return { ok: false, stale: true }; // 그 사이 다른 문서를 열었다 — 앞선 읽기가 늦게 끝나도 이기지 않는다
           const name = path.split("/").pop().replace(/\.(md|markdown)$/i, "");
           return begin({ name, src: String(text), kind: "folder", folder, path, meta }).then(() => ({ ok: true }));
-        }, () => (my !== seq ? { ok: false, stale: true } : { ok: false, msg: "파일을 읽지 못했습니다" }));
+        }, () => (my !== seq ? { ok: false, stale: true } : { ok: false, msg: DOC_READ_FAILED }));
       },
       setTheme(name) { theme = String(name || ""); return draw(); },
       api: () => api,
@@ -640,7 +645,7 @@
       const fm = Array.isArray(v.folder_meta) ? v.folder_meta : [];
       el.textContent = fm.length ? "폴더 설정 " + fm.length + "개" : "폴더 설정 없음";
       el.title = (fm.length ? "적용된 폴더 설정(가까운 것부터): " + fm.join(", ") : "문서 폴더부터 연 폴더까지 _metadata.yml 이 없습니다") +
-        " — 연 폴더보다 위의 폴더는 브라우저가 주지 않아 보지 못합니다";
+        " — 연 폴더보다 위의 폴더는 브라우저가 주지 않아 보지 못합니다. 고친 내용은 「폴더」로 다시 열어야 보입니다";
       el.hidden = false;
     } else if (kind === "file" || kind === "paste") {
       el.textContent = "폴더 설정·그림 미적용";

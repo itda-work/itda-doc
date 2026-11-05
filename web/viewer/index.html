@@ -46,9 +46,9 @@
   <div class="doc-name"><span id="doc-title">뷰어를 올리는 중…</span></div>
   <div class="spacer"></div>
   <div class="viewer-tools">
-    <button class="btn" id="btn-open" title="md 파일 열기(이 브라우저 안에서만 읽는다)">열기</button>
+    <button class="btn" id="btn-open" title="md 파일 열기(이 브라우저 안에서만 읽는다, 고친 뒤에는 다시 연다)">열기</button>
     <input type="file" id="file" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
-    <button class="btn" id="btn-folder" title="문서 폴더 열기 — 폴더 설정(_metadata.yml)과 상대 경로 그림을 쓴다(이 브라우저 안에서만 읽는다)">폴더</button>
+    <button class="btn" id="btn-folder" title="문서 폴더 열기 — 폴더 설정(_metadata.yml)과 상대 경로 그림을 쓴다(이 브라우저 안에서만 읽는다, 고친 뒤에는 다시 연다)">폴더</button>
     <input type="file" id="dir" webkitdirectory hidden>
     <select id="doc-pick" class="vsel" title="폴더 안의 문서" aria-label="폴더 안의 문서" hidden></select>
     <button class="btn" id="btn-paste" title="원문 붙여넣기">붙여넣기</button>
@@ -87,7 +87,12 @@
     <div id="viewer-empty" class="viewer-empty">
       <div class="viewer-empty-card">
         <h2>itda-doc 뷰어</h2>
-        <p>md 파일이나 문서 폴더를 여기에 끌어 놓거나 「열기」·「폴더」·「붙여넣기」·「견본」으로 엽니다. 폴더로 열면 폴더 설정(_metadata.yml)과 상대 경로 그림이 적용됩니다. 문서는 이 브라우저 안에서만 그려지고 어디로도 보내지 않습니다.</p>
+        <p>md 파일이나 문서 폴더를 여기에 끌어 놓거나 「열기」·「폴더」·「붙여넣기」·「견본」으로 엽니다. 폴더로 열면 폴더 설정(_metadata.yml)과 상대 경로 그림이 적용됩니다.</p>
+        <ul class="viewer-limits">
+          <li>파일은 서버로 보내지 않고 이 브라우저 안에서만 읽습니다. 폴더를 열 때 브라우저 창에 「복사」라고 나와도 서버로 올라가지 않습니다.</li>
+          <li>파일을 고쳐도 화면은 저절로 바뀌지 않습니다. 고친 뒤 다시 열어 주세요.</li>
+          <li>연 폴더보다 위 폴더의 설정은 읽지 못합니다.</li>
+        </ul>
       </div>
     </div>
     <div id="ended" class="share-ended" hidden>
