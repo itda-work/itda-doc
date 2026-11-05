@@ -992,18 +992,26 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .page.slide.has-panel { --panel-w: 50%; --panel-gap: min(var(--slide-pad-x), 36pt); }
 .page.slide.split-1-2 { --panel-w: 33.3333%; }
 .page.slide.split-1-3 { --panel-w: 25%; }
-.page.slide.split-2-1 { --panel-w: 66.6667%; }
-.page.slide.split-3-1 { --panel-w: 75%; }
+/* 글 쪽이 좁은 분할은 구역 제목도 줄인다 — 48pt 는 세 글자도 한 줄에 못 들어간다(#58) */
+.page.slide.split-2-1 { --panel-w: 66.6667%; --slide-section-size: 30pt; --slide-section-gap: 24pt; }
+.page.slide.split-3-1 { --panel-w: 75%; --slide-section-size: 22pt; --slide-section-gap: 24pt; }
 .page.slide.panel-left > :is(.slide-head, .slide-foot) { left: calc(var(--panel-w) + var(--panel-gap)); }
 /* 왼쪽 패널 장의 본문은 left 를 덮지 않고 margin-left 로 민다(itda-work/itda-hyve#581) — 테마가 본문 left 를 정하면(구역 장 장식 옆으로 미는
    .slide-deco.k-section ~ .page-body 등) 그 값이 그대로 남고, 패널 폭과 「바깥 여백 → 패널 간격」 차만 더해진다. 테마가 안 정하면
    left 는 --slide-pad-x 라 결과는 패널 폭 + --panel-gap 으로 머리·바닥과 같다. --slide-deco-x 는 장식 상자(.slide-deco)의 왼쪽
    끝(패널 폭)이다 — 장식 상자 폭의 %로 그리는 테마 장식(classic 의 24% 띠)은 본문 left 의 %(쪽 폭 기준)에서 이 몫을 빼 맞춘다 */
 .page.slide.panel-left { --slide-deco-x: var(--panel-w); }
+.page.slide.panel-right { --slide-deco-right: var(--panel-w); } /* 오른쪽 패널도 장식 상자가 그만큼 좁아진다(#58) */
 .page.slide.panel-left > .page-body { margin-left: calc(var(--panel-w) + var(--panel-gap) - var(--slide-pad-x)); }
+/* 위 margin 은 「바깥 여백 → 패널 간격」 차만큼 덜 민다. 좁은 분할의 구역 장 간격이 띠에 겹치지 않게 그 차를 더한다(#58) */
+.page.slide.panel-left:is(.split-2-1, .split-3-1) { --slide-section-gap: calc(24pt + var(--slide-pad-x) - var(--panel-gap)); }
 .page.slide.panel-right > :is(.page-body, .slide-head, .slide-foot) { right: calc(var(--panel-w) + var(--panel-gap)); }
 .page.slide.panel-left > .slide-deco { left: var(--panel-w); }
 .page.slide.panel-right > .slide-deco { right: var(--panel-w); }
+/* 패널 장 바닥글은 한 줄 — 좁은 분할에서 조직명이 여러 줄로 꺾여 쪽 번호를 밀지 않게 말줄임한다(#58) */
+.page.slide.has-panel > .slide-foot { gap: 12pt; }
+.page.slide.has-panel > .slide-foot .sf-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page.slide.has-panel > .slide-foot .sf-num { flex: none; }
 .page.slide > .slide-panel { position: absolute; top: 0; bottom: 0; width: var(--panel-w); z-index: 1; display: flex; flex-direction: column; overflow: hidden; }
 .page.slide.panel-left > .slide-panel { left: 0; }
 .page.slide.panel-right > .slide-panel { right: 0; }
@@ -1106,7 +1114,7 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 .slide-section { margin: 0 0 18pt; }
 .ss-num { font-family: var(--font-heading); font-size: calc(var(--slide-section-size) * 1.5 * var(--slide-scale)); font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 10pt; }
 .page-body .ss-title { font-family: var(--font-heading); font-size: calc(var(--slide-section-size) * var(--slide-scale)); font-weight: 800; line-height: 1.2; color: var(--ink);
-  margin: 0; border: 0; padding: 0; letter-spacing: -0.02em; }
+  margin: 0; border: 0; padding: 0; letter-spacing: -0.02em; word-break: keep-all; overflow-wrap: anywhere; }
 .page-body .ss-title::before, .page-body .ss-title::after { content: none; }
 
 /* 하나만 있는 슬라이드: 그것을 크게, 가운데에 */
