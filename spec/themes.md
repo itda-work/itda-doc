@@ -422,6 +422,7 @@ frontmatter 에 `theme: <이 테마>` 와 채울 자리를, 본문에 그 문서
 
 - woff2 만 받는다. `@font-face` 는 theme.css 맨 위에(`@media` 안이 아니라) 둔다. 서술자는 `font-family`·`src`·`font-weight`·`font-style`·
   `font-display`·`unicode-range`·`font-stretch`·`size-adjust`·`*-override` 만.
+- TrueType 윤곽 woff2 를 쓴다 — CFF(OTF 기반)는 macOS PDF 에서 글자층(ToUnicode)이 비어 검색·복사가 깨진다(itda-hyve#666 실측). 내장 테마는 `TestBuiltinWoff2TrueType`(`themes/themes_test.go` — woff2 머리의 flavor 표식만 본다)이 막고, 회사 테마는 검사하지 않는다. TrueType 이어도 기본으로 켜지는 GSUB(`calt`·`locl`·`liga`·`ccmp`)가 글자를 cmap 에 없는 글리프로 바꾸면 그 글자가 글자층에서 깨진다 — 이 조건은 시험하지 않으므로 subset 할 때 뺀다(`themes/editorial/assets/README.md`).
 - `font-display: block` 을 권한다 — 화면이 글꼴을 다 받은 뒤 쪽을 나누므로(줄 수가 바뀌지 않게) PDF 와 화면이 같다.
 - PDF 에 글꼴이 임베드된다(`pdffonts` 로 확인). 글꼴의 사용 허락(OFL 등)을 확인하라 — PDF 에 들어가 배포된다.
 - 뒤에 `"Pretendard"` 를 두면 테마 글꼴에 없는 글자(한자 등)를 기본 글꼴로 채운다.

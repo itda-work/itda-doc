@@ -33,4 +33,5 @@
 |---|---|---|
 | Temml 0.13.5(`temml.min.js`) | `texmath/temml/` | MIT — `texmath/temml/LICENSE` |
 | Pretendard(regular·semibold·bold woff2) | `web/fonts/` | SIL Open Font License 1.1 — `web/fonts/OFL-Pretendard.txt` |
+| Noto Serif KR(Bold, 한글·라틴 subset woff2 — editorial 테마) | `themes/editorial/assets/` | SIL Open Font License 1.1 — `themes/editorial/assets/OFL-NotoSerifKR.md` |
 | Lucide 아이콘 모양(공유 화면 `share.html` 의 심볼) | `web/share.html` | ISC(일부 MIT — Feather) — `web/LICENSE-Lucide.txt` |
