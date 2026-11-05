@@ -100,11 +100,11 @@ func TestTableHeadCodeColor(t *testing.T) {
 		t.Fatal(err)
 	}
 	css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
-	head := strings.Index(css, ".page-body th code { color: inherit; background: transparent; }")
+	head := strings.Index(css, ".page-body th code { color: inherit; background: var(--head-code-bg, transparent);")
 	if head < 0 {
 		t.Fatal("표 머리 안 인라인 코드가 머리 글자색을 따르는 규칙이 없음")
 	}
-	if !strings.Contains(css, ".page-body th code { background: color-mix(in srgb, currentColor 16%, transparent); }") {
+	if !strings.Contains(css, ".page-body th code { background: var(--head-code-bg, color-mix(in srgb, currentColor 16%, transparent)); }") {
 		t.Error("표 머리 안 인라인 코드 상자가 글자색(currentColor) 기반이 아님")
 	}
 	if link := strings.Index(css, ".page-body a code { color: var(--ink); }"); link < 0 || head < link {

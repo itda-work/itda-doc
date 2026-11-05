@@ -91,6 +91,7 @@ func TestStandardVocabBaseCSS(t *testing.T) {
 	for _, m := range regexp.MustCompile(`(--[\w-]+)\s*:`).FindAllStringSubmatch(root[1], -1) {
 		defined[m[1]] = true
 	}
+	defined["--head-code-line"] = true // 할 일 표 머리 규칙이 th 에서 정하고 그 안 code 가 읽는 지역 변수(page/actionshead_test.go)
 	vocabSel := regexp.MustCompile(`\.(decisions|actions|steps|result)\b`)
 	pseudo := regexp.MustCompile(`::(before|after)$`)
 	colorLit := regexp.MustCompile(`#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(|\boklch\(`)

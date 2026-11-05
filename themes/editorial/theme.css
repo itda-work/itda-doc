@@ -47,32 +47,6 @@ nav.toc .toc-section-number { color: var(--accent); }
 /* 그림·표 캡션은 작게(base 9pt → 8.5pt), 색은 --caption-color(크림 위 5.03:1) */
 .page-body figcaption, .page-body caption { font-size: 8.5pt; }
 
-/* ---- 강조색(빨강) 면 안의 링크·각주 번호·인라인. 빨강 면에 글이 놓이는 자리는 할 일 표(:::actions) 머리 하나다 —
-   base 가 .actions 의 --table-head-bg 를 --accent 로 둔다(web/base.css). 다른 표 머리는 투명(theme.json)이고 결재란 머리도 base 가
-   투명이다. 구역 장 면은 옅은 --accent-soft 라(아래) 여기 넣지 않는다. 선택자 목록은 그 자리 하나지만, 자리가 늘면 :is() 에 더한다.
-   그 면 위 링크색(남청 #3d5a80)은 1.10:1 이다 — 링크·각주·가리킴을 흰색(--accent-ink 7.75:1)·면 없음으로.
-   base 가 색·바탕을 주는 인라인(web/base.css 의 code·mark·del·kbd 규칙):
-   - code: 글자는 면 글자색, 상자는 그 글자색 16%(base 의 표 머리 code 와 같은 꼴) — 흰 / #b33b3f 5.81:1
-   - mark: 노랑 #fff1a8 위에 흰 글자가 상속돼 1.14:1 — 그 안 글자·링크·각주는 먹색(15.25:1, 시험 쌍)
-   - del: --muted 가 빨강 위 1.44:1 — 면 글자색 그대로(취소선이 뜻을 알린다)
-   - kbd: base 는 바탕 없이 --rule 테두리라 흰 글자가 상속된다 — 테두리를 글자색으로
-   - kbd·mark 안 각주 번호: sup 과 .footnote-ref 가 함께 올려 숫자가 상자 위로 삐져나온다(verdant 에서 확인) — 한 번만, 덜 올린다
-   면 밖(크림 본문·다른 표 머리·결재란 머리)의 같은 요소는 base 그대로다 */
-:is(.page-body .actions th) {
-  --link: var(--accent-ink); --link-hover-ink: var(--accent-ink); --link-hover-bg: transparent; --link-hover-line: var(--accent-ink); }
-:is(.page-body .actions th) code { color: inherit; background: transparent; }
-@supports (color: color-mix(in srgb, black 16%, transparent)) {
-  :is(.page-body .actions th) code { background: color-mix(in srgb, currentColor 16%, transparent); }
-}
-:is(.page-body .actions th) mark { color: var(--ink); --link: var(--ink); --link-hover-ink: var(--ink); --link-hover-line: var(--ink); }
-:is(.page-body .actions th) del { color: inherit; }
-:is(.page-body .actions th) kbd { border-color: currentColor; }
-:is(.page-body .actions th) :is(kbd, mark) sup { vertical-align: 0.3em; line-height: 0; }
-:is(.page-body .actions th) :is(kbd, mark) .footnote-ref { vertical-align: baseline; }
-
-/* ---- decisions: base 의 ✔ 자리 들여쓰기는 15pt 고정이라 슬라이드 글자 크기에서 ✔ 와 글이 붙는다(classic 도 같다, PNG) — 글자 크기에 비례하게 */
-.decisions li { padding-left: 1.4em; }
-
 /* ---- 슬라이드: 위 가는 빨강 선 하나, 세리프 먹 제목(왼쪽 막대 없음), 번호는 빨강 */
 .slide-deco::before { height: 2pt; }
 .slide-deco::after { content: none; }
