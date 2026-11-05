@@ -23,7 +23,7 @@ func TestBuiltinThemeGroups(t *testing.T) {
 		}
 	}
 	// 중립 스타일 테마는 구조 테마를 extends 하고 자기 무드의 묶음을 적는다(group 은 물려받지 않는다)
-	for n, want := range map[string]struct{ group, extends string }{"slate": {"formal", "classic"}, "swiss": {"formal", "bold"}, "contrast": {"formal", "mono"}, "verdant": {"editorial", "spine"}} {
+	for n, want := range map[string]struct{ group, extends string }{"slate": {"formal", "classic"}, "swiss": {"formal", "bold"}, "contrast": {"formal", "mono"}, "verdant": {"editorial", "spine"}, "editorial": {"editorial", "classic"}} {
 		th, ok := ts.Get(n)
 		if !ok || th.Group != want.group || th.GroupWarning() != "" || th.Extends != want.extends {
 			t.Errorf("%s: Group %q, extends %q(바란 값 %+v), 경고 %q", n, th.Group, th.Extends, want, th.GroupWarning())

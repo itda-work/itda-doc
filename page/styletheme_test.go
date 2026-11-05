@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37 · verdant itda-doc#35)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
+// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37 · verdant itda-doc#35 · editorial itda-doc#34)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
 // 그 바탕 4.5:1(contrast 는 7:1 — 무드의 목표. 보장은 아래 쌍에 적은 조합까지), 차트 계열은 흰 바탕 3:1 이다. 조합은 테마마다 실제로 쓰는 것만 적는다(theme.css 와 base.css 의 어휘 규칙).
 // contrast 의 차트 6~8번(Okabe-Ito 주황·하늘·노랑)은 3:1 에 못 미쳐 이 기준에서 빼고, 대신 그 면을 두르는 테두리 색(--ink)이 3:1 인지 본다 —
 // 테두리가 실제로 그려지는지는 배치와 같이 PNG 로 확인한다.
@@ -68,6 +68,21 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--accent-ink", "--accent"},    // 숲색 면(표 머리·steps 번호 원·맨 구역 장 제목과 그 바닥글) 위 흰 글자·링크·각주(--link 재정의), 면 안 del
 			{"--accent-ink", "--highlight"}, // 잎색 꼬리표 위 흰 글자(theme.css)
 			{"--ink", "@base-mark"},         // 숲색 면 안 mark: 노랑 바탕 위 먹 글자·링크(theme.css)
+			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
+			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
+		}},
+		// editorial(classic 바탕): 바탕은 크림 --paper(#faf7f2 — 토큰이라 아래 vals 가 흰색 기본값을 덮는다). 빨강 --accent 면은 할 일 표 머리
+		// 하나이고(다른 표 머리·결재란 머리는 투명), 구역 장 왼쪽 면은 옅은 --accent-soft 라 그 위 바닥글(--muted·--ink)을 본다.
+		// 할 일 표 머리 안 code 의 상자(흰색 16% + 빨강 = 5.81:1)는 합성 색이라 여기 넣지 않았다 — 계산과 PNG 로 확인한다.
+		"editorial": {min: 4.5, pairs: []pair{
+			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--link", "--paper"}, {"--link", "--link-hover-bg"},
+			{"--header-color", "--paper"}, {"--caption-color", "--paper"}, {"--quote-ink", "--paper"},
+			{"--alert-note", "--paper"}, {"--alert-tip", "--paper"}, {"--alert-important", "--paper"},
+			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, // 알림 면(6% 섞음) 위 값은 보고서에 따로
+			{"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, {"--muted", "--accent-soft"}, // decisions 면과 ✔, 구역 장 면 위 바닥글
+			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"},
+			{"--accent-ink", "--accent"}, // 빨강 면(할 일 표 머리·steps 번호 원) 위 흰 글자·링크·각주(--link 재정의), 면 안 del·kbd
+			{"--ink", "@base-mark"},      // 빨강 면 안 mark: 노랑 바탕 위 먹 글자·링크(theme.css)
 			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
 			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
 		}},
