@@ -1,6 +1,8 @@
 package page
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -145,6 +147,8 @@ type Theme struct {
 	groupWarn string
 	// files 는 이 테마(와 조상)의 assets 를 내줄 때 쓴다: 앱 주소 → (fs, 경로).
 	files map[string]themeAsset
+	// Hash 는 풀린 내용의 지문이다(themeHash). Rev 는 프로세스마다 처음부터 세어 재시작을 넘어 견줄 수 없다 — 프로세스를 넘어 같은 테마인지는 이것으로 안다(itda-hyve#705).
+	Hash string `json:"-"`
 }
 
 type themeAsset struct {
@@ -324,6 +328,10 @@ func (ts *Themes) resolveAll(entries map[string]*themeEntry, broken map[string]s
 			broken[n] = err.Error()
 			continue
 		}
+		// 지문은 판(?v=)을 뺀 풀이로 만든다 — 사용자 테마의 CSS·로고 주소에 든 Rev 가 지문을 흔들지 않게. 첫 풀이가 지난 테마라 파일이 그 사이 바뀐 때만 틀린다 — 지문을 비워 둔다(화면은 theme_rev 로 견준다)
+		if plain, err := resolveTheme(entries, broken, n, 0, 0); err == nil {
+			t.Hash = themeHash(plain)
+		}
 		ts.byName[n] = t
 		ts.order = append(ts.order, n)
 		for _, a := range t.Aliases {
@@ -331,6 +339,22 @@ func (ts *Themes) resolveAll(entries map[string]*themeEntry, broken map[string]s
 		}
 	}
 	return nil
+}
+
+// themeHash 는 판 없이 푼 테마의 지문이다(sha256 앞 16자리): 내보낸 값 전부(토큰·틀·CSS·글꼴·template.md)와 assets 의 경로·바이트(조상의 것 포함).
+// 내용이 같으면 프로세스·불러온 차례와 상관없이 같다.
+func themeHash(t *Theme) string {
+	h := sha256.New()
+	b, _ := json.Marshal(t)
+	h.Write(b)
+	for _, u := range sortedKeys(t.files) {
+		a := t.files[u]
+		fmt.Fprintf(h, "\x00%s\x00", u)
+		if c, err := fs.ReadFile(a.fsys, a.path); err == nil {
+			h.Write(c)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
 // readThemeDir 는 fsys 의 맨 위 폴더마다 theme.json 을 읽는다. 폴더 하나의 문제는 broken 에 남긴다.

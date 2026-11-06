@@ -61,6 +61,7 @@ func renderViewOpts(src []byte, path string, ts *Themes, themeOverride string, o
 		r.Warnings = append(r.Warnings, mdoc.Warning{Code: WarnUnknownTheme, Message: fmt.Sprintf("모르는 테마 %q — %s 로 보인다", r.Meta.Theme, t.Name)})
 	}
 	v.Theme = t.Name
+	v.ThemeHash = t.Hash
 	v.HTML, v.Header, v.Footer = Assemble(r, t)
 	v.H1Break, v.H1Always = t.H1Break, t.H1Always
 	v.ListStyle = listStyle(r.Meta, t)

@@ -35,6 +35,9 @@
 // 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
 // 시작이나 훅이 던지면 콘솔에만 남기고 확장 없이처럼 이어 간다.
 // 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
+// 같은 주소 공유(itda-hyve#705 3절): stop 의 까닭이 paused 이거나 hello 에 keep 이 있던 공유의 연결이 끊기면 끝난 화면으로 가지 않는다 — 문서를 두고 띠(#pause-band)를 보이고 다시 붙기를
+// 시도한다(connect). 다시 붙으면 hello → sync.check 가 바뀐 문서를 받고 띠를 지운다. 새로 고치지 않으므로 읽던 자리가 남는다(다만 테마의 내용이 바뀌었으면 기존 reloadGate 대로 새로 고친다).
+// 쿠키를 잃은 브라우저는 다시 붙지 못하므로 재시도가 지금 주소를 살펴 공유가 열렸으면 새로 고쳐 입장 화면으로 간다(hostSource resync). 같은 주소 공유의 자동 새로 고침은 모두 reloadGate 의 hold 를 지나고, 메모를 새로 고침이 지울 때는 확장이 막는다(holdReload — 없으면 막지 않는다).
 // 앱 이름(itda-hyve#625): 탭 제목 접미 「 — <앱 이름>」 은 모듈에 박지 않는다 — 서버가 share.html 의 <meta name="application-name"> 자리를
 // 채우면 그 이름을 붙이고, 비우거나 채우지 않으면(자리 글자 그대로) 접미 없이 문서 제목만 쓴다(appName·docTitle).
 // 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄·YouTube 재생(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
@@ -162,15 +165,45 @@
   // backoff 는 n 번째(0부터) 다시 붙기 전의 대기다(ms) — 1·2·4·8·16·30·30…초.
   function backoff(n) { return Math.min(30000, 1000 * Math.pow(2, n)); }
 
+  // PAUSE_MAX 는 잠시 닫힘이 시작된 뒤 다시 붙기를 시도하는 시간이다(ms) — 지나면 멈추고 새로 고침을 안내한다.
+  const PAUSE_MAX = 24 * 3600 * 1000;
+
   // parseData 는 이벤트 data(JSON)다 — 틀리면 {}.
   function parseData(e) { try { return JSON.parse(e && e.data) || {}; } catch (err) { return {}; } }
 
-  // connect 는 갱신 스트림의 상태 기계다. 상태: connecting → open(hello) → waiting(끊김, 다시 붙기 전) → … / ended(stop·kick·공유 없음).
-  // deps: EventSource, probe()(끊긴 뒤 부른다 — viewState 의 값을 돌려준다. "alive"·"missing" 이면 다시 붙고 "ended"·"kicked" 면 끝낸다), setTimeout·clearTimeout,
+  // connect 는 갱신 스트림의 상태 기계다. 상태: connecting → open(hello) → waiting(끊김, 다시 붙기 전) → … / ended(stop·kick·공유 없음) / idle(잠시 닫힘이 PAUSE_MAX 를 넘겨 멈춤).
+  // 잠시 닫힘(같은 주소 공유): stop 의 까닭이 paused 이거나 hello 에 keep 이 있던 공유의 스트림이 끊기면 c.paused(시작 시각)를 두고 onPaused("closed") — 끝내지 않는다. 이때 probe 의
+  // "ended"(404)는 재시도이고 "kicked"(403)만 끝낸다. 망 실패는 syncer 가 "alive" 로 돌려주므로 재시도다. 다시 붙은 hello 가 onPaused("") 로 거둔다. PAUSE_MAX 가 지나면 onPaused("stale") 로
+  // 바꾸고 다시 붙지 않는다. keep 은 hello 마다 고친다 — 같은 주소가 아닌 공유는 이 길을 타지 않는다.
+  // deps: EventSource, probe()(끊긴 뒤 부른다 — viewState 의 값을 돌려준다. "alive"·"missing" 이면 다시 붙고 "ended"·"kicked" 면 끝낸다), setTimeout·clearTimeout, now()(없으면 Date.now),
   // onHello(first, data), onReload(), onVersion(data), onSlide(data — {index, total, look, follow}), onPos(data — {block, frac, total, follow}, ⑧),
-  // onFiles()(폴더의 문서 목록이 바뀜 — 없어도 된다), onEnded(reason — kick·403 은 "kicked").
+  // onFiles()(폴더의 문서 목록이 바뀜 — 없어도 된다), onEnded(reason — kick·403 은 "kicked"), onPaused(state — "closed"·"stale"·"", 같은 주소 공유만).
+  // gone(reason)은 view.json 이 공유 없음("")·끊김("kicked")을 말할 때다(syncer) — 같은 주소 공유의 공유 없음은 끝이 아니라 잠시 닫힘이다.
   function connect(base, deps) {
-    const c = { state: "connecting", tries: 0, es: null, timer: 0, hellos: 0 };
+    const c = { state: "connecting", tries: 0, es: null, timer: 0, hellos: 0, keep: false, paused: 0 };
+    const now = () => deps.now ? deps.now() : Date.now();
+    function pause() {
+      c.keep = true;
+      if (c.paused) return;
+      c.paused = now();
+      deps.onPaused("closed");
+    }
+    // lost 는 스트림을 잃었을 때다 — 지금 스트림을 닫고 상태를 물어 끝내거나 다시 붙는다.
+    function lost() {
+      if (c.es) { c.es.close(); c.es = null; }
+      c.state = "waiting";
+      Promise.resolve(deps.probe()).then(st => {
+        if (c.state !== "waiting" || c.es) return;
+        if (st === "kicked") { end("kicked"); return; }
+        if (st === "ended" && !c.paused) { end(""); return; }
+        if (c.paused && now() - c.paused >= PAUSE_MAX) {
+          c.state = "idle";
+          deps.onPaused("stale");
+          return;
+        }
+        c.timer = deps.setTimeout(open, backoff(c.tries++));
+      });
+    }
     function end(reason) {
       if (c.state === "ended") return;
       c.state = "ended";
@@ -188,7 +221,10 @@
         if (c.es !== es) return;
         c.state = "open";
         c.tries = 0;
-        deps.onHello(c.hellos++ === 0, parseData(e));
+        const data = parseData(e);
+        c.keep = !!data.keep;
+        if (c.paused) { c.paused = 0; deps.onPaused(""); }
+        deps.onHello(c.hellos++ === 0, data);
       });
       es.addEventListener("reload", () => {
         if (c.es !== es || c.state === "ended") return;
@@ -218,23 +254,23 @@
         if (c.es !== es) return;
         let reason = "";
         try { reason = JSON.parse(e.data).reason || ""; } catch (err) { /* 까닭 없음 */ }
+        if (reason === "paused") { pause(); lost(); return; }
         end(reason);
       });
       es.onerror = () => {
         if (c.es !== es || c.state === "ended") return;
-        es.close();
-        c.es = null;
-        c.state = "waiting";
-        Promise.resolve(deps.probe()).then(st => {
-          if (c.state !== "waiting" || c.es) return;
-          if (st === "kicked") { end("kicked"); return; }
-          if (st === "ended") { end(""); return; }
-          c.timer = deps.setTimeout(open, backoff(c.tries++));
-        });
+        if (c.keep) pause();
+        lost();
       };
     }
     // wake 는 화면이 다시 보일 때(뒤로 갔다 옴·탭 전환) 기다리지 않고 바로 다시 붙는다.
     c.wake = () => { if (c.state === "waiting" && !c.es) { c.tries = 0; open(); } };
+    c.gone = reason => {
+      if (reason === "kicked" || !c.keep) { end(reason); return; }
+      if (c.state === "ended" || c.state === "idle") return;
+      pause();
+      if (c.state !== "waiting") lost(); // 기다리는 중이면 이미 다음 시도가 있다
+    };
     c.end = end;
     open();
     return c;
@@ -257,14 +293,17 @@
       try { const at = Number(deps.storage().getItem(srvKey)); if (at) return Math.max(at, lastServer); } catch (e) { /* 메모리 시각 */ }
       return lastServer;
     }
+    const held = () => !!deps.hold && deps.hold();
     function fire(now) {
+      if (held()) return false;
       lastServer = now;
       try { deps.storage().setItem(srvKey, String(now)); } catch (e) { /* 페이지 안에서만 보호 */ }
       deps.reload();
+      return true;
     }
     return {
       once(why) {
-        if (deps.ended()) return false;
+        if (deps.ended() || held()) return false;
         const now = deps.now();
         try {
           const st = deps.storage();
@@ -282,15 +321,16 @@
           timer = deps.setTimeout(() => { timer = 0; if (!deps.ended()) fire(deps.now()); }, 2000 - since);
           return false;
         }
-        fire(now);
-        return true;
+        return fire(now);
       },
       cancel() { if (timer) { deps.clearTimeout(timer); timer = 0; } },
     };
   }
 
   // themeKey 는 view 의 테마 판이다(이름@테마 판).
-  function themeKey(v) { return v.theme + "@" + (v.theme_rev || 0); }
+  // theme_hash 는 내용 지문이라 서버를 다시 띄워도 같은 테마면 같고, 내용이 바뀌면 판 번호가 같아도 다르다(itda-hyve#705 — theme_rev 는 프로세스마다 처음부터 센다). 지문이 없는 서버는 theme_rev 다.
+  function themeStamp(v) { return v.theme_hash || v.theme_rev || 0; }
+  function themeKey(v) { return v.theme + "@" + themeStamp(v); }
 
   // themeApplier 는 테마 CSS 를 <link>(link)에 한 번 넣는 함수를 만든다(정책 D — 화면을 불러올 때 한 번). 돌려준 apply(v) 는:
   //  - 처음이면 v 의 테마를 넣고 load·error 를 기다린다. 3초 넘으면 기다리지 않는다(느린 망에서 그리기를 막지 않는다). 리스너는 떼지
@@ -312,7 +352,7 @@
         const finish = ok => { if (!done) { done = true; resolve(ok); } };
         link.addEventListener("load", () => { if (done) deps.late(); else finish(true); });
         link.addEventListener("error", () => { finish(!deps.reload("theme")); });
-        link.setAttribute("href", base + "/_/_theme/" + encodeURIComponent(v.theme) + "/theme.css?v=" + (v.theme_rev || 0));
+        link.setAttribute("href", base + "/_/_theme/" + encodeURIComponent(v.theme) + "/theme.css?v=" + themeStamp(v));
         deps.setTimer(() => finish(true), 3000);
       });
     };
@@ -367,7 +407,7 @@
   //  - 404 면 공유 끝, 403 이면 이 화면을 끊음, 429 면 1·2·4…30초 뒤 다시(backoff), 그 밖의 실패는 안내. 문서 부재는 받은 오류 view 를 그린다.
   //  - refresh 는 받은 응답의 상태(viewState)를 돌려준다. 망 실패는 "alive" 다.
   //  - recovering(연결 복구 — hostSource resync): 받은 view 를 그리는 것은 같되 안내·끝내기·429 재시도는 하지 않고 상태만 돌려준다 — 끝내기와 다음 시도는 connect 의 몫이다.
-  //  - check(data): hello·version 의 data({version, theme, theme_rev})가 지금 view 와 다르면 refresh. 같으면 아무것도 하지 않는다.
+  //  - check(data): hello·version 의 data({version, theme, theme_rev, theme_hash})가 지금 view 와 다르면 refresh. 같으면 아무것도 하지 않는다.
   function syncer(deps) {
     let gen = 0, tries = 0, timer = 0;
     function differs(d) {
@@ -848,6 +888,7 @@
   //  - attach(api) 는 화면이 시작할 때 한 번(첫 그리기 전) 부른다. api 는 화면 부품이다: $(id), ended()(공유가 끝남), current()(지금
   //    view 또는 null), show(v)(view 를 바꾸고 그린다 — Promise), redraw()(끝나지 않았고 view 가 있으면 다시 그림), look(name)(보기 꼴을
   //    골라 다시 그림 — Promise), failed(msg)(안내 줄), themeFailed()(「테마를 불러오지 못했습니다」), end(reason)(끝난 화면),
+  //    paused(st)(같은 주소 공유의 잠시 닫힘 띠 — "closed"·"stale"·"held"·""), holdReload()(새로 고치면 잃을 것이 있으면 참 — 확장이 답한다),
   //    hello(d)·slide(d)·pos(d)(발표자 따라가기 — follower), toast(msg), files(d)(폴더의 문서 목록 {docs, rev, truncated})·
   //    nav(n)(폴더 공유의 주소 쪽 일 { look(), setLook(look), hash(), open(doc, hash) } — 첫 show 전에 한 번). 뒤의 둘은 hostSource 만 부른다.
   //  - applyTheme(v): render 가 그리기 전에 부른다(오류 view 는 부르지 않는다). true(또는 Promise<true>)면 그리고, false 면 그리지 않는다.
@@ -864,6 +905,12 @@
           setTimeout: (f, ms) => w.setTimeout(f, ms),
           clearTimeout: t => w.clearTimeout(t),
           failed: () => api.themeFailed(),
+          // 자동 새로 고침의 한 관문(#705): 쿠키 유실·테마 변경·reload·CSS 실패 모두 여기를 지난다. 같은 주소 공유만 묻는다 — 그 밖의 공유는 지금처럼 새로 고친다
+          hold: () => {
+            if (!conn || !conn.keep || !api.holdReload()) return false;
+            api.paused("held");
+            return true;
+          },
         });
         const applyTheme = themeApplier(api.$("theme-css"), base, {
           setTimer: (f, ms) => w.setTimeout(f, ms),
@@ -905,15 +952,24 @@
           },
           gate,
           ended: () => api.ended(),
-          end: reason => conn.end(reason),
+          end: reason => conn.gone(reason),
           failed: () => api.failed("문서를 받지 못했습니다 — 네트워크를 확인하세요."),
           setTimeout: (f, ms) => w.setTimeout(f, ms),
           clearTimeout: t => w.clearTimeout(t),
         });
+        // pageStatus 는 지금 주소(폴더 공유는 ?doc= 까지)의 상태 코드다 — 쓰기 없는 GET, 망 실패는 0.
+        const pageStatus = () => w.fetch(w.location.href, { cache: "no-store", credentials: "same-origin" }).then(r => r.status, () => 0);
         // resync 는 연결 복구의 한 절차다 — 스트림이 끊길 때마다(문서 없음이면 backoff 재시도마다) 지금 문서의 view 와 폴더면 목록을 다시 받아 맞추고 상태를 돌려준다. 받은 view 가
-        // 곧 생존 판정이라 따로 묻지 않는다. 폴더 공유가 아니면 filesOn 이 거짓이라 목록 요청이 없다.
+        // 곧 생존 판정이라 따로 묻지 않는다. 폴더 공유가 아니면 filesOn 이 거짓이라 목록 요청이 없다. 잠시 닫힘의 view 404 만 지금 주소를 함께 살핀다: 세션이 없어도 토큰이 살아 있으면
+        // 입장 화면이 200 이므로, 200 은 공유는 열렸는데 이 브라우저의 쿠키만 모른다는 뜻이다 — 새로 고쳐 입장 화면이나 문서를 띄운다. 공유가 없는 동안은 같은 404 라 재시도이고 403 은 끝이다.
         const resync = async () => {
           const st = await sync.refresh(false, true);
+          if (st === "ended" && conn.paused) {
+            const code = await pageStatus();
+            if (code === 403) return "kicked";
+            if (code === 200) gate.server();
+            return st;
+          }
           if (filesOn && (st === "alive" || st === "missing")) await loadFiles();
           return st;
         };
@@ -937,6 +993,7 @@
               onSlide: data => api.slide(data),
               onPos: data => api.pos(data),
               onEnded: reason => api.end(reason),
+              onPaused: st => api.paused(st),
             });
             // 폰 Safari 는 뒤로 갔다 오면(bfcache) 스트림이 끊겨 있다 — 보이면 바로 다시 붙는다
             w.addEventListener("pageshow", () => conn.wake());
@@ -1003,8 +1060,8 @@
   // 본문이 안 붙거나 목차 강조가 멈추지 않게(itda-hyve#617 리뷰 3회차 [2]).
   let ext = {};
   const hook = (name, ...args) => {
-    if (typeof ext[name] !== "function") return;
-    try { ext[name](...args); } catch (e) { console.error("share ext:", name, e); }
+    if (typeof ext[name] !== "function") return undefined;
+    try { return ext[name](...args); } catch (e) { console.error("share ext:", name, e); return undefined; }
   };
 
   let toastTimer = 0;
@@ -1017,6 +1074,8 @@
   }
 
   const THEME_FAILED = "테마를 불러오지 못했습니다 — 화면을 새로 고쳐 주세요.";
+  const PAUSE_MSG = { closed: "공유가 잠시 닫혔습니다 — 같은 주소로 다시 열리면 이어집니다", stale: "공유가 오래 닫혀 있어 다시 잇기를 멈췄습니다 — 공유가 다시 열렸으면 새로 고쳐 주세요",
+    held: "화면을 새로 고쳐야 하는데 메모가 이 화면에만 있습니다 — 내려받은 뒤 새로 고쳐 주세요" };
   // 원천을 화면에 잇는다(hostSource 머리 주석의 api). fol 은 아래에서 만든다 — 원천은 start() 뒤에만 부른다.
   const linked = source.attach({
     $,
@@ -1033,6 +1092,21 @@
       $("load-err").textContent = THEME_FAILED;
     },
     end: reason => showEnded(reason),
+    holdReload: () => !!hook("holdReload"), // 확장이 없거나 던지면 막지 않는다
+    // 띠는 문서 위에 떠 있어 쪽 나눔·굴림 자리를 건드리지 않는다. 끊기기 직전의 「문서를 받지 못했습니다」 는 띠가 대신한다(테마 실패는 그대로 둔다)
+    paused: st => {
+      let band = document.getElementById("pause-band");
+      if (!band) { // 공유 화면만 쓰는 자리라 처음 쓸 때 만든다 — 뷰어 화면(web/viewer)은 이 길을 타지 않는다
+        band = document.createElement("p");
+        band.id = "pause-band";
+        band.className = "pause-band";
+        band.setAttribute("role", "status");
+        document.querySelector(".main").appendChild(band);
+      }
+      band.hidden = !st;
+      band.textContent = PAUSE_MSG[st] || "";
+      if (!state.themeFailed && !(state.view && state.view.error)) $("load-err").hidden = true;
+    },
     hello: d => { fol.hello(d); zoomCheck(); },
     slide: d => { fol.onSlide(d); zoomCheck(); },
     pos: d => fol.onPos(d),

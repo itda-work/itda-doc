@@ -17,6 +17,10 @@
   font: inherit; font-size: 15px; font-weight: 600; padding: 10px 18px; border: 0; border-radius: 999px; background: #2f6fed; color: #fff;
   box-shadow: 0 4px 14px rgba(0, 0, 0, .25); cursor: pointer; white-space: nowrap; }
 .follow-back[hidden] { display: none; }
+/* 같은 주소 공유의 잠시 닫힘 띠(share.js) — 문서 위에 떠서 쪽 나눔·굴림 자리를 건드리지 않고, 뒤의 문서를 누르는 것을 막지 않는다 */
+.pause-band { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; margin: 0; padding: 8px 14px; max-width: min(92%, 560px); width: max-content;
+  border-radius: 8px; background: #fff4d6; color: #5c4400; border: 1px solid #e6c766; font-size: 13.5px; line-height: 1.45; text-align: center; pointer-events: none; }
+.pause-band[hidden] { display: none; }
 /* 발표자 노트 컨트롤(itda-hyve#344) — 틀은 호스트 앱 창 틀 CSS 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
 .share-view .notes-switch[hidden] { display: none !important; }
 .share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
