@@ -56,6 +56,8 @@ type View struct {
 	Version       int64          `json:"version"` // 다시 렌더할 때마다 오른다(화면이 바뀐 것을 안다)
 	// ThemeRev 는 테마 묶음의 판이다. 사용자 테마 폴더가 바뀌면 오르고, 화면은 테마 CSS 를 다시 받는다.
 	ThemeRev int64 `json:"theme_rev"`
+	// ThemeHash 는 보이는 테마의 내용 지문이다(Theme.Hash). 재시작을 넘어 이어지는 공유 화면이 쓴다 — 문서 창은 ThemeRev 를 쓴다.
+	ThemeHash string `json:"theme_hash"`
 	// ThemesDir 는 사용자 테마 폴더가 있는지(회사 테마 만들기·폴더 열기를 보일지)다. 경로는 보내지 않는다.
 	UserThemes bool `json:"user_themes"`
 	// ScopeOK 는 테마 CSS 를 가둘 수 있는 엔진인지다(옛 WebKit 이면 false — 회사 테마를 쓰지 않는다).
