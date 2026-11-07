@@ -8,6 +8,7 @@
 - CFF(OTF 기반) 판을 쓰지 않는다 — macOS PDF 에서 글자층(ToUnicode)이 비어 제목의 검색·복사가 깨졌다(itda-hyve#666 실측, itda-doc#50). 내장 테마의 woff2 가 TrueType 인지는 `TestBuiltinWoff2TrueType`(`themes/themes_test.go`)이 막는다.
 - editorial 테마의 제목·큰 인용에만 쓴다(`--font-heading`). 본문은 바탕의 Pretendard 그대로다.
   테마 자산을 제공하는 호스트에서 사용하도록 묶었다(OFL 은 문서 임베드를 허용한다). 앱 화면 로딩·PDF 임베드는 미검증이다. 글꼴을 따로 팔지 않는다.
+  `GOOS=js` 빌드에는 넣지 않는다(`themes/themes_js.go`) — wasm·웹 뷰어 번들에 이 글꼴과 라이선스 원문이 없고, 웹 뷰어의 제목은 Pretendard 로 나온다.
 - 원본에서 굵기를 700 으로 고정하고 아래 글자만 남겨 woff2 로 바꿨다(fontTools 4.68.0·brotli 1.2.1, 같은 입력이면 같은 바이트):
 
   ```

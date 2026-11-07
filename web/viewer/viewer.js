@@ -26,7 +26,8 @@
 //    (IMAGE_TYPES)이면 blob: URL 을 src 로 넣는다(folderImages — 쪽 나누기 전, share.js imagesSettled 가 기다린다). blob URL 은 같은 문서를
 //    다시 그릴 때 재사용하고 문서·폴더를 바꾸면(새 문서를 그린 뒤) 거둔다. 표에 없거나 뿌리 밖·/ 로 시작·허용 목록 밖은 src 를
 //    data-local-src 로 옮겨 요청하지 않고 경고 칸에 알린다. 파일 하나·붙여넣기로 열면 상대 경로 그림은 그리지 않는다(localImages —
-//    「폴더로 열면 그린다」 경고). 원격 그림은 늘 끈다 — mdoc 이 data-remote-src 로 옮기고(경고는 View.warnings), 그래도 남은 원격 src 는
+//    「폴더로 열면 그린다」 경고). 표에서 찾은 그림을 브라우저가 읽지 못하면(연 뒤에 고치거나 옮긴 파일) 문서당 한 번 알리고 경고 칸에 한 줄을 더한다
+//    (source.imageFailed — 지금 문서의 blob: URL 에만 반응한다. itda-doc#67). 원격 그림은 늘 끈다 — mdoc 이 data-remote-src 로 옮기고(경고는 View.warnings), 그래도 남은 원격 src 는
 //    localImages·folderImages 가 옮기며, CSP img-src(data:·blob: 만)가 원격·같은 출처 그림 요청을 막는다.
 //  - 문서 안 상대 링크(#조각·http(s)·mailto·tel 이 아닌 href — 다른 md·// 주소 등)는 href 를 data-local-href 로 옮겨(localLinks)
 //    같은 출처로 이동하지 않는다 — 가운데 단추·새 탭으로 열어도 마찬가지다. 누르면 share.js onClick 이 linkMsg 안내를 낸다(폴더로 열어도
@@ -38,7 +39,7 @@
 //    인쇄 단추는 이어보기면 쪽 보기로 바꿔 그린 뒤 인쇄한다(브라우저 메뉴의 인쇄는 지금 꼴 그대로).
 // node 시험(cmd/itda-doc-wasm/testdata/viewer.cjs)이 document 없이 이 파일을 올려 window.ItdaViewer 의 부품(localImages·localLinks·warningLines·
 // viewerSource·viewerOpener·resolveImgPath·folderImages·tableFromList·walkEntries·walkHandle·docList·firstDoc·metaChain·readFolderMeta·
-// droppedDir·folderDocError)을 본다 —
+// droppedDir·folderDocError·failedImageURL·watchImageErrors)을 본다 —
 // document 가 없으면 화면을 시작하지 않는다.
 (function () {
   "use strict";
@@ -298,6 +299,22 @@
   // 연 뒤 파일을 고치면 브라우저가 쥔 File 의 읽기가 거부될 수 있다(Chromium 실측: NotReadableError). 까닭을 가리지 않고 할 일을 말한다.
   const DOC_READ_FAILED = "파일을 읽지 못했습니다 — 연 뒤에 고쳤거나 옮겼다면 「폴더」로 다시 열어 주세요";
   const META_READ_FAILED = "읽지 못함(연 뒤에 고쳤다면 「폴더」로 다시 열어 주세요)";
+  // 그림은 File 을 읽는 코드가 없이 <img> 가 blob: URL 로 읽으므로 실패가 error 이벤트로만 보인다. 알림은 곧 사라져 경고 칸에도 남긴다.
+  const IMAGE_READ_FAILED = "그림을 읽지 못했습니다 — 연 뒤에 고쳤거나 옮겼다면 「폴더」로 다시 열어 주세요";
+  const IMAGE_READ_LINE = { line: 0, code: "viewer-image-read", text: "읽지 못한 그림이 있음 — 연 뒤에 고쳤거나 옮겼다면 「폴더」로 다시 열어 주세요" };
+
+  // failedImageURL 은 error 이벤트의 대상이 blob: 그림이면 그 URL 이다(아니면 ""). src 를 걷어낸 그림(data-local-src)·원격·data: 그림은 대상이 아니다.
+  function failedImageURL(el) {
+    if (!el || el.tagName !== "IMG") return "";
+    const src = el.getAttribute("src") || "";
+    return /^blob:/i.test(src) ? src : "";
+  }
+
+  // watchImageErrors 는 문서 전체의 error 이벤트를 듣고 그림 실패를 source.imageFailed 로 넘긴다. error 는 버블되지 않아 capture 로 듣는다.
+  // 문서 영역 밖 그림은 지금 문서의 URL 이 아니어서 imageFailed 가 거른다.
+  function watchImageErrors(doc, source) {
+    doc.addEventListener("error", e => { source.imageFailed(failedImageURL(e.target)); }, true);
+  }
 
   // readFolderMeta 는 metaChain 의 파일을 읽어 render 옵션 folderMeta 꼴([{rel, yaml, err}])로 돌려준다. 상한(64KB)을 넘거나 읽지 못하면
   // err 만 채운다 — 문구는 page.ReadMetaFile 과 같고(「파일이 너무 큼(64KB 넘음)」·「읽지 못함」), 내용 읽기 실패에만 다시 열라는 안내를 붙인다
@@ -333,16 +350,18 @@
   // viewerSource 는 뷰어의 View 원천이다(share.js hostSource 머리 주석의 꼴). deps:
   //   load() → Promise<doc>(ItdaDocLoader.load), setThemeCSS(css) → Promise(테마 CSS 를 건다 — 걸린 뒤 풀린다),
   //   unscoped()(@scope 를 모르는 엔진이면 참), onReady(doc)(wasm 이 올라옴), onOpen()(새 문서를 그리기 직전 — 굴린 자리·경고 칸 되돌리기),
-  //   onView(v, lines, cur)(그리기 직전 — 경고 목록·상태 칸 칠하기), onError(msg)(wasm 을 올리지 못함),
+  //   onView(v, lines, cur)(그리기 직전 — 경고 목록·상태 칸 칠하기), onWarnings(lines)(그린 뒤 경고 목록이 늘어남), onError(msg)(wasm 을 올리지 못함),
   //   objectURL(file, type)·revokeURL(url)(그림 blob URL — 없으면 URL.createObjectURL·revokeObjectURL. node 시험이 바꿔 낀다).
   // 원천 밖에서 부르는 것: open(name, src, kind)(새 문서 — kind: "file"·"paste"·"sample", 폴더 상태를 비운다. wasm 이 아직이면 올라온 뒤
   // 그린다), openFolder(folder, path) → Promise<{ok, stale?, msg?}>(폴더 표 folder({name, files})의 문서 path 를 연다 — 원문과
   // _metadata.yml 을 읽은 뒤 그린다. 그 사이 다른 open·openFolder 가 오면 이 읽기는 버린다(stale)), setTheme(name)("" 이면 문서의 테마),
+  // imageFailed(url)(문서 그림의 읽기 실패 — 지금 문서의 blob: URL 이면 문서당 한 번 알리고 참을 돌려준다),
   // api()(attach 가 받은 화면 부품), doc()(올라온 doc 또는 null), current()({name, src, kind, folder?, path?, meta?} 또는 null).
   function viewerSource(deps) {
     let api = null, doc = null, cur = null, theme = "", cssKey = "", fresh = false, seq = 0;
     // 문서 안 그림의 blob URL(표의 경로 → URL). 같은 문서를 다시 그릴 때(테마 등) 재사용하고, 문서·폴더를 바꾸면 새 문서를 그린 뒤 거둔다.
     let urls = new Map();
+    let imageBad = false, lines = []; // imageBad: 이 문서에서 그림 읽기 실패를 이미 알림. lines: 지금 문서의 경고 목록
     const makeURL = deps.objectURL || ((file, type) => URL.createObjectURL(new Blob([file], { type })));
     const dropURL = deps.revokeURL || (u => URL.revokeObjectURL(u));
     function urlFor(path, file, type) {
@@ -360,13 +379,16 @@
       const imgs = cur.folder ? folderImages(v.html, cur.path, cur.folder.files, urlFor) : localImages(v.html);
       v.html = localLinks(imgs.html);
       if (fresh) { fresh = false; if (deps.onOpen) deps.onOpen(); }
-      if (deps.onView) deps.onView(v, warningLines(v, imgs, cur.kind), cur);
+      lines = warningLines(v, imgs, cur.kind);
+      if (imageBad) lines.push(IMAGE_READ_LINE); // 같은 문서를 다시 그려도(테마 등) 경고 칸에서 사라지지 않게
+      if (deps.onView) deps.onView(v, lines, cur);
       return api.show(v);
     }
     // begin 은 새 문서를 세워 그린다 — 앞 문서의 blob URL 은 새 문서를 그린 뒤 거둔다(그리는 동안 앞 화면이 깨지지 않게).
     function begin(next) {
       const old = urls;
       urls = new Map();
+      imageBad = false;
       cur = next;
       fresh = true;
       const done = () => { for (const u of old.values()) dropURL(u); };
@@ -419,6 +441,15 @@
         }, () => (my !== seq ? { ok: false, stale: true } : { ok: false, msg: DOC_READ_FAILED }));
       },
       setTheme(name) { theme = String(name || ""); return draw(); },
+      // 앞 문서의 그림이 새 문서를 그리기 전에 늦게 실패해도 새 문서를 탓하지 않게, 지금 문서의 URL 표에 있는 것에만 반응한다
+      imageFailed(url) {
+        if (imageBad || !url || ![...urls.values()].includes(url)) return false;
+        imageBad = true;
+        lines.push(IMAGE_READ_LINE);
+        if (deps.onWarnings) deps.onWarnings(lines);
+        if (api) api.toast(IMAGE_READ_FAILED);
+        return true;
+      },
       api: () => api,
       doc: () => doc,
       current: () => cur,
@@ -514,7 +545,7 @@
   }
 
   window.ItdaViewer = { localImages, localLinks, warningLines, viewerSource, viewerOpener, TAB_TITLE, LIMITS, IMAGE_TYPES,
-    resolveImgPath, folderImages, walkEntries, walkHandle, tableFromList, docList, firstDoc, metaChain, readFolderMeta, droppedDir, folderDocError };
+    resolveImgPath, folderImages, walkEntries, walkHandle, tableFromList, docList, firstDoc, metaChain, readFolderMeta, droppedDir, folderDocError, failedImageURL, watchImageErrors };
   if (typeof document === "undefined" || !document.body || !document.body.classList.contains("itda-viewer")) return;
 
   // ---- 화면(뷰어의 막대·대화상자). 그리기는 share.js 가 한다.
@@ -543,9 +574,11 @@
     onReady: d => { paintThemes(d.themes()); loadSamples(); $("doc-title").textContent = "문서를 여세요 — 열기·폴더·끌어놓기·붙여넣기·견본"; setBusy(false); },
     onOpen: () => { $("viewer").scrollTop = 0; closeWarnings(); }, // 새 문서는 맨 위부터(render 는 읽던 자리를 둔다)
     onView: (v, lines, cur) => { $("viewer-empty").hidden = true; paintWarnings(lines); paintState(v, cur); },
+    onWarnings: lines => paintWarnings(lines),
     onError: () => { $("doc-title").textContent = "뷰어를 올리지 못했습니다"; }, // 단추는 막아 둔 채로 — 그릴 수 없다
   });
   window.ItdaViewSource = source;
+  watchImageErrors(document, source);
 
   function setBusy(on) {
     for (const id of ["btn-open", "btn-folder", "btn-paste", "sample", "doc-pick", "theme", "btn-print"]) $(id).disabled = on;

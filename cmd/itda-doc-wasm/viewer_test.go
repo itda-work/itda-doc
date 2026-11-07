@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -40,6 +41,10 @@ func TestViewerLoaderAndSource(t *testing.T) {
 	build.Env = append(os.Environ(), "GOOS=js", "GOARCH=wasm")
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("wasm 빌드 실패: %v\n%s", err, out)
+	}
+	// 글꼴은 wasm 에 들어가지 않는다(themes/themes_js.go, itda-doc#48) — 웹 뷰어의 글꼴은 정적 파일(web/fonts)이다
+	if n := bytes.Count([]byte(readFile(t, wasm)), []byte("wOF2")); n != 0 {
+		t.Errorf("wasm 안에 woff2 서명(wOF2)이 %d 개", n)
 	}
 
 	// 견본 목록은 빌드 스크립트의 SAMPLES 한 곳에서 읽는다(「<저장소 경로>|<번들 이름>|<고르기 글>」)
