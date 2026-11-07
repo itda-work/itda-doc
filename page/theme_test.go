@@ -1,8 +1,10 @@
 package page
 
 import (
+	"fmt"
 	"github.com/itda-work/itda-doc/web"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -428,5 +430,108 @@ func TestSlideGuardRuleForms(t *testing.T) {
 	// 지원하지 않는 @묶음(안에 규칙이 있다)은 건너뛰지 않고 파싱 실패(리뷰 4회차 [1])
 	if _, err := slideCSSRules("@document url(x) { .ss-num { font-size: 44pt; } }"); err == nil {
 		t.Errorf("지원하지 않는 @묶음이 파싱 성공으로 판정됨")
+	}
+}
+
+// TestThemeHashAcrossProcess 는 지문이 프로세스를 넘어 내용을 가른다는 것을 별도 프로세스로 본다(itda-hyve#705): Rev 는 두 프로세스에서 같은 번호라 CSS 만 고친 테마를
+// 가르지 못하고, 지문은 가른다. 같은 내용이면 Rev 가 달라도 같다(사용자 테마의 CSS·로고 주소에 ?v=<Rev> 가 들어도).
+func TestThemeHashAcrossProcess(t *testing.T) {
+	if dir := os.Getenv("THEME_HASH_DIR"); dir != "" {
+		ts, err := LoadThemeSet(builtinFS(t), dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		th, ok := ts.Get("co")
+		if !ok {
+			t.Fatal("테마 co 가 없음")
+		}
+		fmt.Printf("HASH %d %s\n", ts.Rev, th.Hash)
+		return
+	}
+	child := func(dir string) (rev, hash string) {
+		t.Helper()
+		cmd := exec.Command(os.Args[0], "-test.run=^TestThemeHashAcrossProcess$", "-test.v")
+		cmd.Env = append(os.Environ(), "THEME_HASH_DIR="+dir)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("자식 프로세스: %v\n%s", err, out)
+		}
+		m := regexp.MustCompile(`HASH (\d+) (\S+)`).FindStringSubmatch(string(out))
+		if m == nil {
+			t.Fatalf("자식 출력: %s", out)
+		}
+		return m[1], m[2]
+	}
+	tree := func(mod map[string]string) string {
+		files := map[string]string{
+			"base/theme.json":    `{"extends":"classic","tokens":{"--accent":"#112233"}}`,
+			"base/assets/bg.svg": `<svg xmlns="http://www.w3.org/2000/svg"/>`,
+			"co/theme.json":      `{"extends":"base","logo":"assets/logo.svg"}`,
+			"co/theme.css":       `.cover-title { color: red; background: url(assets/logo.svg) }`,
+			"co/assets/logo.svg": `<svg xmlns="http://www.w3.org/2000/svg"/>`,
+		}
+		for k, v := range mod {
+			files[k] = v
+		}
+		dir := t.TempDir()
+		writeTree(t, dir, files)
+		return dir
+	}
+	rev0, base := child(tree(nil))
+	if base == "" {
+		t.Fatal("지문이 비었음")
+	}
+	if rev, h := child(tree(nil)); rev != rev0 || h != base {
+		t.Errorf("같은 내용·별도 프로세스: rev %s·%s, 지문 %s·%s", rev0, rev, base, h)
+	}
+	for name, mod := range map[string]map[string]string{
+		"CSS":    {"co/theme.css": `.cover-title { color: blue; background: url(assets/logo.svg) }`},
+		"토큰":     {"co/theme.json": `{"extends":"base","logo":"assets/logo.svg","tokens":{"--accent":"#c8102e"}}`},
+		"그림":     {"co/assets/logo.svg": `<svg xmlns="http://www.w3.org/2000/svg" width="1"/>`},
+		"조상의 토큰": {"base/theme.json": `{"extends":"classic","tokens":{"--accent":"#445566"}}`},
+		"조상의 그림": {"base/assets/bg.svg": `<svg xmlns="http://www.w3.org/2000/svg" width="2"/>`},
+	} {
+		rev, h := child(tree(mod))
+		if rev != rev0 {
+			t.Errorf("%s: 시험의 전제가 깨짐 — 프로세스마다 Rev 가 같아야 한다(%s·%s)", name, rev0, rev)
+		}
+		if h == base {
+			t.Errorf("%s 를 고쳐도 지문이 같음", name)
+		}
+	}
+	// 한 프로세스에서 다시 불러 Rev 가 달라져도 내용이 같으면 지문이 같다
+	dir := tree(nil)
+	a, err := LoadThemeSet(builtinFS(t), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := LoadThemeSet(builtinFS(t), dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ta, _ := a.Get("co")
+	tb, _ := b.Get("co")
+	if a.Rev == b.Rev || ta.CSS == tb.CSS || ta.Hash != base || tb.Hash != base {
+		t.Errorf("Rev %d·%d, CSS 같음 %v, 지문 %s·%s, 기대 %s", a.Rev, b.Rev, ta.CSS == tb.CSS, ta.Hash, tb.Hash, base)
+	}
+}
+
+// TestViewThemeHash 는 view 가 고른 테마의 지문을 싣는 것을 본다. 이름 없는 지문이면 공유 화면이 테마를 견주지 못한다.
+func TestViewThemeHash(t *testing.T) {
+	ts, err := BuiltinThemes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]string{}
+	for _, name := range []string{"classic", "compact"} {
+		v := renderView([]byte("---\ntheme: "+name+"\n---\n# 가\n"), "", "", ts, "", false)
+		th, _ := ts.Get(name)
+		if v.ThemeHash == "" || v.ThemeHash != th.Hash {
+			t.Errorf("%s: view 지문 %q, 테마 지문 %q", name, v.ThemeHash, th.Hash)
+		}
+		seen[v.ThemeHash] = name
+	}
+	if len(seen) != 2 {
+		t.Errorf("다른 테마의 지문이 같음: %v", seen)
 	}
 }

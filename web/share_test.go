@@ -488,3 +488,527 @@ func TestShareFolderRecovery(t *testing.T) {
 		t.Fatalf("연결 복구: %v\n%s", err, out)
 	}
 }
+
+// 같은 주소 공유의 잠시 닫힘(itda-hyve#705 3절): stop 의 까닭 paused·hello 의 keep 뒤 끊김은 끝이 아니다. 404·망 실패는 재시도, 403 만 끝, 다시 붙으면 새로 고침 없이 띠가 사라지고
+// 바뀐 문서를 받는다. 24시간 뒤 멈춘다. keep 이 아닌 공유는 그대로다(끊김 뒤 404 는 끝, TestShareFolderRecovery 도 본다).
+func TestSharePausedResume(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  const DAY = 24 * 3600 * 1000;
+  // page 는 가짜 서버(srv)에 이어진 한 화면이다. srv.mode: ok·gone(404)·kicked(403)·down(망 실패)·stranger(쿠키를 모름 — view.json 404, 지금 주소 200)·page403(지금 주소만 403)
+  // themed 면 show 가 진짜 themeApplier 를 지나 이 페이지의 테마 키를 잡는다(hold 는 함수로 줘도 된다 — 시험 중간에 바뀐다)
+  const page = async (srv, hold, themed) => {
+    const p = { streams: [], timers: [], ended: [], fails: 0, cur: null, shows: 0, bands: [], reloads: 0, wakes: [], views: 0, pages: [], base: "/b", hrefs: [], link: {} };
+    const reply = (status, body) => ({ ok: status === 200, status, headers: { get: () => null }, json: async () => body });
+    const on = (o, n, f) => { if (n === "pageshow" || n === "visibilitychange") p.wakes.push(f); };
+    const kept = {};
+    const w = { sessionStorage: { getItem: k => kept[k] || null, setItem: (k, v) => { kept[k] = v; } }, addEventListener(n, f) { on(w, n, f); }, document: { addEventListener(n, f) { on(w, n, f); }, visibilityState: "visible" },
+      location: { pathname: "/b", hash: "", href: "http://h/b?doc=a.md", reload: () => { p.reloads++; } },
+      setTimeout: f => { p.timers.push({ f, off: false }); return p.timers.length; },
+      clearTimeout: id => { if (id && p.timers[id - 1]) p.timers[id - 1].off = true; },
+      fetch: async (u, o) => {
+        if (srv.mode === "down") throw new Error("망");
+        if (!u.endsWith("view.json")) {
+          p.pages.push(((o && o.method) || "GET") + " " + u);
+          return reply(srv.mode === "stranger" ? 200 : srv.mode === "page403" ? 403 : 404, null);
+        }
+        p.views++;
+        if (srv.mode === "gone" || srv.mode === "stranger" || srv.mode === "page403") return reply(404, null);
+        if (srv.mode === "kicked") return reply(403, null);
+        return reply(200, { version: srv.version, theme: "t", theme_rev: srv.rev, theme_hash: srv.hash, html: srv.html });
+      },
+      EventSource: class { constructor(u) { this.u = u; this.on = {}; p.streams.push(this); } addEventListener(n, f) { this.on[n] = f; } close() { this.closed = true; } } };
+    const link = { addEventListener(n, f) { p.link[n] = f; }, setAttribute(k, v) { p.hrefs.push(v); } };
+    let src;
+    const api = { $: () => link, ended: () => p.ended.length > 0, current: () => p.cur, show: async v => { if (themed) src.applyTheme(v); p.cur = v; p.shows++; }, failed() { p.fails++; }, themeFailed() {},
+      end(r) { p.ended.push(r); }, hello() {}, slide() {}, pos() {}, redraw() {}, files() {}, nav() {}, paused: st => p.bands.push(st), holdReload: () => !!(typeof hold === "function" ? hold() : hold) };
+    src = S.hostSource("/b", w).attach(api);
+    src.start();
+    await settle();
+    p.timers.forEach(t => { t.off = true; }); // 테마 CSS 를 기다리는 시계 — 이 시험의 재시도가 아니다
+    p.last = () => p.streams[p.streams.length - 1];
+    p.hello = async d => { p.last().on.hello({ data: JSON.stringify(d) }); await settle(); };
+    p.drop = async () => { p.last().onerror(); await settle(); };
+    p.stop = async reason => { p.last().on.stop({ data: JSON.stringify({ reason }) }); await settle(); };
+    p.retry = async () => { const t = p.timers.filter(x => !x.off).pop(); t.off = true; t.f(); await settle(); };
+    p.live = () => p.timers.filter(x => !x.off).length;
+    return p;
+  };
+  const server = () => ({ mode: "ok", version: 1, html: "읽던 문서" });
+  const hello = { version: 1, theme: "t", keep: true };
+  (async () => {
+    // paused 로 닫힘 → 404 동안 재시도 → 다시 떠서 바뀐 문서를 받고 띠가 사라짐, 새로 고침 없음
+    let srv = server(), p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone";
+    await p.stop("paused");
+    eq("paused: 띠·끝나지 않음·문서 남음", [p.bands, p.ended, p.cur.html, p.live()], [["closed"], [], "읽던 문서", 1]);
+    const streams = p.streams.length;
+    await p.retry();
+    eq("재시도: 스트림을 다시 엶", p.streams.length, streams + 1);
+    await p.drop();
+    eq("404 는 끝이 아니다", [p.ended, p.bands, p.live()], [[], ["closed"], 1]);
+    srv.mode = "down";
+    await p.retry(); await p.drop();
+    eq("망 실패도 재시도, 안내 없음", [p.ended, p.fails, p.live()], [[], 0, 1]);
+    srv.mode = "ok"; srv.version = 2; srv.html = "고친 문서";
+    await p.retry();
+    await p.hello({ version: 2, theme: "t", keep: true });
+    eq("복귀: 바뀐 문서·띠 지움·새로 고침 없음", [p.cur.html, p.bands, p.reloads, p.ended], ["고친 문서", ["closed", ""], 0, []]);
+    await p.stop("paused");
+    eq("다시 닫혀도 같다", [p.bands.slice(2), p.ended], [["closed"], []]);
+
+    // 쿠키를 잃음: 재시도가 지금 주소를 살펴 200 이면 새로 고친다. 공유가 없으면(404) 새로 고치지 않는다 — 꺼진 서버로 새로 고치면 브라우저 오류 화면이다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    eq("쿠키: 공유가 없으면 재시도", [p.pages, p.reloads, p.ended, p.live()], [["GET http://h/b?doc=a.md"], 0, [], 1]);
+    srv.mode = "stranger";
+    await p.retry(); await p.drop();
+    eq("쿠키: 200 이면 새로 고침", [p.reloads, p.ended, p.pages.length], [1, [], 2]);
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    srv.mode = "page403"; await p.retry(); await p.drop();
+    eq("쿠키: 지금 주소 403 은 끝", [p.ended, p.reloads, p.live()], [["kicked"], 0, 0]);
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "down"; await p.drop();
+    eq("쿠키: 망 실패는 살피지 않음", [p.pages, p.reloads], [[], 0]);
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    await p.drop();
+    srv.mode = "ok"; await p.retry();
+    eq("쿠키: view.json 이 되면 살피지 않음", [p.pages, p.reloads], [[], 0]);
+
+    // 새로 고침이 메모를 지울 때는 띠로 안내한다
+    srv = server(); p = await page(srv, true);
+    await p.hello(hello);
+    srv.mode = "stranger"; await p.stop("paused");
+    eq("메모가 화면에만: 새로 고치지 않고 안내", [p.reloads, p.bands, p.ended, p.live()], [0, ["closed", "held"], [], 1]);
+
+    // 테마는 내용 지문으로 견준다: 서버를 다시 띄워 판 번호가 달라져도 지문이 같으면 새로 고치지 않고 문서만 바꾼다
+    const themeHello = (hash, rev) => ({ version: 2, theme: "t", keep: true, theme_hash: hash, theme_rev: rev });
+    const themedPage = async (hold, hash) => {
+      const s = server(); s.hash = hash || "aaa"; s.rev = 5;
+      const q = await page(s, hold, true);
+      await q.hello({ version: 1, theme: "t", keep: true, theme_hash: s.hash, theme_rev: 5 });
+      s.mode = "gone"; await q.stop("paused");
+      return [s, q];
+    };
+    [srv, p] = await themedPage();
+    eq("CSS 주소는 지문", p.hrefs, ["/b/_/_theme/t/theme.css?v=aaa"]);
+    srv.mode = "ok"; srv.rev = 1; srv.version = 2; srv.html = "고친 문서";
+    await p.retry(); await p.hello(themeHello("aaa", 1));
+    eq("같은 지문·다른 판: 새로 고침 없음", [p.reloads, p.cur.html, p.hrefs.length, p.bands], [0, "고친 문서", 1, ["closed", ""]]);
+
+    // 지문이 다르면 판 번호가 같아도(재시작한 프로세스의 같은 번호) 새로 고친다
+    [srv, p] = await themedPage();
+    srv.mode = "ok"; srv.hash = "bbb";
+    await p.retry(); await p.hello(themeHello("bbb", 5));
+    eq("다른 지문·같은 판: 새로 고침", [p.reloads, p.cur.html], [1, "읽던 문서"]);
+
+    // 쿠키 정상 + 저장 불가 메모 + 닫힌 사이 테마 변경: 새로 고치지 않고 문서를 두고 안내한다
+    [srv, p] = await themedPage(true);
+    srv.mode = "ok"; srv.hash = "bbb"; srv.version = 2;
+    await p.retry(); await p.hello(themeHello("bbb", 5));
+    eq("메모 보호: hello", [p.reloads, p.bands, p.cur.html, p.ended], [0, ["closed", "", "held"], "읽던 문서", []]);
+    p.last().on.version({ data: JSON.stringify({ version: 3, theme: "t", theme_hash: "ccc" }) }); await settle();
+    p.last().on.reload({}); await settle();
+    eq("메모 보호: version·reload", [p.reloads, p.cur.html], [0, "읽던 문서"]);
+    p.link.error(); await settle();
+    eq("메모 보호: CSS 실패", p.reloads, 0);
+    [srv, p] = await themedPage(true);
+    srv.mode = "ok"; srv.hash = "bbb";
+    await p.retry(); await p.drop(); // hello 전에 다시 끊겨 복구의 view 가 먼저 온다
+    eq("메모 보호: 복구의 view", [p.reloads, p.bands], [0, ["closed", "held"]]);
+
+    // 2초 보호로 미룬 새로 고침도 그때 다시 묻는다
+    let held = false;
+    [srv, p] = await themedPage(() => held);
+    srv.mode = "ok"; srv.hash = "bbb";
+    await p.retry(); await p.hello(themeHello("bbb", 5));
+    eq("첫 새로 고침", p.reloads, 1);
+    p.last().on.reload({}); await settle();
+    held = true;
+    p.timers.filter(t => !t.off).pop().f(); await settle();
+    eq("미룬 새로 고침도 막힘", [p.reloads, p.bands.includes("held")], [1, true]);
+
+    // 같은 주소가 아닌 공유는 holdReload 를 묻지 않는다 — 지금처럼 새로 고친다
+    srv = server(); srv.hash = "aaa"; p = await page(srv, true, true);
+    await p.hello({ version: 1, theme: "t", theme_hash: "aaa" });
+    p.last().on.reload({}); await settle();
+    eq("keep 아님: 관문 없음", [p.reloads, p.bands], [1, []]);
+
+    // 강제 종료: stop 없이 끊겨도 keep 공유면 띠
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "down";
+    await p.drop();
+    eq("강제 종료: 띠", [p.bands, p.ended, p.fails, p.live()], [["closed"], [], 0, 1]);
+
+    // 403 은 끝낸다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    srv.mode = "kicked"; await p.retry(); await p.drop();
+    eq("403: 끝남", [p.ended, p.live()], [["kicked"], 0]);
+
+    // 끝남 stop·kick 은 keep 공유에서도 끝이다(주소 버리기)
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    await p.stop("address_dropped");
+    eq("주소 버리기: 끝남", [p.ended, p.bands], [["address_dropped"], []]);
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    p.last().on.kick({}); await settle();
+    eq("kick: 끝남", [p.ended, p.bands], [["kicked"], []]);
+
+    // 붙어 있는 동안 version 의 view.json 이 404 면 끝이 아니라 잠시 닫힘이다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone";
+    p.last().on.version({ data: JSON.stringify({ version: 9, theme: "t" }) }); await settle();
+    eq("연결 중 404: 잠시 닫힘", [p.ended, p.bands, p.last().closed, p.live()], [[], ["closed"], true, 1]);
+
+    // 붙어 있는 동안의 403 은 끝이다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "kicked";
+    p.last().on.version({ data: JSON.stringify({ version: 9, theme: "t" }) }); await settle();
+    eq("연결 중 403: 끝남", [p.ended, p.bands], [["kicked"], []]);
+
+    // 화면이 다시 보이면 바로 붙는다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    const n = p.streams.length;
+    p.wakes[0](); await settle();
+    eq("wake: 바로 붙음", p.streams.length, n + 1);
+
+    // 24시간: 재시도를 멈추고 안내로 바꾼다
+    let shift = 0, c0 = null;
+    const t0 = 1000, late = [], ended = [], seen = [];
+    const c = S.connect("/b", { EventSource: class { constructor() { c0 = this; this.on = {}; } addEventListener(n, f) { this.on[n] = f; } close() {} },
+      probe: async () => "ended", setTimeout: f => { late.push(f); return late.length; }, clearTimeout() {}, now: () => t0 + shift,
+      onHello() {}, onEnded: r => ended.push(r), onPaused: s => seen.push(s) });
+    await settle();
+    c0.on.hello({ data: JSON.stringify({ keep: true }) });
+    c0.on.stop({ data: JSON.stringify({ reason: "paused" }) }); await settle();
+    eq("24시간 전: 재시도", [seen, late.length], [["closed"], 1]);
+    shift = DAY - 1; late.shift()(); c0.onerror(); await settle();
+    eq("24시간 직전: 재시도", [seen, late.length], [["closed"], 1]);
+    shift = DAY; late.shift()(); c0.onerror(); await settle();
+    eq("24시간: 멈추고 안내", [seen, late.length, ended], [["closed", "stale"], 0, []]);
+    const before = c.state;
+    c.wake(); await settle();
+    eq("멈춘 뒤 wake 는 붙지 않음", [before, c.state], ["idle", "idle"]);
+
+    // keep 이 아닌 공유는 그대로다: 끊김 뒤 404 는 끝, 띠 없음, stop 은 끝
+    srv = server(); p = await page(srv);
+    await p.hello({ version: 1, theme: "t" });
+    srv.mode = "gone"; await p.drop();
+    eq("keep 아님: 끊김 뒤 404 는 끝", [p.ended, p.bands, p.live(), p.pages], [[""], [], 0, []]);
+    srv = server(); p = await page(srv);
+    await p.hello({ version: 1, theme: "t" });
+    await p.stop("user");
+    eq("keep 아님: stop 은 끝", [p.ended, p.bands], [["user"], []]);
+    srv = server(); p = await page(srv);
+    await p.hello({ version: 1, theme: "t" });
+    srv.mode = "down"; await p.drop();
+    eq("keep 아님: 망 실패는 띠 없이 다시 붙기", [p.ended, p.bands, p.live()], [[], [], 1]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "PAUSED OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "PAUSED OK" {
+		t.Fatalf("잠시 닫힘: %v\n%s", err, out)
+	}
+}
+
+// 잠시 닫힘 띠: 문서를 지우는 끝난 화면을 부르지 않는다 — 띠는 share.css 에서 흐름 밖에 떠 있어 쪽 나눔·굴림 자리를 건드리지 않는다. 자리는 share.js 가 처음 쓸 때 .main 에 만든다.
+func TestSharePauseBandParts(t *testing.T) {
+	read := func(n string) string {
+		b, err := os.ReadFile(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	css := read("share.css")
+	if !strings.Contains(css, ".pause-band { position: absolute;") || !strings.Contains(css, ".pause-band[hidden] { display: none; }") {
+		t.Error("띠가 흐름 밖에 있어야 함")
+	}
+	src := read("share.js")
+	a := strings.Index(src, "    paused: st => {\n")
+	z := strings.Index(src[max(a, 0):], "\n    },\n")
+	if a < 0 || z < 0 {
+		t.Fatal("share.js 에서 paused 를 찾지 못함")
+	}
+	if body := src[a : a+z]; strings.Contains(body, "showEnded") || strings.Contains(body, `"pages"`) {
+		t.Errorf("띠가 문서를 건드림:\n%s", body)
+	}
+}
+
+// 글꼴을 받은 뒤 나누기(itda-doc#62): share.js 의 render·draw·fontWait·fontsLate 정의를 그대로 떼어 node 로 돌린다. 화면 부품은 가짜(이름을 모르면 빈 함수)이고
+// 나누기는 ItdaSlides.build 호출로 센다. 글꼴·타이머는 시험이 손으로 끝낸다.
+func TestShareFontsBeforeSplit(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	cut := func(head, tail string) string {
+		a := strings.Index(src, head)
+		if a < 0 {
+			t.Fatalf("share.js 에서 %q 를 찾지 못함", head)
+		}
+		z := strings.Index(src[a:], tail)
+		if z < 0 {
+			t.Fatalf("share.js 에서 %q 의 끝을 찾지 못함", head)
+		}
+		return src[a : a+z+len(tail)]
+	}
+	decl := cut("  const fontWait = fontGate(", ";\n") + cut("  function fontsLate() {", "\n  }\n") +
+		cut("  async function render(v, sort) {", "\n  }\n") + cut("  async function draw(sort) {", "\n  }\n")
+	node := needNode(t)
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(process.env.SRC, ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  const noop = () => {};
+  // face 는 끝나지 않은 글꼴이다. arrive·fail 로 끝낸다. load 를 부르기 전에는 끝낼 수 없다 — load 를 안 하면 글꼴은 오지 않는다
+  const face = (log, name, status) => {
+    const f = { status: status || "unloaded", loads: 0 };
+    const p = new Promise((ok, no) => { f.arrive = () => { f.status = "loaded"; ok(f); }; f.fail = () => { f.status = "error"; no(new Error("404")); }; });
+    p.catch(noop);
+    f.load = () => { f.loads++; log.push("load " + name); return p; };
+    return f;
+  };
+  // el 은 어떤 메서드를 불러도 되는 가짜 요소다
+  const element = () => new Proxy({ querySelectorAll: () => [], querySelector: () => null, firstChild: null, childElementCount: 0, scrollTop: 0, textContent: "", style: {}, dataset: {} }, {
+    get: (t, k) => k in t ? t[k] : k === "classList" || k === "style" ? { toggle: noop, add: noop, remove: noop, setProperty: noop, removeProperty: noop } : noop,
+    set: (t, k, val) => { t[k] = val; return true; },
+  });
+  const load = new Function("env", "with (env) { " + process.env.DECL + " return { render, draw, fontsLate }; }");
+  function rig(faces) {
+    const log = [], r = { log, timers: [], builds: [], sorts: [], ticks: 0, imgs: null };
+    r.faces = faces(log);
+    const set = r.faces; set.ready = Promise.resolve();
+    const el = element();
+    r.state = { view: null, look: "", chosen: "", ratio: "16:9", ended: false, rendering: null, again: false, slideNotes: [], hasNotes: false, tableSort: null, fontStale: false };
+    const env = { state: r.state, fontGate: S.fontGate, applyTheme: async () => true, $: () => el, docTitle: () => "", app: "", source: {}, fol: { active: () => false },
+      findHeading: { refresh: noop }, jumper: { jump: noop }, TableSort: { mark: noop, apply: (f, sort) => { r.sorts.push(sort); return true; } }, CodeLines: null, CodeCopy: null, boardZoom: null, hook: name => { if (name === "tick") r.ticks++; }, imagesSettled: () => r.imgs ? r.imgs.done : null,
+      lookFor: (v, w, chosen) => v.look || chosen || "slides",
+      document: { fonts: set, title: "", body: el, documentElement: el, createElement: () => element(), createDocumentFragment: () => element(), querySelectorAll: () => [] },
+      setTimeout: (f, ms) => { r.timers.push({ f, ms }); return r.timers.length; },
+      window: { innerWidth: 1200, ItdaPager: { numberBlocks: noop, prepareTOC: noop, adoptWidths: () => { r.builds.push("flow"); log.push("build"); }, paginate: (f, t, o) => { r.builds.push("page"); log.push("build"); } },
+        ItdaSlides: { SIZE: { "16:9": [960, 540], "4:3": [960, 720] }, placeNotes: noop, build: () => { r.builds.push("slides"); log.push("build"); return {}; } },
+        ItdaBoard: { build: () => { r.builds.push("board"); log.push("build"); } } } };
+    const scope = new Proxy(env, { has: () => true, get: (t, k) => k === Symbol.unscopables ? undefined : k in t ? t[k] : k in globalThis ? globalThis[k] : noop });
+    Object.assign(r, load(scope));
+    r.show = v => { r.state.view = v; return r.draw(); };
+    r.expire = async () => { r.timers.splice(0).forEach(t => t.f()); await settle(); };
+    r.holdImages = () => { let open; r.imgs = { done: new Promise(ok => { open = ok; }) }; r.imgs.open = () => { open(); r.imgs = null; }; };
+    return r;
+  }
+  const v = { html: "" };
+  (async () => {
+    // build 전에 모든 face 의 load 가 끝난다 — 안 쓰는 face 까지
+    let r = rig(l => [face(l, "본문"), face(l, "테마")]);
+    r.show(v); await settle();
+    eq("끝나기 전에는 나누지 않음", r.builds, []);
+    eq("모든 face 를 받기 시작", r.faces.map(f => f.loads), [1, 1]);
+    eq("상한", r.timers.map(t => t.ms), [5000]);
+    r.faces[0].arrive(); await settle();
+    eq("하나만 왔을 때", r.builds, []);
+    r.faces[1].arrive(); await settle();
+    eq("다 오면 나눔", r.log, ["load 본문", "load 테마", "build"]);
+    await r.expire();
+    eq("끝난 뒤 지난 타이머는 할 일이 없음", r.builds.length, 1);
+    r.fontsLate(); await settle();
+    eq("끝난 뒤에는 다시 그리지 않음", r.builds.length, 1);
+
+    // 쪽·보드·이어보기도 같다 — 기다린 뒤 그리고, 상한을 넘기면 도착 뒤 다시 그린다(이어보기는 adoptWidths 로 센다)
+    for (const [look, kind] of [["doc", "page"], ["dashboard", "board"], ["flow", "flow"]]) {
+      r = rig(l => [face(l, "본문")]);
+      r.show({ html: "", look }); await settle();
+      eq(look + ": 기다림", r.builds, []);
+      r.faces[0].arrive(); await settle();
+      eq(look + ": 나눔", r.builds, [kind]);
+      r = rig(l => [face(l, "본문")]);
+      r.show({ html: "", look }); await settle(); await r.expire();
+      eq(look + ": 상한 뒤 먼저 그림", r.builds, [kind]);
+      r.faces[0].arrive(); await settle(); await r.expire();
+      eq(look + ": 도착 뒤 다시 그림", r.builds, [kind, kind]);
+    }
+
+    // fonts.ready 가 남아 있으면 끝날 때까지 기다린다
+    r = rig(l => [face(l, "본문")]);
+    let readyOK;
+    r.faces.ready = new Promise(ok => { readyOK = ok; });
+    r.show(v); await settle();
+    r.faces[0].arrive(); await settle();
+    eq("ready 전", r.builds, []);
+    readyOK(); await settle();
+    eq("ready 뒤", r.builds, ["slides"]);
+
+    // 실패한 face 는 막지 않는다
+    r = rig(l => [face(l, "깨짐"), face(l, "본문")]);
+    r.show(v); await settle();
+    r.faces[0].fail(); r.faces[1].arrive(); await settle();
+    eq("reject 된 face 가 있어도 진행", r.builds, ["slides"]);
+    eq("reject 뒤 다시 그리지 않음", [r.state.fontStale, r.timers.filter(t => t.ms !== 5000)], [false, []]);
+
+    // 이미 끝난 글꼴은 지연이 없다 — 타이머도 없다
+    r = rig(l => [face(l, "본문", "loaded"), face(l, "깨짐", "error")]);
+    r.faces[0].arrive(); r.faces[1].fail();
+    await r.show(v);
+    eq("끝난 글꼴: 바로 나눔", [r.builds, r.timers.length], [["slides"], 0]);
+
+    // 상한을 넘기면 먼저 그리고, 도착하면 한 번만 다시 그린다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle();
+    await r.expire();
+    eq("상한 뒤 먼저 그림", r.builds.length, 1);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("도착 뒤 한 번 다시 그림", r.builds.length, 2);
+    eq("다시 그린 뒤 표시 없음", [r.state.fontStale, r.timers.length], [false, 0]);
+    r.fontsLate(); await settle();
+    eq("두 번 다시 그리지 않음", r.builds.length, 2);
+
+    // 하나가 끝나지 않아도 도착한 face 마다 다시 나눈다
+    r = rig(l => [face(l, "본문"), face(l, "제목"), face(l, "안 끝남")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("끝나지 않는 face 가 있어도 다시 나눔", r.builds.length, 2);
+    eq("다시 나눈 뒤 남은 face 를 기다리지 않음", r.timers.length, 0);
+    r.faces[1].arrive(); await settle(); await r.expire();
+    eq("다시 그린 뒤 도착한 face 로 또 나눔", r.builds.length, 3);
+    eq("끝나지 않는 face 를 또 받지 않음", r.faces[2].loads, 2);
+
+    // 몰려 도착하면 합친다
+    r = rig(l => [face(l, "가"), face(l, "나"), face(l, "다"), face(l, "안 끝남")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].arrive(); r.faces[1].arrive(); await settle();
+    r.faces[2].arrive(); await settle();
+    eq("합치는 동안 그리지 않음", [r.builds.length, r.timers.length], [1, 1]);
+    await r.expire();
+    eq("몰린 도착은 한 번", r.builds.length, 2);
+
+    // 도착이 실패면 나눔이 바뀌지 않는다
+    r = rig(l => [face(l, "깨짐")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces[0].fail(); await settle(); await r.expire();
+    eq("상한 뒤 실패는 다시 그리지 않음", r.builds.length, 1);
+
+    // 상한을 넘긴 글꼴은 다음 그리기를 또 늦추지 않고, 여러 번 그려도 도착 뒤 한 번만 다시 그린다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    await r.draw();
+    eq("상한을 넘긴 face 는 또 기다리지 않음", [r.builds.length, r.timers.length], [2, 0]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("여러 번 그렸어도 도착 뒤 한 번", r.builds.length, 3);
+
+    // 새 face(늦은 테마 CSS)는 그 face 만 기다린다
+    r = rig(l => [face(l, "안 끝남")]);
+    r.faces.ready = new Promise(noop); // 끝나지 않는 face 가 있는 동안 브라우저의 ready 는 풀리지 않는다
+    r.show(v); await settle(); await r.expire();
+    r.faces.push(face(r.log, "테마"));
+    r.draw(); await settle();
+    eq("새 face 를 기다림", [r.builds.length, r.timers.map(t => t.ms)], [1, [5000]]);
+    eq("새 face 를 받기 시작", r.faces[1].loads, 1);
+    r.faces[1].arrive(); await settle();
+    eq("새 face 가 오면 상한을 또 쓰지 않고 나눔", r.builds.length, 2);
+    await r.expire();
+    eq("새 face 로 나눴으니 다시 그리지 않음", r.builds.length, 2);
+
+    // 나누는 동안 처음 나타난 face 도 도착하면 다시 나눈다
+    r = rig(l => []);
+    r.holdImages();
+    r.show(v); await settle();
+    r.faces.push(face(r.log, "늦은 선언"));
+    r.imgs.open(); await settle();
+    eq("늦은 선언: 먼저 그림", [r.builds.length, r.faces[0].loads], [1, 1]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("늦은 선언: 도착 뒤 다시 그림", r.builds.length, 2);
+
+    // 렌더 도중 도착: 나누기 전이면 그 렌더가 글꼴을 쓴다 — 추가 렌더도, 정렬 풀림도 없다
+    r = rig(l => [face(l, "본문")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.holdImages();
+    const sorting = r.draw({ col: 1 }); await settle();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    r.imgs.open(); await sorting; await settle(); await r.expire();
+    eq("렌더 도중 도착: 정렬", [r.sorts, r.state.tableSort], [[{ col: 1 }], { col: 1 }]);
+    eq("렌더 도중 도착: 추가 렌더 없음", [r.builds.length, r.state.again, r.state.fontStale], [2, false, false]);
+
+    // 렌더 도중 일부만 왔으면 다음 도착이 정렬을 이어 다시 나눈다
+    r = rig(l => [face(l, "본문"), face(l, "제목")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.holdImages();
+    const part = r.draw({ col: 2 }); await settle();
+    r.faces[0].arrive(); await settle(); await r.expire();
+    r.imgs.open(); await part; await settle();
+    eq("일부 도착: 표시 남음", [r.builds.length, r.state.fontStale], [2, true]);
+    r.faces[1].arrive(); await settle(); await r.expire();
+    eq("일부 도착: 정렬 이음", [r.builds.length, r.sorts, r.state.tableSort], [3, [{ col: 2 }, { col: 2 }], { col: 2 }]);
+
+    // 공유가 끝났으면 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.state.ended = true;
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("끝난 공유", r.builds.length, 1);
+
+    // 문서가 바뀌어 새 그리기가 글꼴을 받고 나눴으면 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.faces.push(face(r.log, "새 문서"));
+    r.show({ html: "새 판" }); await settle();
+    r.faces[1].arrive(); r.faces[0].arrive(); await settle(); await r.expire();
+    eq("바뀐 문서", r.builds.length, 2);
+
+    // 오류 view 로 바뀌었으면 글꼴이 와도 그 화면을 다시 그리지 않는다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.show({ error: "문서 없음" }); await settle();
+    eq("오류 view 그림", [r.builds.length, r.ticks], [1, 1]);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("오류 view 를 다시 그리지 않음", [r.builds.length, r.ticks], [1, 1]);
+
+    // 바뀐 문서도 대체 글꼴로 나눴으면 그 문서를 다시 나눈다
+    r = rig(l => [face(l, "본문")]);
+    r.show(v); await settle(); await r.expire();
+    r.show({ html: "새 판" }); await settle();
+    eq("바뀐 문서 먼저 그림", r.builds.length, 2);
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("바뀐 문서를 한 번 다시 나눔", r.builds.length, 3);
+
+    // 다시 그려도 사람이 고른 표 정렬은 잇는다
+    r = rig(l => [face(l, "본문")]);
+    r.show({ html: "", look: "doc" }); await settle(); await r.expire();
+    r.state.tableSort = { col: 1 };
+    r.faces[0].arrive(); await settle(); await r.expire();
+    eq("다시 그린 뒤 표 정렬", [r.sorts, r.state.tableSort], [[{ col: 1 }], { col: 1 }]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "FONTS OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "FONTS OK" {
+		t.Fatalf("글꼴을 받은 뒤 나누기: %v\n%s", err, out)
+	}
+}
