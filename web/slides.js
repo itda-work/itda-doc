@@ -550,13 +550,14 @@
   }
 
   // ---- 노트 칸(itda-hyve#344) — 호스트 앱의 슬라이드 미리보기와 공유 보는 화면(share.js)이 함께 쓴다.
-  // 노트 칸(aside.slide-note)은 슬라이드(.page) 밖의 형제라 슬라이드 수·발표 사본·쪽 넘김(.page 만 센다)에 섞이지 않는다.
+  // 노트 칸(aside.slide-note)은 슬라이드(.page) 밖이라 슬라이드 수·발표 사본·쪽 넘김(.page 만 센다)에 섞이지 않는다. 두 화면 모두 칸을 transform 이
+  // 걸린 #pages 의 형제 상자(#notes)에 둔다 — WebKit 은 transform 요소 안에 합성 층 자손(굴러가는 칸)이 있으면 조상 전체를 비트맵으로 늘려 글자가 흐려진다(itda-hyve#752).
 
-  // placeNotes 는 box(무대의 target 또는 #pages) 안의 슬라이드마다 노트 칸을 붙인다. o = { notes[](build 의 값), on(붙일지),
-  // grip(오른쪽 배치에서 끌어 너비를 바꾸는 손잡이 .sn-grip 을 칸 왼쪽에 둘지) }. on 이 거짓이면 지우기만 한다.
+  // placeNotes 는 box(#pages) 안의 슬라이드마다 노트 칸을 만들어 o.into(#notes)에 붙인다. o = { notes[](build 의 값), on(붙일지), into(칸을 넣을 상자 — 없으면
+  // 칸을 쪽 바로 뒤 형제로), grip(오른쪽 배치에서 끌어 너비를 바꾸는 손잡이 .sn-grip 을 칸 왼쪽에 둘지) }. on 이 거짓이면 지우기만 한다.
   // 노트가 없는 슬라이드는 넘쳐 생긴 「(계속)」 장이든 아니든 「노트 없음」(오른쪽 배치에서만 보이고 아래 배치에서는 접힌다, itda-hyve#518).
   function placeNotes(box, o) {
-    for (const x of box.querySelectorAll(":scope > .slide-note")) x.remove();
+    for (const x of (o.into || box).querySelectorAll(":scope > .slide-note")) x.remove();
     if (!o.on) return;
     box.querySelectorAll(":scope > .page").forEach((pg, i) => {
       const n = el("aside", "slide-note");
@@ -573,8 +574,67 @@
         for (const x of body.querySelectorAll("[id]")) x.removeAttribute("id"); // 목차·링크가 노트 칸을 가리키지 않게(발표 사본과 같다)
         n.appendChild(body);
       }
-      pg.after(n);
+      if (o.into) o.into.appendChild(n); else pg.after(n);
     });
+  }
+
+  const NOTE_BELOW_GAP = 10; // 아래 배치에서 쪽과 칸 사이(화면 px)
+
+  // notePlacement 는 칸의 화면 픽셀 자리를 계산한다(DOM 없음). rects 는 쪽마다 { left, top, right, bottom, width, height, hidden }(transform 이 반영된 화면 좌표),
+  // box 는 칸 좌표의 원점(.pages-box 의 rect), o = { layout: "right"|"below", noteW, gap }. 돌려주는 값은 쪽마다 { hidden: true } 또는
+  // { hidden: false, left, top, width, height } — 아래 배치의 height 는 null(내용을 따른다).
+  function notePlacement(rects, box, o) {
+    return rects.map(r => {
+      if (r.hidden) return { hidden: true };
+      if (o.layout === "right") return { hidden: false, left: Math.round(r.right - box.left + o.gap), top: Math.round(r.top - box.top), width: o.noteW, height: Math.round(r.height) };
+      return { hidden: false, left: Math.round(r.left - box.left), top: Math.round(r.bottom - box.top + NOTE_BELOW_GAP), width: Math.round(r.width), height: null };
+    });
+  }
+  // noteAfter 는 아래 배치에서 칸 높이 h(화면 px)만큼 다음 쪽을 밀 여백이다 — 쪽은 transform 안이라 배치 px(1/zoom)로 돌려준다.
+  function noteAfter(h, zoom) { return (h + NOTE_BELOW_GAP) / zoom; }
+
+  // layoutNotes 는 notes(#notes) 의 칸을 pages(#pages) 의 쪽에 맞춰 놓는다. o = { layout: "off"|"right"|"below", zoom, noteW, gap }. 호출자가 #pages 의 transform·너비를 정한
+  // 뒤에 부르고, 쪽을 미는 여백이 #pages 높이에 들어가므로 바깥 상자 높이는 그 뒤에 잰다. 쪽의 여백은 인라인 margin 대신 --sn-after 로 건다 —
+  // 발표 덱·축소본이 쪽을 복제해도 #pages.notes-below 규칙(화면 전용 CSS)이 닿지 않아 복제본과 인쇄에는 여백이 없다. 쓰기는 값이 다를 때만 한다.
+  function layoutNotes(pages, notes, o) {
+    const put = (el, k, v) => { if (el.style[k] !== v) el.style[k] = v; };
+    const after = (pg, v) => { if (pg.style.getPropertyValue("--sn-after") !== v) { if (v) pg.style.setProperty("--sn-after", v); else pg.style.removeProperty("--sn-after"); } };
+    const px = v => Math.round(v * 1000) / 1000 + "px";
+    const list = [...pages.querySelectorAll(":scope > .page")], right = o.layout === "right", below = o.layout === "below";
+    put(pages, "paddingRight", right ? px((o.noteW + o.gap) / o.zoom) : ""); // 쪽+칸 묶음이 가운데 오게
+    if (!below) for (const pg of list) after(pg, "");
+    if (!right && !below) return;
+    const kids = [...notes.children];
+    const pageOf = n => list[Number(n.dataset.slide) - 1];
+    // 아래 배치: 너비 먼저 → 높이 재기 → 여백 걸기 → 위치. 칸 높이는 위치와 무관해 한 번으로 끝난다.
+    const shown = kids.filter(n => {
+      const pg = pageOf(n), hide = !pg || pg.offsetParent === null || (below && n.classList.contains("sn-empty"));
+      n.hidden = hide;
+      if (hide) { delete n.snH; if (pg) after(pg, ""); }
+      else if (below) { put(n, "width", px(Math.round(pg.getBoundingClientRect().width))); put(n, "height", ""); }
+      return !hide;
+    });
+    if (below) {
+      const hs = shown.map(n => n.offsetHeight);
+      shown.forEach((n, i) => { n.snH = hs[i]; after(pageOf(n), px(noteAfter(hs[i], o.zoom))); });
+    } else for (const n of shown) delete n.snH;
+    const b = notes.parentElement.getBoundingClientRect();
+    const spots = notePlacement(shown.map(n => pageOf(n).getBoundingClientRect()), b, o);
+    shown.forEach((n, i) => {
+      const s = spots[i];
+      put(n, "left", px(s.left)); put(n, "top", px(s.top)); put(n, "width", px(s.width));
+      put(n, "height", s.height === null ? "" : px(s.height));
+    });
+  }
+
+  // watchNotes 는 아래 배치의 칸 높이가 layoutNotes 가 잰 값과 달라지면(노트 안 그림이 늦게 왔을 때) relayout 을 부르는 감시를 만든다. 돌려주는 함수를
+  // 칸을 다시 만들 때마다 부른다. relayout 이 layoutNotes 를 다시 부르면 잰 값이 같아져 되돌이가 없다.
+  function watchNotes(notes, relayout) {
+    if (typeof ResizeObserver === "undefined") return () => {};
+    const ro = new ResizeObserver(() => {
+      for (const n of notes.children) if (n.snH !== undefined && n.offsetHeight !== n.snH) { relayout(); return; }
+    });
+    return () => { ro.disconnect(); for (const n of notes.children) ro.observe(n); };
   }
 
   // 노트 글자 크기 단계(px — Go 의 noteFontSizes 와 같다). 미리보기 노트 칸·발표 N 칸·공유 보는 화면이 함께 쓴다.
@@ -588,5 +648,5 @@
   }
 
   // 정식 이름은 window.ItdaSlides 다. window.HyveSlides 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
-  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, noteHTML, NOTE_FONTS, noteFontStep };
+  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, notePlacement, noteAfter, layoutNotes, watchNotes, noteHTML, NOTE_FONTS, noteFontStep };
 })();
