@@ -1152,11 +1152,12 @@
       box.style.width = box.style.height = pg.style.transform = pg.style.width = "";
       pg.classList.remove("notes-right", "notes-below");
       state.notesLayout = "off";
+      window.ItdaSlides.layoutNotes(pg, $("notes"), { layout: "off" });
       return;
     }
     if (viewer.clientWidth === 0) return;
     const gutter = viewer.clientWidth < 600 ? 16 : 56;
-    // 노트 칸(itda-hyve#344): 오른쪽이면 슬라이드 맞춤의 너비에서 칸(NOTE_W + NOTE_GAP)을 뺀다. 칸의 크기·글자는 화면 픽셀로 같다(--nz)
+    // 노트 칸(itda-hyve#344): 오른쪽이면 슬라이드 맞춤의 너비에서 칸(NOTE_W + NOTE_GAP)을 뺀다. 칸은 #pages 밖(#notes)이라 크기·글자가 화면 픽셀이다(slides.js layoutNotes)
     const layout = notesLayout(np.mode, state.hasNotes, state.look, viewer.clientWidth, gutter, NOTE_W, NOTE_GAP, NOTE_NARROW);
     const side = layout === "right" ? NOTE_W + NOTE_GAP : 0;
     state.notesLayout = layout;
@@ -1175,12 +1176,12 @@
       z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
     }
     const outW = Math.max(viewer.clientWidth, Math.ceil(w * z + side));
-    pg.style.setProperty("--nz", String(z));
-    pg.style.setProperty("--note-w", String(NOTE_W));
+    pg.style.setProperty("--nz", String(z)); // 공유 메모 표지의 화면 픽셀 역산(호스트 sharememo-view.css)
     box.classList.add("scaled");
     pg.style.width = outW / z + "px";
     pg.style.transform = "scale(" + z + ")";
     box.style.width = outW + "px";
+    window.ItdaSlides.layoutNotes(pg, $("notes"), { layout, zoom: z, noteW: NOTE_W, gap: NOTE_GAP }); // 아래 배치의 여백이 #pages 높이에 들어가므로 높이를 재기 전에
     box.style.height = Math.ceil(pg.offsetHeight * z) + "px";
     if (boardZoom) boardZoom.fit(); // 크게 보기 타일은 보이는 영역을 채운다
   }
@@ -1214,7 +1215,7 @@
     paintTOC(v);
     if (v.error) state.tableSort = null; // 본문을 비운다 — 아래 줄(시험이 글로 보는 자리)
     if (v.error) hook("tick"); // 확장: 오류 view 는 본문을 다시 만들지 않는다 — 지난 본문 기준 그대로
-    if (v.error) { closeTableMenu(); $("pages").textContent = ""; findHeading.refresh(); return; }
+    if (v.error) { closeTableMenu(); $("pages").textContent = $("notes").textContent = ""; findHeading.refresh(); return; }
     state.landscape = v.paper === "a4-landscape";
     document.body.classList.toggle("paper-a4-landscape", state.landscape);
     document.body.classList.toggle("paper-a4", !state.landscape);
@@ -1260,7 +1261,6 @@
       // 노트는 호스트가 「노트 함께 보이기」 를 켰을 때만 온다 — 오지 않았으면 컨트롤을 숨기고 칸도 없다
       state.slideNotes = r.notes || [];
       state.hasNotes = state.slideNotes.some(Boolean);
-      placeSlideNotes(target);
     } else if (state.look === "flow") {
       for (const x of flow.querySelectorAll(".pause, .notes")) x.remove();
       window.ItdaPager.adoptWidths(flow);
@@ -1289,9 +1289,10 @@
     const viewer = $("viewer"), top = viewer.scrollTop; // 제자리 갱신(version)은 읽던 자리를 둔다
     closeTableMenu();
     pagesEl.replaceChildren(frag);
+    placeSlideNotes(pagesEl); // 노트 칸(슬라이드 보기 밖이면 지우기만)은 쪽을 바꿔 끼운 뒤에 — 칸은 #notes 에 있어 쪽과 함께 갈리지 않는다
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     // 쪽·이어보기·슬라이드(발표 공유) 모두.
-    if (CodeCopy) CodeCopy.arm(pagesEl);
+    if (CodeCopy) { CodeCopy.arm(pagesEl); CodeCopy.arm($("notes")); }
     if (boardZoom && state.look === "dashboard") boardZoom.arm(); // 크게 보기 단추 — 새 보드의 타일마다(옛 보드는 떨어져 열린 상태도 버려진다)
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
@@ -1306,8 +1307,11 @@
 
   // ---- 발표자 노트(itda-hyve#344)
 
+  let noteWatch = null;
   function placeSlideNotes(box) {
-    window.ItdaSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off" });
+    window.ItdaSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off", into: $("notes") });
+    if (!noteWatch) noteWatch = window.ItdaSlides.watchNotes($("notes"), applyZoom); // 아래 칸의 그림이 늦게 와 높이가 바뀌면 다시 놓는다
+    noteWatch();
   }
   // applyNoteFont 는 고른 글자 크기를 문서 뿌리의 --note-fs 로 건다(0 이면 기본 14 — 호스트 앱 창 틀 CSS 의 .slide-note).
   function applyNoteFont() {
@@ -1336,7 +1340,7 @@
     if (replace) {
       placeSlideNotes($("pages"));
       // 노트 칸을 다시 만들었으니 복사 단추(itda-hyve#413)도 다시 붙인다 — 노트 코드의 조각 범위는 그 노트 안(codecopy.js noteOf)
-      if (CodeCopy) CodeCopy.arm($("pages"));
+      if (CodeCopy) CodeCopy.arm($("notes"));
     }
     applyZoom();
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac);
@@ -1359,8 +1363,8 @@
   function placeSlide(pg) {
     if (!pg) return;
     const viewer = $("viewer"), vr = viewer.getBoundingClientRect(), r = pg.getBoundingClientRect();
-    const nt = pg.nextElementSibling;
-    const shown = !!(nt && nt.matches(".slide-note") && nt.offsetParent !== null);
+    const nt = $("notes").querySelector('[data-slide="' + ([...$("pages").querySelectorAll(":scope > .page")].indexOf(pg) + 1) + '"]');
+    const shown = !!(nt && nt.offsetParent !== null);
     if (followSpot(state.notesLayout, shown) === "top") viewer.scrollTop += r.top - vr.top - 8;
     else viewer.scrollTop += (r.top + r.height / 2) - (vr.top + vr.height / 2);
   }
@@ -1528,7 +1532,7 @@
       $("ended-msg").textContent = "공유한 사람이 이 화면의 연결을 끊었습니다.";
     }
     closeTableMenu();
-    $("pages").textContent = "";
+    $("pages").textContent = $("notes").textContent = "";
     findHeading.refresh();
     $("stage").textContent = "";
     $("pages-box").style.width = $("pages-box").style.height = "";
@@ -1646,18 +1650,18 @@
   // openTableMenu 는 target 이 표 안이고 고른 글이 없으면 메뉴를 (x, y)에 열고 true 다. 아니면 메뉴를 닫고 false(브라우저 기본 메뉴).
   function openTableMenu(target, x, y, how) {
     if (!TableCopy) return false; // 호스트 부품이 없으면(뷰어) 브라우저 기본 메뉴
-    const table = TableCopy.tableAt(target, $("pages"));
+    const table = TableCopy.tableAt(target, $("pages-box")); // 본문과 노트 칸(#notes)의 표 모두
     const sel = window.getSelection && String(window.getSelection() || "");
     if (!table || (sel && sel.trim())) { closeTableMenu(); return false; }
-    ctxTables = TableCopy.pieces(table, $("pages"));
+    ctxTables = TableCopy.pieces(table, $("pages-box"));
     tmenu.open(x, y, how);
     return true;
   }
-  $("pages").addEventListener("contextmenu", e => {
+  $("pages-box").addEventListener("contextmenu", e => {
     if (tmenu.fromKey()) { e.preventDefault(); return; }
     if (openTableMenu(e.target, e.clientX, e.clientY, "mouse")) e.preventDefault();
   });
-  $("pages").addEventListener("keydown", e => {
+  $("pages-box").addEventListener("keydown", e => {
     if (!((e.key === "F10" && e.shiftKey) || e.key === "ContextMenu") || e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
     const r = e.target.getBoundingClientRect();
     if (!openTableMenu(e.target, r.left, r.bottom, "key")) return;
@@ -1666,7 +1670,7 @@
   });
   $("table-ctx").addEventListener("keydown", e => tmenu.key(e));
   const copyFromMenu = tableCopyClick({ tables: () => ctxTables, close: closeTableMenu, toast,
-    copy: (kind, tables) => TableCopy.copy(kind, tables, $("pages")) });
+    copy: (kind, tables) => TableCopy.copy(kind, tables, $("pages-box")) });
   for (const b of document.querySelectorAll("[data-table-copy]")) b.addEventListener("click", () => { copyFromMenu(b.dataset.tableCopy); });
   // ---- 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 위임 클릭 하나를 문서(document)에 단다 — 본문을 다시 그려도 살아 있다.
   // 이 화면은 http(비보안 컨텍스트)라 navigator.clipboard 가 없다 — 누른 처리 안에서 바로 execCommand 로 쓴다(tablecopy.js write).

@@ -92,14 +92,13 @@ body.look-slides #pages .page { border-radius: 2px; }
 #pages:empty { display: none; }
 .stage { position: absolute; left: -40000px; top: 0; visibility: hidden; padding: 0; display: block; }
 
-/* ---- 발표자 노트 칸(slides.js placeNotes) */
-#pages { --nu: calc(1px / var(--nz, 1)); }
-#pages.notes-right { display: grid; grid-template-columns: var(--page-w) calc(var(--note-w, 320) * var(--nu)); column-gap: calc(20 * var(--nu)); row-gap: 26px;
-  justify-content: center; align-items: start; }
-.slide-note { position: relative; box-sizing: border-box; font: calc(var(--note-fs, 14) * var(--nu))/1.6 var(--ui-font); color: #1f2937; background: #fbfbf8;
-  border: calc(1 * var(--nu)) solid #e3e1d8; border-radius: calc(6 * var(--nu)); padding: 0.9em 1.1em; overflow-wrap: anywhere; color-scheme: light; }
-#pages.notes-right .slide-note { height: var(--page-h); overflow: auto; }
-#pages.notes-below .slide-note { width: var(--page-w); margin-top: -16px; }
+/* ---- 발표자 노트 칸(slides.js placeNotes·layoutNotes) — #pages 의 형제 상자(#notes)라 transform 을 타지 않는다. 크기·글자·선은 화면 픽셀이고 자리는 layoutNotes 가 잡는다 */
+#notes { position: absolute; left: 0; top: 0; }
+.slide-note { position: absolute; box-sizing: border-box; font: calc(var(--note-fs, 14) * 1px)/1.6 var(--ui-font); color: #1f2937; background: #fbfbf8;
+  border: 1px solid #e3e1d8; border-radius: 6px; padding: 0.9em 1.1em; overflow-wrap: anywhere; color-scheme: light; }
+.slide-note[hidden] { display: none; }
+#pages.notes-right ~ #notes .slide-note { overflow: auto; }
+@media screen { #pages.notes-below > .page { margin-bottom: var(--sn-after, 0px); } }
 
 /* ---- 메뉴·알림 */
 .menu { position: fixed; z-index: 40; min-width: 180px; background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 9px;
@@ -135,11 +134,11 @@ body.dropping .viewer { outline: 3px dashed var(--ui-accent); outline-offset: -8
   html, body { height: auto; overflow: visible; background: #fff; display: block; }
   .bar, .sidebar, .toc-back, .toast, .stage, .menu, .warn-panel, .viewer-empty, .share-err, .follow-back, .paste-dlg { display: none !important; }
   .main, .viewer { display: block; overflow: visible; }
-  .pages { display: block; padding: 0; gap: 0; transform: none !important; margin: 0 !important; }
+  .pages { display: block; padding: 0 !important; gap: 0; transform: none !important; margin: 0 !important; }
   .pages-box { width: auto !important; height: auto !important; overflow: visible !important; }
   .pages-box > #pages { position: static !important; width: auto !important; }
   #pages .page { box-shadow: none; margin: 0; break-after: page; }
   #pages > .page:last-of-type { break-after: auto; }
-  .slide-note { display: none !important; }
+  #notes, .slide-note { display: none !important; }
   #pages.notes-right, #pages.notes-below { display: block !important; }
 }

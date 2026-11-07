@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <!-- 설치 없는 웹 뷰어(itda-work/itda-hyve#577 2b). 그리기는 공유 화면(share.html)과 같은 share.js 이고 View 원천만 다르다 — viewer.js 가
      share.js 앞에서 window.ItdaViewSource(wasm 으로 그린 View)를 둔다. body 에 data-base 가 없어야 한다(있으면 share.js 가 공유 서버 원천을 쓴다).
-     아래 id 들(doc-title·look-switch·notes-switch·sidebar·side-toc·toc-back·viewer·pages-box·pages·ended·load-err·follow-back·table-ctx·toast·stage)은
+     아래 id 들(doc-title·look-switch·notes-switch·sidebar·side-toc·toc-back·viewer·pages-box·pages·notes·ended·load-err·follow-back·table-ctx·toast·stage)은
      share.js 가 찾는 자리다 — share.html 과 같게 둔다.
      CSP 는 공유 화면처럼 default-src 'none' 에 쓰는 것만 연다. 제3자 출처로 가는 요청(connect·그림·글꼴·스크립트·스타일)은 막는다.
      그림(img-src)은 data:·blob: 만 열어 같은 출처(뷰어를 낸 서버)로 가는 그림 요청도 막는다 — 상대 경로 그림의 파일 이름이 서버로 가지
@@ -83,7 +83,7 @@
   </aside>
   <div id="toc-back" class="toc-back" hidden></div>
   <div id="viewer" class="viewer">
-    <div id="pages-box" class="pages-box"><div id="pages" class="pages"></div></div>
+    <div id="pages-box" class="pages-box"><div id="pages" class="pages"></div><div id="notes"></div></div>
     <div id="viewer-empty" class="viewer-empty">
       <div class="viewer-empty-card">
         <h2>itda-doc 뷰어</h2>
