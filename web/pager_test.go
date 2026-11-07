@@ -143,3 +143,24 @@ func pagerSource(t *testing.T) string {
 	}
 	return string(b)
 }
+
+// 이어 만들기 공통 부품(incr.js, itda-hyve#658): 서명은 위치 속성을 묶음 첫 값에 대한 상대값으로 넣는다(통째로 밀린 묶음은 같은 서명, 묶음 안
+// 줄 간격·내용·종류가 바뀌면 다른 서명), 밀기는 줄·블록 번호를 차이만큼, 끼우기는 그대로 쓰는 노드를 옮기지 않는다, 비우기는 기억을 놓는다.
+// 작은 가짜 DOM 으로 node 에서 돌린다(testdata/incr.cjs). 이어 만든 슬라이드 = 처음부터 만든 것은 레이아웃이 들어 itda-hyve selftest 가 본다.
+func TestIncrParts(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	runner, _ := filepath.Abs(filepath.Join("testdata", "incr.cjs"))
+	out, err := exec.Command(node, runner).CombinedOutput()
+	if err != nil {
+		t.Fatalf("이어 만들기 부품 검사 실패: %v\n%s", err, out)
+	}
+	if !regexp.MustCompile(`INCR DONE cases=\d+ failed=0\s*$`).Match(out) {
+		t.Fatalf("끝나지 않음\n%s", out)
+	}
+}

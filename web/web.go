@@ -5,7 +5,7 @@ import "embed"
 
 // FS 는 자원을 뿌리에 둔 파일 묶음이다(FS 의 "base.css"·"fonts/pretendard-regular.woff2" 꼴).
 //
-//go:embed base.css pager.js slides.js dashboard.js share.css share.html share.js fonts LICENSE-Lucide.txt
+//go:embed base.css pager.js slides.js incr.js dashboard.js share.css share.html share.js fonts LICENSE-Lucide.txt
 var FS embed.FS
 
 // BaseCSS 는 base.css 하나다. FS 를 쓰지 않는 쪽(page 의 예약 글꼴 모으기)이 글꼴 묶음까지 바이너리에 끌어오지 않게 따로 둔다.
