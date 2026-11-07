@@ -5,7 +5,7 @@
 // 다른 이름으로 저장)면 화면을 처음부터 다시 불러오고, stop 이면 「공유가 끝났습니다」, kick(이 화면을 끊음)이면 「이 화면의 공유가
 // 끝났습니다」 로 바꾸고 더 요청하지 않는다. 스트림이 끊기면(폰 Safari 가 뒤로 갔다 오면 끊긴다) 지금 문서(와 폴더면 목록)를 다시 받아 상태를 본 뒤
 // 1·2·4…30초 간격으로 다시 붙는다. 테마 CSS 는 화면을 불러올 때 한 번 받는다(정책 D — themeApplier).
-// 편집·저장·테마 바꾸기·링크 열기 바인딩은 없다. 보기 꼴은 슬라이드 문서면 슬라이드, 아니면 좁은 화면(768px 이하)은 이어보기, 넓으면 쪽.
+// 편집·저장·테마 바꾸기·링크 열기 바인딩은 없다. 보기 꼴은 슬라이드 문서면 슬라이드, 아니면 좁은 화면(768px 이하)은 이어보기, 넓으면 쪽. 호스트의 꼴 전환은 아래 「호스트 꼴 적용」.
 // ③ 발표자 따라가기: slide 이벤트(hello 에도 slide·slide_total·follow)로 호스트의 발표 슬라이드를 받아, 따라가기가 켜져 있고 이 화면이
 // 잠시 풀리지 않았으면 보기 꼴을 슬라이드로 바꾸고 그 슬라이드를 가운데로 굴린다(follower). 보는 사람이 직접 움직이면(휠·터치·키·
 // 굴림 막대·문서 안 #제목 링크) 이 화면에서만 잠시 풀리고 「발표자 위치로」 단추로 다시 맞춘다. 크기가 바뀌면(폰 회전·창 너비) 따라가는
@@ -34,6 +34,9 @@
 // 「확장을 시작한다」 절)을 넘기고 돌려받은 훅을 그리기 길에서 부른다 — flow(흐름 — 나누기 전, numberBlocks 뒤)·drawn(새 본문을 다 그린 뒤)·tick(목차
 // 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
 // 시작이나 훅이 던지면 콘솔에만 남기고 확장 없이처럼 이어 간다.
+// 호스트 꼴 적용(itda-hyve#748): 확장이 api.setLook(name) 을 부르면 호스트가 고른 꼴로 다시 그린다 — 사람이 고른 것이 아니라 폴더 공유의 기억한 꼴(nav.setLook)에 적지 않는다.
+// 쪽·이어보기면 state.forced 가 서서 슬라이드·보드 문서에서도 그 꼴로 그린다(lookFor). 사람이 꼴 단추를 누르거나, 발표 꼴로 바꾸거나(follower align), 따라가기가 꺼지면(release) 내려간다.
+// 따라가기가 꺼질 때 슬라이드·보드 문서는 꼴 단추가 숨어 있어 chosen 도 비워 문서의 꼴로 돌아가고, 그 밖의 문서는 꼴을 그대로 둔다. 따라가기가 켜진 채 위치만 없어지면(호스트가 다른 탭으로 감) 꼴을 두고 다시 돌아오길 기다린다.
 // 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
 // 같은 주소 공유(itda-hyve#705 3절): stop 의 까닭이 paused 이거나 hello 에 keep 이 있던 공유의 연결이 끊기면 끝난 화면으로 가지 않는다 — 문서를 두고 띠(#pause-band)를 보이고 다시 붙기를
 // 시도한다(connect). 다시 붙으면 hello → sync.check 가 바뀐 문서를 받고 띠를 지운다. 새로 고치지 않으므로 읽던 자리가 남는다(다만 테마의 내용이 바뀌었으면 기존 reloadGate 대로 새로 고친다).
@@ -76,8 +79,11 @@
   // 그 밖에는 보드 문서(board.present)는 보드(호스트의 처음 꼴과 같이 slides: 보다 앞선다), 슬라이드 문서는 슬라이드다.
   // 쪽 따라가기는 chosen 을 "doc" 으로 바꾼다. 보드를 그릴 수 없는 화면(boardOK 거짓 — dashboard.js 를 싣지 않은 웹 뷰어)에서는 보드를
   // 고르지 않는다 — board.present 와 chosen "dashboard" 를 없는 것으로 보고 아래 규칙으로 고른다(쪽 문서와 같이).
-  function lookFor(v, width, chosen) {
+  // forced 가 참이면(호스트의 꼴 전환 — setLook, itda-hyve#748) chosen 의 쪽·이어보기도 문서의 꼴보다 앞선다. 발표 꼴은 그보다 앞이다. forced 를 넘기지 않으면 chosen 의 쪽·이어보기는 슬라이드·보드 문서를 바꾸지 않는다 —
+  // 폴더 공유의 기억한 꼴·view.json 의 look·좁은 화면의 처음 꼴이 이 길이다.
+  function lookFor(v, width, chosen, forced) {
     if (chosen === "slides" || (chosen === "dashboard" && boardOK)) return chosen;
+    if (forced && (chosen === "doc" || chosen === "flow")) return chosen;
     if (boardDoc(v)) return "dashboard";
     if (v && v.slides && v.slides.present) return "slides";
     if (chosen === "doc" || chosen === "flow") return chosen;
@@ -1036,7 +1042,7 @@
   const appMeta = document.querySelector('meta[name="application-name"]');
   const app = appName(appMeta && appMeta.getAttribute("content"));
   if (app) document.title = app; // 문서를 받기 전의 탭 제목 — 앱 이름이 없으면 share.html 의 title 그대로
-  const state = { view: null, look: "", chosen: "", themeFailed: false, ratio: "16:9", landscape: false, ended: false, rendering: null, again: false,
+  const state = { view: null, look: "", chosen: "", forced: false, themeFailed: false, ratio: "16:9", landscape: false, ended: false, rendering: null, again: false,
     // 발표자 노트(itda-hyve#344): 받은 view 의 슬라이드마다 노트(slideNotes — 원문 자리의 장, slides.js build itda-hyve#518)·노트가 하나라도 있는지(hasNotes)·지금 그린 배치(notesLayout)
     slideNotes: [], hasNotes: false, notesLayout: "off",
     // 지금 화면에 걸린 표 정렬 지정(itda-hyve#349 2단계 — 이 화면만). 없으면 null
@@ -1226,7 +1232,7 @@
     await fontWait.wait(); // 테마 CSS(applyTheme)가 선언한 face 까지 본다
     if (state.ended) return;
     const sv = v.slides || {}, bv = v.board || {};
-    state.look = lookFor(v, window.innerWidth, state.chosen);
+    state.look = lookFor(v, window.innerWidth, state.chosen, state.forced);
     state.ratio = (state.look === "dashboard" ? bv.ratio : sv.ratio) === "4:3" ? "4:3" : "16:9";
     paintLookSwitch();
     for (const b of document.querySelectorAll("[data-look]")) b.classList.toggle("on", b.dataset.look === state.look);
@@ -1490,6 +1496,13 @@
     try { await state.rendering; } finally { state.rendering = null; }
   }
 
+  // setLook 은 호스트가 고른 꼴로 바꾼다(확장 api — 머리 주석 「호스트 꼴 적용」). 그리는 중이면 draw 가 한 번 더 그린다. 이미 그 꼴이면 그리지 않는다 — 꼴 단추와 같다.
+  function setLook(name) {
+    state.chosen = name;
+    state.forced = name === "doc" || name === "flow";
+    return state.look !== name ? draw() : (state.rendering || Promise.resolve());
+  }
+
   // fol 은 발표자 따라가기다(follower). 맞출 때 할 일은 followAction 이 정한다 — 발표 슬라이드는 보기 꼴이 호스트의 발표 꼴(want —
   // 슬라이드·보드)이 아니면 그 꼴로 바꿔 다시 그리고(render 가 끝에 맞춘다), 내용 위치는 보기 꼴을 그대로 둔 채 지금 꼴에서 맞춘다
   // (⑧ — 원래 슬라이드 문서는 슬라이드로. 보드 발표의 내용 위치는 예외로 보기 꼴을 보드로 바꿔 맞춘다). 발표가 끝나거나 따라가기를 끄면 슬라이드·보드 문서는 자기 꼴로 돌아간다(release — restoreOwnLook).
@@ -1497,12 +1510,18 @@
     align: (i, kind, frac, want) => {
       if (state.ended) return;
       const act = followAction(kind, state.look, state.view, window.innerWidth, want);
-      if (act === "redraw") { state.chosen = want === "dashboard" ? "dashboard" : "slides"; draw(); return; }
+      if (act === "redraw") { state.chosen = want === "dashboard" ? "dashboard" : "slides"; state.forced = false; draw(); return; }
       if (act === "scroll") scrollToFollow(i, kind, frac);
     },
     release: () => {
       for (const x of $("pages").querySelectorAll(".following")) x.classList.remove("following");
-      if (!state.ended && restoreOwnLook(state.view, state.chosen, window.innerWidth)) { state.chosen = ""; draw(); }
+      if (state.ended) return;
+      if (state.forced && !fol.follow) { // 호스트의 꼴을 거둔다 — 머리 주석 「호스트 꼴 적용」
+        state.forced = false;
+        if (lookSwitchHidden(state.view, "", false)) { state.chosen = ""; draw(); }
+        return;
+      }
+      if (restoreOwnLook(state.view, state.chosen, window.innerWidth)) { state.chosen = ""; draw(); }
     },
     // 따라가기 상태가 바뀔 때마다(발표·읽기 시작·끝, 켬·끔, 풀림·복귀, hello) 쪽 | 이어보기 단추를 고친다 — 발표가 끝나면 보이고,
     // 보기 꼴 그대로 다음 발표·다시 켬이 오면 다시 숨긴다(내용 위치 따라가기는 숨기지 않는다)
@@ -1626,6 +1645,7 @@
   for (const b of document.querySelectorAll("[data-look]")) {
     b.addEventListener("click", () => {
       state.chosen = b.dataset.look;
+      state.forced = false; // 사람이 고른 꼴이다
       if (nav) nav.setLook(state.chosen); // 폴더 공유 — 다음 문서에도 이 꼴로
       if (state.look !== state.chosen) draw();
     });
@@ -1727,7 +1747,7 @@
   const extInit = pick(window, "ShareExt");
   if (typeof extInit === "function") {
     try {
-      ext = extInit({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast }) || {};
+      ext = extInit({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast, setLook }) || {};
     } catch (e) { ext = {}; console.error("share ext:", e); }
   }
   new ResizeObserver(() => {
