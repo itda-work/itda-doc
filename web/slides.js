@@ -306,9 +306,17 @@
   }
 
   // build 는 flow(문서 흐름 HTML 이 든 요소)를 target 안의 슬라이드(.page.slide)로 나눈다.
-  // o = { ratio, level, incremental, fontScale(slides.font-scale — 0 이면 기본), logo, org, footer(글자) }. 돌려주는 값: { slides, notes[], overflow, ms }
+  // o = { ratio, level, incremental, fontScale(slides.font-scale — 0 이면 기본), logo, org, footer(글자), info, memo, key }.
+  // 돌려주는 값: { slides, notes[], overflow, ms, pages[], made, reused }
   // notes[i] 는 슬라이드 i 에 붙은 노트 HTML 이다(없으면 "") — 노트는 원문에서 놓인 자리의 장에 붙는다(notePage, itda-hyve#518). 넘쳐 생긴
   // 「(계속)」 장도 제 노트만 갖고, 노트가 붙지 않은 장은 미리보기 노트 칸·발표 N 칸·공유 보는 화면 모두 「노트 없음」이다.
+  // 이어 만들기(itda-hyve#658): o.memo(빈 객체로 시작해 렌더마다 같은 것을 넘긴다)를 주면 지난번 묶음을 기억해 두고, 서명(incr.js sig — 묶음
+  // 종류·구역 차례·제목·블록·노트, 위치 속성은 상대값)이 같은 묶음의 장은 다시 만들지 않고 지난번 노드를 그대로 쓴다 — 위치 속성만 차이만큼
+  // 밀고(shift) 번호는 아래 number 가 고친다. 노트 HTML 은 이번 묶음의 노트로 다시 만든다 — 노트 안 표의 위치값도 밀려야 하고, 장 배치(slots)는 서명이 같으면
+  // 같다. 그대로 쓰는 장은 target 에 넣지 않는다(호출자의 상자에 그대로 있다). pages 가 새 차례의 장 전부이고,
+  // 호출자가 그 차례로 상자를 맞춘다(incr.js place). 판 키(boardKey — 비율·단계·차례로 나타내기·글자 배율·로고·바닥 글·정보·문서 언어·o.key)가
+  // 지난번과 다르면 기억을 비우고 모두 다시 만든다. 그림이 덜 읽혔거나 깨진 채 만든 묶음은 기억하되 그대로 쓰지 않는다(다음에 다시 만든다).
+  // o.memo 가 없으면 이전과 같다 — 모든 장을 target 에 넣는다(공유 보는 화면·출력·내보내기).
   function build(flow, target, o) {
     const t0 = performance.now();
     const [w, h] = SIZE[o.ratio] || SIZE["16:9"];
@@ -321,133 +329,218 @@
     const scale = fs >= 0.6 && fs <= 1.5 ? String(fs) : "";
     if (scale) target.style.setProperty("--slide-scale", scale);
     const gs = groups(flow, o.level || 0);
-    const notes = [];
-    let overflow = 0, sections = 0;
-    for (const g of gs) {
-      const sub = document.createElement("div");
-      target.appendChild(sub);
-      if (g.kind === "title") {
-        const r = window.ItdaPager.paginate(document.createElement("div"), sub, { pageClass: "slide k-title" });
-        overflow += r.overflow;
-        titleSlide(sub.querySelector(".page"), g.src, o);
-      } else {
-        const f = document.createElement("div");
-        f.className = "page-body doc-flow";
-        // 구역 슬라이드는 제목을 본문 첫 블록으로 넣는다(뒤의 내용과 함께 나뉜다). 내용 슬라이드의 제목은 머리 자리(slide-head)에.
-        if (g.kind === "section") f.appendChild(sectionHead(g.title, ++sections));
-        for (const b of g.blocks) f.appendChild(b);
-        // 하나만 있는 슬라이드의 그 블록은 크게 — 쪽을 나누기 전에 붙여야 잰 크기와 그린 크기가 같다(뒤에 붙였더니 표가 넘쳐 잘렸다)
-        if (g.kind === "single") for (const b of g.blocks) if (!b.matches(".pause")) b.classList.add("slide-only");
-        markFigures(f);
-        rowCaptions(f);
-        sub.appendChild(f);
-        // 분할 그림이 있는 묶음(itda-hyve#550)은 쪽 class 로 글 영역을 반대쪽으로 좁힌다(base.css has-panel·panel-*·split-*) — 쪽을 나누기 전에
-        // 걸어야 글 영역 폭으로 잰다(머리 높이 재기 probe 도 같은 class). 패널 자체는 나눈 뒤 장마다 붙인다(넘친 장도 반복).
-        const cls = "slide k-" + g.kind + (g.title && g.kind !== "section" ? " has-head" : "") +
-          (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
-          (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
-        // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
-        // 넘쳐 여러 장이 된 묶음의 머리에는(첫 장 포함) 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
-        // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
-        // 화면에 들어가는 블록은 늘 원본 f 이고 원본은 한 번만 나눈다 — 장 수를 미리 알아야 할 때는 사본(f.cloneNode)으로 센다.
-        //   1. plain(표지 없는 머리)과 tagged(DIGITS_MAX 자리 표지)를 잰다. tagged ≤ plain 이면 어떤 장 수의 표지도 줄을 바꾸지
-        //      않는다(표지 높이는 자릿수가 늘수록 줄지 않는다) — plain 으로 원본을 한 번 나눈다. 이전과 같은 길이다.
-        //   2. 표지가 줄을 바꿀 수 있는 제목이면 headHeight 가 사본으로 장 수를 세며 실제 장 수의 자릿수 표지로 높이를 고른다.
-        //      그 높이로 원본을 한 번 나눈다. 한 장이거나 실제 표지가 줄을 바꾸지 않으면 plain 이 남아 나눈 결과는 이전과 같다
-        //      — 다만 사본 나눔이 한 번 더 든다(넘치지 않는 장도 이런 제목이면 한 쪽짜리 사본 나눔 한 번).
-        let headH = 0;
-        if (g.title && g.kind !== "section") {
-          const probe = document.createElement("div");
-          probe.className = "page " + cls;
-          const hd = probe.appendChild(el("div", "slide-head"));
-          hd.appendChild(headClone(g.title, false));
-          sub.appendChild(probe);
-          const plainH = Math.ceil(hd.getBoundingClientRect().height);
-          const tagCache = {};
-          const tagged = d => {
-            if (!(d in tagCache)) {
-              const nines = "9".repeat(d);
-              hd.replaceChildren(headClone(g.title, { k: nines, n: nines }));
-              tagCache[d] = Math.ceil(hd.getBoundingClientRect().height);
-            }
-            return tagCache[d];
-          };
-          headH = plainH;
-          sub.style.setProperty("--slide-head-h", plainH + "px");
-          f.remove();
-          if (tagged(DIGITS_MAX) > plainH) {
-            const count = h => {
-              const dry = document.createElement("div");
-              dry.style.setProperty("--slide-head-h", h + "px");
-              target.appendChild(dry);
-              window.ItdaPager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
-              const n = dry.querySelectorAll(":scope > .page").length;
-              dry.remove();
-              return n;
-            };
-            headH = headHeight(plainH, tagged, count).h;
-            sub.style.setProperty("--slide-head-h", headH + "px");
-          }
-          probe.remove();
-        }
-        f.remove();
-        const r = window.ItdaPager.paginate(f, sub, { pageClass: cls, fitFill: true });
-        overflow += r.overflow;
-        const pages = [...sub.querySelectorAll(":scope > .page")];
-        pages.forEach((pg, i) => {
-          if (g.title && g.kind !== "section") {
-            const hd = el("div", "slide-head");
-            hd.appendChild(headClone(g.title, pages.length > 1 && { k: i + 1, n: pages.length }));
-            pg.insertBefore(hd, pg.firstChild);
-          }
-          if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));
-          if (g.bg) pg.insertBefore(slotBox(g.bg, i > 0), pg.firstChild); // 배경은 쪽의 첫 자식 — 머리·본문·바닥이 그 위에 그려진다
-        });
-      }
-      const made = [...sub.querySelectorAll(":scope > .page")];
-      const starts = made.map(pg => firstLine(pg.querySelector(".page-body")));
-      const per = made.map(() => []);
-      for (const n of g.notes) per[notePage(n.at, Number(n.el.getAttribute("data-line")), starts)].push(n.el);
-      for (const [j, pg] of made.entries()) {
-        // 잴 때 임시 상자(sub)에 걸린 값(그림 최대 높이·제목 높이)을 쪽으로 옮긴다 — sub 를 지우면 사라져 차트가 커지고 잘렸다
-        for (const k of ["--img-max-h", "--slide-head-h"]) { const v = sub.style.getPropertyValue(k); if (v) pg.style.setProperty(k, v); }
-        if (scale) pg.style.setProperty("--slide-scale", scale);
-        pg.dataset.kind = g.kind;
-        notes.push(noteHTML(per[j]));
-        target.insertBefore(pg, sub);
-      }
-      sub.remove();
+    const memo = o.memo || null;
+    const I = memo && window.ItdaIncr;
+    let old = null;
+    if (I) {
+      const key = boardKey(o);
+      if (memo.key === key && memo.units) old = indexUnits(memo.units);
+      else { I.clear(memo); memo.key = key; }
     }
-    // 꾸밈: 단계, 바닥(로고·조직·번호), 장식 자리(테마가 CSS 로 칠한다), 종류 클래스를 안쪽 요소에도(테마 CSS 는 .page 자신을 고르지 못한다)
-    const all = [...target.querySelectorAll(":scope > .page")];
-    all.forEach((pg, i) => {
-      const kind = pg.dataset.kind;
-      const body = pg.querySelector(".page-body");
-      pg.dataset.steps = String(kind === "title" ? 0 : steps(body, o.incremental));
-      pg.dataset.slide = String(i + 1);
-      pg.dataset.page = String(i + 1);
-      // 맨 구역 장(bare — 테마가 장식 면 위에 큰 제목을 놓는다)은 배경 그림 장이 아닐 때만. 배경 장에는 장식이 없어(아래) 그 모양을 쓰지 않는다(itda-hyve#569)
-      const hasBg = !!pg.querySelector(":scope > .slide-bg");
-      if (kind === "section" && body.children.length === 1 && !hasBg) { body.classList.add("bare"); pg.classList.add("bare"); }
-      for (const x of [pg.querySelector(".page-header"), pg.querySelector(".page-footer")]) if (x) x.remove();
-      // 배경 그림 장(itda-hyve#569)에는 장식을 넣지 않는다 — 넓게 칠하는 장식이 그림을 가리고, DOM 에 두면 테마의 형제 선택자
-      // (.slide-deco.k-section ~ .page-body 들여쓰기 등)가 보이지 않는 장식 폭만큼 본문을 민다. 종류 class(k-*)는 그대로 단다.
-      if (!hasBg)
-        pg.insertBefore(el("div", "slide-deco k-" + kind + (pg.classList.contains("bare") ? " bare" : "")), pg.firstChild);
-      body.classList.add("k-" + kind);
-      const head = pg.querySelector(".slide-head");
-      if (head) head.classList.add("k-" + kind);
-      if (kind !== "title") {
-        const foot = el("div", "slide-foot k-" + kind);
-        const left = el("div", "sf-left");
-        if (o.logo) { const im = document.createElement("img"); im.className = "sf-logo"; im.src = o.logo; im.alt = ""; left.appendChild(im); }
-        if (o.footer) left.appendChild(el("span", "sf-text", o.footer));
-        foot.appendChild(left);
-        foot.appendChild(el("div", "sf-num", (i + 1) + " / " + all.length));
-        pg.appendChild(foot);
+    const notes = [], pages = [], units = [];
+    let overflow = 0, sections = 0, made = 0, reused = 0;
+    for (const g of gs) {
+      const nth = g.kind === "section" ? ++sections : 0;
+      let u = null, sg = "", b = null;
+      if (I) {
+        b = I.base(groupEls(g));
+        sg = groupSig(I, g, nth, b);
+        u = old && takeUnit(old, sg);
       }
+      if (u) {
+        for (const pg of u.pages) I.shift(pg, b.line - u.base.line, b.n - u.base.n);
+        u.base = b;
+        u.notes = u.slots.map(s => noteHTML(s.map(i => g.notes[i].el)));
+        reused += u.pages.length;
+      } else {
+        u = makeGroup(g, nth, target, o, scale);
+        u.sig = sg;
+        u.base = b;
+        made += u.pages.length;
+      }
+      units.push(u);
+      pages.push(...u.pages);
+      notes.push(...u.notes);
+      overflow += u.overflow;
+    }
+    number(pages);
+    if (I) memo.units = units; // 이번 차례의 묶음만 — 쓰지 않은 옛 묶음의 장은 놓는다
+    return { slides: pages.length, notes, overflow, ms: Math.round(performance.now() - t0), pages, made, reused };
+  }
+
+  // boardKey 는 장 모양을 정하는 build 옵션 전부다(묶음 서명 밖의 값). o.key 는 호출자가 더하는 값(테마·용지 같은 화면 쪽 조건)이다.
+  function boardKey(o) {
+    return JSON.stringify([o.ratio, o.level || 0, !!o.incremental, o.fontScale || 0, o.logo || "", o.footer || "", o.info || null,
+      document.documentElement.lang || "", o.key || ""]);
+  }
+  // groupEls 는 묶음이 장을 만들 때 읽는 원본 요소 전부다(서명과 위치 기준).
+  function groupEls(g) {
+    return [g.src, g.title, g.panel && g.panel.block, g.bg && g.bg.block, ...g.blocks, ...g.notes.map(n => n.el)];
+  }
+  // groupSig 는 묶음의 서명이다 — 종류, 구역 차례(구역 장은 번호 자리에 차례를 쓸 수 있다), 원본 요소, 노트가 붙는 법(at).
+  function groupSig(I, g, nth, b) {
+    const parts = [g.kind, nth, "t", g.src || "", g.title || "", "p", g.panel ? g.panel.block : "", "b", g.bg ? g.bg.block : "", "k", ...g.blocks, "n"];
+    for (const n of g.notes) parts.push(n.at, n.el);
+    return I.sig(parts, b);
+  }
+  // indexUnits·takeUnit — 서명마다 지난번 묶음을 차례로 둔다(같은 서명이 둘이면 앞의 것부터 쓴다). 그림이 덜 읽혔거나 깨진 채 만든 묶음은 넣지 않는다.
+  function indexUnits(units) {
+    const m = new Map();
+    for (const u of units) {
+      if (!u.ok || !u.sig) continue;
+      if (!m.has(u.sig)) m.set(u.sig, []);
+      m.get(u.sig).push(u);
+    }
+    return m;
+  }
+  function takeUnit(m, sg) {
+    const q = m.get(sg);
+    return q && q.length ? q.shift() : null;
+  }
+
+  // makeGroup 은 묶음 하나의 장을 만들어 target 끝에 넣고, 장마다 한 번만 하는 꾸밈(decorate)까지 한다. 번호는 number 가 단다.
+  // 돌려주는 값: { pages, notes(장마다 노트 HTML), slots(장마다 붙은 노트의 g.notes 번호), overflow, ok(만들 때 장 안 그림이 모두 읽혔고 깨지지 않았는가) }
+  function makeGroup(g, nth, target, o, scale) {
+    let overflow = 0;
+    const sub = document.createElement("div");
+    target.appendChild(sub);
+    if (g.kind === "title") {
+      const r = window.ItdaPager.paginate(document.createElement("div"), sub, { pageClass: "slide k-title" });
+      overflow += r.overflow;
+      titleSlide(sub.querySelector(".page"), g.src, o);
+    } else {
+      const f = document.createElement("div");
+      f.className = "page-body doc-flow";
+      // 구역 슬라이드는 제목을 본문 첫 블록으로 넣는다(뒤의 내용과 함께 나뉜다). 내용 슬라이드의 제목은 머리 자리(slide-head)에.
+      if (g.kind === "section") f.appendChild(sectionHead(g.title, nth));
+      for (const b of g.blocks) f.appendChild(b);
+      // 하나만 있는 슬라이드의 그 블록은 크게 — 쪽을 나누기 전에 붙여야 잰 크기와 그린 크기가 같다(뒤에 붙였더니 표가 넘쳐 잘렸다)
+      if (g.kind === "single") for (const b of g.blocks) if (!b.matches(".pause")) b.classList.add("slide-only");
+      markFigures(f);
+      rowCaptions(f);
+      sub.appendChild(f);
+      // 분할 그림이 있는 묶음(itda-hyve#550)은 쪽 class 로 글 영역을 반대쪽으로 좁힌다(base.css has-panel·panel-*·split-*) — 쪽을 나누기 전에
+      // 걸어야 글 영역 폭으로 잰다(머리 높이 재기 probe 도 같은 class). 패널 자체는 나눈 뒤 장마다 붙인다(넘친 장도 반복).
+      const cls = "slide k-" + g.kind + (g.title && g.kind !== "section" ? " has-head" : "") +
+        (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
+        (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
+      // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
+      // 넘쳐 여러 장이 된 묶음의 머리에는(첫 장 포함) 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
+      // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
+      // 화면에 들어가는 블록은 늘 원본 f 이고 원본은 한 번만 나눈다 — 장 수를 미리 알아야 할 때는 사본(f.cloneNode)으로 센다.
+      //   1. plain(표지 없는 머리)과 tagged(DIGITS_MAX 자리 표지)를 잰다. tagged ≤ plain 이면 어떤 장 수의 표지도 줄을 바꾸지
+      //      않는다(표지 높이는 자릿수가 늘수록 줄지 않는다) — plain 으로 원본을 한 번 나눈다. 이전과 같은 길이다.
+      //   2. 표지가 줄을 바꿀 수 있는 제목이면 headHeight 가 사본으로 장 수를 세며 실제 장 수의 자릿수 표지로 높이를 고른다.
+      //      그 높이로 원본을 한 번 나눈다. 한 장이거나 실제 표지가 줄을 바꾸지 않으면 plain 이 남아 나눈 결과는 이전과 같다
+      //      — 다만 사본 나눔이 한 번 더 든다(넘치지 않는 장도 이런 제목이면 한 쪽짜리 사본 나눔 한 번).
+      let headH = 0;
+      if (g.title && g.kind !== "section") {
+        const probe = document.createElement("div");
+        probe.className = "page " + cls;
+        const hd = probe.appendChild(el("div", "slide-head"));
+        hd.appendChild(headClone(g.title, false));
+        sub.appendChild(probe);
+        const plainH = Math.ceil(hd.getBoundingClientRect().height);
+        const tagCache = {};
+        const tagged = d => {
+          if (!(d in tagCache)) {
+            const nines = "9".repeat(d);
+            hd.replaceChildren(headClone(g.title, { k: nines, n: nines }));
+            tagCache[d] = Math.ceil(hd.getBoundingClientRect().height);
+          }
+          return tagCache[d];
+        };
+        headH = plainH;
+        sub.style.setProperty("--slide-head-h", plainH + "px");
+        f.remove();
+        if (tagged(DIGITS_MAX) > plainH) {
+          const count = h => {
+            const dry = document.createElement("div");
+            dry.style.setProperty("--slide-head-h", h + "px");
+            target.appendChild(dry);
+            window.ItdaPager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
+            const n = dry.querySelectorAll(":scope > .page").length;
+            dry.remove();
+            return n;
+          };
+          headH = headHeight(plainH, tagged, count).h;
+          sub.style.setProperty("--slide-head-h", headH + "px");
+        }
+        probe.remove();
+      }
+      f.remove();
+      const r = window.ItdaPager.paginate(f, sub, { pageClass: cls, fitFill: true });
+      overflow += r.overflow;
+      const pgs = [...sub.querySelectorAll(":scope > .page")];
+      pgs.forEach((pg, i) => {
+        if (g.title && g.kind !== "section") {
+          const hd = el("div", "slide-head");
+          hd.appendChild(headClone(g.title, pgs.length > 1 && { k: i + 1, n: pgs.length }));
+          pg.insertBefore(hd, pg.firstChild);
+        }
+        if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));
+        if (g.bg) pg.insertBefore(slotBox(g.bg, i > 0), pg.firstChild); // 배경은 쪽의 첫 자식 — 머리·본문·바닥이 그 위에 그려진다
+      });
+    }
+    const pages = [...sub.querySelectorAll(":scope > .page")];
+    const starts = pages.map(pg => firstLine(pg.querySelector(".page-body")));
+    const slots = pages.map(() => []);
+    g.notes.forEach((n, i) => slots[notePage(n.at, Number(n.el.getAttribute("data-line")), starts)].push(i));
+    const notes = [];
+    let ok = true;
+    for (const [j, pg] of pages.entries()) {
+      // 잴 때 임시 상자(sub)에 걸린 값(그림 최대 높이·제목 높이)을 쪽으로 옮긴다 — sub 를 지우면 사라져 차트가 커지고 잘렸다
+      for (const k of ["--img-max-h", "--slide-head-h"]) { const v = sub.style.getPropertyValue(k); if (v) pg.style.setProperty(k, v); }
+      if (scale) pg.style.setProperty("--slide-scale", scale);
+      pg.dataset.kind = g.kind;
+      notes.push(noteHTML(slots[j].map(i => g.notes[i].el)));
+      for (const im of pg.querySelectorAll("img")) if (!im.complete || !im.naturalWidth) ok = false;
+      target.insertBefore(pg, sub);
+      decorate(pg, o);
+    }
+    sub.remove();
+    return { pages, notes, slots, overflow, ok };
+  }
+
+  // decorate 는 장마다 한 번만 하는 꾸밈이다: 단계, 장식 자리(테마가 CSS 로 칠한다), 종류 클래스를 안쪽 요소에도(테마 CSS 는 .page 자신을
+  // 고르지 못한다), 바닥(로고·조직 — 번호 자리는 number 가 채운다). 장의 내용과 판 키(boardKey)로만 정해지므로 그대로 쓰는 장에는 다시 하지 않는다.
+  function decorate(pg, o) {
+    const kind = pg.dataset.kind;
+    const body = pg.querySelector(".page-body");
+    pg.dataset.steps = String(kind === "title" ? 0 : steps(body, o.incremental));
+    // 맨 구역 장(bare — 테마가 장식 면 위에 큰 제목을 놓는다)은 배경 그림 장이 아닐 때만. 배경 장에는 장식이 없어(아래) 그 모양을 쓰지 않는다(itda-hyve#569)
+    const hasBg = !!pg.querySelector(":scope > .slide-bg");
+    if (kind === "section" && body.children.length === 1 && !hasBg) { body.classList.add("bare"); pg.classList.add("bare"); }
+    for (const x of [pg.querySelector(".page-header"), pg.querySelector(".page-footer")]) if (x) x.remove();
+    // 배경 그림 장(itda-hyve#569)에는 장식을 넣지 않는다 — 넓게 칠하는 장식이 그림을 가리고, DOM 에 두면 테마의 형제 선택자
+    // (.slide-deco.k-section ~ .page-body 들여쓰기 등)가 보이지 않는 장식 폭만큼 본문을 민다. 종류 class(k-*)는 그대로 단다.
+    if (!hasBg)
+      pg.insertBefore(el("div", "slide-deco k-" + kind + (pg.classList.contains("bare") ? " bare" : "")), pg.firstChild);
+    body.classList.add("k-" + kind);
+    const head = pg.querySelector(".slide-head");
+    if (head) head.classList.add("k-" + kind);
+    if (kind !== "title") {
+      const foot = el("div", "slide-foot k-" + kind);
+      const left = el("div", "sf-left");
+      if (o.logo) { const im = document.createElement("img"); im.className = "sf-logo"; im.src = o.logo; im.alt = ""; left.appendChild(im); }
+      if (o.footer) left.appendChild(el("span", "sf-text", o.footer));
+      foot.appendChild(left);
+      foot.appendChild(el("div", "sf-num"));
+      pg.appendChild(foot);
+    }
+  }
+
+  // number 는 매번 하는 꾸밈이다: 장 번호(data-slide·data-page)와 바닥 번호(「i / 전체」). 값이 바뀐 장만 쓴다.
+  function number(pages) {
+    const total = pages.length;
+    pages.forEach((pg, i) => {
+      const s = String(i + 1);
+      if (pg.dataset.slide !== s) pg.dataset.slide = s;
+      if (pg.dataset.page !== s) pg.dataset.page = s;
+      const num = pg.querySelector(":scope > .slide-foot > .sf-num");
+      const t = s + " / " + total;
+      if (num && num.textContent !== t) num.textContent = t;
     });
-    return { slides: all.length, notes, overflow, ms: Math.round(performance.now() - t0) };
   }
 
   // noteHTML 은 한 장에 붙은 노트 요소들의 HTML 이다(원문 차례로 잇는다) — 빈 노트(공유가 「노트 함께 보이기」 꺼짐에서 남긴 빈 자리 — mdoc transform.go
