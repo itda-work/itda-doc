@@ -207,6 +207,8 @@
       for (const b of it.blocks) body.appendChild(b);
       grid.appendChild(tile);
     });
+    // 넓은 수식을 타일 너비에 맞춘 뒤에 넘침을 잰다 — 줄어든 높이로 재야 수식이 있는 타일이 필요 없이 잘리지 않는다(보드는 쪽 나눔을 지나지 않는다, itda-hyve#752)
+    window.ItdaPager.fitMath(pg);
     let overflow = 0;
     for (const t of target.querySelectorAll(".page.board .tile")) if (fitTile(t)) overflow++;
     return { overflow, ms: Math.round(performance.now() - t0) };
@@ -272,7 +274,10 @@
     o = o || {};
     const doc = root.ownerDocument, win = doc.defaultView;
     const GAP = 12;
-    let cur = null, down = null, closedBy = null;
+    let cur = null, down = null, closedBy = null, mathW = null;
+    // 수식은 글자 크기(크게 보기는 1.3배)와 타일 너비로 맞춘 값이다(pager.js fitMath) — 크게 보기를 열고 닫을 때와 타일 너비가 바뀔 때 다시 맞춘다. 안 그러면 작은 타일의
+    // 높이에 큰 글자가 잘린다. 굴리지 않는다 — 타일이 #pages 안이라 굴림 상자가 쪽 전체를 흐리게 한다(itda-hyve#752).
+    const fitTileMath = tile => { if (win.ItdaPager) win.ItdaPager.fitMath(tile); };
     const tiles = () => [...root.querySelectorAll(".page.board .page-body.board-grid > .tile")];
     const titleOf = tile => { const h = tile.querySelector(":scope > .tile-head > :is(h1, h2, h3, h4, h5, h6)"); return h ? h.textContent.trim() : ""; };
     const reveal = el => {
@@ -287,6 +292,7 @@
       const k = o.scale ? o.scale() : (page.offsetWidth ? rp.width / page.offsetWidth : 1);
       const b = zoomBox(o.scroller.getBoundingClientRect(), rp, grid.getBoundingClientRect(), k, GAP);
       for (const n of ["left", "top", "width", "height"]) cur.style.setProperty("--tz-" + n, b[n] + "px");
+      if (b.width !== mathW) { mathW = b.width; fitTileMath(cur); } // 굴림마다 부르는 길이라 너비가 그대로면 재지 않는다
     }
     // under 는 크게 보기 동안 숨기는 것들이다 — 같은 격자의 타일·구역 줄과 보드 머리
     const under = tile => {
@@ -334,7 +340,9 @@
       cur = tile;
       tile.classList.add("tile-zoomed");
       for (const t of under(tile)) t.classList.add("tile-under");
+      mathW = null;
       fit();
+      if (mathW === null) fitTileMath(tile); // 칸이 없으면 fit 이 재지 않는다
       tile.setAttribute("role", "dialog");
       tile.setAttribute("aria-modal", "true");
       tile.setAttribute("aria-label", titleOf(tile) || "타일 크게 보기");
@@ -355,6 +363,7 @@
       tile.classList.remove("tile-zoomed");
       for (const t of tile.parentElement ? under(tile) : []) t.classList.remove("tile-under");
       for (const n of ["left", "top", "width", "height"]) tile.style.removeProperty("--tz-" + n);
+      fitTileMath(tile);
       tile.removeAttribute("role");
       tile.removeAttribute("aria-modal");
       tile.removeAttribute("aria-label");
@@ -424,6 +433,6 @@
     return { arm, open: tile => open(tile), close: () => shut(false), step, fit, current: () => (stale() ? null : cur) };
   }
 
-  // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를 쓴다 — 그 뒤에 싣는다.
+  // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
   window.ItdaBoard = { build, groups, pack, tileWidth, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
 })();

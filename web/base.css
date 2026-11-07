@@ -563,6 +563,10 @@ h1 > .header-section-number::after { content: "."; }
 math { font-family: var(--font-math), var(--font-body), math; font-style: normal; font-weight: normal; letter-spacing: normal; text-indent: 0; text-transform: none; direction: ltr; }
 math[display="block"] { display: block; display: block math; }
 .math-display { margin: 6pt 0; overflow-x: auto; overflow-y: hidden; }
+/* 쪽·슬라이드·보드(transform 으로 확대하는 쪽 상자)에서는 굴림 상자를 만들지 않는다 — 넓은 수식이 굴러가면 쪽 전체가 흐려진다(itda-hyve#752).
+   넓은 수식은 pager.js fitMath 가 본문 너비에 맞춰 줄인다. 두 축 모두 clip 이다: 한 축만 clip 이고 다른 축이 hidden 이면 clip 이 hidden 으로 계산돼
+   굴림 상자가 그대로 남는다(CSS Overflow). 쪽 상자 밖(노트 칸·발표 노트)과 이어보기(CSS zoom — 너비가 창을 따른다)는 위 규칙대로 굴러간다. */
+.page:not(.page-flow) .math-display { overflow: hidden; overflow: clip; }
 .math-error { font-family: var(--font-mono); font-size: 0.92em; }
 @media screen { .math-error { text-decoration: underline wavy var(--alert-caution); text-decoration-thickness: 1px; } }
 math * { border-color: currentColor; }
