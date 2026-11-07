@@ -53,6 +53,13 @@ const throwsType = (name, f) => {
   check("themeCSS 없는 테마는 null", doc.themeCSS("nope") === null);
   check("themeCSS 글자", typeof doc.themeCSS("classic", { unscoped: true }) === "string");
   check("themes 배열", Array.isArray(doc.themes()) && doc.themes().length >= 5, doc.themes().length);
+  // js 묶음에 글꼴이 없어도(themes/themes_js.go) editorial 은 쓸 수 있는 테마이고 오류·새 경고가 없다
+  const edInfo = doc.themes().find(t => t.name === "editorial");
+  const edSrc = "---\ntitle: 제목\n---\n\n# 제목\n\n> 인용\n";
+  const edView = doc.render(edSrc, { theme: "editorial" }), clView = doc.render(edSrc, { theme: "classic" });
+  check("editorial: 글꼴 없는 js 묶음에서 오류·새 경고 없음", edInfo && !edInfo.error && !edView.error && edView.theme === "editorial" && edView.html.includes("<h1") &&
+    JSON.stringify(edView.warnings) === JSON.stringify(clView.warnings), JSON.stringify({ edInfo, e: edView.error, w: edView.warnings, c: clView.warnings }));
+  check("editorial: 테마 CSS 를 냄", /Noto Serif KR/.test(doc.themeCSS("editorial") || ""));
   // 그리다 생긴 오류는 throw 가 아니라 View.error 다 — 여기서는 없는 경우만 본다(옵션은 로더가 거른다)
 
   // 뷰어 원천: 가짜 화면 api·<style> 로 attach → start → open
@@ -505,8 +512,64 @@ async function folderChecks(V, doc, api, shown) {
   check("folderDocError", V.folderDocError(f3, "big.md").includes("너무 큽니다") && V.folderDocError(f3, "x.md") === "문서를 찾지 못했습니다" && V.folderDocError(f3, "slow.md") === "");
 
   await openerChecks(V);
+  await imageErrorChecks(V, doc);
 
   // 폴더 열기로 그린 html 에도 data:·blob: 이 아닌 src 가 없다
   const fleaks = fshown.filter(v => /<img\b[^>]*\ssrc="(?!data:|blob:)/i.test(v.html)).length;
   check("폴더 show 직전 html 에 원격·상대 src 없음", fshown.length >= 6 && fleaks === 0, fshown.length + " " + fleaks);
+}
+
+// ---- 읽지 못한 그림 안내(itda-doc#67): 지금 문서의 blob: 그림에만, 문서당 한 번, 다음 문서·폴더 다시 열기에서 초기화.
+async function imageErrorChecks(V, doc) {
+  const el = (tagName, src) => ({ tagName, getAttribute: k => (k === "src" ? src : null) });
+  check("failedImageURL: blob: 그림만", V.failedImageURL(el("IMG", "blob:x/1")) === "blob:x/1" && V.failedImageURL(el("IMG", "BLOB:x/2")) === "BLOB:x/2" &&
+    [el("IMG", "data:image/png;base64,AA"), el("IMG", "https://e.x/a.png"), el("IMG", "a.png"), el("IMG", null), el("LINK", "blob:x/3"), {}, null].every(e => V.failedImageURL(e) === ""));
+
+  // 등록 대상·capture·콜백 전달. 화면 쪽 호출 줄은 document 가 없어 돌지 않으므로 소스에서 본다 — 실제 이벤트 발생은 브라우저에서만 볼 수 있다.
+  const added = [], failed = [];
+  V.watchImageErrors({ addEventListener: (type, fn, opt) => added.push({ type, fn, opt }) }, { imageFailed: u => failed.push(u) });
+  check("watchImageErrors: error 를 capture 로 한 번 등록", added.length === 1 && added[0].type === "error" && added[0].opt === true, JSON.stringify(added));
+  if (added[0]) { added[0].fn({ target: el("IMG", "blob:x/9") }); added[0].fn({ target: el("IMG", "https://e.x/a.png") }); }
+  check("watchImageErrors: 대상 그림의 URL 을 imageFailed 로 전달", failed.length === 2 && failed[0] === "blob:x/9" && failed[1] === "", JSON.stringify(failed));
+  const viewerText = nodeFS.readFileSync(path.join(webDir, "viewer", "viewer.js"), "utf8");
+  check("화면이 document 에 watchImageErrors 를 건다", /^\s*watchImageErrors\(document, source\);\s*$/m.test(viewerText));
+
+  const MSG = "그림을 읽지 못했습니다 — 연 뒤에 고쳤거나 옮겼다면 「폴더」로 다시 열어 주세요";
+  const toasts = [], painted = [], views = [];
+  let made = 0;
+  const s = V.viewerSource({ load: () => Promise.resolve(doc), setThemeCSS: () => Promise.resolve(), unscoped: () => false,
+    onView: (v, lines) => views.push({ v, lines }), onWarnings: lines => painted.push(lines),
+    objectURL: () => "blob:fake/" + (++made), revokeURL() {} });
+  s.attach({ show: () => Promise.resolve(), failed() {}, toast: m => toasts.push(m) }).start();
+  for (let i = 0; i < 100 && !s.doc(); i++) await new Promise(r => setTimeout(r, 5));
+  const reads = lines => lines.filter(l => l.code === "viewer-image-read").length;
+  const srcs = () => (views[views.length - 1].v.html.match(/src="blob:[^"]*"/g) || []).map(x => x.slice(5, -1));
+
+  const folder = { files: mapOf({ "a.md": "![a](a.png) ![b](b.png) ![없음](없음.png) ![밖](../o.png) ![원격](https://e.x/r.png)\n", "b.md": "![a](a.png)\n", "a.png": "p", "b.png": "p" }) };
+  await s.openFolder(folder, "a.md");
+  const [u1, u2] = srcs();
+  check("읽기 실패 전에는 알리지 않음", u1 && u2 && toasts.length === 0 && reads(views[views.length - 1].lines) === 0, JSON.stringify(srcs()));
+  // 걷어낸 그림·원격·data: 와 이 문서의 것이 아닌 blob: 에는 반응하지 않는다(그런 그림은 src 가 없어 failedImageURL 이 "" 를 준다)
+  const none = [s.imageFailed(""), s.imageFailed("https://e.x/r.png"), s.imageFailed("data:image/png;base64,AA"), s.imageFailed("blob:남의것")];
+  check("blob: 이 아니거나 이 문서의 것이 아니면 반응 없음", none.every(x => x === false) && toasts.length === 0 && painted.length === 0, JSON.stringify({ none, toasts }));
+
+  const first = s.imageFailed(u1);
+  check("blob: 실패: 알림 문구·경고 칸에 한 줄", first === true && toasts.length === 1 && toasts[0] === MSG && painted.length === 1 && reads(painted[0]) === 1 &&
+    painted[0].some(l => l.code === "viewer-local-image"), JSON.stringify({ toasts, painted }));
+  const again = [s.imageFailed(u1), s.imageFailed(u2)];
+  check("같은 문서에서는 한 번만(같은 그림·다른 그림)", again.every(x => x === false) && toasts.length === 1 && painted.length === 1 && reads(painted[0]) === 1, JSON.stringify({ again, toasts }));
+  await s.setTheme("mono");
+  check("같은 문서를 다시 그려도 경고 줄은 남고 알림은 다시 내지 않음", reads(views[views.length - 1].lines) === 1 && toasts.length === 1, JSON.stringify(views[views.length - 1].lines));
+  await s.setTheme("");
+
+  await s.openFolder(folder, "b.md");
+  const [u3] = srcs();
+  check("다음 문서에서 초기화", reads(views[views.length - 1].lines) === 0 && u3 && u3 !== u1, JSON.stringify(views[views.length - 1].lines));
+  check("앞 문서 그림의 늦은 실패는 새 문서에 알리지 않음", s.imageFailed(u1) === false && toasts.length === 1, toasts.length);
+  check("다음 문서의 실패는 다시 알림", s.imageFailed(u3) === true && toasts.length === 2, toasts.length);
+  await s.openFolder({ files: folder.files }, "b.md"); // 폴더를 다시 열면 같은 문서라도 새 표·새 URL
+  const [u4] = srcs();
+  check("폴더를 다시 열면 초기화", reads(views[views.length - 1].lines) === 0 && u4 !== u3 && s.imageFailed(u3) === false && s.imageFailed(u4) === true && toasts.length === 3, toasts.length);
+  await s.open("붙임", "# p\n", "paste");
+  check("파일·붙여넣기로 바꾸면 폴더 그림 URL 에 반응 없음", s.imageFailed(u4) === false && toasts.length === 3 && reads(views[views.length - 1].lines) === 0, toasts.length);
 }
