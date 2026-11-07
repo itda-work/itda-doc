@@ -1012,3 +1012,210 @@ func TestShareFontsBeforeSplit(t *testing.T) {
 		t.Fatalf("글꼴을 받은 뒤 나누기: %v\n%s", err, out)
 	}
 }
+
+// 호스트 꼴 적용(itda-hyve#748): lookFor 표, setLook·꼴 단추·release 의 forced 수명, 발표 흐름. share.js 의 fol 선언·setLook·꼴 단추 처리를 소스 그대로 떼어 진짜 follower·followAction·restoreOwnLook·lookSwitchHidden 위에서 돌린다.
+// draw 는 render 의 꼴 정하기만 한다(소스에서 render 가 state.forced 를 넘기는지는 글로 본다). 실제 화면은 미검증.
+func TestShareForcedLook(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	cut := func(from, to string) string {
+		t.Helper()
+		a := strings.Index(src, from)
+		z := strings.Index(src[max(a, 0):], to)
+		if a < 0 || z < 0 {
+			t.Fatalf("share.js 에서 %q 를 찾지 못함", from)
+		}
+		return src[a : a+z+len(to)]
+	}
+	for _, m := range []string{
+		`state.look = lookFor(v, window.innerWidth, state.chosen, state.forced);`,
+		`chosen: "", forced: false,`,
+	} {
+		if !strings.Contains(src, m) {
+			t.Errorf("share.js 에 %s 가 없다", m)
+		}
+	}
+	if !strings.Contains(cut("ext = extInit({", "})"), "setLook") {
+		t.Error("확장 api 에 setLook 이 없다")
+	}
+	node := needNode(t)
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(process.env.SRC, ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const doc = {}, slide = { slides: { present: true } }, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
+
+  // ---- lookFor: forced 없음은 기존 값 그대로
+  const table = [
+    [doc, 1200, "", "doc"], [doc, 500, "", "flow"], [doc, 1200, "flow", "flow"], [doc, 500, "doc", "doc"], [doc, 1200, "slides", "slides"], [doc, 1200, "dashboard", "dashboard"],
+    [slide, 1200, "", "slides"], [slide, 500, "", "slides"], [slide, 1200, "doc", "slides"], [slide, 1200, "flow", "slides"], [slide, 500, "flow", "slides"], [slide, 1200, "slides", "slides"], [slide, 1200, "dashboard", "dashboard"],
+    [board, 1200, "", "dashboard"], [board, 500, "", "dashboard"], [board, 1200, "doc", "dashboard"], [board, 1200, "flow", "dashboard"], [board, 1200, "slides", "slides"], [board, 1200, "dashboard", "dashboard"],
+    [both, 1200, "", "dashboard"], [both, 1200, "flow", "dashboard"], [both, 1200, "slides", "slides"],
+  ];
+  for (const [v, w, c, want] of table) {
+    const name = JSON.stringify(v) + " " + w + " " + JSON.stringify(c);
+    eq("forced 없음 " + name, S.lookFor(v, w, c), want);
+    eq("forced 거짓 " + name, S.lookFor(v, w, c, false), want);
+    // forced 는 쪽·이어보기 chosen 만 바꾼다
+    eq("forced 참 " + name, S.lookFor(v, w, c, true), c === "doc" || c === "flow" ? c : want);
+  }
+  for (const v of [slide, board, both]) for (const c of ["doc", "flow"]) for (const w of [1200, 500]) eq("forced 가 문서 꼴을 이김 " + JSON.stringify(v) + c + w, S.lookFor(v, w, c, true), c);
+  S.setBoardOK(false);
+  eq("boardOK 거짓: forced 이어보기", S.lookFor(board, 1200, "flow", true), "flow");
+  eq("boardOK 거짓: forced 쪽(슬라이드 문서)", S.lookFor(both, 1200, "doc", true), "doc");
+  eq("boardOK 거짓: forced 없는 보드 문서", S.lookFor(board, 1200, ""), "doc");
+  eq("boardOK 거짓: 발표 꼴 dashboard 는 forced 여도 고르지 않음", S.lookFor(both, 1200, "dashboard", true), "slides");
+  S.setBoardOK(true);
+
+  // ---- 호스트 꼴이 아닌 길은 슬라이드 문서를 바꾸지 않는다: view.json 의 look·폴더의 기억한 꼴·좁은 화면의 처음 꼴
+  eq("view.json look", S.lookFor(slide, 1200, S.initialLook("", "", "flow")), "slides");
+  eq("기억한 꼴", S.lookFor(board, 1200, S.initialLook("", "doc", "flow")), "dashboard");
+  eq("좁은 화면 처음 꼴", S.lookFor(slide, 500, "flow"), "slides");
+  eq("일반 문서 view.json look", S.lookFor(doc, 500, S.initialLook("", "", "doc")), "doc");
+  eq("일반 문서 기억한 꼴", S.lookFor(doc, 1200, S.initialLook("", "flow", "doc")), "flow");
+
+  // ---- 화면: 소스 그대로
+  const make = new Function("follower", "followAction", "restoreOwnLook", "lookSwitchHidden", "state", "$", "window", "draw", "scrollToFollow", "paintLookSwitch", "nav", "b",
+    process.env.DECL + "\n" + process.env.SET + "\nconst click = []; const on = (n, f) => click.push(f); const btn = { dataset: b.dataset, addEventListener: on };\n" +
+    "(b => { " + process.env.CLICK + " })(btn);\nreturn { fol, setLook, click: () => click[0]() };");
+  function rig(view, chosen) {
+    const r = { draws: 0, scrolls: 0, saved: [], label: { look: "doc" } };
+    r.state = { ended: false, view, look: "", chosen: chosen || "", forced: false, rendering: null, again: false };
+    const el = { hidden: true, textContent: "", classList: { remove() {} }, querySelectorAll: () => [] };
+    const draw = () => { r.draws++; r.state.look = S.lookFor(r.state.view, 1200, r.state.chosen, r.state.forced); return Promise.resolve(); };
+    const m = make(S.follower, S.followAction, S.restoreOwnLook, S.lookSwitchHidden, r.state, () => el, { innerWidth: 1200 }, draw, () => { r.scrolls++; }, () => {},
+      { setLook: x => r.saved.push(x) }, { dataset: r.label });
+    r.fol = m.fol; r.setLook = m.setLook; r.click = m.click;
+    draw(); r.draws = 0;
+    r.at = () => [r.state.look, r.state.chosen, r.state.forced];
+    return r;
+  }
+  const off = { index: -1, total: 0, follow: false }, end = { index: -1, total: 0, follow: true };
+
+  // setLook
+  let r = rig(slide);
+  r.setLook("flow");
+  eq("setLook 이어보기", [r.at(), r.draws], [["flow", "flow", true], 1]);
+  eq("setLook 은 기억한 꼴에 적지 않는다", r.saved, []);
+  r.setLook("flow");
+  eq("같은 꼴은 다시 그리지 않는다", [r.at(), r.draws], [["flow", "flow", true], 1]);
+  r.setLook("doc");
+  eq("setLook 쪽", [r.at(), r.draws], [["doc", "doc", true], 2]);
+  r.setLook("slides");
+  eq("setLook 슬라이드는 forced 를 내린다", r.at(), ["slides", "slides", false]);
+  r.setLook("flow");
+  r.setLook("dashboard");
+  eq("setLook 보드도", r.at(), ["dashboard", "dashboard", false]);
+  r = rig(doc);
+  r.setLook("flow");
+  eq("일반 문서 setLook", r.at(), ["flow", "flow", true]);
+  r.state.rendering = Promise.resolve("그리는 중");
+  eq("이미 그 꼴이면 그리는 중인 그림을 돌려준다", r.setLook("flow"), r.state.rendering);
+
+  // 꼴 단추: 사람이 고르면 forced 를 내리고 기억한다
+  r = rig(doc);
+  r.setLook("flow");
+  r.click();
+  eq("단추", [r.at(), r.saved], [["doc", "doc", false], ["doc"]]);
+  r = rig(doc);
+  r.setLook("doc");
+  r.click();
+  eq("단추 — 그리지 않아도 forced 를 내린다", [r.at(), r.draws], [["doc", "doc", false], 0]);
+
+  // release: 따라가기 끔
+  for (const [name, v, own] of [["슬라이드", slide, "slides"], ["보드", board, "dashboard"]]) {
+    r = rig(v);
+    r.fol.onSlide(end);
+    r.setLook("flow");
+    r.fol.onSlide(off);
+    eq(name + " 문서 따라가기 끔 → 문서 꼴", r.at(), [own, "", false]);
+    eq(name + " 문서 끔은 한 번 그린다", r.draws, 2);
+  }
+  r = rig(doc);
+  r.fol.onSlide(end);
+  r.setLook("flow");
+  const was = r.draws;
+  r.fol.onSlide(off);
+  eq("일반 문서 끔 → 꼴은 그대로, 표시만", [r.at(), r.draws], [["flow", "flow", false], was]);
+  r = rig(slide);
+  r.fol.onSlide(end);
+  r.setLook("flow");
+  r.state.ended = true;
+  r.fol.onSlide(off);
+  eq("끝난 화면은 건드리지 않는다", r.at(), ["flow", "flow", true]);
+
+  // release: 따라가기가 켜진 채 위치만 없어짐 — 호스트의 꼴을 거두지 않는다(번호가 같아 다시 맞출 길이 없다)
+  r = rig(slide);
+  r.fol.onPos({ block: 3, frac: 0, total: 9, follow: true });
+  r.setLook("flow");
+  r.fol.onPos({ block: -1, frac: 0, total: 0, follow: true });
+  eq("호스트가 다른 탭으로 감", r.at(), ["flow", "flow", true]);
+  r.fol.hello({ slide: -1, slide_total: 0, pos: -1, pos_frac: 0, pos_total: 0, follow: true });
+  eq("재접속 hello 에 위치가 없음", r.at(), ["flow", "flow", true]);
+
+  // 발표 흐름: 슬라이드 문서를 이어보기로 바꾼 뒤 F5 → 발표 끝 → 호스트의 지금 꼴
+  r = rig(slide);
+  r.fol.onPos({ block: 3, frac: 0, total: 9, follow: true });
+  r.setLook("flow");
+  r.setLook("slides"); // 호스트가 슬라이드로 다시 그려 먼저 알린다(app.js presentNow)
+  r.fol.onSlide({ index: 2, total: 5, look: "slides", follow: true });
+  eq("F5: 슬라이드", r.at(), ["slides", "slides", false]);
+  r.fol.onSlide(end);
+  eq("발표 끝: 문서 꼴이 그 꼴이라 그대로", r.at(), ["slides", "slides", false]);
+  r.setLook("flow");
+  eq("발표 끝 뒤 호스트가 이어보기", r.at(), ["flow", "flow", true]);
+
+  // 알림 차례가 달라 slide 가 먼저 와도 forced 가 남지 않는다
+  r = rig(slide);
+  r.fol.onPos({ block: 3, frac: 0, total: 9, follow: true });
+  r.setLook("flow");
+  r.fol.onSlide({ index: 0, total: 5, look: "slides", follow: true });
+  eq("F5 가 먼저: align 이 forced 를 내린다", r.at(), ["slides", "slides", false]);
+  r.fol.onSlide(off);
+  eq("발표 중 끔: forced 가 없어 restoreOwnLook 길", r.at(), ["slides", "slides", false]);
+
+  // 보드 문서를 슬라이드로 발표 → 끝 → 문서 꼴, 이어서 호스트의 지금 꼴
+  r = rig(board);
+  r.fol.onPos({ block: 3, frac: 0, total: 9, follow: true });
+  r.setLook("flow");
+  r.fol.onSlide({ index: 0, total: 5, look: "slides", follow: true });
+  eq("보드 문서 F5", r.at(), ["slides", "slides", false]);
+  r.fol.onSlide(end);
+  eq("보드 문서 발표 끝 → 문서 꼴", r.at(), ["dashboard", "", false]);
+  r.setLook("slides");
+  eq("이어서 호스트의 지금 꼴", r.at(), ["slides", "slides", false]);
+
+  // 보드 발표의 내용 위치도 forced 를 내린다
+  r = rig(board);
+  r.fol.onPos({ block: 3, frac: 0, total: 9, follow: true });
+  r.setLook("flow");
+  r.fol.onSlide({ index: 0, total: 1, look: "dashboard", follow: true });
+  eq("보드 발표", r.at(), ["dashboard", "dashboard", false]);
+
+  // 따라가기를 끈 뒤 다시 켜면 확장이 setLook 을 다시 부른다 — 그 길이 다시 forced 를 세운다
+  r = rig(slide);
+  r.fol.onSlide(end);
+  r.setLook("doc");
+  r.fol.onSlide(off);
+  r.fol.onSlide(end);
+  eq("다시 켬: 확장이 부르기 전에는 문서 꼴", r.at(), ["slides", "", false]);
+  r.setLook("doc");
+  eq("다시 켬: 호스트의 꼴", r.at(), ["doc", "doc", true]);
+
+  process.stdout.write(bad.length ? "FAIL " + bad.join("\n") : "FORCED OK");
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "SRC="+src,
+		"DECL="+cut("  const fol = follower({\n", "\n  });\n"),
+		"SET="+cut("  function setLook(name) {\n", "\n  }\n"),
+		"CLICK="+cut("b.addEventListener(\"click\", () => {\n      state.chosen = b.dataset.look;", "\n    });"))
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "FORCED OK" {
+		t.Fatalf("호스트 꼴 적용: %v\n%s", err, out)
+	}
+}
