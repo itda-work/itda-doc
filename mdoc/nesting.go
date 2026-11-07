@@ -156,7 +156,7 @@ func renderRaw(meta Meta, body []byte, warns []Warning, overLine, skip int) Resu
 }
 
 // WithheldNotice 는 노트를 빼야 하는 렌더(Options.DropNotes)가 블록 중첩 상한을 넘었을 때 본문 대신 내는 안내다.
-const WithheldNotice = "이 문서는 구조가 너무 깊어 공유 화면에 보일 수 없습니다."
+const WithheldNotice = "이 문서는 구조가 너무 깊어 본문을 보일 수 없습니다."
 
 // withheldRaw 는 DropNotes 의 안전 모드 결과다. renderRaw 는 원문 글자 그대로라 노트를 뺄 수 없으므로 본문 대신 안내 한 줄만
 // 낸다. 목차·슬라이드 단계는 비고, 경고는 frontmatter 의 것과 too-complex 하나다(원문 글을 싣지 않는다).
