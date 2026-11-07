@@ -164,3 +164,53 @@ func TestIncrParts(t *testing.T) {
 		t.Fatalf("끝나지 않음\n%s", out)
 	}
 }
+
+// 넓은 수식 맞추기(itda-hyve#752): fitMath 의 동작은 testdata/pager_fitmath.cjs 가 pager.js 를 그대로 돌려 보고, 쪽 나눔이 줄어든 높이로 재는 차례
+// (adoptWidths 가 인라인 style 을 지운 뒤, 나누기 전)와 굴림 상자가 쪽 상자 안에 남지 않는 CSS 를 글자로 본다. 실제 레이아웃은 selftest 가 본다.
+func TestPagerFitMath(t *testing.T) {
+	b, err := os.ReadFile("pager.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	a := strings.Index(src, "  function paginate(")
+	if a < 0 {
+		t.Fatal("pager.js 에서 paginate 를 찾지 못함")
+	}
+	p := src[a:]
+	wi, fi, li := strings.Index(p, "adoptWidths(flow)"), strings.Index(p, "fitQueueMath(queue)"), strings.Index(p, "while (queue.length")
+	if wi < 0 || fi < wi || li < fi {
+		t.Errorf("paginate 의 차례가 adoptWidths → fitQueueMath → 나누기가 아님: %d %d %d", wi, fi, li)
+	}
+	dash, err := os.ReadFile("dashboard.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fm, ft := strings.Index(string(dash), "ItdaPager.fitMath(pg)"), strings.Index(string(dash), "if (fitTile(t))"); fm < 0 || ft < fm {
+		t.Errorf("dashboard.js build 가 타일 넘침을 재기(fitTile) 전에 수식을 맞추지 않음: %d %d", fm, ft)
+	}
+	css, err := os.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), ".page:not(.page-flow) .math-display { overflow: hidden; overflow: clip; }") {
+		t.Error("base.css 의 쪽 상자 안 .math-display 가 두 축 모두 clip 이 아님")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	js, _ := filepath.Abs("pager.js")
+	runner, _ := filepath.Abs(filepath.Join("testdata", "pager_fitmath.cjs"))
+	out, err := exec.Command(node, runner, js).CombinedOutput()
+	if err != nil {
+		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
+	}
+	m := regexp.MustCompile(`PAGER DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out))
+	if m == nil || m[1] == "0" {
+		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
+	}
+}

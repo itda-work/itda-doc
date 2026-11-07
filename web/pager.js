@@ -523,6 +523,47 @@
     return h;
   }
 
+  // fitMath 는 rootEl 안에서 본문보다 넓은 블록 수식을 그 너비에 맞춰 줄인다(itda-hyve#752) — 굴림 상자가 쪽 전체를 흐리게 하므로 쪽·슬라이드·보드는 굴리지 않는다.
+  // 다시 부르면 전에 건 값을 지우고 다시 잰다. 넘치지 않는 수식은 style 도 달지 않는다. 확대된 조상(보드 크게 보기 — #pages 의 transform) 안에서 불러도 된다:
+  // rect 는 화면 px, clientWidth·scrollWidth 는 배치 px 라 rect 를 그 배율(z)로 나눠 배치 px 로 맞춘다.
+  //   CSS zoom 을 쓰지 않는다: WebKit 최소 글자 크기(이 Mac 실측 9px) 밑으로 줄지 않아 넓은 수식이 그대로 넘친다.
+  //   재는 값: 범위(Range) 너비와 scrollWidth 중 큰 쪽 — WebKit 의 넓은 block math 는 상자가 내용만큼 늘고, 엔진에 따라 상자는 본문 너비이고 내용만 넘칠 수 있다.
+  //   상자 너비를 그 값으로 못 박고 왼쪽 위를 기준으로 줄인다 — 줄인 결과가 본문 너비와 같으니 가운데 정렬과 자리가 같다(상자가 늘어난 채 가운데를 기준으로 줄이면 왼쪽이 잘린다).
+  //   높이를 인라인으로 적어 쪽 나눔이 줄어든 높이로 잰다(transform 은 레이아웃 크기를 바꾸지 않는다). CSSOM 은 CSP 에 막히지 않는다.
+  function fitMath(rootEl) {
+    for (const box of rootEl.querySelectorAll(".math-display")) {
+      const m = box.querySelector("math");
+      if (!m) continue;
+      if (m.style.transform) {
+        for (const p of ["width", "transform", "transform-origin"]) m.style.removeProperty(p);
+        if (!m.getAttribute("style")) m.removeAttribute("style");
+        box.style.removeProperty("height");
+        if (!box.getAttribute("style")) box.removeAttribute("style");
+      }
+      const avail = box.clientWidth;
+      const z = box.getBoundingClientRect().width / box.offsetWidth || 1;
+      const range = document.createRange();
+      range.selectNodeContents(m);
+      const wide = Math.max(m.scrollWidth, range.getBoundingClientRect().width / z);
+      if (!avail || wide <= avail + 0.5) continue; // 숨은 자리(너비 0)는 잴 수 없다
+      m.style.width = wide + "px";
+      const k = avail / wide;
+      const h = m.getBoundingClientRect().height / z;
+      m.style.transformOrigin = "0 0";
+      m.style.transform = "scale(" + k + ")";
+      box.style.height = h * k + "px";
+    }
+  }
+  // fitQueueMath 는 나눌 블록의 수식을 첫 쪽 본문에 잠깐 넣어 줄인다 — 쪽 나눔이 줄어든 높이로 재게 나누기 전에. 흐름(flow)은 쪽 밖이라 글자 크기(테마·슬라이드 배율)·너비가
+  // 그린 자리와 다르다. adoptWidths 가 인라인 style 을 지우므로 그 뒤에 부른다. 블록은 queue 가 쥐고 있어 떼어 두어도 차례가 그대로다.
+  function fitQueueMath(queue) {
+    const hosts = queue.filter(n => n.classList.contains("math-display") || n.querySelector(".math-display"));
+    if (!hosts.length) return;
+    for (const n of hosts) body.appendChild(n);
+    fitMath(body);
+    for (const n of hosts) body.removeChild(n);
+  }
+
   // paginate 는 flow 의 블록을 target 안의 쪽 상자로 나눠 담는다. flow 는 비워진다.
   function paginate(flow, target, o) {
     const t0 = performance.now();
@@ -531,6 +572,7 @@
     adoptWidths(flow);
     const queue = [...flow.childNodes].filter(n => n.nodeType === 1);
     newPage(false);
+    fitQueueMath(queue);
     let guard = 0;
     while (queue.length && guard++ < 200000) {
       const n = queue.shift();
@@ -818,5 +860,5 @@
   }
 
   // 정식 이름은 window.ItdaPager 다. window.HyvePager 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입해 둘이 갈라지지 않는다.
-  window.ItdaPager = window.HyvePager = { paginate, prepareTOC, adoptWidths, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
+  window.ItdaPager = window.HyvePager = { paginate, prepareTOC, adoptWidths, fitMath, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
 })();

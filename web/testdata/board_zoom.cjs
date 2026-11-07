@@ -1,7 +1,7 @@
 // dashboard.js 의 크게 보기(zoomHit·zoomStep·zoomKey·zoomer)를 node 로 돌린다(board_test.go TestBoardZoom). 인자: dashboard.js.
 // zoomer 는 작은 가짜 DOM 위에서 돈다 — 선택자는 쉼표로 나눈 조각마다 마지막 겹(태그·클래스·[속성])만 본다(실제 화면 동작은 문서 창 selftest 가 본다).
 "use strict";
-const fs = require("fs"), vm = require("vm");
+const fs = require("fs"), vm = require("vm"), path = require("path");
 
 // ---- 가짜 DOM
 // 선택자: 쉼표 목록, 겹(태그·.클래스·[속성], :not(...) 는 무시)과 결합자(자손 공백·자식 >), :scope, :is(a, b) 는 펼친다.
@@ -106,6 +106,7 @@ head(D, "주요 수주"); body(D);
 const ctx = { window: WIN, document: DOC, performance: { now: () => 0 } };
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(process.argv[2], "utf8"), ctx);
+vm.runInContext(fs.readFileSync(path.join(path.dirname(process.argv[2]), "pager.js"), "utf8"), ctx); // 수식 맞춤은 실제 fitMath 를 지난다
 const Bd = ctx.window.ItdaBoard;
 
 let cases = 0, failed = 0;
@@ -291,15 +292,68 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   delete WIN.ItdaYT;
 }
 
+// ---- 크게 보기의 수식(itda-hyve#752 리뷰 [1]): 크게 보기는 글자가 1.3배이고 타일이 넓어진다 — 줄인 값을 다시 맞춰 수식 아래가 잘리지 않고, 닫으면 작은 타일 값으로 돌아온다.
+{
+  // 치수 모델(배치 px): 제 크기는 글자 크기에 비례(작은 타일 4000×400, 크게 보기 5200×520 — 어느 타일보다 넓다). 상자 너비는 작은 타일 200, 크게 보기 --tz-width − 40. 화면 rect 는 배율 Z 를 곱한다.
+  const Z = 1.54, tile = D, box = tile.querySelector(".tile-body").appendChild(new El("div", "math-display")), m = box.appendChild(new El("math"));
+  const zoomed = () => tile.cls.has("tile-zoomed"), fs = () => (zoomed() ? 1.3 : 1);
+  const styleOf = el => {
+    const s = { props: {}, removeProperty(k) { delete this.props[k]; } };
+    for (const [js, css] of [["width", "width"], ["height", "height"], ["transform", "transform"], ["transformOrigin", "transform-origin"]]) {
+      Object.defineProperty(s, js, { get() { return this.props[css] || ""; }, set(v) { this.props[css] = v; } });
+    }
+    el.style = s;
+    el.getAttribute = k => (k === "style" ? Object.entries(s.props).map(e => e.join(":")).join(";") || null : null);
+    el.removeAttribute = () => {};
+  };
+  styleOf(box); styleOf(m);
+  const tzW = () => parseFloat(tile.style.vars["--tz-width"]);
+  Object.defineProperty(box, "clientWidth", { get: () => (zoomed() ? tzW() - 40 : 200) });
+  Object.defineProperty(box, "offsetWidth", { get: () => box.clientWidth });
+  box.getBoundingClientRect = () => ({ width: box.clientWidth * Z });
+  const natural = () => 4000 * fs(), scaleOf = () => { const x = /scale\(([^)]+)\)/.exec(m.style.transform); return x ? Number(x[1]) : 1; };
+  Object.defineProperty(m, "scrollWidth", { get: () => Math.max(box.clientWidth, natural()) });
+  m.getBoundingClientRect = () => ({ width: (parseFloat(m.style.width) || box.clientWidth) * scaleOf() * Z, height: 400 * fs() * scaleOf() * Z });
+  DOC.createRange = () => ({ selectNodeContents() {}, getBoundingClientRect: () => ({ width: natural() * Z }) });
+  // 수식의 그린 높이(배치 px)가 상자 높이 안인가
+  const inBox = () => 400 * fs() * scaleOf() <= parseFloat(box.style.height) + 0.01;
+  ctx.window.ItdaPager.fitMath(tile);
+  const small = [m.style.transform, m.style.width, box.style.height];
+  eq("크게 보기 수식: 작은 타일 값(4000 → 200, 높이 20)", small, ["scale(0.05)", "4000px", "20px"]);
+  z.open(tile);
+  const k1 = (tzW() - 40) / 5200;
+  eq("크게 보기 수식: 열면 큰 글자·넓은 타일로 다시 맞춘다", [m.style.width, m.style.transform, box.style.height, inBox()],
+    ["5200px", "scale(" + k1 + ")", 520 * k1 + "px", true]);
+  const prev = scrollerEl.on.scroll.fn, heightOpen = box.style.height;
+  let calls = 0; const real = ctx.window.ItdaPager.fitMath;
+  ctx.window.ItdaPager.fitMath = r => { calls++; real(r); };
+  scrollerEl.top = 40; prev();
+  eq("크게 보기 수식: 굴러 너비가 그대로면 다시 재지 않는다", [calls, box.style.height], [0, heightOpen]);
+  scrollerEl.top = 0;
+  const wasRect = scrollerEl.getBoundingClientRect;
+  scrollerEl.getBoundingClientRect = () => rect(0, 50, 600, 650);
+  prev();
+  const k2 = (tzW() - 40) / 5200;
+  eq("크게 보기 수식: 타일 너비가 바뀌면 다시 맞춘다", [calls, k2 < k1, box.style.height, inBox()], [1, true, 520 * k2 + "px", true]);
+  scrollerEl.getBoundingClientRect = wasRect;
+  ctx.window.ItdaPager.fitMath = real;
+  z.close();
+  eq("크게 보기 수식: 닫으면 원래 타일 치수로", [m.style.transform, m.style.width, box.style.height, inBox()], [...small, true]);
+  box.remove();
+}
+
 // ---- 빌드(build): 판 없이 한 장 — 구역 줄·줄 나눔·머리 제목은 groups·pack 을 지나 격자 자리로 나타난다
 {
   ctx.window.ItdaSlides = { SIZE: { "16:9": [1280, 720], "4:3": [960, 720] } };
+  const fitted = []; // 수식 맞춤(pager.js fitMath)이 받은 것 — 타일이 격자에 놓인 보드 한 장이어야 한다
+  ctx.window.ItdaPager.fitMath = pg => fitted.push([pg.matches(".page.board", pg), pg.querySelectorAll(".tile").length]);
   const mk = (tag, text, id) => { const e = new El(tag); e.textContent = text; if (id) e.id = id; return e; };
   const tiles = t => t.querySelectorAll(".tile").map(x => [x.querySelector("h2").textContent, x.style.gridRow, x.style.gridColumn]);
   const flow = new El("div");
   [mk("h1", "첫 구역", "first"), mk("h2", "매출"), mk("p", "글"), new El("hr"), mk("h2", "이익"), mk("h1", "둘째 구역", "second"), mk("h2", "비용"), mk("h2", "인력"), new El("hr"), new El("hr"), mk("h2", "일정")].forEach(e => flow.appendChild(e));
   const t = new El("div");
   const r = Bd.build(flow, t, { ratio: "16:9", cols: 4, rows: 2, level: 2 });
+  eq("빌드: 타일을 놓은 보드에 수식 맞춤을 한 번 건다", fitted, [[true, 5]]);
   eq("빌드: 보드는 한 장이고 돌려주는 값에 판 수가 없다", [t.querySelectorAll(".page.board").length, Object.keys(r).sort()], [1, ["ms", "overflow"]]);
   eq("빌드: 판 번호·rows 는 줄 높이 기준으로", [t.querySelectorAll(".bh-num").length, t.querySelector(".page.board").style.vars["--board-rows"]], [0, "2"]);
   eq("빌드: 타일 앞 첫 높은 제목은 머리 제목(제목 요소 그대로 — id 유지), 구역 줄이 되지 않는다", [t.querySelector(".bh-title h1").id, t.querySelectorAll(".board-section").length], ["first", 1]);
