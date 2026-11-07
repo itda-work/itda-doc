@@ -207,3 +207,30 @@ func TestClassicSectionFootContrast(t *testing.T) {
 		t.Errorf("--muted on --paper = %.2f:1 — 4.5:1 이상이어야 함", r)
 	}
 }
+
+// 오른쪽 패널 장의 띠는 장식 상자를 따라 좁아진다 — 본문 left 가 그 몫을 빼지 않으면 3:1 에서 폭이 0 이하가 되어 구역 제목이 사라진다(#58).
+// 테마 CSS 는 @scope 안이라 쪽 요소를 고를 수 없어, 쪽 class 로 정하는 변수는 base.css 에 둔다.
+func TestClassicSectionPanelWidth(t *testing.T) {
+	th, ok := builtin(t).Get("classic")
+	if !ok {
+		t.Fatal("classic 없음")
+	}
+	want := "left: calc(24% - (var(--slide-deco-x, 0%) + var(--slide-deco-right, 0%)) * 0.24 + var(--slide-section-gap, 60pt));"
+	if !strings.Contains(th.CSS, want) {
+		t.Errorf("classic 구역 본문 left 가 다름: %q 없음", want)
+	}
+	base, err := os.ReadFile("../web/base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range []string{
+		".page.slide.panel-right { --slide-deco-right: var(--panel-w); }",
+		".page.slide.split-3-1 { --panel-w: 75%; --slide-section-size: 22pt; --slide-section-gap: 24pt; }",
+		".page.slide.panel-left:is(.split-2-1, .split-3-1) { --slide-section-gap: calc(24pt + var(--slide-pad-x) - var(--panel-gap)); }",
+		"word-break: keep-all; overflow-wrap: anywhere;",
+	} {
+		if !strings.Contains(string(base), w) {
+			t.Errorf("base.css 에 %q 가 없음", w)
+		}
+	}
+}

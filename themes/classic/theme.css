@@ -61,8 +61,9 @@ nav.toc > ul > li > a { color: var(--accent); }
 /* 띠는 바닥글 줄 위에서 끊는다 — 바닥글 작은 글자가 강조색 면이나 면 경계에 걸리지 않게(#38) */
 .slide-deco.k-section::before { top: 0; bottom: var(--slide-pad-bottom); right: auto; width: 24%; height: auto; }
 .slide-deco.k-section::after { left: 24%; top: 0; bottom: var(--slide-pad-bottom); width: 7pt; height: auto; }
-/* 띠는 장식 상자 폭의 24%. 왼쪽 패널 장은 장식 상자가 패널 폭(--slide-deco-x)만큼 좁아지므로 쪽 폭 기준 %에서 그 24% 를 뺀다(itda-work/itda-hyve#581) */
-.slide-deco.k-section ~ .page-body { left: calc(24% - var(--slide-deco-x, 0%) * 0.24 + 60pt); }
+/* 띠는 장식 상자 폭의 24%. 패널 장은 장식 상자가 패널 폭(왼쪽 --slide-deco-x, 오른쪽 --slide-deco-right)만큼 좁아지므로 쪽 폭 기준 %에서 그 24% 를
+   뺀다(itda-work/itda-hyve#581, #58). 띠와 본문 간격은 글 쪽이 좁은 분할에서 base 가 줄인다(--slide-section-gap) */
+.slide-deco.k-section ~ .page-body { left: calc(24% - (var(--slide-deco-x, 0%) + var(--slide-deco-right, 0%)) * 0.24 + var(--slide-section-gap, 60pt)); }
 .page-body .ss-num { color: var(--accent-3); font-size: calc(92pt * var(--slide-scale)); letter-spacing: -0.04em; margin-bottom: 4pt; }
 .page-body .ss-title { color: var(--accent); }
 
