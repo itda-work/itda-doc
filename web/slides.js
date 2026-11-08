@@ -593,7 +593,8 @@
   // noteAfter 는 아래 배치에서 칸 높이 h(화면 px)만큼 다음 쪽을 밀 여백이다 — 쪽은 transform 안이라 배치 px(1/zoom)로 돌려준다.
   function noteAfter(h, zoom) { return (h + NOTE_BELOW_GAP) / zoom; }
 
-  // layoutNotes 는 notes(#notes) 의 칸을 pages(#pages) 의 쪽에 맞춰 놓는다. o = { layout: "off"|"right"|"below", zoom, noteW, gap }. 호출자가 #pages 의 transform·너비를 정한
+  // layoutNotes 는 notes(#notes) 의 칸을 pages(#pages) 의 쪽에 맞춰 놓는다. o = { layout: "off"|"right"|"below", zoom, noteW, gap, showEmpty }. showEmpty 가 참이면
+  // 아래 배치에서도 「노트 없음」 칸(.sn-empty)을 접지 않는다 — 호스트 앱이 그 칸에 새 노트를 여는 단추를 둔다(itda-hyve#781). 공유 보는 화면은 넘기지 않아 접힌다. 호출자가 #pages 의 transform·너비를 정한
   // 뒤에 부르고, 쪽을 미는 여백이 #pages 높이에 들어가므로 바깥 상자 높이는 그 뒤에 잰다. 쪽의 여백은 인라인 margin 대신 --sn-after 로 건다 —
   // 발표 덱·축소본이 쪽을 복제해도 #pages.notes-below 규칙(화면 전용 CSS)이 닿지 않아 복제본과 인쇄에는 여백이 없다. 쓰기는 값이 다를 때만 한다.
   function layoutNotes(pages, notes, o) {
@@ -608,7 +609,7 @@
     const pageOf = n => list[Number(n.dataset.slide) - 1];
     // 아래 배치: 너비 먼저 → 높이 재기 → 여백 걸기 → 위치. 칸 높이는 위치와 무관해 한 번으로 끝난다.
     const shown = kids.filter(n => {
-      const pg = pageOf(n), hide = !pg || pg.offsetParent === null || (below && n.classList.contains("sn-empty"));
+      const pg = pageOf(n), hide = !pg || pg.offsetParent === null || (below && !o.showEmpty && n.classList.contains("sn-empty"));
       n.hidden = hide;
       if (hide) { delete n.snH; if (pg) after(pg, ""); }
       else if (below) { put(n, "width", px(Math.round(pg.getBoundingClientRect().width))); put(n, "height", ""); }
