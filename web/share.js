@@ -39,7 +39,7 @@
 // 따라가기가 꺼질 때 슬라이드·보드 문서는 꼴 단추가 숨어 있어 chosen 도 비워 문서의 꼴로 돌아가고, 그 밖의 문서는 꼴을 그대로 둔다. 따라가기가 켜진 채 위치만 없어지면(호스트가 다른 탭으로 감) 꼴을 두고 다시 돌아오길 기다린다.
 // 확장이 쓸 화면 자리는 share.html 의 {{EXT_*}} 다(서버가 채우거나 비운다).
 // 같은 주소 공유(itda-hyve#705 3절): stop 의 까닭이 paused 이거나 hello 에 keep 이 있던 공유의 연결이 끊기면 끝난 화면으로 가지 않는다 — 문서를 두고 띠(#pause-band)를 보이고 다시 붙기를
-// 시도한다(connect). 다시 붙으면 hello → sync.check 가 바뀐 문서를 받고 띠를 지운다. 새로 고치지 않으므로 읽던 자리가 남는다(다만 테마의 내용이 바뀌었으면 기존 reloadGate 대로 새로 고친다).
+// 시도한다(connect — 1·2·4·5·5…초, pauseBackoff). 띠의 「지금 다시 잇기」·망 복귀(online)·탭이 다시 보임은 기다리지 않고 바로 붙어 본다(retryNow·wake). 다시 붙으면 hello → sync.check 가 바뀐 문서를 받고 띠를 지운다. 새로 고치지 않으므로 읽던 자리가 남는다(다만 테마의 내용이 바뀌었으면 기존 reloadGate 대로 새로 고친다).
 // 쿠키를 잃은 브라우저는 다시 붙지 못하므로 재시도가 지금 주소를 살펴 공유가 열렸으면 새로 고쳐 입장 화면으로 간다(hostSource resync). 같은 주소 공유의 자동 새로 고침은 모두 reloadGate 의 hold 를 지나고, 메모를 새로 고침이 지울 때는 확장이 막는다(holdReload — 없으면 막지 않는다).
 // 앱 이름(itda-hyve#625): 탭 제목 접미 「 — <앱 이름>」 은 모듈에 박지 않는다 — 서버가 share.html 의 <meta name="application-name"> 자리를
 // 채우면 그 이름을 붙이고, 비우거나 채우지 않으면(자리 글자 그대로) 접미 없이 문서 제목만 쓴다(appName·docTitle).
@@ -171,6 +171,9 @@
   // backoff 는 n 번째(0부터) 다시 붙기 전의 대기다(ms) — 1·2·4·8·16·30·30…초.
   function backoff(n) { return Math.min(30000, 1000 * Math.pow(2, n)); }
 
+  // pauseBackoff 는 잠시 닫힘(connect 의 c.paused) 동안 n 번째 다시 붙기 전의 대기다(ms) — 1·2·4·5·5…초. 자동 재시도 사이의 대기 상한이 5초다(요청 처리 시간은 따로 — itda-hyve#728 후속).
+  function pauseBackoff(n) { return Math.min(5000, 1000 * Math.pow(2, n)); }
+
   // PAUSE_MAX 는 잠시 닫힘이 시작된 뒤 다시 붙기를 시도하는 시간이다(ms) — 지나면 멈추고 새로 고침을 안내한다.
   const PAUSE_MAX = 24 * 3600 * 1000;
 
@@ -180,7 +183,10 @@
   // connect 는 갱신 스트림의 상태 기계다. 상태: connecting → open(hello) → waiting(끊김, 다시 붙기 전) → … / ended(stop·kick·공유 없음) / idle(잠시 닫힘이 PAUSE_MAX 를 넘겨 멈춤).
   // 잠시 닫힘(같은 주소 공유): stop 의 까닭이 paused 이거나 hello 에 keep 이 있던 공유의 스트림이 끊기면 c.paused(시작 시각)를 두고 onPaused("closed") — 끝내지 않는다. 이때 probe 의
   // "ended"(404)는 재시도이고 "kicked"(403)만 끝낸다. 망 실패는 syncer 가 "alive" 로 돌려주므로 재시도다. 다시 붙은 hello 가 onPaused("") 로 거둔다. PAUSE_MAX 가 지나면 onPaused("stale") 로
-  // 바꾸고 다시 붙지 않는다. keep 은 hello 마다 고친다 — 같은 주소가 아닌 공유는 이 길을 타지 않는다.
+  // 바꾸고 다시 붙지 않는다. keep 은 hello 마다 고친다 — 같은 주소가 아닌 공유는 이 길을 타지 않는다. 잠시 닫힘의 재시도 간격은 pauseBackoff(상한 5초), 그 밖의 끊김은 backoff(상한 30초)다.
+  // c.retryNow() 는 잠시 닫힘에서 기다리지 않고 바로 붙어 본다(띠의 「지금 다시 잇기」): 기다리던 타이머를 지우고 tries 를 0 으로 open. 멈춤(idle — stale)이면 c.paused 를 지금으로 두고
+  // onPaused("closed") 뒤 다시 PAUSE_MAX 동안 시도한다. 붙는 중(connecting)이면 새로 열지 않는다(스트림 하나). 상태를 묻는 중(probe)이면 바로 열고 늦게 온 그 답은 버린다(gen). 이번 시도가 끝나면 풀리는 Promise 를 돌려준다 — hello 면 true,
+  // 실패해 다음 시도를 걸었거나·멈췄거나·끝났으면 false. 잠시 닫힘이 아니거나 끝났으면 아무것도 하지 않고 false.
   // deps: EventSource, probe()(끊긴 뒤 부른다 — viewState 의 값을 돌려준다. "alive"·"missing" 이면 다시 붙고 "ended"·"kicked" 면 끝낸다), setTimeout·clearTimeout, now()(없으면 Date.now),
   // onHello(first, data), onReload(), onVersion(data), onSlide(data — {index, total, look, follow}), onPos(data — {block, frac, total, follow}, ⑧),
   // onFiles()(폴더의 문서 목록이 바뀜 — 없어도 된다), onEnded(reason — kick·403 은 "kicked"), onPaused(state — "closed"·"stale"·"", 같은 주소 공유만).
@@ -188,6 +194,13 @@
   function connect(base, deps) {
     const c = { state: "connecting", tries: 0, es: null, timer: 0, hellos: 0, keep: false, paused: 0 };
     const now = () => deps.now ? deps.now() : Date.now();
+    // waiters 는 retryNow 가 돌려준 Promise 의 resolve 들이다 — 이번 시도의 끝(settle)에서 한 번에 푼다.
+    let waiters = [];
+    function settle(ok) { const ws = waiters; waiters = []; for (const f of ws) f(ok); }
+    // gen 은 시도 세대다 — open·lost·end 가 올린다. lost 의 probe 는 건 때의 세대가 아직 지금 세대일 때만 결과를 쓴다(그 사이 retryNow·wake 가 새로 열었으면 버린다 —
+    // waiters 는 새 시도의 끝이 푼다). 연결 시도도 다음 타이머도 늘 하나다(arm 은 기존 타이머를 지우고 건다, open 은 남은 스트림을 닫고 연다).
+    let gen = 0;
+    function arm(ms) { deps.clearTimeout(c.timer); c.timer = deps.setTimeout(open, ms); }
     function pause() {
       c.keep = true;
       if (c.paused) return;
@@ -198,28 +211,35 @@
     function lost() {
       if (c.es) { c.es.close(); c.es = null; }
       c.state = "waiting";
+      const g = ++gen;
       Promise.resolve(deps.probe()).then(st => {
-        if (c.state !== "waiting" || c.es) return;
+        if (g !== gen || c.state !== "waiting" || c.es) return; // 지난 세대의 probe — 그 뒤에 새 시도가 있었다
         if (st === "kicked") { end("kicked"); return; }
         if (st === "ended" && !c.paused) { end(""); return; }
         if (c.paused && now() - c.paused >= PAUSE_MAX) {
           c.state = "idle";
           deps.onPaused("stale");
+          settle(false);
           return;
         }
-        c.timer = deps.setTimeout(open, backoff(c.tries++));
+        arm((c.paused ? pauseBackoff : backoff)(c.tries++));
+        settle(false);
       });
     }
     function end(reason) {
       if (c.state === "ended") return;
       c.state = "ended";
+      gen++;
       if (c.es) { c.es.close(); c.es = null; }
       deps.clearTimeout(c.timer);
       deps.onEnded(reason || "");
+      settle(false);
     }
     function open() {
       if (c.state === "ended") return;
       deps.clearTimeout(c.timer);
+      gen++;
+      if (c.es) { c.es.close(); c.es = null; } // 스트림은 늘 하나 — 남은 것을 닫고 연다(닫힌 것의 이벤트는 c.es !== es 로 버린다)
       c.state = "connecting";
       const es = new deps.EventSource(base + "/events");
       c.es = es;
@@ -230,6 +250,7 @@
         const data = parseData(e);
         c.keep = !!data.keep;
         if (c.paused) { c.paused = 0; deps.onPaused(""); }
+        settle(true);
         deps.onHello(c.hellos++ === 0, data);
       });
       es.addEventListener("reload", () => {
@@ -271,6 +292,17 @@
     }
     // wake 는 화면이 다시 보일 때(뒤로 갔다 옴·탭 전환) 기다리지 않고 바로 다시 붙는다.
     c.wake = () => { if (c.state === "waiting" && !c.es) { c.tries = 0; open(); } };
+    c.retryNow = () => {
+      if (c.state === "ended" || !c.paused) return Promise.resolve(false);
+      const p = new Promise(r => waiters.push(r));
+      if (c.state === "idle") { // 멈춘 뒤의 단추: 다시 PAUSE_MAX 동안 시도한다
+        c.paused = now();
+        c.state = "waiting";
+        deps.onPaused("closed");
+      }
+      c.wake(); // 붙는 중이면 그 시도를 기다린다
+      return p;
+    };
     c.gone = reason => {
       if (reason === "kicked" || !c.keep) { end(reason); return; }
       if (c.state === "ended" || c.state === "idle") return;
@@ -614,6 +646,23 @@
     if (fol.active()) scrollTo(fol.index, fol.kind, fol.frac);
   }
 
+  // slideGlider 는 슬라이드 보기에서 발표자를 따라가는 굴림이다(itda-hyve#728 후속). to(viewer, el, delta, move): 슬라이드 el 을 보기 영역의 자리로 옮긴다 — delta 는 지금 굴린
+  // 자리에서 el 의 자리까지(요소의 화면 자리로 잰 값이라 굴리는 도중이어도 목표는 늘 요소의 자리다). move(발표자가 옮김 — follower align)이고 지난번에 맞춘 것과 다른 슬라이드 요소이고
+  // reduced()(prefers-reduced-motion: reduce)가 아니면 부드럽게(scrollTo behavior "smooth" — 도중에 다음 슬라이드가 오면 새 목표로 다시 굴린다), 아니면 바로 간다(scrollTop 대입 —
+  // 첫 맞추기·같은 슬라이드 다시 맞추기·그리기·창 크기·배율 뒤의 재정렬. 굴리는 중이던 부드러운 굴림을 덮는다). 따라가기 해제는 wheel·touchmove·mousedown 이라 굴림의 scroll 이벤트는 풀지 않는다.
+  function slideGlider(reduced) {
+    let last = null;
+    return {
+      to(viewer, el, delta, move) {
+        const smooth = move && last !== null && el !== last && !reduced();
+        last = el;
+        const top = viewer.scrollTop + delta;
+        if (smooth) viewer.scrollTo({ top, behavior: "smooth" });
+        else viewer.scrollTop = top;
+      },
+    };
+  }
+
   // followLink 는 문서 안 #제목 링크로 이동한다: 대상(el)이 있으면 사람이 직접 움직인 것이므로 먼저 따라가기를 풀고(fol.moved) 굴린다
   // (scroll(el)). 대상이 없으면 아무것도 하지 않고 거짓.
   function followLink(fol, el, scroll) {
@@ -894,7 +943,7 @@
   //  - attach(api) 는 화면이 시작할 때 한 번(첫 그리기 전) 부른다. api 는 화면 부품이다: $(id), ended()(공유가 끝남), current()(지금
   //    view 또는 null), show(v)(view 를 바꾸고 그린다 — Promise), redraw()(끝나지 않았고 view 가 있으면 다시 그림), look(name)(보기 꼴을
   //    골라 다시 그림 — Promise), failed(msg)(안내 줄), themeFailed()(「테마를 불러오지 못했습니다」), end(reason)(끝난 화면),
-  //    paused(st)(같은 주소 공유의 잠시 닫힘 띠 — "closed"·"stale"·"held"·""), holdReload()(새로 고치면 잃을 것이 있으면 참 — 확장이 답한다),
+  //    paused(st, retry?)(같은 주소 공유의 잠시 닫힘 띠 — "closed"·"stale"·"held"·"". retry 는 "closed"·"stale" 에만 온다 — 바로 다시 붙어 보는 함수(connect 의 retryNow, Promise)), holdReload()(새로 고치면 잃을 것이 있으면 참 — 확장이 답한다),
   //    hello(d)·slide(d)·pos(d)(발표자 따라가기 — follower), toast(msg), files(d)(폴더의 문서 목록 {docs, rev, truncated})·
   //    nav(n)(폴더 공유의 주소 쪽 일 { look(), setLook(look), hash(), open(doc, hash) } — 첫 show 전에 한 번). 뒤의 둘은 hostSource 만 부른다.
   //  - applyTheme(v): render 가 그리기 전에 부른다(오류 view 는 부르지 않는다). true(또는 Promise<true>)면 그리고, false 면 그리지 않는다.
@@ -999,11 +1048,13 @@
               onSlide: data => api.slide(data),
               onPos: data => api.pos(data),
               onEnded: reason => api.end(reason),
-              onPaused: st => api.paused(st),
+              onPaused: st => api.paused(st, st ? () => conn.retryNow() : undefined), // 띠의 「지금 다시 잇기」
             });
-            // 폰 Safari 는 뒤로 갔다 오면(bfcache) 스트림이 끊겨 있다 — 보이면 바로 다시 붙는다
+            // 폰 Safari 는 뒤로 갔다 오면(bfcache) 스트림이 끊겨 있다 — 보이면 바로 다시 붙는다(잠시 닫힘의 기다림도 지운다)
             w.addEventListener("pageshow", () => conn.wake());
             w.document.addEventListener("visibilitychange", () => { if (w.document.visibilityState === "visible") conn.wake(); });
+            // 망이 돌아오면 잠시 닫힘은 기다리지 않고 한 번 붙어 본다(멈춤 — stale — 은 그대로, 잠시 닫힘이 아닌 끊김은 backoff 그대로)
+            w.addEventListener("online", () => { if (conn.paused) conn.wake(); });
             sync.refresh(true);
           },
           stop() { gate.cancel(); sync.cancel(); },
@@ -1023,7 +1074,7 @@
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
-    restoreOwnLook, setBoardOK,
+    restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
@@ -1082,6 +1133,15 @@
   const THEME_FAILED = "테마를 불러오지 못했습니다 — 화면을 새로 고쳐 주세요.";
   const PAUSE_MSG = { closed: "공유가 잠시 닫혔습니다 — 같은 주소로 다시 열리면 이어집니다", stale: "공유가 오래 닫혀 있어 다시 잇기를 멈췄습니다 — 공유가 다시 열렸으면 새로 고쳐 주세요",
     held: "화면을 새로 고쳐야 하는데 메모가 이 화면에만 있습니다 — 메모를 복사한 뒤 새로 고쳐 주세요" };
+  // pauseCtl 은 잠시 닫힘 띠의 단추 상태다 — retry(지금 띠에 온 다시 잇기 함수, 없으면 null)·busy(누른 시도가 아직 안 끝남).
+  const pauseCtl = { retry: null, busy: false };
+  function paintRetry() {
+    const band = document.getElementById("pause-band"), btn = band && band.querySelector(".pause-retry"); // 띠는 처음 쓸 때 만드는 자리라 화면 html 에 없다
+    if (!btn) return;
+    btn.hidden = !pauseCtl.retry;
+    btn.disabled = pauseCtl.busy;
+    btn.textContent = pauseCtl.busy ? "잇는 중…" : "지금 다시 잇기";
+  }
   // 원천을 화면에 잇는다(hostSource 머리 주석의 api). fol 은 아래에서 만든다 — 원천은 start() 뒤에만 부른다.
   const linked = source.attach({
     $,
@@ -1100,17 +1160,33 @@
     end: reason => showEnded(reason),
     holdReload: () => !!hook("holdReload"), // 확장이 없거나 던지면 막지 않는다
     // 띠는 문서 위에 떠 있어 쪽 나눔·굴림 자리를 건드리지 않는다. 끊기기 직전의 「문서를 받지 못했습니다」 는 띠가 대신한다(테마 실패는 그대로 둔다)
-    paused: st => {
+    // 「지금 다시 잇기」 단추는 retry 가 온 띠("closed"·"stale")에만 보인다 — 누르면 붙는 중(retry 의 Promise 가 풀리기 전)에는 막고 「잇는 중…」. 알림(role="status")은 글 칸에만 두어 단추 글자와 섞여 읽히지 않는다
+    paused: (st, retry) => {
       let band = document.getElementById("pause-band");
       if (!band) { // 공유 화면만 쓰는 자리라 처음 쓸 때 만든다 — 뷰어 화면(web/viewer)은 이 길을 타지 않는다
-        band = document.createElement("p");
+        band = document.createElement("div");
         band.id = "pause-band";
         band.className = "pause-band";
-        band.setAttribute("role", "status");
+        const msg = document.createElement("span");
+        msg.className = "pause-msg";
+        msg.setAttribute("role", "status");
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pause-retry";
+        btn.addEventListener("click", () => {
+          if (pauseCtl.busy || !pauseCtl.retry) return;
+          pauseCtl.busy = true;
+          paintRetry();
+          Promise.resolve(pauseCtl.retry()).catch(() => false).then(() => { pauseCtl.busy = false; paintRetry(); });
+        });
+        band.append(msg, btn);
         document.querySelector(".main").appendChild(band);
       }
       band.hidden = !st;
-      band.textContent = PAUSE_MSG[st] || "";
+      const text = PAUSE_MSG[st] || "", msg = band.querySelector(".pause-msg");
+      if (msg.textContent !== text) msg.textContent = text; // 같은 글을 다시 넣어 알림이 되풀이되지 않게
+      pauseCtl.retry = (st === "closed" || st === "stale") && typeof retry === "function" ? retry : null;
+      paintRetry();
       if (!state.themeFailed && !(state.view && state.view.error)) $("load-err").hidden = true;
     },
     hello: d => { fol.hello(d); zoomCheck(); },
@@ -1367,13 +1443,19 @@
   }
   // placeSlide 는 슬라이드 하나를 보기 영역에 둔다 — 아래에 노트 칸이 붙어 보이면 위에 붙여(노트까지 보이게), 아니면 가운데(followSpot).
   function placeSlide(pg) {
-    if (!pg) return;
-    const viewer = $("viewer"), vr = viewer.getBoundingClientRect(), r = pg.getBoundingClientRect();
+    if (pg) $("viewer").scrollTop += slideDelta(pg);
+  }
+  // slideDelta 는 지금 굴린 자리에서 슬라이드 pg 를 placeSlide 의 자리에 두기까지 굴릴 양이다(px).
+  function slideDelta(pg) {
+    const vr = $("viewer").getBoundingClientRect(), r = pg.getBoundingClientRect();
     const nt = $("notes").querySelector('[data-slide="' + ([...$("pages").querySelectorAll(":scope > .page")].indexOf(pg) + 1) + '"]');
     const shown = !!(nt && nt.offsetParent !== null);
-    if (followSpot(state.notesLayout, shown) === "top") viewer.scrollTop += r.top - vr.top - 8;
-    else viewer.scrollTop += (r.top + r.height / 2) - (vr.top + vr.height / 2);
+    if (followSpot(state.notesLayout, shown) === "top") return r.top - vr.top - 8;
+    return (r.top + r.height / 2) - (vr.top + vr.height / 2);
   }
+  // glider 는 슬라이드 보기 따라가기의 굴림이다(slideGlider) — 옮김만 부드럽게, 줄인 움직임을 고른 사람에게는 늘 바로.
+  const reducedMotion = window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+  const glider = slideGlider(() => !!(reducedMotion && reducedMotion.matches));
 
   // ---- 목차(④)
 
@@ -1448,11 +1530,12 @@
   //  - pos: 보기 꼴 그대로. 슬라이드 보기면 블록 i 가 든 슬라이드를 가운데로, 쪽·이어보기면 블록 i 의 조각들(쪽 나눔이 쪼갠 것) 가운데
   //    비율 frac 이 닿는 지점(fragAt)을 보기 영역 맨 위 + 1px(호스트의 기준선과 같다)에. 그 꼴에 없는 블록이면 가까운 앞 블록(pickBlock).
   const ytFollowChanged = ytFollowGate();
-  function scrollToFollow(i, kind, frac) {
+  // move 는 발표자가 옮겨서 맞추는 때다(fol 의 align) — 슬라이드 보기에서 다른 슬라이드로 옮기면 부드럽게 굴린다(glider). 그리기·노트 배치·창 크기 뒤의 재정렬은 move 없이 바로 간다.
+  function scrollToFollow(i, kind, frac, move) {
     const root = $("pages"), viewer = $("viewer"), vr = viewer.getBoundingClientRect();
     if (ytFollowChanged(i, kind)) ytStop(); // 따라간 슬라이드 번호가 바뀌면 소리가 남지 않게(같은 슬라이드 안 조각·내용 위치는 그대로)
     for (const x of root.querySelectorAll(".following")) x.classList.remove("following");
-    const center = el => placeSlide(el); // 아래 노트가 붙어 보이면 위에 붙인다(itda-hyve#344)
+    const center = el => glider.to(viewer, el, slideDelta(el), !!move); // 아래 노트가 붙어 보이면 위에 붙인다(itda-hyve#344 — placeSlide 의 자리)
     if (kind === "slide") {
       if (state.look !== "slides") return; // 보드 발표의 번호(0 / 1)는 꼴만 붙든다 — 위치는 내용 위치(pos)로 온다
       const pg = root.querySelectorAll(".page")[i];
@@ -1511,7 +1594,7 @@
       if (state.ended) return;
       const act = followAction(kind, state.look, state.view, window.innerWidth, want);
       if (act === "redraw") { state.chosen = want === "dashboard" ? "dashboard" : "slides"; state.forced = false; draw(); return; }
-      if (act === "scroll") scrollToFollow(i, kind, frac);
+      if (act === "scroll") scrollToFollow(i, kind, frac, true);
     },
     release: () => {
       for (const x of $("pages").querySelectorAll(".following")) x.classList.remove("following");
