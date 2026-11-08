@@ -21,12 +21,25 @@
 .pause-band { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 20; margin: 0; padding: 8px 14px; max-width: min(92%, 560px); width: max-content;
   border-radius: 8px; background: #fff4d6; color: #5c4400; border: 1px solid #e6c766; font-size: 13.5px; line-height: 1.45; text-align: center; pointer-events: none; }
 .pause-band[hidden] { display: none; }
+/* 「지금 다시 잇기」 — 띠는 누름을 흘려보내도 단추만은 받는다 */
+.pause-retry { pointer-events: auto; font: inherit; font-weight: 600; margin-left: 10px; padding: 2px 10px; border: 1px solid #c9a53a; border-radius: 999px;
+  background: #fff; color: #5c4400; cursor: pointer; white-space: nowrap; }
+.pause-retry:disabled { opacity: .6; cursor: default; }
+.pause-retry[hidden] { display: none; }
+@media (max-width: 600px) { /* 폰: 띠를 얇게 해 문서를 덜 가린다 */
+  .pause-band { top: 6px; padding: 5px 10px; font-size: 12.5px; line-height: 1.35; max-width: 94%; }
+  .pause-retry { margin-left: 8px; padding: 1px 9px; }
+}
 /* 발표자 노트 컨트롤(itda-hyve#344) — 틀은 호스트 앱 창 틀 CSS 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
 .share-view .notes-switch[hidden] { display: none !important; }
 .share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
 @media (max-width: 600px) {
   .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
 }
+/* 노트 칸 너비 손잡이(share.js bindNoteGrip): 보이기·모양은 호스트 앱 창 틀 CSS(#pages.notes-right ~ #notes .sn-grip — 오른쪽 배치에서만). 여기서는
+   펜·터치로 끌 때 브라우저가 굴리지 않게 하고, 끄는 동안 글이 선택되지 않게 한다. 폰은 늘 아래 배치라 손잡이가 없다 */
+.share-view .sn-grip { touch-action: none; -webkit-user-select: none; user-select: none; }
+body.share-view.dragging-note { -webkit-user-select: none; user-select: none; }
 .share-err { margin: 24px auto; max-width: 480px; text-align: center; color: #d64545; }
 /* ④ 목차: 틀은 호스트 앱 창 틀 CSS 의 .sidebar·#side-toc·body.no-toc 를 그대로 쓴다. 좁은 화면(toc-drawer — share.js 가 폭으로 단다)은 본문 위에
    겹치는 서랍과 바깥 가림막 */

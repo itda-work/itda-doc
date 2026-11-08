@@ -3,9 +3,21 @@ package web
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// srcFile 은 node 가 읽을 소스를 임시 파일로 두고 경로를 돌려준다 — 환경 변수 하나로 넘기면 Linux 의 문자열 하나 상한
+// (MAX_ARG_STRLEN 128KiB)에 걸린다(share.js 가 그보다 크다).
+func srcFile(t *testing.T, src string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "share-src.js")
+	if err := os.WriteFile(p, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
 
 // 보기 화면의 확장 훅(itda-hyve#617 리뷰 3회차 [2]): 훅이 던져도 hook 은 던지지 않고(콘솔 오류 한 줄) 그리기 길이 이어진다. share.js 의
 // ext·hook 정의를 그대로 떼어 node 로 돌린다 — 던지는 훅·없는 훅·인자 전달.
@@ -176,7 +188,7 @@ func TestShareFollowerWiring(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare;
   const make = new Function("follower", "followAction", "restoreOwnLook", "state", "$", "window", "draw", "scrollToFollow", "paintLookSwitch",
     ` + "`" + `${process.env.DECL}; return fol;` + "`" + `);
@@ -205,7 +217,7 @@ func TestShareFollowerWiring(t *testing.T) {
   process.stdout.write(bad.length ? "FOL FAIL " + bad.join(" / ") : "FOL OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FOL OK" {
 		t.Fatalf("발표 꼴 따라가기 연결: %v\n%s", err, out)
@@ -236,7 +248,7 @@ func TestShareBoardUnavailable(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { if (got !== want) bad.push(name + ": " + JSON.stringify(got) + " ≠ " + JSON.stringify(want)); };
   const doc = {}, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
@@ -259,7 +271,7 @@ func TestShareBoardUnavailable(t *testing.T) {
   process.stdout.write(bad.length ? "BOARD FAIL " + bad.join("; ") : "BOARD OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "SRC="+src)
+	cmd.Env = append(os.Environ(), "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "BOARD OK" {
 		t.Fatalf("보드를 그릴 수 없는 화면: %v\n%s", err, out)
@@ -506,7 +518,7 @@ func TestSharePausedResume(t *testing.T) {
   const page = async (srv, hold, themed) => {
     const p = { streams: [], timers: [], ended: [], fails: 0, cur: null, shows: 0, bands: [], reloads: 0, wakes: [], views: 0, pages: [], base: "/b", hrefs: [], link: {} };
     const reply = (status, body) => ({ ok: status === 200, status, headers: { get: () => null }, json: async () => body });
-    const on = (o, n, f) => { if (n === "pageshow" || n === "visibilitychange") p.wakes.push(f); };
+    const on = (o, n, f) => { if (n === "pageshow" || n === "visibilitychange") p.wakes.push(f); if (n === "online") p.online = f; };
     const kept = {};
     const w = { sessionStorage: { getItem: k => kept[k] || null, setItem: (k, v) => { kept[k] = v; } }, addEventListener(n, f) { on(w, n, f); }, document: { addEventListener(n, f) { on(w, n, f); }, visibilityState: "visible" },
       location: { pathname: "/b", hash: "", href: "http://h/b?doc=a.md", reload: () => { p.reloads++; } },
@@ -527,7 +539,7 @@ func TestSharePausedResume(t *testing.T) {
     const link = { addEventListener(n, f) { p.link[n] = f; }, setAttribute(k, v) { p.hrefs.push(v); } };
     let src;
     const api = { $: () => link, ended: () => p.ended.length > 0, current: () => p.cur, show: async v => { if (themed) src.applyTheme(v); p.cur = v; p.shows++; }, failed() { p.fails++; }, themeFailed() {},
-      end(r) { p.ended.push(r); }, hello() {}, slide() {}, pos() {}, redraw() {}, files() {}, nav() {}, paused: st => p.bands.push(st), holdReload: () => !!(typeof hold === "function" ? hold() : hold) };
+      end(r) { p.ended.push(r); }, hello() {}, slide() {}, pos() {}, redraw() {}, files() {}, nav() {}, paused: (st, r) => { p.bands.push(st); p.retryFn = r; }, holdReload: () => !!(typeof hold === "function" ? hold() : hold) };
     src = S.hostSource("/b", w).attach(api);
     src.start();
     await settle();
@@ -692,6 +704,46 @@ func TestSharePausedResume(t *testing.T) {
     p.wakes[0](); await settle();
     eq("wake: 바로 붙음", p.streams.length, n + 1);
 
+    // 띠의 「지금 다시 잇기」(itda-hyve#728 후속): 기다리던 타이머를 지우고 바로 붙는다. 붙는 중에 또 눌러도 스트림 하나, 이번 시도가 끝나면 풀린다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    let m = p.streams.length;
+    eq("단추: closed 띠에 다시 잇기 함수", [typeof p.retryFn, p.live()], ["function", 1]);
+    let first = p.retryFn(), again = p.retryFn();
+    eq("단추: 타이머를 지우고 바로 붙음·두 번 눌러도 스트림 하나", [p.streams.length, p.live()], [m + 1, 0]);
+    await p.drop();
+    eq("단추: 실패하면 false 로 풀리고 다음 시도", [await first, await again, p.live(), p.ended], [false, false, 1, []]);
+    // online·visible 도 잠시 닫힘이면 기다리지 않고 한 번 붙어 본다
+    m = p.streams.length;
+    p.online(); await settle();
+    eq("online: 타이머를 지우고 바로 붙음", [p.streams.length, p.live()], [m + 1, 0]);
+    await p.drop();
+    m = p.streams.length;
+    p.wakes[1](); await settle();
+    eq("visible: 타이머를 지우고 바로 붙음", [p.streams.length, p.live()], [m + 1, 0]);
+    await p.drop();
+    srv.mode = "ok";
+    first = p.retryFn();
+    await p.hello(hello);
+    eq("단추: 붙으면 true·띠 지움", [await first, p.bands[p.bands.length - 1], p.retryFn], [true, "", undefined]);
+    // 잠시 닫힘이 아닌 끊김: online 은 backoff 를 앞당기지 않는다
+    srv = server(); p = await page(srv);
+    await p.hello({ version: 1, theme: "t" });
+    srv.mode = "down"; await p.drop();
+    m = p.streams.length;
+    p.online(); await settle();
+    eq("keep 아님: online 은 그대로", [p.streams.length, p.live()], [m, 1]);
+    // 끝난 뒤에는 아무것도 하지 않는다
+    srv = server(); p = await page(srv);
+    await p.hello(hello);
+    srv.mode = "gone"; await p.stop("paused");
+    const retry = p.retryFn;
+    srv.mode = "kicked"; await p.retry(); await p.drop();
+    m = p.streams.length;
+    const late403 = retry(); p.online(); p.wakes[1](); await settle();
+    eq("끝난 뒤: 붙지 않음", [await late403, p.streams.length, p.ended], [false, m, ["kicked"]]);
+
     // 24시간: 재시도를 멈추고 안내로 바꾼다
     let shift = 0, c0 = null;
     const t0 = 1000, late = [], ended = [], seen = [];
@@ -709,6 +761,11 @@ func TestSharePausedResume(t *testing.T) {
     const before = c.state;
     c.wake(); await settle();
     eq("멈춘 뒤 wake 는 붙지 않음", [before, c.state], ["idle", "idle"]);
+    // 멈춘 뒤의 단추: 지금부터 다시 PAUSE_MAX 동안 시도한다
+    const restart = c.retryNow(); await settle();
+    eq("stale 에서 다시 시작", [seen, c.state, c.paused], [["closed", "stale", "closed"], "connecting", t0 + DAY]);
+    shift = 2 * DAY - 1; c0.onerror(); await settle();
+    eq("다시 시작한 뒤 재시도", [await restart, late.length, seen.length], [false, 1, 3]);
 
     // keep 이 아닌 공유는 그대로다: 끊김 뒤 404 는 끝, 띠 없음, stop 은 끝
     srv = server(); p = await page(srv);
@@ -747,13 +804,21 @@ func TestSharePauseBandParts(t *testing.T) {
 		t.Error("띠가 흐름 밖에 있어야 함")
 	}
 	src := read("share.js")
-	a := strings.Index(src, "    paused: st => {\n")
+	a := strings.Index(src, "    paused: (st, retry) => {\n")
 	z := strings.Index(src[max(a, 0):], "\n    },\n")
 	if a < 0 || z < 0 {
 		t.Fatal("share.js 에서 paused 를 찾지 못함")
 	}
-	if body := src[a : a+z]; strings.Contains(body, "showEnded") || strings.Contains(body, `"pages"`) {
+	body := src[a : a+z]
+	if strings.Contains(body, "showEnded") || strings.Contains(body, `"pages"`) {
 		t.Errorf("띠가 문서를 건드림:\n%s", body)
+	}
+	// 「지금 다시 잇기」(itda-hyve#728 후속): 키보드로 닿는 button, 알림(role="status")은 글 칸에만, 띠가 누름을 흘려보내도 단추는 받는다
+	if !strings.Contains(body, `createElement("button")`) || !strings.Contains(body, `msg.setAttribute("role", "status")`) || strings.Contains(body, `band.setAttribute("role"`) {
+		t.Errorf("단추·알림 자리가 틀림:\n%s", body)
+	}
+	if !strings.Contains(css, ".pause-retry { pointer-events: auto;") {
+		t.Error("단추가 누름을 받아야 함")
 	}
 }
 
@@ -782,7 +847,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
   const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
@@ -1006,7 +1071,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
   })().catch(e => process.stdout.write("FAIL " + e.stack));
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FONTS OK" {
 		t.Fatalf("글꼴을 받은 뒤 나누기: %v\n%s", err, out)
@@ -1045,7 +1110,7 @@ func TestShareForcedLook(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
   const doc = {}, slide = { slides: { present: true } }, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
@@ -1210,12 +1275,380 @@ func TestShareForcedLook(t *testing.T) {
   process.stdout.write(bad.length ? "FAIL " + bad.join("\n") : "FORCED OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "SRC="+src,
+	cmd.Env = append(os.Environ(), "SRC_FILE="+srcFile(t, src),
 		"DECL="+cut("  const fol = follower({\n", "\n  });\n"),
 		"SET="+cut("  function setLook(name) {\n", "\n  }\n"),
 		"CLICK="+cut("b.addEventListener(\"click\", () => {\n      state.chosen = b.dataset.look;", "\n    });"))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FORCED OK" {
 		t.Fatalf("호스트 꼴 적용: %v\n%s", err, out)
+	}
+}
+
+// 다시 붙기 간격(itda-hyve#728 후속): 잠시 닫힘 동안은 1·2·4·5·5초(pauseBackoff), 잠시 닫힘이 아닌 끊김은 1·2·4·8·16·30·30초(backoff) 그대로다.
+// retryNow 는 잠시 닫힘이 아니면(붙어 있음·잠시 닫힘 아닌 끊김·끝남) 아무것도 하지 않는다.
+func TestSharePauseRetryDelay(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  // run 은 가짜 스트림에 이은 connect 다 — ms 는 setTimeout 에 건 대기, opens 는 연 스트림 수
+  const run = probe => {
+    const r = { ms: [], fns: [], opens: 0, ended: [], seen: [] };
+    r.c = S.connect("/b", { EventSource: class { constructor() { r.es = this; r.opens++; this.on = {}; } addEventListener(n, f) { this.on[n] = f; } close() {} },
+      probe: async () => probe, setTimeout: (f, d) => { r.fns.push(f); r.ms.push(d); return r.fns.length; }, clearTimeout() {},
+      onHello() {}, onEnded: x => r.ended.push(x), onPaused: s => r.seen.push(s) });
+    r.next = async () => { r.fns[r.fns.length - 1](); r.es.onerror(); await settle(); };
+    return r;
+  };
+  (async () => {
+    eq("pauseBackoff", [0, 1, 2, 3, 4, 9].map(S.pauseBackoff), [1000, 2000, 4000, 5000, 5000, 5000]);
+    eq("backoff 그대로", [0, 1, 2, 3, 4, 5, 6].map(S.backoff), [1000, 2000, 4000, 8000, 16000, 30000, 30000]);
+
+    let r = run("ended");
+    r.es.on.hello({ data: JSON.stringify({ keep: true }) });
+    r.es.on.stop({ data: JSON.stringify({ reason: "paused" }) }); await settle();
+    for (let k = 0; k < 4; k++) await r.next();
+    eq("잠시 닫힘 간격", [r.ms, r.seen, r.ended], [[1000, 2000, 4000, 5000, 5000], ["closed"], []]);
+
+    r = run("alive");
+    r.es.on.hello({ data: JSON.stringify({}) });
+    r.es.onerror(); await settle();
+    for (let k = 0; k < 6; k++) await r.next();
+    eq("잠시 닫힘 아님: 30초 상한", [r.ms, r.seen], [[1000, 2000, 4000, 8000, 16000, 30000, 30000], []]);
+    const opens = r.opens;
+    eq("잠시 닫힘 아님: retryNow 는 아무것도 안 함", [await r.c.retryNow(), r.opens], [false, opens]);
+
+    r = run("ended");
+    r.es.on.hello({ data: JSON.stringify({ keep: true }) });
+    eq("붙어 있음: retryNow 는 아무것도 안 함", [await r.c.retryNow(), r.opens], [false, 1]);
+    r.es.on.kick({}); await settle();
+    eq("끝남: retryNow 는 아무것도 안 함", [await r.c.retryNow(), r.opens, r.ended], [false, 1, ["kicked"]]);
+
+    // 붙는 중에 끝나면(kick) 기다리던 단추도 false 로 풀린다
+    r = run("ended");
+    r.es.on.hello({ data: JSON.stringify({ keep: true }) });
+    r.es.on.stop({ data: JSON.stringify({ reason: "paused" }) }); await settle();
+    const p = r.c.retryNow();
+    r.es.on.kick({}); await settle();
+    eq("붙는 중 끝남", [await p, r.ended, r.opens], [false, ["kicked"], 2]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "DELAY OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "DELAY OK" {
+		t.Fatalf("다시 붙기 간격: %v\n%s", err, out)
+	}
+}
+
+// 재시도 경합(itda-hyve#728 리뷰 1회차 [1]): 늦은 probe A 도중 retryNow → 새 스트림도 실패해 probe B → A·B 가 차례로 돌아옴 → 다시 retryNow → 남은 타이머 실행 → end.
+// 지난 세대의 probe(A)는 버려 타이머가 하나만 남고, 스트림은 늘 하나이며, end 뒤 열린 스트림은 0 이다. 첫 단추를 망 복귀(online — hostSource 의
+// `if (conn.paused) conn.wake()`)가 대신해도 같다. A 의 답이 retryNow 의 Promise 를 엉뚱하게 풀지 않고, B 의 끝에서 false 로 풀린다.
+func TestSharePauseRetryRace(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
+  // run 은 probe 의 답을 손으로 푸는 connect 다 — probes 는 미완료 probe 의 resolve, timers 는 clearTimeout 이 지우는 Map, streams 는 연 스트림
+  const run = () => {
+    const r = { streams: [], probes: [], timers: new Map(), id: 0, ended: [] };
+    r.c = S.connect("/b", { EventSource: class { constructor() { r.streams.push(this); this.on = {}; } addEventListener(n, f) { this.on[n] = f; } close() { this.closed = true; } },
+      probe: () => new Promise(res => r.probes.push(res)),
+      setTimeout: (f, d) => { r.timers.set(++r.id, { f, d }); return r.id; }, clearTimeout: id => { r.timers.delete(id); },
+      onHello() {}, onEnded: x => r.ended.push(x), onPaused() {} });
+    r.last = () => r.streams[r.streams.length - 1];
+    r.open = () => r.streams.filter(s => !s.closed).length;
+    r.fire = async () => { const all = [...r.timers]; r.timers.clear(); for (const [, t] of all) t.f(); await settle(); };
+    return r;
+  };
+  const race = async (name, first) => {
+    const r = run();
+    r.last().on.hello({ data: JSON.stringify({ keep: true }) });
+    r.last().on.stop({ data: JSON.stringify({ reason: "paused" }) }); await settle(); // 1. probe A 미완료
+    const A = r.probes.shift();
+    let done = "pending";
+    const p1 = first(r.c); if (p1) p1.then(v => { done = v; });          // 2. 새 스트림을 엶 — A 는 아직
+    await settle();
+    eq(name + ": 첫 시도 뒤 열린 스트림", [r.open(), r.streams.length], [1, 2]);
+    r.last().onerror(); await settle();                                    // 3. probe B
+    const B = r.probes.shift();
+    A("ended"); await settle();                                            // 4. A 가 늦게 돌아옴 — 버린다
+    eq(name + ": 지난 probe 는 타이머를 걸지 않고 Promise 를 풀지 않음", [r.timers.size, done], [0, "pending"]);
+    B("ended"); await settle();
+    eq(name + ": 타이머 하나·Promise false", [[...r.timers.values()].map(t => t.d), p1 ? done : false], [[1000], false]);
+    const p2 = r.c.retryNow(); await settle();                             // 5. 다시 단추
+    eq(name + ": 두 번째 단추 뒤 열린 스트림·남은 타이머", [r.open(), r.timers.size], [1, 0]);
+    await r.fire();                                                        // 6. 남은 타이머(없어야 한다)
+    eq(name + ": 남은 타이머 실행 뒤 열린 스트림", r.open(), 1);
+    r.c.end();                                                             // 7.
+    eq(name + ": end 뒤 열린 스트림·Promise", [r.open(), await p2, r.ended], [0, false, [""]]);
+  };
+  (async () => {
+    await race("단추", c => c.retryNow());
+    await race("online", c => { if (c.paused) c.wake(); return null; });
+
+    // open 은 남은 스트림이 있으면 닫고 연다 — 붙는 중의 wake·단추는 새로 열지 않고, 지난 스트림의 이벤트는 버린다
+    const r = run();
+    r.last().on.hello({ data: JSON.stringify({ keep: true }) });
+    r.last().on.stop({ data: JSON.stringify({ reason: "paused" }) }); await settle();
+    r.probes.shift()("ended"); await settle();
+    const old = r.c.retryNow(); r.c.wake(); await settle();
+    eq("붙는 중: 스트림 하나", [r.open(), r.streams.length], [1, 2]);
+    r.streams[0].onerror(); await settle();
+    eq("닫힌 스트림의 오류는 버림", [r.probes.length, r.open()], [0, 1]);
+    r.last().on.hello({ data: JSON.stringify({ keep: true }) }); await settle();
+    eq("붙으면 true", [await old, r.c.state], [true, "open"]);
+
+    process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "RACE OK");
+  })().catch(e => process.stdout.write("FAIL " + e.stack));
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "RACE OK" {
+		t.Fatalf("재시도 경합: %v\n%s", err, out)
+	}
+}
+
+// 슬라이드 이동 굴림(itda-hyve#728 후속): 발표자가 다른 슬라이드로 옮기면 scrollTo smooth(목표는 요소의 자리), 첫 맞추기·같은 슬라이드·재정렬·
+// prefers-reduced-motion 이면 scrollTop 을 바로 둔다. 화면은 fol 의 align 만 move 로 부른다 — 그리기·노트 배치·창 크기의 재정렬은 바로 간다.
+func TestShareSlideGlide(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  const v = { scrollTop: 100, calls: [], scrollTo(o) { this.calls.push(o); } };
+  let reduced = false;
+  const g = S.slideGlider(() => reduced), a = {}, b = {}, c = {};
+  g.to(v, a, 50, true);
+  eq("첫 맞추기: 바로", [v.calls, v.scrollTop], [[], 150]);
+  g.to(v, a, 10, true);
+  eq("같은 슬라이드: 바로", [v.calls, v.scrollTop], [[], 160]);
+  g.to(v, b, 200, true);
+  eq("다른 슬라이드: smooth", [v.calls, v.scrollTop], [[{ top: 360, behavior: "smooth" }], 160]);
+  v.scrollTop = 250; // 굴리는 도중 — delta 는 지금 자리에서 잰 요소의 자리
+  g.to(v, c, 300, true);
+  eq("굴리는 도중 다음 슬라이드: 새 목표", v.calls[1], { top: 550, behavior: "smooth" });
+  v.scrollTop = 400;
+  g.to(v, c, 150, false);
+  eq("재정렬: 바로 덮음", [v.calls.length, v.scrollTop], [2, 550]);
+  g.to(v, a, -100, false);
+  eq("재정렬(다른 요소): 바로", [v.calls.length, v.scrollTop], [2, 450]);
+  reduced = true;
+  g.to(v, b, 40, true);
+  eq("줄인 움직임: 바로", [v.calls.length, v.scrollTop], [2, 490]);
+  process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "GLIDE OK");
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "GLIDE OK" {
+		t.Fatalf("슬라이드 굴림: %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	// move 를 넘기는 곳은 fol 의 align 하나다 — 재정렬(render·relayoutNotes·afterResize)은 세 인자로 부른다
+	if n := strings.Count(src, "scrollToFollow(i, kind, frac, true)"); n != 1 || !strings.Contains(src, `if (act === "scroll") scrollToFollow(i, kind, frac, true);`) {
+		t.Errorf("align 만 move 로 불러야 함 (%d)", n)
+	}
+	if n := strings.Count(src, "scrollToFollow(fol.index, fol.kind, fol.frac)"); n != 2 || !strings.Contains(src, "afterResize(fol, applyZoom, scrollToFollow)") {
+		t.Errorf("재정렬은 move 없이 불러야 함 (%d)", n)
+	}
+	if !strings.Contains(src, `"(prefers-reduced-motion: reduce)"`) {
+		t.Error("prefers-reduced-motion 을 봐야 함")
+	}
+}
+
+// 노트 칸 너비 끌기(itda-hyve#728 실기 후속): 너비는 240~640 으로 자르고, 끄는 동안의 상한은 오른쪽 배치가 유지되는 너비까지,
+// 기억은 이 브라우저의 localStorage(hs-note-w — 틀린 값·없는 값이면 320), 두 번 누르면 기본 320, 아래 전환 문턱은 고른 너비로 잰다.
+func TestShareNoteWidth(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  eq("자름", [S.noteWidth(100), S.noteWidth(240), S.noteWidth(400.6), S.noteWidth(640), S.noteWidth(900), S.noteWidth(NaN), S.noteWidth("x")], [240, 240, 401, 640, 640, 320, 320]);
+  // 상한: 보기 1400·여백 56·사이 20·최소 슬라이드 520 → 804 → 640, 1100 → 504, 좁으면 240
+  eq("상한", [S.noteWidthCap(1400, 56, 20, 520), S.noteWidthCap(1100, 56, 20, 520), S.noteWidthCap(700, 56, 20, 520)], [640, 504, 240]);
+  // 기억 읽기
+  const store = init => { const m = Object.assign({}, init); return { m, getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v); } }; };
+  const fonts = [12, 14, 17];
+  const w = init => S.notePrefs(() => store(init), fonts).width;
+  eq("없음·틀림·범위 밖이면 320", [w({}), w({ "hs-note-w": "" }), w({ "hs-note-w": "abc" }), w({ "hs-note-w": "100" }), w({ "hs-note-w": "700" }), w({ "hs-note-w": "Infinity" })], [320, 320, 320, 320, 320, 320]);
+  eq("맞는 값", [w({ "hs-note-w": "240" }), w({ "hs-note-w": "480" }), w({ "hs-note-w": "640" })], [240, 480, 640]);
+  eq("못 읽으면 320", S.notePrefs(() => { throw new Error("막힘"); }, fonts).width, 320);
+  const st = store({}), p = S.notePrefs(() => st, fonts);
+  p.setWidth(500);
+  eq("기억 쓰기", [p.width, st.m["hs-note-w"]], [500, "500"]);
+  p.setWidth(9999);
+  eq("기억 쓰기도 자름", [p.width, st.m["hs-note-w"]], [640, "640"]);
+  eq("다시 읽기", S.notePrefs(() => st, fonts).width, 640);
+  // 끌기: 왼쪽으로 끌면 넓어지고 상한·하한에서 멈추며 놓을 때 한 번만 기억, 두 번 누르면 320 기억
+  let cur = 320, cap = 504; const log = [];
+  const r = S.noteResizer({ width: () => cur, cap: () => cap, apply: (px, save) => { cur = px; log.push([px, save]); } });
+  r.move(0); r.end();
+  eq("잡지 않으면 아무것도", log, []);
+  r.begin(1000);
+  eq("잡음", r.dragging(), true);
+  r.move(900); r.move(700); r.move(1300);
+  eq("끄는 중(상한 504·하한 240)", log, [[420, false], [504, false], [240, false]]);
+  r.move(1050); r.end();
+  eq("놓을 때 한 번 기억", log.slice(3), [[270, false], [270, true]]);
+  eq("놓은 뒤", r.dragging(), false);
+  log.length = 0; cap = 640; r.begin(500); r.move(500); r.end();
+  eq("안 바뀌면 기억하지 않음", log, []);
+  r.reset();
+  eq("두 번 누름: 기본 320 기억", [cur, log], [320, [[320, true]]]);
+  // 상한은 움직일 때마다 다시 묻는다(리뷰 [2]): 보기 1400 에서 잡고(상한 640) 끄는 중 보기가 1000 으로 줄면 상한 404
+  log.length = 0; cur = 320; cap = S.noteWidthCap(1400, 56, 20, 520); r.begin(1000);
+  r.move(900); cap = S.noteWidthCap(1000, 56, 20, 520); r.move(800);
+  eq("끄는 중 상한이 줄어듦", [cap, log], [404, [[420, false], [404, false]]]);
+  r.end();
+  eq("상한 없으면 640", (() => { let c = 320; const q = S.noteResizer({ width: () => c, apply: px => { c = px; } }); q.begin(1000); q.move(0); return c; })(), 640);
+
+  // 끌기 이벤트 수명(리뷰 [1]) — 가짜 document·window·칸·손잡이로 noteGripDrag 를 실제로 돌린다.
+  const target = () => { const ls = {}; return { ls,
+    addEventListener(t, f) { (ls[t] = ls[t] || []).push(f); },
+    removeEventListener(t, f) { ls[t] = (ls[t] || []).filter(g => g !== f); },
+    fire(t, e) { for (const f of (ls[t] || []).slice()) f(Object.assign({ preventDefault() {} }, e || {})); },
+    count() { return Object.values(ls).reduce((n, a) => n + a.length, 0); } }; };
+  const rig = () => {
+    const doc = target(), win = target(), notes = target(), cls = new Set();
+    doc.visibilityState = "visible";
+    const body = { classList: { add: c => cls.add(c), remove: c => cls.delete(c) } };
+    const caps = new Set(), released = [];
+    const mkGrip = () => ({ isConnected: true, closest: s => null,
+      setPointerCapture: id => caps.add(id), hasPointerCapture: id => caps.has(id),
+      releasePointerCapture: id => { caps.delete(id); released.push(id); doc.fire("lostpointercapture", { pointerId: id }); } });
+    let grip = mkGrip(); grip.closest = s => s === ".sn-grip" ? grip : null;
+    const o = { w: 320, saves: [], right: true, starts: 0 };
+    const res = S.noteResizer({ width: () => o.w, cap: () => 640, apply: (px, save) => { o.w = px; if (save) o.saves.push(px); } });
+    const drag = S.noteGripDrag({ notes, doc, win, body, resizer: res, canGrip: () => o.right, onStart: () => { o.starts++; } });
+    const docBase = doc.count();
+    o.down = (id, x, extra) => notes.fire("pointerdown", Object.assign({ target: grip, pointerId: id, pointerType: "mouse", button: 0, clientX: x }, extra || {}));
+    o.move = (id, x, buttons) => doc.fire("pointermove", { pointerId: id, pointerType: "mouse", buttons: buttons === undefined ? 1 : buttons, clientX: x });
+    o.regrip = () => { grip.isConnected = false; grip = mkGrip(); grip.closest = s => s === ".sn-grip" ? grip : null; };
+    // 끝난 상태: 끌기 아님·document·window 리스너 0·dragging-note 없음·캡처 없음
+    o.clean = () => !drag.dragging() && doc.count() === docBase && win.count() === 0 && !cls.has("dragging-note") && caps.size === 0;
+    return Object.assign(o, { doc, win, notes, cls, caps, released, drag });
+  };
+  { // 놓기
+    const g = rig(); g.down(1, 1000);
+    eq("잡으면 끄는 중", [g.drag.dragging(), g.cls.has("dragging-note"), g.caps.has(1), g.starts, g.win.count() > 0], [true, true, true, 1, true]);
+    g.move(1, 900); g.move(2, 100); // 다른 포인터는 무시
+    g.doc.fire("pointerup", { pointerId: 2 });
+    eq("다른 포인터의 놓음은 무시", [g.drag.dragging(), g.w], [true, 420]);
+    g.doc.fire("pointerup", { pointerId: 1 });
+    eq("놓기: 정리·한 번 기억", [g.clean(), g.saves], [true, [420]]);
+    g.drag.finish(); g.doc.fire("pointerup", { pointerId: 1 }); g.move(1, 0);
+    eq("두 번 끝내도 그대로", [g.clean(), g.saves, g.w], [true, [420], 420]);
+  }
+  { // 취소
+    const g = rig(); g.down(1, 1000); g.move(1, 950); g.doc.fire("pointercancel", { pointerId: 1 });
+    eq("취소: 정리·바뀐 너비 기억", [g.clean(), g.saves], [true, [370]]);
+  }
+  { // 캡처 상실 → 버튼 없이 움직임 → 새로 잡기
+    const g = rig(); g.down(1, 1000); g.move(1, 900);
+    g.caps.delete(1); g.doc.fire("lostpointercapture", { pointerId: 1 });
+    eq("캡처 상실: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+    g.move(1, 500, 0);
+    eq("상실 뒤 움직임은 너비를 안 바꿈", g.w, 420);
+    g.down(7, 800);
+    eq("새 포인터로 다시 잡힘", [g.drag.dragging(), g.caps.has(7)], [true, true]);
+    g.doc.fire("pointerup", { pointerId: 7 });
+    eq("다시 놓음", g.clean(), true);
+  }
+  { // 창 밖에서 놓아 pointerup 을 놓침 → 버튼 없는 마우스 움직임
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.move(1, 600, 0);
+    eq("버튼 없는 움직임: 끝냄·그 움직임은 안 씀", [g.clean(), g.w, g.saves], [true, 420, [420]]);
+  }
+  { // 창 blur
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.win.fire("blur");
+    eq("blur: 정리·기억·캡처 풂", [g.clean(), g.saves, g.released], [true, [420], [1]]);
+  }
+  { // 탭 숨김 — 보임은 끝내지 않는다
+    const g = rig(); g.down(1, 1000);
+    g.doc.fire("visibilitychange"); eq("보이는 동안은 이어짐", g.drag.dragging(), true);
+    g.doc.visibilityState = "hidden"; g.doc.fire("visibilitychange");
+    eq("숨김: 정리·안 바뀌면 기억 없음", [g.clean(), g.saves], [true, []]);
+  }
+  { // 손잡이를 없애는 재그리기
+    const g = rig(); g.down(1, 1000); g.move(1, 900);
+    g.drag.check(); eq("손잡이가 그대로면 이어짐", g.drag.dragging(), true);
+    g.regrip(); g.drag.check();
+    eq("재그리기로 손잡이가 빠짐: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+  }
+  { // 배치 전환(오른쪽이 아니게 됨)
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.right = false; g.drag.check();
+    eq("배치 전환: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+    g.down(2, 1000); eq("오른쪽이 아니면 잡지 않음", g.drag.dragging(), false);
+  }
+  { // 잡지 않는 경우와 두 번 누름
+    const g = rig();
+    g.down(1, 1000, { button: 2 }); g.notes.fire("pointerdown", { target: { closest: () => null }, pointerId: 1, pointerType: "mouse", button: 0, clientX: 0 });
+    eq("오른쪽 단추·손잡이 밖은 잡지 않음", [g.drag.dragging(), g.starts], [false, 0]);
+    g.down(1, 1000); g.move(1, 900);
+    g.notes.fire("dblclick", { target: { closest: s => s === ".sn-grip" ? {} : null } });
+    eq("두 번 누름: 끝내고 320 기억", [g.clean(), g.w, g.saves, g.starts], [true, 320, [420, 320], 2]);
+  }
+  // 보던 자리(리뷰 [3]): 가운데 mid=500, 슬라이드 0 은 [100,400], 1 은 [420,720] → 1 번 안 (500-420)/300
+  const a = S.slideAnchor([{ top: 100, bottom: 400, height: 300 }, { top: 420, bottom: 720, height: 300 }], 500);
+  eq("자리 잡기", [a.i, Math.round(a.frac * 1000)], [1, 267]);
+  eq("슬라이드 없음", S.slideAnchor([], 500), null);
+  eq("사이에 걸리면 가까운 슬라이드 밖 자리", S.slideAnchor([{ top: 100, bottom: 400, height: 300 }, { top: 440, bottom: 740, height: 300 }], 410).i, 0);
+  // 배율이 줄어 슬라이드 1 이 [380,620](높이 240)이 되면 같은 자리(380+0.267×240=444)를 가운데 500 으로 — 56 위로 굴림(가운데 정렬이면 0)
+  eq("자리 지키기", Math.round(S.anchorDelta({ top: 380, height: 240 }, a.frac, 500)), -56);
+  eq("자리 그대로면 굴리지 않음", S.anchorDelta({ top: 420, height: 300 }, a.frac, 500), 0);
+  // 아래 전환 문턱은 고른 너비로: 보기 1000·여백 56·사이 20·최소 520 → 너비 404 까지 오른쪽, 405 부터 아래
+  eq("문턱", [S.notesLayout("right", true, "slides", 1000, 56, 404, 20, 520), S.notesLayout("right", true, "slides", 1000, 56, 405, 20, 520),
+    S.notesLayout("below", true, "slides", 1000, 56, 640, 20, 520), S.notesLayout("off", true, "slides", 1000, 56, 240, 20, 520)], ["right", "below", "below", "off"]);
+  // 폰 폭(< 600, 여백 16)은 가장 좁은 칸이어도 늘 아래
+  eq("폰은 아래", S.notesLayout("right", true, "slides", 599, 16, 240, 20, 520), "below");
+  process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "NOTEW OK");
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "NOTEW OK" {
+		t.Fatalf("노트 칸 너비: %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	// 화면 연결: 배율·칸 배치가 고른 너비를 쓰고, 손잡이를 붙이고, 터치 끌기가 따라가기를 풀지 않는다
+	for _, want := range []string{
+		"notesLayout(np.mode, state.hasNotes, state.look, viewer.clientWidth, gutter, noteW, NOTE_GAP, NOTE_NARROW)",
+		"{ layout, zoom: z, noteW, gap: NOTE_GAP }",
+		`into: $("notes"), grip: true }`,
+		`canGrip: () => state.notesLayout === "right",`,
+		`if (e.target && e.target.closest && e.target.closest(".sn-grip")) return;`,
+		"bindNoteGrip();",
+		// 끌기를 끝낼지: 배치를 정할 때(두 갈래 모두)와 칸을 다시 만들 때 gripDrag.check()
+		"state.notesLayout = \"off\";\n      if (gripDrag) gripDrag.check();",
+		"state.notesLayout = layout;\n    if (gripDrag) gripDrag.check();",
+		"grip: true });\n    if (gripDrag) gripDrag.check();",
+		// 상한은 지금 보기 폭으로, 자리는 슬라이드 안의 자리로
+		"cap: () => { const w = $(\"viewer\").clientWidth; return noteWidthCap(w, gutterOf(w), NOTE_GAP, NOTE_NARROW); },",
+		"scrollTop += anchorDelta(pg.getBoundingClientRect(), a.frac, viewerMid());",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("share.js 에 %q 가 없음", want)
+		}
+	}
+	if strings.Contains(src, "NOTE_W,") || strings.Contains(src, "noteW: NOTE_W") {
+		t.Error("고정 너비 NOTE_W 가 남아 있음")
 	}
 }
