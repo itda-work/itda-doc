@@ -49,6 +49,7 @@
     "--alert-important": "#000000",
     "--alert-warning": "#5c3c00",
     "--alert-caution": "#b00020",
+    "--alert-todo": "#2e3a46",
     "--alert-bg-alpha": "0%",
     "--caption-color": "#333333",
     "--slide-text-size": "24pt",

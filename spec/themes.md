@@ -203,6 +203,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--alert-important` | 알림 `[!IMPORTANT]` 색 | `#7c4dcc` |
 | `--alert-warning` | 알림 `[!WARNING]` 색 | `#b7791f` |
 | `--alert-caution` | 알림 `[!CAUTION]` 색 | `#c53030` |
+| `--alert-todo` | 알림 `[!TODO]`·할 일 모음(`:::todos`) 막대 색 | `#57677a` |
 | `--alert-bg-alpha` | 알림 바탕의 진하기 | `8%` |
 | `--chart-1` | 차트 계열 1의 색(막대·선·조각) — 기본은 강조색. 차트 쓰는 법은 [차트 안내서](charts.md) | `var(--accent)` |
 | `--chart-2` | 차트 계열 2 | `#eb6834` |
@@ -309,6 +310,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 ```
 
 **목차**: `<section class="toc-page"><h2 class="toc-title">목차</h2><nav class="toc"><ul><li><a><span class="toc-section-number">1</span> 제목 <span class="toc-pno">3</span></a>…`
+
+**할 일 모음**(`:::todos`): `<nav class="todos"><ul><li class="todos-alert"><a href="#todo-1"><span class="todos-path">2 예산 › 2.1 인건비</span> <span class="todos-text">첫 줄 글</span></a></li>…`(`- [ ]` 항목은 `li.todos-task`, 남은 것이 없으면 `<p class="todos-empty">`). 가리키는 자리는 알림 `div.markdown-alert-todo` 나 할 일 항목 `li` 의 `id`(`todo-N`)다(`mdoc/todos.go`).
 
 **본문**: 제목 번호 `<span class="header-section-number">1.2</span>`(끝의 점은 `h1 > .header-section-number::after` 로 붙인다), 그림
 `<figure><img><figcaption>`(번호는 `--figure-label` + CSS 카운터), 표 `<table><caption>`, 알림 `<div class="markdown-alert markdown-alert-note">

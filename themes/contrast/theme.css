@@ -16,10 +16,12 @@
 .markdown-alert-important .markdown-alert-title { color: var(--alert-important); }
 .markdown-alert-warning .markdown-alert-title { color: var(--alert-warning); }
 .markdown-alert-caution .markdown-alert-title { color: var(--alert-caution); }
+.markdown-alert-todo .markdown-alert-title { color: var(--alert-todo); }
 .markdown-alert-note { border-color: var(--alert-note); }
 .markdown-alert-tip { border-color: var(--alert-tip); }
 .markdown-alert-warning { border-color: var(--alert-warning); }
 .markdown-alert-caution { border-color: var(--alert-caution); }
+.markdown-alert-todo { border-color: var(--alert-todo); }
 
 /* ---- 차트: 계열 색은 Okabe-Ito 여덟. 흰 바탕 3:1 에 못 미치는 주황·하늘·노랑(6~8번)은 차례 뒤로 두고, 면이 있는 표식
    (막대·쌓은 칸·원 조각·점·범례 표식)에는 먹색 테두리를 둘러 모양 경계를 21:1 로 세운다. 선(.line)·면적(.area)에는 두르지 않는다 —

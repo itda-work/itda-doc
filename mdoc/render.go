@@ -39,6 +39,7 @@ func (r *htmlRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(KindFigureCaption, r.figureCaption)
 	reg.Register(KindPageBreak, r.pageBreak)
 	reg.Register(KindTOCNav, r.tocNav)
+	reg.Register(KindTodosNav, r.todosNav)
 	reg.Register(KindTableCaption, r.tableCaption)
 	reg.Register(KindChart, r.chart)
 	reg.Register(KindPause, r.pause)
@@ -457,15 +458,21 @@ var alertTitles = map[string][2]string{
 	"important": {"중요", "Important"},
 	"warning":   {"주의", "Warning"},
 	"caution":   {"경고", "Caution"},
+	"todo":      {"할 일", "Todo"},
 }
 
 func (r *htmlRenderer) alertTitle(typ string) string {
 	t := alertTitles[typ]
-	lang := strings.ToLower(r.st.meta.Lang)
-	if lang == "" || lang == "ko" || strings.HasPrefix(lang, "ko-") {
+	if r.korean() {
 		return t[0]
 	}
 	return t[1]
+}
+
+// korean 은 문서 lang 이 한국어(또는 없음)인지다 — 알림 제목·할 일 모음의 빈 줄 글이 따른다.
+func (r *htmlRenderer) korean() bool {
+	lang := strings.ToLower(r.st.meta.Lang)
+	return lang == "" || lang == "ko" || strings.HasPrefix(lang, "ko-")
 }
 
 func (r *htmlRenderer) alert(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -475,6 +482,9 @@ func (r *htmlRenderer) alert(w util.BufWriter, src []byte, node ast.Node, enteri
 		return ast.WalkContinue, nil
 	}
 	_, _ = w.WriteString(`<div class="markdown-alert markdown-alert-` + n.AlertType + `"`)
+	if id := r.st.todoID(n); id != "" {
+		attr(w, "id", id) // 할 일 모음이 가리키는 자리(todos.go)
+	}
 	dataAttrs(w, n)
 	_, _ = w.WriteString(">\n" + `<p class="markdown-alert-title">` + r.alertTitle(n.AlertType) + "</p>\n")
 	return ast.WalkContinue, nil

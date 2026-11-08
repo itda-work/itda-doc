@@ -98,6 +98,7 @@
   --lead-bg: transparent;
 
   --alert-note: #2f6fdb; --alert-tip: #1f8a4c; --alert-important: #7c4dcc; --alert-warning: #b7791f; --alert-caution: #c53030;
+  --alert-todo: #57677a; /* 할 일(작성자 메모) — 다섯 알림과 구별되는 청회색, itda-doc#74 */
   --alert-bg-alpha: 8%;
 
   --chart-1: var(--accent);
@@ -361,6 +362,15 @@ h1 > .header-section-number::after { content: "."; }
 .markdown-alert-title { font-weight: 700; color: var(--c); margin: 0 0 2pt !important; font-size: 0.95em; }
 .markdown-alert-tip { --c: var(--alert-tip); } .markdown-alert-important { --c: var(--alert-important); }
 .markdown-alert-warning { --c: var(--alert-warning); } .markdown-alert-caution { --c: var(--alert-caution); }
+.markdown-alert-todo { --c: var(--alert-todo); }
+/* 남은 할 일 모음(:::todos, itda-doc#74 — mdoc/todos.go). 할 일 알림과 같은 색 막대, 항목마다 제목 경로(흐린 글자)와 첫 줄 글 */
+nav.todos { margin: 9pt 0; padding: 4pt 11pt; border-left: 3pt solid var(--alert-todo); }
+nav.todos ul { list-style: none; padding: 0; margin: 0; }
+nav.todos li { margin: 0; padding: 2pt 0; }
+nav.todos a { color: var(--ink); }
+nav.todos .todos-path { color: var(--muted); font-size: 0.9em; margin-right: 4pt; }
+nav.todos .todos-path::after { content: " ›"; }
+nav.todos .todos-empty { color: var(--muted); margin: 0; }
 
 /* 그림·표 캡션 — 번호는 CSS 카운터(설계 1.7). 쪽 상자들의 공통 조상(#pages)에서 센다. */
 .pages { counter-reset: fig tbl; }

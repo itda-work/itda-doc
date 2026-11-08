@@ -22,6 +22,8 @@ type state struct {
 	warns     []Warning
 	toc       []TOCItem
 	tocPlaced bool
+	todos     []todoItem      // 남은 할 일(문서 차례) — todos.go collectTodos
+	todoIDs   map[string]bool // 할 일 id(todo-k) — 다른 id 가 비킨다(todos.go collectTodos, headings.go processHeadings)
 
 	headings map[*ast.Heading]*headingInfo
 	images   map[*ast.Image]*imageInfo

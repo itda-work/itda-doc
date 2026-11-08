@@ -48,6 +48,7 @@
     "--alert-important": "#6b3e66",
     "--alert-warning": "#8a5a00",
     "--alert-caution": "#a4161a",
+    "--alert-todo": "#4e5966",
     "--alert-bg-alpha": "6%",
     "--link": "#3d5a80",
     "--link-hover-ink": "#3d5a80",

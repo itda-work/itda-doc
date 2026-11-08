@@ -106,6 +106,8 @@ const (
 	WarnDashboardSources      = "dashboard-sources"       // dashboard.sources·refresh — 이 판은 실시간 소스를 지원하지 않아 표를 그대로 그림(meta.go parseDashboard, itda-work/itda-hyve#362)
 	WarnKPIAmbiguous          = "kpi-ambiguous"           // :::kpi 안에 정의 목록과 3열 표가 함께 — 정의 목록이 KPI, 표는 그대로(kpi.go)
 	WarnKPIEmpty              = "kpi-empty"               // 보드 문서의 :::kpi 안에 정의 목록·3열 표가 없어 KPI 로 그리지 않음(kpi.go)
+	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)
+	WarnTodosBody             = "todos-body"              // :::todos 안에 글이 있어 모음 대신 보통 상자로 그림(todos.go todosContainers, itda-doc#74)
 )
 
 // Render 는 마크다운 원문을 렌더한다. 오류는 내부 렌더 실패뿐이다 — 문법 문제는 Warnings 로 알린다.
@@ -222,7 +224,7 @@ func slideLevel(doc ast.Node) int {
 			top = h.Level
 		}
 		switch c.NextSibling().(type) {
-		case nil, *ast.Heading, *PageBreak, *ast.ThematicBreak, *TOCNav:
+		case nil, *ast.Heading, *PageBreak, *ast.ThematicBreak, *TOCNav, *TodosNav:
 			continue
 		}
 		if best == 0 || h.Level < best {
