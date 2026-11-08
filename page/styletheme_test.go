@@ -44,7 +44,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--link", "--paper"},
 			{"--header-color", "--paper"}, {"--caption-color", "--paper"}, {"--quote-ink", "--paper"},
 			{"--alert-note", "--paper"}, {"--alert-tip", "--paper"}, {"--alert-important", "--paper"},
-			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, // 알림 바탕은 투명(--alert-bg-alpha 0%)
+			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, {"--alert-todo", "--paper"}, // 알림 바탕은 투명(--alert-bg-alpha 0%)
 			{"--ink", "--table-head-bg"}, {"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, // 표 머리, decisions 면과 ✔
 			{"--accent-ink", "--accent"}, // 남색 면(actions 머리·steps 번호 원) 위 흰 글자·링크, 머리 안 code·del·kbd(base)
 			{"--ink", "@base-mark"},      // 머리 안 mark: 노랑 바탕 위 먹 글자·링크(base 의 --mark-ink)
@@ -60,7 +60,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--highlight", "--paper"}, // 절·목차 번호 글자, --accent 는 숲색 면 안 kbd(흰 바탕)의 링크도
 			{"--link", "--paper"}, {"--link", "--link-hover-bg"},
 			{"--alert-note", "--paper"}, {"--alert-tip", "--paper"}, {"--alert-important", "--paper"},
-			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, // 알림 면(9% 섞음) 위 값은 보고서에 따로
+			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, {"--alert-todo", "--paper"}, // 알림 면(9% 섞음) 위 값은 보고서에 따로
 			{"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, // decisions 면과 ✔, 표지 정보 표 머리
 			{"--ink", "--highlight-soft"}, {"--accent", "--highlight-soft"}, // 요약문·result 면과 「결과」
 			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"}, {"--ink", "--box-bg"},
@@ -76,7 +76,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--link", "--paper"}, {"--link", "--link-hover-bg"},
 			{"--header-color", "--paper"}, {"--caption-color", "--paper"}, {"--quote-ink", "--paper"},
 			{"--alert-note", "--paper"}, {"--alert-tip", "--paper"}, {"--alert-important", "--paper"},
-			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, // 알림 면(6% 섞음) 위 값은 보고서에 따로
+			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, {"--alert-todo", "--paper"}, // 알림 면(6% 섞음) 위 값은 보고서에 따로
 			{"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, {"--muted", "--accent-soft"}, // decisions 면과 ✔, 구역 장 면 위 바닥글
 			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"},
 			{"--accent-ink", "--accent"}, // 빨강 면(할 일 표 머리·steps 번호 원) 위 흰 글자·링크·각주, 면 안 code·del·kbd(base)

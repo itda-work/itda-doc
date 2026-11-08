@@ -17,7 +17,9 @@ import (
 // transform 은 goldmark 가 만든 AST 를 1장의 문법에 맞게 고친다. 순서가 뜻을 가진다:
 // raw HTML 을 먼저 걷어 내야 쪽 나눔·그림 판정이 남은 노드만 본다.
 func (st *state) transform(doc *ast.Document) {
+	todos := st.todosContainers(doc) // notes 앞 — 노트를 빼든 내든 경고·할 일 id 가 같다(todos.go). {.notes} 가 붙은 것은 notes 가 맡는다
 	st.notes(doc)
+	todoIDs := st.placeTodos(todos)
 	var (
 		htmlBlocks []*ast.HTMLBlock
 		rawParents []ast.Node
@@ -119,12 +121,14 @@ func (st *state) transform(doc *ast.Document) {
 	for _, c := range kpis {
 		st.kpi(c) // 표 캡션을 옮긴 뒤 — 3열 표 꼴은 캡션을 쓰지 않는다(kpi.go)
 	}
-	st.processHeadings(headings)
+	st.collectTodos(doc, todoIDs) // 알림 판정 뒤, 제목 id 앞 — 할 일 id 를 먼저 정해 제목 id 가 비킨다(todos.go)
+	st.processHeadings(headings, doc)
 	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(itda-hyve#550)
 	for _, l := range links {
 		st.link(l)
 	}
 	st.pitfalls(doc)
+	st.finishTodos(doc) // 제목 번호·id 를 정한 뒤(processHeadings) — 경로·컨테이너 id 비키기·todo-left
 	for c := doc.FirstChild(); c != nil; c = c.NextSibling() {
 		if line := st.blockLine(c); line > 0 {
 			c.SetAttributeString("data-line", []byte(strconv.Itoa(line)))
@@ -439,7 +443,7 @@ func hasChild[T ast.Node](n ast.Node) bool {
 
 // ---- 알림 (1.6)
 
-var alertRe = regexp.MustCompile(`(?i)^\[!(note|tip|important|warning|caution)\]$`)
+var alertRe = regexp.MustCompile(`(?i)^\[!(note|tip|important|warning|caution|todo)\]$`)
 
 // alert 는 첫 줄이 [!NOTE] 뿐인 인용을 알림으로 바꾼다. 표시 줄은 지운다.
 func (st *state) alert(q *ast.Blockquote) {
@@ -708,7 +712,7 @@ func (st *state) imagePlace(line int, info *imageInfo, a attrs) {
 //     자리를 가진 후보의 맨 위 블록에 data-slide-panel(분할) 또는 data-slide-bg(배경)를 단다(slides.js takeSlot 이 그 블록을 옮긴다).
 //
 // 슬라이드는 slides.js groups 가 렌더된 맨 위 블록을 보는 분기를 같은 차례로 옮겨 가른다(lvl 은 frontmatter slides.level, 없으면
-// slideLevel — 화면이 받는 값과 같다): 목차 자리(TOCNav)·class notes 블록은 건너뛰고, 쪽 나눔·가로줄·class page-break 블록
+// slideLevel — 화면이 받는 값과 같다): 목차 자리(TOCNav)·할 일 모음 자리(TodosNav)·class notes 블록은 건너뛰고, 쪽 나눔·가로줄·class page-break 블록
 // (:::page-break 컨테이너, {.page-break} 제목)·슬라이드 단계 이하의 제목은 경계, 각주 목록·class footnotes 블록은 앞뒤가 경계인
 // 제 슬라이드, 그 밖은 지금 슬라이드의 본문이다.
 func (st *state) slideSplits(doc ast.Node) {
@@ -750,7 +754,7 @@ func (st *state) slideSplits(doc ast.Node) {
 		_, isFootnotes := c.(*extast.FootnoteList)
 		h, isHeading := c.(*ast.Heading)
 		switch {
-		case isTOC(c), slices.Contains(cls, "notes"):
+		case isTOC(c), isTodos(c), slices.Contains(cls, "notes"):
 		case isBreak(c), slices.Contains(cls, "page-break"), isHeading && lvl > 0 && h.Level <= lvl, isFootnotes, slices.Contains(cls, "footnotes"):
 			seen = "" // 각주는 제 슬라이드 — 안에 후보가 없고 뒤는 새 슬라이드다
 		default:
@@ -899,6 +903,8 @@ func olDigits(l *ast.List) {
 }
 
 func isTOC(n ast.Node) bool { _, ok := n.(*TOCNav); return ok }
+
+func isTodos(n ast.Node) bool { _, ok := n.(*TodosNav); return ok }
 
 func isBreak(n ast.Node) bool {
 	switch n.(type) {

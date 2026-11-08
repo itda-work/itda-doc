@@ -31,14 +31,24 @@ type headingInfo struct {
 	unnumber bool
 	unlisted bool
 	inNotes  bool // 발표자 노트(:::notes) 안 — 목차·번호·기준 단계에서 빠진다(inNotes)
+	explicit bool // 직접 적은 {#id}
 }
 
 // 제목 끝의 { … } 속성. 앞에 공백이 있어야 한다(Pandoc).
 var headingAttrRe = regexp.MustCompile(`(?:^|[ \t])\{([^{}]*)\}[ \t]*$`)
 
-func (st *state) processHeadings(hs []*ast.Heading) {
+func (st *state) processHeadings(hs []*ast.Heading, doc ast.Node) {
+	// 할 일 id(todo-k)는 먼저 정해져 이긴다(todos.go collectTodos) — 자동 id 는 피해 가고, 직접 적은 id 는 아래 2) 뒤에 비킨다.
+	// 비킨 id(할 일 id 에서 「-N」 을 찾는 자동 id·직접 적은 id)는 컨테이너가 이미 쓰는 id(ctr)도 피한다 — 원래 다른 id 였던 제목과
+	// 컨테이너가 비키면서 같은 id 가 되지 않게. 할 일 id 와 상관없는 제목 id 는 예전처럼 컨테이너 id 를 보지 않는다.
+	ctr := st.containerIDs(doc)
 	used := map[string]bool{}
+	for id := range st.todoIDs {
+		used[id] = true
+	}
 	infos := make([]*headingInfo, len(hs))
+	var yield []*headingInfo // 할 일 id 와 겹친 직접 적은 id
+	yieldLine := map[*headingInfo]int{}
 
 	// 1) 속성을 떼고 글자를 모은다. 직접 적은 id 를 먼저 등록해 자동 id 가 피해 가게 한다.
 	for i, h := range hs {
@@ -51,11 +61,15 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 			info.data = a.Data
 			info.unnumber = a.Unnumbered
 			info.unlisted = a.has("unlisted")
-			if a.ID != "" {
+			if a.ID != "" && st.todoIDs[a.ID] {
+				info.id, info.explicit = a.ID, true
+				yield = append(yield, info)
+				yieldLine[info] = line
+			} else if a.ID != "" {
 				if used[a.ID] {
 					st.warn(line, WarnDuplicateID, "제목 id #"+a.ID+" 가 겹침")
 				}
-				info.id = a.ID
+				info.id, info.explicit = a.ID, true
 				used[a.ID] = true
 			}
 		}
@@ -87,14 +101,29 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 		}
 		id := base
 		if used[id] {
+			also := map[string]bool(nil)
+			if st.todoIDs[base] {
+				also = ctr
+			}
 			n := max(next[base], 1)
-			for id = base + "-" + strconv.Itoa(n); used[id]; id = base + "-" + strconv.Itoa(n) {
+			for id = base + "-" + strconv.Itoa(n); used[id] || also[id]; id = base + "-" + strconv.Itoa(n) {
 				n++
 			}
 			next[base] = n + 1
 		}
 		info.id = id
 		used[id] = true
+	}
+	// 할 일 id 와 겹친 직접 적은 id 는 모든 자동 id 뒤에 「id-1」… 가운데 빈 것으로 비킨다 — 본문 먼저, 노트 뒤(위와 같은 까닭으로
+	// 노트를 내든 빼든 본문 제목 id 가 같게). 바꿨으므로 duplicate-id 경고를 낸다.
+	for _, notes := range []bool{false, true} {
+		for _, info := range yield {
+			if info.inNotes == notes {
+				old := info.id
+				info.id = freeID(old, used, ctr)
+				st.warn(yieldLine[info], WarnDuplicateID, "제목 id #"+old+" 가 할 일 id 와 겹침 — #"+info.id+" 로 바꿈")
+			}
+		}
 	}
 
 	// 3) 번호와 목차는 문서에서 가장 높은 제목 단계를 1로 센다.
@@ -254,7 +283,10 @@ func slug(s string) string {
 }
 
 // plainText 는 인라인의 글자만 모은다. 코드 글자는 넣고, raw HTML 과 이미지 대체 글은 뺀다(GitHub 의 textContent 와 같게).
-func plainText(n ast.Node, src []byte) string {
+func plainText(n ast.Node, src []byte) string { return inlineText(n, src, false) }
+
+// inlineText 는 plainText 의 몸이다. firstLine 이면 첫 줄바꿈(부드러운·강제)에서 멈춘다 — 할 일 모음의 첫 줄 글(todos.go).
+func inlineText(n ast.Node, src []byte, firstLine bool) string {
 	var b strings.Builder
 	_ = ast.Walk(n, func(c ast.Node, entering bool) (ast.WalkStatus, error) {
 		if !entering {
@@ -270,6 +302,9 @@ func plainText(n ast.Node, src []byte) string {
 			}
 			b.Write(v)
 			if c.SoftLineBreak() || c.HardLineBreak() {
+				if firstLine {
+					return ast.WalkStop, nil
+				}
 				b.WriteByte(' ')
 			}
 		case *ast.String:

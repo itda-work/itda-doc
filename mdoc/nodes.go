@@ -38,7 +38,7 @@ func (n *Container) Dump(src []byte, level int) {
 // Alert 는 GFM 알림 > [!NOTE] 이다(1.6). 원래 blockquote 의 자식을 그대로 가진다.
 type Alert struct {
 	ast.BaseBlock
-	AlertType string // note · tip · important · warning · caution
+	AlertType string // note · tip · important · warning · caution · todo
 }
 
 var KindAlert = ast.NewNodeKind("Alert")
@@ -84,6 +84,14 @@ var KindTOCNav = ast.NewNodeKind("TOCNav")
 
 func (n *TOCNav) Kind() ast.NodeKind         { return KindTOCNav }
 func (n *TOCNav) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
+
+// TodosNav 는 빈 :::todos 자리다(itda-doc#74, todos.go). 그릴 때 남은 할 일 모음을 채운다.
+type TodosNav struct{ ast.BaseBlock }
+
+var KindTodosNav = ast.NewNodeKind("TodosNav")
+
+func (n *TodosNav) Kind() ast.NodeKind         { return KindTodosNav }
+func (n *TodosNav) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
 
 // TableCaption 은 표 바로 다음의 Table: 문단이다(1.7). 표의 첫 자식으로 옮겨 <caption> 이 된다.
 type TableCaption struct{ ast.BaseBlock }

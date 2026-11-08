@@ -30,7 +30,7 @@
     let head = null, cur = null;
     for (const b of [...flow.children]) {
       if (b.matches("section.cover, header.title-block")) { head = b; continue; }
-      if (b.matches("section.toc-page, nav.toc, .notes, .pause, .footnotes")) continue;
+      if (b.matches("section.toc-page, nav.toc, nav.todos, .notes, .pause, .footnotes")) continue;
       if (b.matches(".page-break, hr")) { items.push({ kind: "break" }); cur = null; continue; }
       if (isHeading(b) && lvl > 0 && level(b) < lvl) { items.push({ kind: "section", title: b }); cur = null; continue; }
       if (isHeading(b) && level(b) === lvl) { cur = { kind: "tile", title: b, blocks: [] }; items.push(cur); continue; }

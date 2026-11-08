@@ -26,6 +26,7 @@
     "--alert-important": "#6e4a2f",
     "--alert-warning": "#7d5a00",
     "--alert-caution": "#b42318",
+    "--alert-todo": "#4b5a63",
     "--link": "#276b7c",
     "--link-hover-ink": "var(--link)",
     "--link-hover-bg": "#e4f0f2",

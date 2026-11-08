@@ -49,6 +49,7 @@
     "--alert-important": "#111111",
     "--alert-warning": "#111111",
     "--alert-caution": "#111111",
+    "--alert-todo": "#111111",
     "--alert-bg-alpha": "0%",
     "--caption-color": "#333333",
     "--chart-1": "#111111",

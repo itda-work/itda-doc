@@ -9,7 +9,7 @@
 //   - 분할 그림(mdoc 이 패널로 표시한 맨 위 블록 — data-slide-panel, itda-hyve#550)은 묶음의 패널로 빼 슬라이드 한쪽을 위아래 끝까지 채운다(takeSlot)
 //   - 배경 그림(mdoc 이 배경으로 표시한 맨 위 블록 — data-slide-bg, itda-hyve#569)은 묶음의 배경으로 빼 슬라이드 전체(제목 띠 포함)를 채운다(takeSlot)
 //   - .fit 그림만 든 문단(mdoc 이 class fit-row 를 단 맨 위 문단, itda-hyve#569)은 같은 높이로 가로에 늘어놓는다(rowCaptions·pager.js placeFit)
-// 목차(nav.toc)는 슬라이드에 넣지 않는다. :::notes 는 슬라이드에서 빼 발표자 노트로 모은다(슬라이드·PDF 에는 안 보인다 —
+// 목차(nav.toc)와 할 일 모음(nav.todos, :::todos — itda-doc#74)은 슬라이드에 넣지 않는다. :::notes 는 슬라이드에서 빼 발표자 노트로 모은다(슬라이드·PDF 에는 안 보인다 —
 // 미리보기의 노트 칸·발표 N 칸만 쓴다, itda-hyve#344). 노트는 원문에서 놓인 자리의 장에 붙는다(groups·notePage, itda-hyve#518).
 // 차례로 나타내기: ". . ."(div.pause) 뒤의 블록, :::incremental(또는 slides.incremental 이면 모든 목록, :::nonincremental 안은 빼고)의
 // 목록 항목에 data-step(1, 2, …)을 단다. 미리보기·PDF 는 모두 보이고(정적), 발표(present.js)가 단계별로 보인다.
@@ -37,7 +37,7 @@
     let cur = null, titleG = null;
     const open = (kind, title) => { cur = { kind, title, blocks: [], notes: [] }; out.push(cur); return cur; };
     for (const el of [...flow.children]) {
-      if (el.matches("section.toc-page, nav.toc")) continue;
+      if (el.matches("section.toc-page, nav.toc, nav.todos")) continue;
       // .notes 는 태그를 가리지 않지만 mdoc 은 제목의 notes class 를 버리므로(headings.go dropHeadingNotes) 결과적으로 :::notes 컨테이너만 걸린다
       if (el.matches(".notes")) {
         if (!cur && titleG) titleG.notes.push({ el, at: "first" });
