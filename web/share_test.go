@@ -3,9 +3,21 @@ package web
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// srcFile 은 node 가 읽을 소스를 임시 파일로 두고 경로를 돌려준다 — 환경 변수 하나로 넘기면 Linux 의 문자열 하나 상한
+// (MAX_ARG_STRLEN 128KiB)에 걸린다(share.js 가 그보다 크다).
+func srcFile(t *testing.T, src string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "share-src.js")
+	if err := os.WriteFile(p, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
 
 // 보기 화면의 확장 훅(itda-hyve#617 리뷰 3회차 [2]): 훅이 던져도 hook 은 던지지 않고(콘솔 오류 한 줄) 그리기 길이 이어진다. share.js 의
 // ext·hook 정의를 그대로 떼어 node 로 돌린다 — 던지는 훅·없는 훅·인자 전달.
@@ -176,7 +188,7 @@ func TestShareFollowerWiring(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare;
   const make = new Function("follower", "followAction", "restoreOwnLook", "state", "$", "window", "draw", "scrollToFollow", "paintLookSwitch",
     ` + "`" + `${process.env.DECL}; return fol;` + "`" + `);
@@ -205,7 +217,7 @@ func TestShareFollowerWiring(t *testing.T) {
   process.stdout.write(bad.length ? "FOL FAIL " + bad.join(" / ") : "FOL OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FOL OK" {
 		t.Fatalf("발표 꼴 따라가기 연결: %v\n%s", err, out)
@@ -236,7 +248,7 @@ func TestShareBoardUnavailable(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { if (got !== want) bad.push(name + ": " + JSON.stringify(got) + " ≠ " + JSON.stringify(want)); };
   const doc = {}, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
@@ -259,7 +271,7 @@ func TestShareBoardUnavailable(t *testing.T) {
   process.stdout.write(bad.length ? "BOARD FAIL " + bad.join("; ") : "BOARD OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "SRC="+src)
+	cmd.Env = append(os.Environ(), "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "BOARD OK" {
 		t.Fatalf("보드를 그릴 수 없는 화면: %v\n%s", err, out)
@@ -835,7 +847,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
   const settle = async () => { for (let i = 0; i < 8; i++) await new Promise(r => setImmediate(r)); };
@@ -1059,7 +1071,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
   })().catch(e => process.stdout.write("FAIL " + e.stack));
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC="+src)
+	cmd.Env = append(os.Environ(), "DECL="+decl, "SRC_FILE="+srcFile(t, src))
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FONTS OK" {
 		t.Fatalf("글꼴을 받은 뒤 나누기: %v\n%s", err, out)
@@ -1098,7 +1110,7 @@ func TestShareForcedLook(t *testing.T) {
 	js := `
   const vm = require("vm");
   const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
-  vm.runInContext(process.env.SRC, ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
   const S = ctx.window.ItdaShare, bad = [];
   const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
   const doc = {}, slide = { slides: { present: true } }, board = { board: { present: true } }, both = { board: { present: true }, slides: { present: true } };
@@ -1263,7 +1275,7 @@ func TestShareForcedLook(t *testing.T) {
   process.stdout.write(bad.length ? "FAIL " + bad.join("\n") : "FORCED OK");
 `
 	cmd := exec.Command(node, "-e", js)
-	cmd.Env = append(os.Environ(), "SRC="+src,
+	cmd.Env = append(os.Environ(), "SRC_FILE="+srcFile(t, src),
 		"DECL="+cut("  const fol = follower({\n", "\n  });\n"),
 		"SET="+cut("  function setLook(name) {\n", "\n  }\n"),
 		"CLICK="+cut("b.addEventListener(\"click\", () => {\n      state.chosen = b.dataset.look;", "\n    });"))
