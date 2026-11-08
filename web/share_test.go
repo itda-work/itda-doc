@@ -1457,3 +1457,186 @@ func TestShareSlideGlide(t *testing.T) {
 		t.Error("prefers-reduced-motion 을 봐야 함")
 	}
 }
+
+// 노트 칸 너비 끌기(itda-hyve#728 실기 후속): 너비는 240~640 으로 자르고, 끄는 동안의 상한은 오른쪽 배치가 유지되는 너비까지,
+// 기억은 이 브라우저의 localStorage(hs-note-w — 틀린 값·없는 값이면 320), 두 번 누르면 기본 320, 아래 전환 문턱은 고른 너비로 잰다.
+func TestShareNoteWidth(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  eq("자름", [S.noteWidth(100), S.noteWidth(240), S.noteWidth(400.6), S.noteWidth(640), S.noteWidth(900), S.noteWidth(NaN), S.noteWidth("x")], [240, 240, 401, 640, 640, 320, 320]);
+  // 상한: 보기 1400·여백 56·사이 20·최소 슬라이드 520 → 804 → 640, 1100 → 504, 좁으면 240
+  eq("상한", [S.noteWidthCap(1400, 56, 20, 520), S.noteWidthCap(1100, 56, 20, 520), S.noteWidthCap(700, 56, 20, 520)], [640, 504, 240]);
+  // 기억 읽기
+  const store = init => { const m = Object.assign({}, init); return { m, getItem: k => k in m ? m[k] : null, setItem: (k, v) => { m[k] = String(v); } }; };
+  const fonts = [12, 14, 17];
+  const w = init => S.notePrefs(() => store(init), fonts).width;
+  eq("없음·틀림·범위 밖이면 320", [w({}), w({ "hs-note-w": "" }), w({ "hs-note-w": "abc" }), w({ "hs-note-w": "100" }), w({ "hs-note-w": "700" }), w({ "hs-note-w": "Infinity" })], [320, 320, 320, 320, 320, 320]);
+  eq("맞는 값", [w({ "hs-note-w": "240" }), w({ "hs-note-w": "480" }), w({ "hs-note-w": "640" })], [240, 480, 640]);
+  eq("못 읽으면 320", S.notePrefs(() => { throw new Error("막힘"); }, fonts).width, 320);
+  const st = store({}), p = S.notePrefs(() => st, fonts);
+  p.setWidth(500);
+  eq("기억 쓰기", [p.width, st.m["hs-note-w"]], [500, "500"]);
+  p.setWidth(9999);
+  eq("기억 쓰기도 자름", [p.width, st.m["hs-note-w"]], [640, "640"]);
+  eq("다시 읽기", S.notePrefs(() => st, fonts).width, 640);
+  // 끌기: 왼쪽으로 끌면 넓어지고 상한·하한에서 멈추며 놓을 때 한 번만 기억, 두 번 누르면 320 기억
+  let cur = 320, cap = 504; const log = [];
+  const r = S.noteResizer({ width: () => cur, cap: () => cap, apply: (px, save) => { cur = px; log.push([px, save]); } });
+  r.move(0); r.end();
+  eq("잡지 않으면 아무것도", log, []);
+  r.begin(1000);
+  eq("잡음", r.dragging(), true);
+  r.move(900); r.move(700); r.move(1300);
+  eq("끄는 중(상한 504·하한 240)", log, [[420, false], [504, false], [240, false]]);
+  r.move(1050); r.end();
+  eq("놓을 때 한 번 기억", log.slice(3), [[270, false], [270, true]]);
+  eq("놓은 뒤", r.dragging(), false);
+  log.length = 0; cap = 640; r.begin(500); r.move(500); r.end();
+  eq("안 바뀌면 기억하지 않음", log, []);
+  r.reset();
+  eq("두 번 누름: 기본 320 기억", [cur, log], [320, [[320, true]]]);
+  // 상한은 움직일 때마다 다시 묻는다(리뷰 [2]): 보기 1400 에서 잡고(상한 640) 끄는 중 보기가 1000 으로 줄면 상한 404
+  log.length = 0; cur = 320; cap = S.noteWidthCap(1400, 56, 20, 520); r.begin(1000);
+  r.move(900); cap = S.noteWidthCap(1000, 56, 20, 520); r.move(800);
+  eq("끄는 중 상한이 줄어듦", [cap, log], [404, [[420, false], [404, false]]]);
+  r.end();
+  eq("상한 없으면 640", (() => { let c = 320; const q = S.noteResizer({ width: () => c, apply: px => { c = px; } }); q.begin(1000); q.move(0); return c; })(), 640);
+
+  // 끌기 이벤트 수명(리뷰 [1]) — 가짜 document·window·칸·손잡이로 noteGripDrag 를 실제로 돌린다.
+  const target = () => { const ls = {}; return { ls,
+    addEventListener(t, f) { (ls[t] = ls[t] || []).push(f); },
+    removeEventListener(t, f) { ls[t] = (ls[t] || []).filter(g => g !== f); },
+    fire(t, e) { for (const f of (ls[t] || []).slice()) f(Object.assign({ preventDefault() {} }, e || {})); },
+    count() { return Object.values(ls).reduce((n, a) => n + a.length, 0); } }; };
+  const rig = () => {
+    const doc = target(), win = target(), notes = target(), cls = new Set();
+    doc.visibilityState = "visible";
+    const body = { classList: { add: c => cls.add(c), remove: c => cls.delete(c) } };
+    const caps = new Set(), released = [];
+    const mkGrip = () => ({ isConnected: true, closest: s => null,
+      setPointerCapture: id => caps.add(id), hasPointerCapture: id => caps.has(id),
+      releasePointerCapture: id => { caps.delete(id); released.push(id); doc.fire("lostpointercapture", { pointerId: id }); } });
+    let grip = mkGrip(); grip.closest = s => s === ".sn-grip" ? grip : null;
+    const o = { w: 320, saves: [], right: true, starts: 0 };
+    const res = S.noteResizer({ width: () => o.w, cap: () => 640, apply: (px, save) => { o.w = px; if (save) o.saves.push(px); } });
+    const drag = S.noteGripDrag({ notes, doc, win, body, resizer: res, canGrip: () => o.right, onStart: () => { o.starts++; } });
+    const docBase = doc.count();
+    o.down = (id, x, extra) => notes.fire("pointerdown", Object.assign({ target: grip, pointerId: id, pointerType: "mouse", button: 0, clientX: x }, extra || {}));
+    o.move = (id, x, buttons) => doc.fire("pointermove", { pointerId: id, pointerType: "mouse", buttons: buttons === undefined ? 1 : buttons, clientX: x });
+    o.regrip = () => { grip.isConnected = false; grip = mkGrip(); grip.closest = s => s === ".sn-grip" ? grip : null; };
+    // 끝난 상태: 끌기 아님·document·window 리스너 0·dragging-note 없음·캡처 없음
+    o.clean = () => !drag.dragging() && doc.count() === docBase && win.count() === 0 && !cls.has("dragging-note") && caps.size === 0;
+    return Object.assign(o, { doc, win, notes, cls, caps, released, drag });
+  };
+  { // 놓기
+    const g = rig(); g.down(1, 1000);
+    eq("잡으면 끄는 중", [g.drag.dragging(), g.cls.has("dragging-note"), g.caps.has(1), g.starts, g.win.count() > 0], [true, true, true, 1, true]);
+    g.move(1, 900); g.move(2, 100); // 다른 포인터는 무시
+    g.doc.fire("pointerup", { pointerId: 2 });
+    eq("다른 포인터의 놓음은 무시", [g.drag.dragging(), g.w], [true, 420]);
+    g.doc.fire("pointerup", { pointerId: 1 });
+    eq("놓기: 정리·한 번 기억", [g.clean(), g.saves], [true, [420]]);
+    g.drag.finish(); g.doc.fire("pointerup", { pointerId: 1 }); g.move(1, 0);
+    eq("두 번 끝내도 그대로", [g.clean(), g.saves, g.w], [true, [420], 420]);
+  }
+  { // 취소
+    const g = rig(); g.down(1, 1000); g.move(1, 950); g.doc.fire("pointercancel", { pointerId: 1 });
+    eq("취소: 정리·바뀐 너비 기억", [g.clean(), g.saves], [true, [370]]);
+  }
+  { // 캡처 상실 → 버튼 없이 움직임 → 새로 잡기
+    const g = rig(); g.down(1, 1000); g.move(1, 900);
+    g.caps.delete(1); g.doc.fire("lostpointercapture", { pointerId: 1 });
+    eq("캡처 상실: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+    g.move(1, 500, 0);
+    eq("상실 뒤 움직임은 너비를 안 바꿈", g.w, 420);
+    g.down(7, 800);
+    eq("새 포인터로 다시 잡힘", [g.drag.dragging(), g.caps.has(7)], [true, true]);
+    g.doc.fire("pointerup", { pointerId: 7 });
+    eq("다시 놓음", g.clean(), true);
+  }
+  { // 창 밖에서 놓아 pointerup 을 놓침 → 버튼 없는 마우스 움직임
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.move(1, 600, 0);
+    eq("버튼 없는 움직임: 끝냄·그 움직임은 안 씀", [g.clean(), g.w, g.saves], [true, 420, [420]]);
+  }
+  { // 창 blur
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.win.fire("blur");
+    eq("blur: 정리·기억·캡처 풂", [g.clean(), g.saves, g.released], [true, [420], [1]]);
+  }
+  { // 탭 숨김 — 보임은 끝내지 않는다
+    const g = rig(); g.down(1, 1000);
+    g.doc.fire("visibilitychange"); eq("보이는 동안은 이어짐", g.drag.dragging(), true);
+    g.doc.visibilityState = "hidden"; g.doc.fire("visibilitychange");
+    eq("숨김: 정리·안 바뀌면 기억 없음", [g.clean(), g.saves], [true, []]);
+  }
+  { // 손잡이를 없애는 재그리기
+    const g = rig(); g.down(1, 1000); g.move(1, 900);
+    g.drag.check(); eq("손잡이가 그대로면 이어짐", g.drag.dragging(), true);
+    g.regrip(); g.drag.check();
+    eq("재그리기로 손잡이가 빠짐: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+  }
+  { // 배치 전환(오른쪽이 아니게 됨)
+    const g = rig(); g.down(1, 1000); g.move(1, 900); g.right = false; g.drag.check();
+    eq("배치 전환: 정리·기억", [g.clean(), g.saves], [true, [420]]);
+    g.down(2, 1000); eq("오른쪽이 아니면 잡지 않음", g.drag.dragging(), false);
+  }
+  { // 잡지 않는 경우와 두 번 누름
+    const g = rig();
+    g.down(1, 1000, { button: 2 }); g.notes.fire("pointerdown", { target: { closest: () => null }, pointerId: 1, pointerType: "mouse", button: 0, clientX: 0 });
+    eq("오른쪽 단추·손잡이 밖은 잡지 않음", [g.drag.dragging(), g.starts], [false, 0]);
+    g.down(1, 1000); g.move(1, 900);
+    g.notes.fire("dblclick", { target: { closest: s => s === ".sn-grip" ? {} : null } });
+    eq("두 번 누름: 끝내고 320 기억", [g.clean(), g.w, g.saves, g.starts], [true, 320, [420, 320], 2]);
+  }
+  // 보던 자리(리뷰 [3]): 가운데 mid=500, 슬라이드 0 은 [100,400], 1 은 [420,720] → 1 번 안 (500-420)/300
+  const a = S.slideAnchor([{ top: 100, bottom: 400, height: 300 }, { top: 420, bottom: 720, height: 300 }], 500);
+  eq("자리 잡기", [a.i, Math.round(a.frac * 1000)], [1, 267]);
+  eq("슬라이드 없음", S.slideAnchor([], 500), null);
+  eq("사이에 걸리면 가까운 슬라이드 밖 자리", S.slideAnchor([{ top: 100, bottom: 400, height: 300 }, { top: 440, bottom: 740, height: 300 }], 410).i, 0);
+  // 배율이 줄어 슬라이드 1 이 [380,620](높이 240)이 되면 같은 자리(380+0.267×240=444)를 가운데 500 으로 — 56 위로 굴림(가운데 정렬이면 0)
+  eq("자리 지키기", Math.round(S.anchorDelta({ top: 380, height: 240 }, a.frac, 500)), -56);
+  eq("자리 그대로면 굴리지 않음", S.anchorDelta({ top: 420, height: 300 }, a.frac, 500), 0);
+  // 아래 전환 문턱은 고른 너비로: 보기 1000·여백 56·사이 20·최소 520 → 너비 404 까지 오른쪽, 405 부터 아래
+  eq("문턱", [S.notesLayout("right", true, "slides", 1000, 56, 404, 20, 520), S.notesLayout("right", true, "slides", 1000, 56, 405, 20, 520),
+    S.notesLayout("below", true, "slides", 1000, 56, 640, 20, 520), S.notesLayout("off", true, "slides", 1000, 56, 240, 20, 520)], ["right", "below", "below", "off"]);
+  // 폰 폭(< 600, 여백 16)은 가장 좁은 칸이어도 늘 아래
+  eq("폰은 아래", S.notesLayout("right", true, "slides", 599, 16, 240, 20, 520), "below");
+  process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "NOTEW OK");
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "NOTEW OK" {
+		t.Fatalf("노트 칸 너비: %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	// 화면 연결: 배율·칸 배치가 고른 너비를 쓰고, 손잡이를 붙이고, 터치 끌기가 따라가기를 풀지 않는다
+	for _, want := range []string{
+		"notesLayout(np.mode, state.hasNotes, state.look, viewer.clientWidth, gutter, noteW, NOTE_GAP, NOTE_NARROW)",
+		"{ layout, zoom: z, noteW, gap: NOTE_GAP }",
+		`into: $("notes"), grip: true }`,
+		`canGrip: () => state.notesLayout === "right",`,
+		`if (e.target && e.target.closest && e.target.closest(".sn-grip")) return;`,
+		"bindNoteGrip();",
+		// 끌기를 끝낼지: 배치를 정할 때(두 갈래 모두)와 칸을 다시 만들 때 gripDrag.check()
+		"state.notesLayout = \"off\";\n      if (gripDrag) gripDrag.check();",
+		"state.notesLayout = layout;\n    if (gripDrag) gripDrag.check();",
+		"grip: true });\n    if (gripDrag) gripDrag.check();",
+		// 상한은 지금 보기 폭으로, 자리는 슬라이드 안의 자리로
+		"cap: () => { const w = $(\"viewer\").clientWidth; return noteWidthCap(w, gutterOf(w), NOTE_GAP, NOTE_NARROW); },",
+		"scrollTop += anchorDelta(pg.getBoundingClientRect(), a.frac, viewerMid());",
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("share.js 에 %q 가 없음", want)
+		}
+	}
+	if strings.Contains(src, "NOTE_W,") || strings.Contains(src, "noteW: NOTE_W") {
+		t.Error("고정 너비 NOTE_W 가 남아 있음")
+	}
+}

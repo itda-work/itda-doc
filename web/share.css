@@ -36,6 +36,10 @@
 @media (max-width: 600px) {
   .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
 }
+/* 노트 칸 너비 손잡이(share.js bindNoteGrip): 보이기·모양은 호스트 앱 창 틀 CSS(#pages.notes-right ~ #notes .sn-grip — 오른쪽 배치에서만). 여기서는
+   펜·터치로 끌 때 브라우저가 굴리지 않게 하고, 끄는 동안 글이 선택되지 않게 한다. 폰은 늘 아래 배치라 손잡이가 없다 */
+.share-view .sn-grip { touch-action: none; -webkit-user-select: none; user-select: none; }
+body.share-view.dragging-note { -webkit-user-select: none; user-select: none; }
 .share-err { margin: 24px auto; max-width: 480px; text-align: center; color: #d64545; }
 /* ④ 목차: 틀은 호스트 앱 창 틀 CSS 의 .sidebar·#side-toc·body.no-toc 를 그대로 쓴다. 좁은 화면(toc-drawer — share.js 가 폭으로 단다)은 본문 위에
    겹치는 서랍과 바깥 가림막 */

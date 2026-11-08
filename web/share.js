@@ -28,8 +28,8 @@
 // 이어보기는 보기 영역 높이 − 40px 만큼(pager.js pageNav — 문서 창 보기 모드와 같은 규칙). 키로 넘기면 따라가기가 이 화면에서 잠시 풀린다(keyHandler).
 // 발표자 노트(itda-hyve#344 결정 7): 호스트가 공유의 「발표자 노트 함께 보이기」 를 켰을 때만 view.json 에 노트가 온다(꺼져 있으면 서버가 뺀다).
 // 노트가 온 슬라이드 보기에서만 「노트: 끔 | 오른쪽 | 아래」(기본 아래 — 폰)와 글자 A−/A+ 를 보인다. 노트 칸은 문서 창 미리보기와 같은
-// 부품이다(slides.js placeNotes·호스트 앱 창 틀 CSS 의 .slide-note). 쪽·이어보기에는 노트가 없다. 고른 배치·글자 크기는 이 브라우저의 localStorage 에만
-// 둔다(못 쓰면 메모리 — notePrefs). 발표 슬라이드를 따라가는 중 노트가 아래면 그 슬라이드를 위에 붙여 아래 노트까지 보이게 한다(followSpot).
+// 부품이다(slides.js placeNotes·호스트 앱 창 틀 CSS 의 .slide-note). 쪽·이어보기에는 노트가 없다. 오른쪽 칸은 왼쪽 손잡이를 끌어 240~640px 로
+// 넓히고 좁힌다(bindNoteGrip — 두 번 누르면 320). 고른 배치·글자 크기·칸 너비는 이 브라우저의 localStorage 에만 둔다(못 쓰면 메모리 — notePrefs). 발표 슬라이드를 따라가는 중 노트가 아래면 그 슬라이드를 위에 붙여 아래 노트까지 보이게 한다(followSpot).
 // 확장(itda-hyve#617): share.js 보다 먼저 실행되는 스크립트가 window.ItdaShareExt(api)(옛 이름 window.HyveShareExt 도 본다) 를 두면, 시작할 때 한 번 불러 화면 부품(api — 아래
 // 「확장을 시작한다」 절)을 넘기고 돌려받은 훅을 그리기 길에서 부른다 — flow(흐름 — 나누기 전, numberBlocks 뒤)·drawn(새 본문을 다 그린 뒤)·tick(목차
 // 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
@@ -806,16 +806,125 @@
     return mode === "right" && viewerW - gutter - noteW - gap < narrow ? "below" : mode;
   }
 
-  // notePrefs 는 보는 사람의 노트 배치·글자 크기 기억이다(이 브라우저의 localStorage — 읽기·쓰기가 던지면 기억 없이 메모리만).
-  // 배치는 "off"·"right"·"below"(그 밖·없음이면 "below"), 글자는 NOTE_FONTS 의 px(그 밖·없음이면 0 — 기본 14).
+  // 오른쪽 노트 칸 너비(화면 px — itda-hyve#728 실기 후속): 기본·최소·최대. 호스트 앱 문서 창의 끌기 손잡이와 같은 값이다(app.js NOTE_W_*).
+  const NOTE_W_DEF = 320, NOTE_W_MIN = 240, NOTE_W_MAX = 640;
+  // noteWidth 는 칸 너비 px 를 [NOTE_W_MIN, NOTE_W_MAX] 로 자르고 반올림한다. 수가 아니면(NaN·무한) 기본 320.
+  function noteWidth(px) {
+    const n = Number(px);
+    return Number.isFinite(n) ? Math.round(Math.min(NOTE_W_MAX, Math.max(NOTE_W_MIN, n))) : NOTE_W_DEF;
+  }
+  // noteWidthCap 은 끄는 동안 받을 칸 너비의 상한이다 — 보기 영역 너비에서 여백(gutter)·사이(gap)·슬라이드 최소 자리(narrow)를 뺀 값까지만
+  // (그보다 넓으면 notesLayout 이 아래로 바꿔 손잡이가 사라진다). [NOTE_W_MIN, NOTE_W_MAX] 안으로 자른다.
+  function noteWidthCap(viewerW, gutter, gap, narrow) {
+    return Math.max(NOTE_W_MIN, Math.min(NOTE_W_MAX, viewerW - gutter - gap - narrow));
+  }
+  // noteResizer 는 노트 칸 왼쪽 손잡이 끌기의 계산이다(DOM 없음). o = { width() — 지금 너비, apply(px, save) — 너비를 걸고 save 면 기억,
+  // cap() — 지금 상한(없으면 NOTE_W_MAX) }. begin(x) 로 잡고 move(x) 마다 잡은 자리에서 왼쪽으로 간 만큼 넓힌다(상한은 움직일 때마다 cap() 을 다시
+  // 묻는다 — 끄는 중 창 폭이 바뀌어도 오른쪽이 유지되는 너비까지만. noteWidth 로 자름 — 기억은 하지 않는다).
+  // end() 는 끌기가 끝날 때다 — 너비가 바뀌었으면 한 번 기억한다. reset() 은 두 번 누름 — 기본 320 으로 걸고 기억한다. 잡지 않았으면 move·end 는 아무것도 하지 않는다.
+  function noteResizer(o) {
+    let d = null;
+    const cap = () => (o.cap ? o.cap() : NOTE_W_MAX);
+    return {
+      begin(x) { d = { x0: x, w0: o.width() }; },
+      dragging() { return d !== null; },
+      move(x) {
+        if (!d) return;
+        const w = noteWidth(Math.min(cap(), d.w0 + (d.x0 - x)));
+        if (w !== o.width()) o.apply(w, false);
+      },
+      end() {
+        if (!d) return;
+        const w0 = d.w0;
+        d = null;
+        if (o.width() !== w0) o.apply(o.width(), true);
+      },
+      reset() { d = null; o.apply(NOTE_W_DEF, true); },
+    };
+  }
+
+  // noteGripDrag 는 노트 칸 손잡이(.sn-grip) 끌기의 이벤트 수명이다(DOM 은 넘겨받는다 — 시험이 가짜로 돌린다). o = { notes(pointerdown·dblclick 을
+  // 받는 칸 상자), doc(document — 움직임·놓음·캡처 상실·숨김), win(window — blur), body(끄는 동안 dragging-note 를 단다), resizer(noteResizer),
+  // canGrip()(지금 오른쪽 배치인가), onStart()(잡을 때·두 번 누를 때 — 보던 자리를 기억) }.
+  // 끌기는 놓기(pointerup)·취소(pointercancel)·캡처 상실(lostpointercapture — 손잡이가 빠지면 document 로 온다)·버튼 없는 마우스 움직임(놓음을 놓침)·
+  // 창 blur·탭 숨김·check()(붙든 손잡이가 문서에서 빠졌거나 오른쪽 배치가 아님) 가운데 무엇으로든 finish 한 곳에서 끝난다 — 리스너·클래스·캡처를 거두고,
+  // 바뀐 너비가 있으면 놓기와 같게 한 번 기억한다(resizer.end). 두 번 불러도 된다. 돌려주는 것 = { finish, check, dragging }.
+  function noteGripDrag(o) {
+    let pid = null, held = null;
+    const gripOf = e => (e.target && e.target.closest ? e.target.closest(".sn-grip") : null);
+    const mine = e => pid !== null && e.pointerId === pid;
+    const onMove = e => {
+      if (!mine(e)) return;
+      if (e.pointerType === "mouse" && e.buttons === 0) { finish(); return; } // 창 밖에서 놓아 pointerup 을 놓쳤다
+      o.resizer.move(e.clientX);
+    };
+    const onEnd = e => { if (mine(e)) finish(); };
+    const onVis = () => { if (o.doc.visibilityState === "hidden") finish(); };
+    const onBlur = () => finish();
+    const DOC = [["pointermove", onMove], ["pointerup", onEnd], ["pointercancel", onEnd], ["lostpointercapture", onEnd], ["visibilitychange", onVis]];
+    function finish() {
+      if (pid === null) return;
+      const id = pid, g = held;
+      pid = null; held = null; // 먼저 비운다 — 아래 캡처 해제가 부르는 lostpointercapture·기억이 부르는 check 가 다시 들어와도 아무것도 하지 않게
+      for (const [t, f] of DOC) o.doc.removeEventListener(t, f);
+      o.win.removeEventListener("blur", onBlur);
+      o.body.classList.remove("dragging-note");
+      try { if (g && g.hasPointerCapture && g.hasPointerCapture(id)) g.releasePointerCapture(id); } catch (err) { /* 이미 풀렸다 */ }
+      o.resizer.end();
+    }
+    // 펜·터치도 받는다(pointer). 잡은 손잡이에 포인터를 붙들어(setPointerCapture) YouTube 틀 위로 지나가도 움직임이 오게 하고, 움직임·놓음은 document 에서 받는다.
+    o.notes.addEventListener("pointerdown", e => {
+      const g = gripOf(e);
+      if (!g || pid !== null || (e.pointerType === "mouse" && e.button !== 0) || !o.canGrip()) return;
+      e.preventDefault();
+      pid = e.pointerId; held = g;
+      o.onStart();
+      o.resizer.begin(e.clientX);
+      try { g.setPointerCapture(pid); } catch (err) { /* 붙들 수 없으면 document 로만 */ }
+      o.body.classList.add("dragging-note");
+      for (const [t, f] of DOC) o.doc.addEventListener(t, f);
+      o.win.addEventListener("blur", onBlur);
+    });
+    o.notes.addEventListener("dblclick", e => {
+      if (!gripOf(e) || !o.canGrip()) return;
+      e.preventDefault();
+      finish();
+      o.onStart();
+      o.resizer.reset();
+    });
+    return {
+      finish,
+      check() { if (pid !== null && (!held || held.isConnected === false || !o.canGrip())) finish(); },
+      dragging: () => pid !== null,
+    };
+  }
+
+  // slideAnchor 는 보기 영역 세로 가운데 mid 에 걸린(없으면 가장 가까운) 슬라이드 번호 i 와 그 슬라이드 안의 자리 frac(위 0 · 아래 1 — 사이에 걸리면
+  // 0 미만·1 초과)이다. rs 는 슬라이드들의 화면 사각형({ top, bottom, height }). 슬라이드가 없으면 null.
+  function slideAnchor(rs, mid) {
+    let best = -1, bd = Infinity;
+    rs.forEach((r, i) => { const d = r.top > mid ? r.top - mid : r.bottom < mid ? mid - r.bottom : 0; if (d < bd) { bd = d; best = i; } });
+    if (best < 0) return null;
+    const r = rs[best];
+    return { i: best, frac: r.height > 0 ? (mid - r.top) / r.height : 0 };
+  }
+  // anchorDelta 는 슬라이드 사각형 r 의 frac 자리를 다시 mid 에 두기까지 굴릴 양(px)이다 — 배율이 바뀌어 슬라이드 크기가 달라져도 슬라이드 안의 같은 자리.
+  function anchorDelta(r, frac, mid) { return r.top + frac * r.height - mid; }
+
+  // notePrefs 는 보는 사람의 노트 배치·글자 크기·오른쪽 칸 너비 기억이다(이 브라우저의 localStorage — 읽기·쓰기가 던지면 기억 없이 메모리만).
+  // 배치는 "off"·"right"·"below"(그 밖·없음이면 "below"), 글자는 NOTE_FONTS 의 px(그 밖·없음이면 0 — 기본 14), 너비는
+  // [NOTE_W_MIN, NOTE_W_MAX] 안의 px(그 밖·수가 아님·없음이면 320). 호스트에 보내지 않는다.
   function notePrefs(storage, fonts) {
     const get = k => { try { return storage().getItem(k); } catch (e) { return null; } };
     const set = (k, v) => { try { storage().setItem(k, v); } catch (e) { /* 메모리만 */ } };
     const m = get("hs-notes");
     const f = Number(get("hs-note-font"));
-    const p = { mode: ["off", "right", "below"].includes(m) ? m : "below", font: fonts.includes(f) ? f : 0 };
+    const ws = get("hs-note-w"), w = ws === null || ws.trim() === "" ? NaN : Number(ws);
+    const p = { mode: ["off", "right", "below"].includes(m) ? m : "below", font: fonts.includes(f) ? f : 0,
+      width: Number.isFinite(w) && w >= NOTE_W_MIN && w <= NOTE_W_MAX ? Math.round(w) : NOTE_W_DEF };
     p.setMode = v => { p.mode = v; set("hs-notes", v); };
     p.setFont = v => { p.font = v; set("hs-note-font", String(v)); };
+    p.setWidth = v => { p.width = noteWidth(v); set("hs-note-w", String(p.width)); };
     return p;
   }
 
@@ -1075,7 +1184,7 @@
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
-    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
+    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
@@ -1102,7 +1211,10 @@
     seen: false, files: null, hash: "",
     // 지금 화면이 끝나지 않은 글꼴을 빼고 나뉘었는가(fontsLate 가 글꼴이 온 뒤 다시 그린다)
     fontStale: false };
-  const NOTE_W = 320, NOTE_GAP = 20, NOTE_NARROW = 520;
+  const NOTE_GAP = 20, NOTE_NARROW = 520; // 오른쪽 칸 너비는 보는 사람이 끌어 고른다(np.width — notePrefs)
+  // gripDrag 는 노트 칸 너비 끌기(bindNoteGrip 이 단다 — 그 전엔 null), gripAnchor 는 끌기를 잡을 때 보던 자리(slideAnchor — 따라가는 중이면 null).
+  // applyZoom·placeSlideNotes 가 배치를 바꿀 때 gripDrag.check() 로 끌기를 끝낼지 본다 — 그래서 여기(먼저 실행되는 자리)에 둔다.
+  let gripDrag = null, gripAnchor = null;
   // nav 는 폴더 공유의 주소 쪽 일이다(원천이 api.nav 로 넘긴다 — 폴더 공유가 아니면 null). firstView 는 첫 view 로 한 번 정하는 것이다 — 처음 보기 꼴, 폴더 공유면 주소의 #제목.
   let nav = null;
   function firstView(v) {
@@ -1225,6 +1337,8 @@
     else { el.style.removeProperty("--page-w"); el.style.removeProperty("--page-h"); }
   }
 
+  // gutterOf 는 보기 영역 너비 w 의 가로 여백이다(좁은 화면 16, 그 밖 56) — 맞춤 배율과 노트 칸 끌기의 상한이 함께 쓴다.
+  function gutterOf(w) { return w < 600 ? 16 : 56; }
   // 쪽은 보기 영역 너비에 맞춰 그린 그림을 줄인다(호스트 앱의 「너비 맞춤」 과 같은 길 — transform). 슬라이드는 너비와 높이를
   // 모두 맞춰 축소한다(slideZoom — ⑥, 하한 0.2 에 걸리면 일부가 잘릴 수 있다). 이어보기는 너비가 화면을 따라 다시 흐르고 확대는 브라우저 것을 쓴다.
   function applyZoom() {
@@ -1234,15 +1348,19 @@
       box.style.width = box.style.height = pg.style.transform = pg.style.width = "";
       pg.classList.remove("notes-right", "notes-below");
       state.notesLayout = "off";
+      if (gripDrag) gripDrag.check(); // 오른쪽이 아니게 됐다 — 끌던 것이 있으면 끝낸다
       window.ItdaSlides.layoutNotes(pg, $("notes"), { layout: "off" });
       return;
     }
     if (viewer.clientWidth === 0) return;
-    const gutter = viewer.clientWidth < 600 ? 16 : 56;
-    // 노트 칸(itda-hyve#344): 오른쪽이면 슬라이드 맞춤의 너비에서 칸(NOTE_W + NOTE_GAP)을 뺀다. 칸은 #pages 밖(#notes)이라 크기·글자가 화면 픽셀이다(slides.js layoutNotes)
-    const layout = notesLayout(np.mode, state.hasNotes, state.look, viewer.clientWidth, gutter, NOTE_W, NOTE_GAP, NOTE_NARROW);
-    const side = layout === "right" ? NOTE_W + NOTE_GAP : 0;
+    const gutter = gutterOf(viewer.clientWidth);
+    // 노트 칸(itda-hyve#344): 오른쪽이면 슬라이드 맞춤의 너비에서 칸(np.width + NOTE_GAP)을 뺀다. 칸은 #pages 밖(#notes)이라 크기·글자가 화면 픽셀이다(slides.js layoutNotes).
+    // 아래 전환 문턱도 고른 너비로 잰다 — 아래 배치의 칸은 슬라이드 너비라 고른 너비를 쓰지 않는다.
+    const noteW = np.width;
+    const layout = notesLayout(np.mode, state.hasNotes, state.look, viewer.clientWidth, gutter, noteW, NOTE_GAP, NOTE_NARROW);
+    const side = layout === "right" ? noteW + NOTE_GAP : 0;
     state.notesLayout = layout;
+    if (gripDrag) gripDrag.check(); // 아래·끔으로 바뀌었으면 끌던 것을 끝낸다
     pg.classList.toggle("notes-right", layout === "right");
     pg.classList.toggle("notes-below", layout === "below");
     let w, z;
@@ -1263,7 +1381,7 @@
     pg.style.width = outW / z + "px";
     pg.style.transform = "scale(" + z + ")";
     box.style.width = outW + "px";
-    window.ItdaSlides.layoutNotes(pg, $("notes"), { layout, zoom: z, noteW: NOTE_W, gap: NOTE_GAP }); // 아래 배치의 여백이 #pages 높이에 들어가므로 높이를 재기 전에
+    window.ItdaSlides.layoutNotes(pg, $("notes"), { layout, zoom: z, noteW, gap: NOTE_GAP }); // 아래 배치의 여백이 #pages 높이에 들어가므로 높이를 재기 전에
     box.style.height = Math.ceil(pg.offsetHeight * z) + "px";
     if (boardZoom) boardZoom.fit(); // 크게 보기 타일은 보이는 영역을 채운다
   }
@@ -1391,7 +1509,9 @@
 
   let noteWatch = null;
   function placeSlideNotes(box) {
-    window.ItdaSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off", into: $("notes") });
+    // grip: 오른쪽 배치에서 칸 너비를 끄는 손잡이(.sn-grip — 보이기는 호스트 앱 창 틀 CSS 의 #pages.notes-right ~ #notes .sn-grip, 끌기는 bindNoteGrip)
+    window.ItdaSlides.placeNotes(box, { notes: state.slideNotes, on: state.look === "slides" && state.hasNotes && np.mode !== "off", into: $("notes"), grip: true });
+    if (gripDrag) gripDrag.check(); // 칸을 다시 만들어 붙든 손잡이가 빠졌으면 끌기를 끝낸다
     if (!noteWatch) noteWatch = window.ItdaSlides.watchNotes($("notes"), applyZoom); // 아래 칸의 그림이 늦게 와 높이가 바뀌면 다시 놓는다
     noteWatch();
   }
@@ -1409,12 +1529,14 @@
   }
   // slideAtMiddle 은 보기 영역 가운데에 걸린 슬라이드 번호다(배치를 바꾼 뒤 그 슬라이드로 돌아오려고). 없으면 -1.
   function slideAtMiddle() {
-    const vr = $("viewer").getBoundingClientRect(), mid = vr.top + vr.height / 2;
-    const pages = [...$("pages").querySelectorAll(":scope > .page")];
-    let best = -1, bd = Infinity;
-    pages.forEach((pg, i) => { const r = pg.getBoundingClientRect(), d = r.top > mid ? r.top - mid : r.bottom < mid ? mid - r.bottom : 0; if (d < bd) { bd = d; best = i; } });
-    return best;
+    const a = anchorAtMiddle();
+    return a ? a.i : -1;
   }
+  // viewerMid 는 보기 영역 세로 가운데(화면 y), slidePages 는 슬라이드들이다.
+  function viewerMid() { const vr = $("viewer").getBoundingClientRect(); return vr.top + vr.height / 2; }
+  function slidePages() { return [...$("pages").querySelectorAll(":scope > .page")]; }
+  // anchorAtMiddle 은 보기 영역 가운데에 걸린 슬라이드와 그 안의 자리다(slideAnchor). 없으면 null.
+  function anchorAtMiddle() { return slideAnchor(slidePages().map(pg => pg.getBoundingClientRect()), viewerMid()); }
   // relayoutNotes 는 노트 배치·글자를 바꾼 뒤다: 칸을 다시 붙이고(배치 바꿈만) 배율을 다시 건 뒤, 따라가는 중이면 발표자 위치로, 아니면
   // 보던 슬라이드로 돌아온다.
   function relayoutNotes(replace) {
@@ -1425,9 +1547,42 @@
       if (CodeCopy) CodeCopy.arm($("notes"));
     }
     applyZoom();
+    realignNotes(keep);
+    paintNotesSwitch();
+  }
+  // realignNotes 는 노트 배치·너비를 바꿔 배율을 다시 건 뒤의 자리 맞추기다: 따라가는 중이면 발표자 위치로(move 없이 — 바로), 아니면
+  // keep 번째 슬라이드로(placeSlide). keep 이 -1 이면 그대로 둔다.
+  function realignNotes(keep) {
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac);
     else if (keep >= 0) placeSlide($("pages").querySelectorAll(":scope > .page")[keep]);
-    paintNotesSwitch();
+  }
+  // 노트 칸 너비 끌기(itda-hyve#728 실기 후속): 오른쪽 칸 왼쪽 손잡이(.sn-grip)를 끌면 너비가 바뀌고(왼쪽으로 끌면 넓어짐), 맞춤 배율·아래 전환 문턱이
+  // 그 너비로 다시 계산된다(applyZoom). 끄는 동안은 지금 화면 폭에서 오른쪽이 유지되는 너비까지만(noteWidthCap — 움직일 때마다 다시 잰다), 잡을 때
+  // 보던 슬라이드 안의 자리(gripAnchor — 따라가는 중이면 발표자 위치)를 지킨다. 끌기가 끝날 때 한 번 이 브라우저에 기억한다(np.setWidth — 호스트에
+  // 보내지 않는다). 두 번 누르면 기본 320. 끝나는 길(놓기·취소·캡처 상실·창 이탈·탭 숨김·손잡이가 빠지는 재그리기·배치 전환)은 noteGripDrag 의 finish 하나다.
+  const resizer = noteResizer({
+    width: () => np.width,
+    cap: () => { const w = $("viewer").clientWidth; return noteWidthCap(w, gutterOf(w), NOTE_GAP, NOTE_NARROW); },
+    apply: (px, save) => {
+      if (save) np.setWidth(px); else np.width = noteWidth(px);
+      applyZoom();
+      keepGripAnchor();
+    },
+  });
+  // keepGripAnchor 는 너비를 바꿔 배율을 다시 건 뒤의 자리 맞추기다: 따라가는 중이면 발표자 위치로(move 없이 — 바로), 아니면 잡을 때 보던
+  // 슬라이드 안의 같은 자리를 보기 영역 가운데에 다시 둔다(슬라이드 가운데로 옮기지 않는다).
+  function keepGripAnchor() {
+    if (fol.active()) { realignNotes(-1); return; }
+    const a = gripAnchor, pg = a && slidePages()[a.i];
+    if (pg) $("viewer").scrollTop += anchorDelta(pg.getBoundingClientRect(), a.frac, viewerMid());
+  }
+  // 보기 영역의 따라가기 해제(mousedown 은 viewer 자신만·touchmove 는 손잡이 제외)에 걸리지 않는다.
+  function bindNoteGrip() {
+    gripDrag = noteGripDrag({
+      notes: $("notes"), doc: document, win: window, body: document.body, resizer,
+      canGrip: () => state.notesLayout === "right",
+      onStart: () => { gripAnchor = fol.active() ? null : anchorAtMiddle(); },
+    });
   }
   function setNotesMode(mode) {
     if (mode === np.mode || !["off", "right", "below"].includes(mode)) return;
@@ -1738,8 +1893,13 @@
   // 것은 굴림(scroll) 이벤트라 여기 걸리지 않는다.
   // #제목 이동으로 고정한 강조(jumper.pin)도 이때 거둔다.
   $("viewer").addEventListener("wheel", () => { jumper.clear(); fol.moved(); }, { passive: true });
-  $("viewer").addEventListener("touchmove", () => { jumper.clear(); fol.moved(); }, { passive: true });
+  // 노트 칸 손잡이(.sn-grip)를 터치로 끄는 것은 굴림이 아니다 — 풀지 않는다(bindNoteGrip)
+  $("viewer").addEventListener("touchmove", e => {
+    if (e.target && e.target.closest && e.target.closest(".sn-grip")) return;
+    jumper.clear(); fol.moved();
+  }, { passive: true });
   $("viewer").addEventListener("mousedown", e => { if (e.target === $("viewer")) { jumper.clear(); fol.moved(); } });
+  bindNoteGrip();
   // 쪽 넘김 키(⑨ — keyHandler): 쪽·슬라이드·이어보기 규칙은 pager.js pageNav(문서 창 보기 모드와 같다)
   document.addEventListener("keydown", keyHandler({ pager: window.ItdaPager, fol, jumper, closeDrawer: () => closeTocDrawer(),
     ended: () => state.ended || !state.view, turn: dir => pageTurn(dir) }));
