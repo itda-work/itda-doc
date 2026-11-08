@@ -233,15 +233,31 @@ func (st *state) yieldContainerIDs(doc ast.Node) {
 	})
 	for _, c := range hits {
 		old := c.Attrs.ID
-		c.Attrs.ID = freeID(old, all)
+		c.Attrs.ID = freeID(old, all, nil)
 		st.warn(st.lines.line(c.Pos()), WarnDuplicateID, "컨테이너 id #"+old+" 가 할 일 id 와 겹침 — #"+c.Attrs.ID+" 로 바꿈")
 	}
 }
 
-// freeID 는 「id-1」·「id-2」… 가운데 used 에 없는 첫 것을 used 에 넣고 돌려준다.
-func freeID(id string, used map[string]bool) string {
+// containerIDs 는 할 일 id 가 있을 때 컨테이너가 쓰는 id 가운데 할 일 id 가 아닌 것이다(할 일 id 와 겹친 컨테이너는 finishTodos 가
+// 옮기고 그때 제목 id 를 피한다). processHeadings 가 비킨 제목 id 를 고를 때 피한다. DropNotes 로 뗀 노트 속 컨테이너는 이미 없다.
+func (st *state) containerIDs(doc ast.Node) map[string]bool {
+	if len(st.todoIDs) == 0 {
+		return nil
+	}
+	ids := map[string]bool{}
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if c, ok := n.(*Container); ok && entering && c.Attrs.ID != "" && !st.todoIDs[c.Attrs.ID] {
+			ids[c.Attrs.ID] = true
+		}
+		return ast.WalkContinue, nil
+	})
+	return ids
+}
+
+// freeID 는 「id-1」·「id-2」… 가운데 used 에도 also 에도 없는 첫 것을 used 에 넣고 돌려준다.
+func freeID(id string, used, also map[string]bool) string {
 	for k := 1; ; k++ {
-		if c := id + "-" + strconv.Itoa(k); !used[c] {
+		if c := id + "-" + strconv.Itoa(k); !used[c] && !also[c] {
 			used[c] = true
 			return c
 		}

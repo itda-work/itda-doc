@@ -310,3 +310,23 @@ func TestTodosBodyIDsYield(t *testing.T) {
 	// 모음 자리가 없으면 할 일 id 가 없으니 아무것도 비키지 않는다
 	contains(t, render(t, "# 제목 {#todo-1}\n\n> [!TODO]\n> 일\n").HTML, `<h1 id="todo-1"`)
 }
+
+// 리뷰 3회차 재현 — 할 일 id 에 밀린 제목 id(직접 적은 것·자동)는 컨테이너가 이미 쓰는 id(todo-1-1)도 피한다.
+// DropNotes 참/거짓 모두 id 가 하나씩이고, 목차 링크가 상자가 아니라 제목에 닿는다.
+func TestTodosHeadingYieldAvoidsContainers(t *testing.T) {
+	cases := []struct{ src, heading string }{
+		{"---\ntoc: true\n---\n\n[TOC]\n\n:::todos\n:::\n\n:::box{#todo-1-1}\n상자\n:::\n\n# 제목 {#todo-1}\n\n> [!TODO]\n> 작업\n", "todo-1-2"},
+		{"---\ntoc: true\n---\n\n[TOC]\n\n:::todos\n:::\n\n:::box{#todo-1-1}\n상자\n:::\n\n# todo 1\n\n> [!TODO]\n> 작업\n", "todo-1-2"},
+	}
+	for i, c := range cases {
+		for _, drop := range []bool{false, true} {
+			r := render(t, c.src, Options{DropNotes: drop})
+			contains(t, r.HTML, `<div class="box" id="todo-1-1"`, `<h1 id="`+c.heading+`"`, `markdown-alert-todo" id="todo-1"`)
+			uniqueIDs(t, "review3", r.HTML)
+			contains(t, regexp.MustCompile(`(?s)<nav class="toc".*?</nav>`).FindString(r.HTML), `href="#`+c.heading+`"`)
+			if len(r.TOC) != 1 || r.TOC[0].ID != c.heading {
+				t.Errorf("[%d] DropNotes=%v: 목차 %+v", i+1, drop, r.TOC)
+			}
+		}
+	}
+}

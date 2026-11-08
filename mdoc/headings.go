@@ -37,8 +37,11 @@ type headingInfo struct {
 // 제목 끝의 { … } 속성. 앞에 공백이 있어야 한다(Pandoc).
 var headingAttrRe = regexp.MustCompile(`(?:^|[ \t])\{([^{}]*)\}[ \t]*$`)
 
-func (st *state) processHeadings(hs []*ast.Heading) {
+func (st *state) processHeadings(hs []*ast.Heading, doc ast.Node) {
 	// 할 일 id(todo-k)는 먼저 정해져 이긴다(todos.go collectTodos) — 자동 id 는 피해 가고, 직접 적은 id 는 아래 2) 뒤에 비킨다.
+	// 비킨 id(할 일 id 에서 「-N」 을 찾는 자동 id·직접 적은 id)는 컨테이너가 이미 쓰는 id(ctr)도 피한다 — 원래 다른 id 였던 제목과
+	// 컨테이너가 비키면서 같은 id 가 되지 않게. 할 일 id 와 상관없는 제목 id 는 예전처럼 컨테이너 id 를 보지 않는다.
+	ctr := st.containerIDs(doc)
 	used := map[string]bool{}
 	for id := range st.todoIDs {
 		used[id] = true
@@ -98,8 +101,12 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 		}
 		id := base
 		if used[id] {
+			also := map[string]bool(nil)
+			if st.todoIDs[base] {
+				also = ctr
+			}
 			n := max(next[base], 1)
-			for id = base + "-" + strconv.Itoa(n); used[id]; id = base + "-" + strconv.Itoa(n) {
+			for id = base + "-" + strconv.Itoa(n); used[id] || also[id]; id = base + "-" + strconv.Itoa(n) {
 				n++
 			}
 			next[base] = n + 1
@@ -113,7 +120,7 @@ func (st *state) processHeadings(hs []*ast.Heading) {
 		for _, info := range yield {
 			if info.inNotes == notes {
 				old := info.id
-				info.id = freeID(old, used)
+				info.id = freeID(old, used, ctr)
 				st.warn(yieldLine[info], WarnDuplicateID, "제목 id #"+old+" 가 할 일 id 와 겹침 — #"+info.id+" 로 바꿈")
 			}
 		}

@@ -122,7 +122,7 @@ func (st *state) transform(doc *ast.Document) {
 		st.kpi(c) // 표 캡션을 옮긴 뒤 — 3열 표 꼴은 캡션을 쓰지 않는다(kpi.go)
 	}
 	st.collectTodos(doc, todoIDs) // 알림 판정 뒤, 제목 id 앞 — 할 일 id 를 먼저 정해 제목 id 가 비킨다(todos.go)
-	st.processHeadings(headings)
+	st.processHeadings(headings, doc)
 	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(itda-hyve#550)
 	for _, l := range links {
 		st.link(l)
