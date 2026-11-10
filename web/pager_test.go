@@ -114,6 +114,40 @@ func TestPagerSplitListStart(t *testing.T) {
 	}
 }
 
+// 한 쪽보다 높은 표 행(itda-hyve#795): paginate 옵션 splitTallRows(공유 PDF 의 노트·메모 쪽만 켠다)가 켜지면 splitTable 이 그 행을 칸의 글 단위로 나눠
+// 앞 조각을 지금 쪽에, 뒤 조각(id 없음, .cont)을 다음 쪽 표의 첫 행으로 보낸다 — 칸 글을 이으면 원래 글이고(공백에서 끊음 — 공백 없는 글자만 그 자리),
+// 이어지는 쪽마다 thead 가 있고, 잘린 것이 없다. 한 쪽에 들어가는 행만 있는 표는 행 단위 그대로(앞 행과 합쳐서만 한 쪽을 넘는 행도 나누지 않는다),
+// rowspan 이 걸린 행·글 단위로 못 자르는 칸(큰 수식 하나·블록)은 잘린 채(overflow-clipped)다. 옵션이 없으면 높은 행을 나누지 않고 잘린 채 담는다
+// (변경 전과 같다). pager.js 의 쪽 나눔 부분을 떼어 레이아웃을 흉내 낸 DOM 대역으로 node 에서 돌린다(testdata/pager_rowsplit.cjs).
+// 실제 레이아웃은 itda-hyve 의 공유 PDF 시험이 본다.
+func TestPagerSplitTallRow(t *testing.T) {
+	src := pagerSource(t)
+	a := strings.Index(src, "  const BLOCK_TAGS")
+	z := strings.Index(src[max(a, 0):], "\n  // ---- .fit 그림")
+	if a < 0 || z < 0 {
+		t.Fatal("pager.js 에서 쪽 나눔 부분을 찾지 못함")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다 — ITDA_DOC_STRICT=1(just test·CI)은 node 가 필요하다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	part := filepath.Join(t.TempDir(), "rowsplit.js")
+	if err := os.WriteFile(part, []byte(src[a:a+z]), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	runner, _ := filepath.Abs(filepath.Join("testdata", "pager_rowsplit.cjs"))
+	out, err := exec.Command(node, runner, part).CombinedOutput()
+	if err != nil {
+		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
+	}
+	if m := regexp.MustCompile(`PAGERROW DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out)); m == nil || m[1] == "0" {
+		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
+	}
+}
+
 // pagerSource 는 pager.js 원문이다. ITDA_DOC_TEST_OVERLAY 가 가리키는 overlay JSON 의 Replace 에 pager.js 가 있으면 그 파일을 읽는다
 // (뮤테이션 시험이 디스크의 원문 대신 바꿔 끼운 소스를 보게 — mdoc/guidemd_test.go 의 overlayReplace 와 같은 약속).
 func pagerSource(t *testing.T) string {

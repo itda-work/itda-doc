@@ -1,6 +1,7 @@
 // 쪽 나눔기 — 문서 흐름의 블록을 A4 상자(.page-body)에 차례로 담고, 넘치면 나눈다(설계 4장).
 // A4 인쇄 실측(docs/DESIGN-markdown-docs.md 4장)의 쪽 나눔 코드를 제품 수준으로 옮겼다. 실측이 남긴 한계를 메운다:
-//   표는 행 단위(새 쪽마다 thead 반복), 목록·정의 목록·각주·중첩 컨테이너는 자식 단위(재귀),
+//   표는 행 단위(새 쪽마다 thead 반복 — 한 쪽보다 높은 행은 잘린 채 담는다. opts.splitTallRows 일 때만 그 행의 칸 글을 쪽 경계에서 나눈다:
+//   itda-hyve 공유 PDF 의 노트·메모 쪽만 켠다, itda-hyve#795), 목록·정의 목록·각주·중첩 컨테이너는 자식 단위(재귀),
 //   문단은 글자 단위(공백에서 끊고 앞뒤 조각 최소 2줄 — 고아·과부 줄. 4줄 미만은 쪼개지 않는다), pre 는 줄 단위,
 //   한 쪽보다 큰 그림은 줄여서, 한 쪽보다 큰 통짜 블록(다단·keep)은 풀어서 나눈다(잘리지 않게).
 //   .page-break 는 새 쪽, .keep·그림·알림·결재란은 들어갈 쪽으로 통째로, 제목은 다음 블록과 함께.
@@ -225,22 +226,116 @@
     parent.appendChild(head);
     if (!fits()) { parent.removeChild(head); return null; }
     const rows = [...tb.rows];
-    let k = 0;
+    let k = 0, rest = null;
     for (; k < rows.length; k++) {
       const row = deepClone(rows[k]); // 사본으로 채운다 — 실패하면 원본 표가 그대로 남아야 한다
       hb.appendChild(row);
-      if (!fits()) { hb.removeChild(row); break; }
+      if (fits()) continue;
+      // opts.splitTallRows(itda-hyve#795 — 공유 PDF 의 노트·메모 쪽만 켠다)일 때 한 쪽보다 높은 행만 칸의 글을 쪽 경계에서 잘라 앞 조각을 이 쪽에
+      // 남긴다(splitRow). 옵션이 없으면 tallRow·splitRow 를 부르지 않는다 — 넘친 행은 다음 쪽으로, 빈 쪽에도 안 들어가면 forceFit 이 잘린 채 담는다.
+      const tall = !!(opts && opts.splitTallRows) && tallRow(head, row, k);
+      hb.removeChild(row);
+      if (tall) rest = splitRow(rows[k], hb);
+      break;
     }
-    if (k >= rows.length) { k = rows.length - 1; hb.removeChild(hb.lastChild); } // tfoot 이 넘쳤다 — 마지막 행을 데려간다
-    if (k <= 0) { parent.removeChild(head); return null; }
+    if (!rest && k >= rows.length) { k = rows.length - 1; hb.removeChild(hb.lastChild); } // tfoot 이 넘쳤다 — 마지막 행을 데려간다
+    if (!rest && k <= 0) { parent.removeChild(head); return null; }
     const tail = shallow(node, true);
     const th = node.tHead;
     if (th) tail.appendChild(deepClone(th));
     const tbb = document.createElement("tbody");
+    if (rest) { tbb.appendChild(rest); k++; } // 뒤 조각 행이 다음 쪽 표의 첫 행이다
     for (const r of rows.slice(k)) tbb.appendChild(r);
     tail.appendChild(tbb);
     if (node.tFoot) tail.appendChild(deepClone(node.tFoot));
     return { head, tail };
+  }
+
+  // tallRow 는 넘친 행 row(표 조각 table 의 tbody 끝에 놓인 사본)가 빈 쪽에도 안 들어가는가다. 다음 쪽 표 조각은 표 머리(thead)부터 이 행까지라
+  // 「표 위 끝 → tbody 위 끝」(thead·위 테두리 — caption 은 첫 조각에만 있어 뺀다) + 이 행 높이 + 「이 행 아래 끝 → 표 아래 끝」(아래 테두리)이 본문
+  // 높이보다 크면 그렇다. 앞에 이미 담은 몸 행은 넣지 않는다 — 다음 쪽에는 그 행들이 없다. 열 너비는 지금 조각에서 잰 그대로다.
+  // 표가 캡션 없이 이미 쪽 맨 위(조상까지 앞 형제가 없다)이고 이 행이 첫 행이면 다음 쪽도 같으니 그렇다 — 목록 안 표처럼 위에 들여쓴 몫이 있어도 잘린 채 남기지 않게.
+  function tallRow(table, row, k) {
+    if (k === 0 && !table.caption && atTop(table)) return true;
+    const cap = table.caption ? table.caption.getBoundingClientRect().height : 0;
+    const t = table.getBoundingClientRect(), b = row.parentNode.getBoundingClientRect(), r = row.getBoundingClientRect();
+    return (b.top - t.top - cap) + r.height + (t.bottom - r.bottom) > bodyHeight + 0.5;
+  }
+  function atTop(el) {
+    for (let n = el; n && n !== body; n = n.parentNode) if (n.previousElementSibling) return false;
+    return true;
+  }
+
+  // ---- 한 쪽보다 높은 표 행(itda-hyve#795): 칸마다 글을 쪽 경계에서 잘라 앞 조각 행(이 쪽 표의 끝 행 — hb 에 넣는다)과 뒤 조각 행(돌려준다 —
+  // 다음 쪽 표의 첫 행)을 만든다. 들어가는 칸은 통째로 앞 조각에 두고 뒤 조각에는 빈 칸(.cont)을 둔다. 넘치는 칸은 cut 으로 자른다 — 공백에서
+  // 끊고(낱말 중간에서 자르지 않는다 — 공백 없는 긴 글자만 그 자리에서 끊는다, splitText 와 같다), 4줄 미만 칸은 자르지 않고, 앞뒤 조각 모두 2줄 이상이다.
+  // 뒤 조각 행·칸은 id 가 없고 .cont 다. 나뉜 행 조각을 원래 행으로 되잇는 정보는 남기지 않는다 — 이 나눔은 내려받는 PDF 의 노트·메모 쪽에만
+  // 쓰고(opts.splitTallRows), 표 복사가 읽는 화면의 쪽에는 쓰지 않는다.
+  // 칸(TD)은 행 높이로 늘어나 칸 높이로는 줄을 셀 수 없다 — 칸 내용을 잠깐 div 로 감싸 잰다(cellContent). 칸마다 따로 잰 높이가 표 테두리
+  // 겹침 등으로 조금 어긋날 수 있어, 다 자른 뒤 fits() 로 확인하고 넘치면 한 줄씩 더 줄여 다시 자른다(처음 + 한 줄씩 줄여 3번).
+  // 자르지 않는 것: 표에 rowspan 칸이 있다, 넘치는 칸이 블록을 품었다(isTextBlock 아님), 칸 글을 자를 수 없다(한 쪽보다 큰 수식 하나 등).
+  // 그러면 null 이고 hb 는 그대로다 — 사본만 만들었으므로 원본 행은 그대로 남아 지금처럼 다음 쪽으로 가거나 잘린 채 담긴다(forceFit).
+  function splitRow(orig, hb) {
+    for (const r of orig.parentNode.rows) for (const c of r.cells) if (c.rowSpan > 1) return null;
+    const cells = [...orig.cells];
+    if (!cells.length) return null;
+    const row = shallow(orig, false);
+    for (const c of cells) row.appendChild(deepClone(c));
+    hb.appendChild(row);
+    const rr = row.getBoundingClientRect();
+    const room = bodyBottom + 0.5 - (deepBottom(body.lastElementChild) - rr.bottom) - rr.top; // 행이 가질 수 있는 높이(행 아래 표 테두리·바깥 여백을 뺀다)
+    const lh = lineHeightOf(row.cells[0]);
+    const cuts = cells.map(() => -1); // -1 은 통째로 앞 조각
+    let ok = false;
+    for (let tries = 0; tries < 4 && !ok; tries++) {
+      const limit = room - tries * lh;
+      cells.forEach((c, i) => { row.replaceChild(deepClone(c), row.cells[i]); cuts[i] = -1; });
+      let fail = false;
+      for (let i = 0; i < cells.length && !fail; i++) {
+        const m = cellContent(row.cells[i]);
+        if (m.h + m.pad <= limit) continue;
+        const n = isTextBlock(cells[i]) ? cutCell(cells[i], row, i, limit - m.pad, m.h) : 0;
+        if (n <= 0) fail = true; else cuts[i] = n;
+      }
+      if (fail) break;
+      ok = cuts.some(n => n > 0) && fits();
+    }
+    if (!ok) { hb.removeChild(row); return null; }
+    const tail = shallow(orig, true);
+    cells.forEach((c, i) => tail.appendChild(cuts[i] > 0 ? cut(c, cuts[i], true) : shallow(c, true)));
+    return tail;
+  }
+  // cutCell 은 칸 cell(원본)의 글을 앞 조각 높이가 limit 이하가 되게 자를 글자 수다(row 의 i 번째 칸을 그 앞 조각으로 바꿔 둔다). 못 자르면 0.
+  function cutCell(cell, row, i, limit, fullH) {
+    const full = cell.textContent;
+    const lh = lineHeightOf(row.cells[i]);
+    const total = Math.round(fullH / lh);
+    if (total < 4 || full.trim().length < 2) return 0; // splitText 와 같다 — 4줄 미만은 자르지 않는다
+    const headOf = n => { const p = cut(cell, n, false); row.replaceChild(p, row.cells[i]); return cellContent(p).h; };
+    let lo = 1, hi = full.length - 1, best = 0;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const h = headOf(mid);
+      if (h <= limit && Math.round(h / lh) <= total - 2) { best = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    let b = best;
+    while (b > 0 && !/\s/.test(full[b - 1])) b--; // 공백에서 끊는다. 공백이 없는 긴 글자는 그 자리에서 끊는다(splitText 와 같다)
+    if (b <= 0) b = best;
+    if (b <= 0) { row.replaceChild(deepClone(cell), row.cells[i]); return 0; }
+    if (Math.round(headOf(b) / lh) < 2) { row.replaceChild(deepClone(cell), row.cells[i]); return 0; } // 쪽 끝에 한 줄만 남기지 않는다
+    return b;
+  }
+  // cellContent 는 칸 안 글의 높이(h)와 칸의 위아래 안쪽 여백·테두리(pad)다. 내용을 잠깐 div 로 감싸 재고 되돌린다(칸은 앞 조각 사본이다).
+  function cellContent(td) {
+    const w = document.createElement("div");
+    while (td.firstChild) w.appendChild(td.firstChild);
+    td.appendChild(w);
+    const h = w.getBoundingClientRect().height;
+    while (w.firstChild) td.insertBefore(w.firstChild, w);
+    td.removeChild(w);
+    const cs = getComputedStyle(td);
+    const pad = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    return { h, pad };
   }
 
   // ---- pre: 줄 단위. 뒷조각의 data-line 은 원문에서 이어지는 줄을 가리킨다.
@@ -564,7 +659,8 @@
     for (const n of hosts) body.removeChild(n);
   }
 
-  // paginate 는 flow 의 블록을 target 안의 쪽 상자로 나눠 담는다. flow 는 비워진다.
+  // paginate 는 flow 의 블록을 target 안의 쪽 상자로 나눠 담는다. flow 는 비워진다. o.splitTallRows 가 참이면 한 쪽보다 높은 표 행을 칸 글 단위로
+  // 나눈다(splitTable·splitRow — itda-hyve#795, 공유 PDF 의 노트·메모 쪽만 켠다). 없으면 그런 행은 잘린 채 담긴다(forceFit, overflow 에 센다).
   function paginate(flow, target, o) {
     const t0 = performance.now();
     opts = o || {};
