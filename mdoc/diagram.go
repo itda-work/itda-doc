@@ -95,6 +95,10 @@ func (st *state) diagram(fc *ast.FencedCodeBlock, src []byte) (string, bool) {
 	for _, is := range out.res.Issues {
 		st.warn(at(is.Line), WarnDiagram, "mermaid 그림: "+is.Msg)
 	}
+	if st.opts.RequireFigureDesc && out.res.Descr == "" {
+		// 게시용 검사(Options.RequireFigureDesc) — 그린 그림만 본다. 결과 기억(diagramCache)에는 옵션과 무관한 결과만 두고 경고는 여기서 낸다
+		st.warn(fence, WarnFigureNoDesc, "mermaid 그림에 설명이 없음 — accDescr: 설명 을 적는다")
+	}
 	st.diagramPics[fc] = DiagramPic{SVG: out.res.SVG, Caption: out.res.Caption}
 	var w strings.Builder
 	w.WriteString(out.res.SVG)

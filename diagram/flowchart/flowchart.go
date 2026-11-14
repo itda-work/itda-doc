@@ -56,7 +56,7 @@ func Render(src string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{SVG: drawSVG(g, l), Caption: diagram.XmlChars(g.Title), Issues: issues}, nil
+	return Result{SVG: drawSVG(g, l), Caption: diagram.XmlChars(g.Title), Descr: g.AccDescr, Issues: issues}, nil
 }
 
 // Dir 는 그리는 방향이다.

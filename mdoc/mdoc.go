@@ -47,6 +47,12 @@ type Options struct {
 	// 남이 보낸 문서를 미리 보는 화면이 수식 비용을 원천에서 막을 때 쓴다(itda-hyve#617). 기본은 거짓 — 수식을 그린다.
 	// 수식만 끈다 — ```mermaid 그림·차트·코드 강조는 이 값과 상관없이 돈다(각자의 상한: diagram.go·render.go).
 	NoMath bool
+	// RequireFigureDesc 가 참이면 게시용 검사를 한다 — 그린 그림 가운데 글 설명이 없는 것마다 경고 figure-no-desc 를 하나 낸다:
+	// accDescr 가 없는 ```mermaid 그림(여는 펜스 줄 — title·accTitle 은 설명으로 치지 않는다, diagram.go state.diagram)과
+	// 캡션이 없는 :::chart(여는 줄, chart.go placeChart). 그리지 못한 블록(diagram·chart 경고가 나는 것)은 보지 않는다.
+	// 렌더 결과(HTML)는 바꾸지 않고 경고만 더한다. DropNotes 와 함께 켜면 뺀 노트 안의 그림은 보지 않는다.
+	// 게시 묶음을 만드는 호출자가 켠다(itda-work/itda-hyve#845). 기본은 거짓 — 이 경고를 내지 않는다.
+	RequireFigureDesc bool
 }
 
 // Result 는 렌더 결과다.
@@ -108,6 +114,7 @@ const (
 	WarnKPIEmpty              = "kpi-empty"               // 보드 문서의 :::kpi 안에 정의 목록·3열 표가 없어 KPI 로 그리지 않음(kpi.go)
 	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)
 	WarnTodosBody             = "todos-body"              // :::todos 안에 글이 있어 모음 대신 보통 상자로 그림(todos.go todosContainers, itda-doc#74)
+	WarnFigureNoDesc          = "figure-no-desc"          // 그린 그림에 글 설명이 없음 — accDescr 없는 mermaid·캡션 없는 차트. Options.RequireFigureDesc 를 켠 렌더에서만, 렌더는 그대로(itda-work/itda-hyve#845)
 )
 
 // Render 는 마크다운 원문을 렌더한다. 오류는 내부 렌더 실패뿐이다 — 문법 문제는 Warnings 로 알린다.

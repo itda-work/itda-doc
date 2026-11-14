@@ -124,5 +124,5 @@ func Render(src string) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	return Result{SVG: drawSVG(c, l), Caption: diagram.XmlChars(c.FMCaption), Issues: issues}, nil
+	return Result{SVG: drawSVG(c, l), Caption: diagram.XmlChars(c.FMCaption), Descr: c.AccDescr, Issues: issues}, nil
 }
