@@ -23,6 +23,7 @@
 // 위치로」·hello·version·크기 변경 뒤 재정렬은 슬라이드와 같은 길이다. 꼴을 붙들지 않으므로 내용 위치를 따라가는 동안에도 쪽 | 이어보기
 // 단추를 보인다(발표 슬라이드를 따라가는 동안만 숨김). 둘 다 -1 이면 놓는다(보기 꼴은 그대로 둔다).
 // ⑥ 슬라이드 보기는 너비와 높이에 맞춰 축소해 한 장이 다 보이게 한다(slideZoom — 최소 0.2 라 아주 작은 화면에서는 일부가 잘릴 수 있다). 쪽 보기는 너비만 맞춘다.
+//   보기 영역이 낮으면(SHORT_VIEW_H 미만 — 폰 가로) 높이를 보지 않고 너비를 여백 없이 채운다(slideFit) — 한 장이 세로로 다 보이지 않을 수 있고 굴려 본다.
 // ⑦ 목차 강조의 id → 제목 Map 은 본문을 바꿀 때 한 번 만들고 스크롤 프레임은 그것을 쓴다(headingFinder 의 refresh·index).
 // ⑨ 쪽 넘김 키: ←/→·PageUp/PageDown·Space/Shift+Space·Home/End 로 쪽 보기는 이전·다음 쪽 맨 위, 슬라이드 보기는 이전·다음 장 가운데,
 // 이어보기는 보기 영역 높이 − 40px 만큼(pager.js pageNav — 문서 창 보기 모드와 같은 규칙). 키로 넘기면 따라가기가 이 화면에서 잠시 풀린다(keyHandler).
@@ -799,6 +800,14 @@
     return Math.min(1.6, Math.max(0.2, Math.min((viewerW - gutter) / slideW, (viewerH - gv) / slideH)));
   }
 
+  // slideFit 은 applyZoom 의 슬라이드 맞춤이다 — { z: 배율, gutter: 가로 여백 }. 보기 영역 높이가 SHORT_VIEW_H 미만이면(폰 가로 —
+  // 위 막대를 빼면 300px 안팎) 높이까지 맞추면 슬라이드가 가운데에 작게 남으므로 너비만 여백 없이 채운다. 그 밖은 slideZoom(⑥)이다.
+  const SHORT_VIEW_H = 480;
+  function slideFit(viewerW, viewerH, slideW, slideH, gutter) {
+    if (viewerH < SHORT_VIEW_H) return { z: Math.min(1.6, Math.max(0.2, viewerW / slideW)), gutter: 0 };
+    return { z: slideZoom(viewerW, viewerH, slideW, slideH, gutter), gutter };
+  }
+
   // notesLayout 은 보는 화면의 노트 배치다: 노트가 없거나 슬라이드 보기가 아니면 "off", 오른쪽을 골랐어도 보기 영역 너비에서 여백(gutter)·
   // 칸(noteW)·사이(gap)를 뺀 슬라이드 자리가 narrow 보다 좁으면 "below"(문서 창 applyZoom 과 같은 규칙).
   function notesLayout(mode, hasNotes, look, viewerW, gutter, noteW, gap, narrow) {
@@ -1182,7 +1191,7 @@
   }
 
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
-  window.ItdaShare = window.HyveShare = { lookFor, slideZoom, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
+  window.ItdaShare = window.HyveShare = { lookFor, slideZoom, slideFit, SHORT_VIEW_H, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
@@ -1367,7 +1376,7 @@
     if (state.look === "slides") {
       const [sw, sh] = window.ItdaSlides.SIZE[state.ratio];
       w = sw;
-      z = slideZoom(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter);
+      z = slideFit(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter).z;
     } else if (state.look === "dashboard") {
       w = window.ItdaSlides.SIZE[state.ratio][0]; // 보드는 긴 한 장이다 — 쪽처럼 너비에 맞춘다
       z = Math.min(1.6, Math.max(0.2, (viewer.clientWidth - gutter) / w));
