@@ -300,6 +300,10 @@ func (st *state) chart(c *Container) {
 // placeChart 는 컨테이너 자리를 차트로 바꾼다. 표도 보일 때는 표(캡션 뺀)를 자식으로 남겨 그림 뒤에 낸다.
 func (st *state) placeChart(c *Container, ch *Chart, tbl *extast.Table) {
 	ch.SetPos(c.Pos())
+	if st.opts.RequireFigureDesc && ch.Caption == "" {
+		// 게시용 검사(Options.RequireFigureDesc) — 그린 차트만 본다. 그리지 못한 :::chart 는 이 함수에 오지 않는다
+		st.warn(st.lines.line(c.Pos()), WarnFigureNoDesc, "차트에 캡션이 없음 — 표 다음 문단을 「: 캡션」 으로 적는다")
+	}
 	for n := c.FirstChild(); n != nil; {
 		next := n.NextSibling()
 		if n == ast.Node(tbl) {

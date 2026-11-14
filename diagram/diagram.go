@@ -39,6 +39,7 @@ type Issue struct {
 type Result struct {
 	SVG     string
 	Caption string // frontmatter 의 title — 그림 캡션
+	Descr   string // accDescr — 그림 설명(SVG <title> 에 쓴 글, 없으면 ""). mdoc 의 게시용 검사(figure-no-desc)가 본다
 	Issues  []Issue
 }
 
