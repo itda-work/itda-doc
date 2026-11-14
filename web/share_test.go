@@ -1652,3 +1652,49 @@ func TestShareNoteWidth(t *testing.T) {
 		t.Error("고정 너비 NOTE_W 가 남아 있음")
 	}
 }
+
+// 낮은 보기 영역(폰 가로)의 슬라이드 맞춤(slideFit): 높이가 SHORT_VIEW_H 미만이면 높이를 보지 않고 너비를 여백 없이 채우고, 그 밖은
+// slideZoom(⑥ — 너비·높이 둘 다)과 같다. applyZoom 이 slideZoom 대신 slideFit 을 부르는지는 글로 본다. 실제 화면은 Chrome 모바일 흉내(844×390) 실측.
+func TestShareSlideFitShortView(t *testing.T) {
+	b, err := FS.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	if !strings.Contains(src, "z = slideFit(viewer.clientWidth - side, viewer.clientHeight, sw, sh, gutter).z;") {
+		t.Error("applyZoom 의 슬라이드 맞춤이 slideFit 을 부르지 않음")
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	js := `
+  const vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  vm.runInContext(require("fs").readFileSync(process.env.SRC_FILE, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  // 폰 가로: 보기 844×345 — 너비를 여백 없이(844/960)
+  let f = S.slideFit(844, 345, 960, 540, 56);
+  if (!near(f.z, 844 / 960) || f.gutter !== 0) bad.push("폰 가로 " + JSON.stringify(f));
+  // 문턱 바로 위는 둘 다 맞춤(⑥) — 높이가 묶는다
+  const h = S.SHORT_VIEW_H;
+  f = S.slideFit(1400, h, 960, 540, 56);
+  if (!near(f.z, S.slideZoom(1400, h, 960, 540, 56)) || f.gutter !== 56) bad.push("문턱 " + JSON.stringify(f));
+  // 상한 1.6·하한 0.2 는 낮은 영역에서도 지킨다
+  f = S.slideFit(4000, 300, 960, 540, 56);
+  if (f.z !== 1.6) bad.push("상한 " + f.z);
+  f = S.slideFit(100, 300, 960, 540, 16);
+  if (f.z !== 0.2) bad.push("하한 " + f.z);
+  process.stdout.write(bad.length ? "FIT FAIL " + bad.join(" / ") : "FIT OK");
+`
+	cmd := exec.Command(node, "-e", js)
+	cmd.Env = append(os.Environ(), "SRC_FILE="+srcFile(t, src))
+	out, err := cmd.CombinedOutput()
+	if err != nil || string(out) != "FIT OK" {
+		t.Fatalf("낮은 보기 영역 맞춤: %v\n%s", err, out)
+	}
+}
