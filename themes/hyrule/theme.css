@@ -1,0 +1,130 @@
+/* 제목 세리프: editorial 과 같은 Noto Serif KR Bold subset 한 벌(OFL — assets/README.md). 제목이 800 을 청해도 이 700 한 벌을 쓴다 */
+@font-face { font-family: "Hyrule Serif"; src: url(assets/noto-serif-kr-bold.woff2) format("woff2"); font-weight: 700; font-display: block; }
+
+/* ==== 하이랄 테마 ====
+   문서(A4)는 양피지, 슬라이드는 밤하늘 청록 바탕의 「고대 석판」 화면이다.
+   반투명 그라디언트는 슬라이드 PDF 에서 검게 찍히므로(itda-doc themes.md 토큰 표 --slide-scrim) 그라디언트는 모두 불투명 색끼리만 잇는다. */
+
+/* ---- 공통 어휘: 대사 상자(:::dialog)·챌린지 카드(:::quest) — 색은 아래 변수로, 슬라이드는 슬라이드 절에서 바꾼다 */
+.page-body {
+  --dlg-bg: #fffaf0; --dlg-line: #b8892e; --dlg-ink: #2b2418; --dlg-name-bg: #b8892e; --dlg-name-ink: #fffaf0; --dlg-arrow: #e07b2a;
+  --q-bg: #fbf3df; --q-line: #d9c9a3; --q-bar: #e07b2a; --q-label: #b4561a; --q-ink: #2b2418;
+}
+.dialog { position: relative; background: var(--dlg-bg); color: var(--dlg-ink); border: 1.5pt solid var(--dlg-line); border-radius: 12pt;
+  padding: 12pt 22pt 14pt; margin: 6pt 0 14pt; }
+.dialog > p:first-child { display: inline-block; margin: 0 0 7pt; padding: 1pt 12pt; border-radius: 9pt;
+  background: var(--dlg-name-bg); color: var(--dlg-name-ink); font-size: 0.72em; font-weight: 800; letter-spacing: 0.04em; line-height: 1.5; }
+.dialog > p:first-child strong { color: inherit; }
+.dialog > p:last-child { margin-bottom: 0; }
+.dialog::after { content: "▼"; position: absolute; right: 14pt; bottom: 6pt; color: var(--dlg-arrow); font-size: 0.55em; }
+
+.quest { background: var(--q-bg); color: var(--q-ink); border: 1pt solid var(--q-line); border-left: 5pt solid var(--q-bar); border-radius: 4pt;
+  padding: 9pt 16pt 10pt; margin: 0 0 12pt; }
+.quest > p:first-child { margin: 0 0 3pt; font-size: 0.68em; font-weight: 800; letter-spacing: 0.14em; color: var(--q-label); }
+.quest > p:first-child strong { color: inherit; }
+.quest > p:first-child::before { content: "!"; display: inline-block; width: 1.45em; height: 1.45em; line-height: 1.45em; text-align: center;
+  border-radius: 50%; background: var(--q-bar); color: #1b1408; margin-right: 0.55em; letter-spacing: 0; }
+.quest > p:last-child { margin-bottom: 0; }
+
+/* ---- 문서(A4): 양피지 위 금빛 장식 줄 */
+.page-body h1:not(.ss-title)::after { content: ""; display: block; height: 1.5pt; width: 55%; margin-top: 6pt;
+  background: linear-gradient(90deg, #b8892e, #f6eedb); }
+.page-body h2::before { content: "◆ "; color: #b8892e; font-size: 0.7em; vertical-align: 0.12em; }
+.cover { background: #f1e6c8; }
+.cover-title { color: #1f6f78; }
+
+/* ---- 보드(itda-work/itda-hyve#362): 양피지 위 청록 띠와 금빛 막대, 타일은 위에 청록 선, 구역 제목은 금빛 괘선 */
+.board-deco::before { left: 0; right: 0; width: auto; height: 5pt; background: #1f6f78; }
+.board-deco::after { content: ""; position: absolute; left: var(--board-pad); top: 5pt; width: 56pt; height: 2.5pt; background: #b8892e; }
+.bh-title { color: #1f6f78; font-family: var(--font-heading); }
+.page-body.board-grid .tile { border-top: 2.5pt solid #1f6f78; }
+.page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6) { color: #1f6f78; }
+.page-body.board-grid .board-section { color: #6b4f1d; border-bottom: 1pt solid #b8892e; }
+
+/* ==== 슬라이드 ==== */
+/* 슬라이드 안 요소에서 색 토큰을 밤 화면 값으로 다시 정한다(문서 토큰은 쪽 상자에서 이미 계산돼 내려오므로 파생 토큰도 직접 준다) */
+.slide-head, .slide-foot, .page-body:is(.k-title, .k-section, .k-content, .k-single) {
+  --sk-bg: #0c1a21; --sk-bg2: #11252e; --sk-line: #24505a; --sk-cyan: #57dbea; --sk-orange: #ff9d42; --sk-gold: #ebc66f; --sk-rupee: #53d36f;
+  --ink: #ece4cf; --muted: #9db4b8; --accent: #57dbea; --accent-ink: #0c1a21; --accent-soft: #123039; --rule: #2a4f59; --paper: #0c1a21;
+  --link: #8fe9f4; --link-hover-ink: #ffffff; --link-hover-bg: #123039; --link-hover-line: #57dbea;
+  --slide-title-color: #ebc66f;
+  --table-head-bg: #133944; --table-head-ink: #8fe9f4; --table-border: #24505a; --table-stripe: #0f2229;
+  --code-bg: #0f2229; --quote-bar: #ebc66f; --quote-bg: #11252e; --quote-border: #24505a; --quote-ink: #ece4cf;
+  --box-bg: #11252e; --box-border: 1pt solid #24505a; --lead-bar: 3pt solid #ebc66f;
+  --img-border: 1.5pt solid #2f6f7a; --caption-color: #9db4b8;
+  --dlg-bg: #07121a; --dlg-line: #b59a58; --dlg-ink: #f3ecd8; --dlg-name-bg: #ebc66f; --dlg-name-ink: #1b1408; --dlg-arrow: #ff9d42;
+  --q-bg: #0f2730; --q-line: #2f6f7a; --q-bar: #ff9d42; --q-label: #ff9d42; --q-ink: #ece4cf;
+  color: var(--ink);
+}
+
+/* 테두리: 안쪽 가는 석판 테두리 + 네 귀의 빛나는 꺾쇠 */
+.slide-deco::before { left: 12pt; top: 12pt; right: 12pt; bottom: 12pt; width: auto; height: auto; border: 1pt solid #1d434c; border-radius: 4pt;
+  background: radial-gradient(ellipse 80% 70% at 50% 0%, #133039, #0c1a21 72%); }
+.slide-deco::after { content: ""; position: absolute; inset: 7pt; pointer-events: none;
+  background:
+    linear-gradient(#57dbea, #57dbea) left top / 26pt 2pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) left top / 2pt 26pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) right top / 26pt 2pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) right top / 2pt 26pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) left bottom / 26pt 2pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) left bottom / 2pt 26pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) right bottom / 26pt 2pt no-repeat,
+    linear-gradient(#57dbea, #57dbea) right bottom / 2pt 26pt no-repeat; }
+
+/* 표지·구역: 탑의 레이더 같은 동심원 */
+.slide-deco:is(.k-title, .k-section)::before {
+  background: repeating-radial-gradient(circle at 50% 52%, #0c1a21 0 70pt, #15333d 70pt 71.5pt, #0c1a21 71.5pt 140pt); }
+
+/* 슬라이드 제목: 금빛 세리프 + 빛이 사그라드는 밑줄 */
+.slide-title { font-family: var(--font-heading); color: var(--slide-title-color); letter-spacing: 0; }
+.slide-title::after { content: ""; display: block; width: 240pt; max-width: 70%; height: 2pt; margin-top: 10pt;
+  background: linear-gradient(90deg, #57dbea, #0c1a21); }
+.slide-title .header-section-number { color: var(--sk-cyan); }
+
+/* 본문 */
+.page-body:is(.k-content, .k-single) strong { color: var(--sk-gold); }
+.page-body:is(.k-content, .k-single) ul > li:not(:has(> input[type="checkbox"])) { list-style-type: "◆  "; }
+.page-body:is(.k-content, .k-single) ul > li::marker { color: var(--sk-cyan); font-size: 0.7em; }
+.page-body:is(.k-content, .k-single) ol > li::marker { color: var(--sk-gold); font-weight: 800; }
+.page-body:is(.k-content, .k-single) table { background: var(--sk-bg); }
+.page-body:is(.k-content, .k-single) th { letter-spacing: 0.04em; }
+.page-body:is(.k-content, .k-single) input[type="checkbox"] { transform: rotate(45deg) scale(0.78); border-radius: 1pt; border-color: var(--sk-orange);
+  background: var(--sk-bg); }
+.page-body:is(.k-content, .k-single) li:has(> input[type="checkbox"]) { margin-bottom: 4pt; }
+
+/* 분할 그림: 사진 안쪽에 석판 테두리 */
+.slide-panel::after { content: ""; position: absolute; inset: 10pt; border: 1.5pt solid #8fe9f4; border-radius: 3pt; pointer-events: none; }
+.slide-panel figcaption { color: #9db4b8; background: #0c1a21; }
+
+/* 표지: 게임 타이틀 화면 */
+.slide-cover { align-items: center; text-align: center; padding: 60pt 90pt 54pt; }
+.sc-top { justify-content: center; color: var(--muted); letter-spacing: 0.1em; }
+.sc-main { display: flex; flex-direction: column; align-items: center; }
+.page-body .sc-title { color: var(--sk-gold); max-width: 100%; letter-spacing: 0; }
+.page-body .sc-sub { color: var(--sk-cyan); letter-spacing: 0.06em; }
+.page-body .sc-sub::before, .page-body .sc-sub::after { content: " ◆ "; color: var(--sk-gold); font-size: 0.7em; }
+.sc-main::after { content: "▶  아무 버튼이나 눌러 모험을 시작하세요"; display: block; margin-top: 40pt; color: #9db4b8;
+  font-size: calc(15pt * var(--slide-scale)); letter-spacing: 0.08em; }
+.sc-meta { justify-content: center; color: var(--muted); }
+
+/* 구역: 「새 지역 발견」 배너 — 가운데 금빛 제목, 양옆 장식 줄 */
+.page-body.bare { align-items: center; text-align: center; }
+.page-body.bare .ss-num { font-family: var(--font-body); font-size: calc(17pt * var(--slide-scale)); font-weight: 700; color: var(--sk-cyan);
+  letter-spacing: 0.32em; margin-bottom: 18pt; }
+.page-body.bare .ss-num::before { content: "제 "; }
+.page-body.bare .ss-num::after { content: " 장"; }
+.page-body.bare .ss-title { display: flex; align-items: center; justify-content: center; gap: 24pt; color: var(--sk-gold); letter-spacing: 0.02em; white-space: nowrap; }
+.page-body.bare .ss-title::before, .page-body.bare .ss-title::after { content: ""; display: block; flex: 0 0 110pt; height: 2pt; }
+.page-body.bare .ss-title::before { background: linear-gradient(90deg, #0c1a21, #ebc66f); }
+.page-body.bare .ss-title::after { background: linear-gradient(90deg, #ebc66f, #0c1a21); }
+.page-body.bare .slide-section::after { content: "◇  ◆  ◇"; display: block; margin-top: 20pt; color: var(--sk-orange); letter-spacing: 0.4em;
+  font-size: calc(14pt * var(--slide-scale)); }
+
+/* 바닥: 쪽번호는 초록 루피 */
+.slide-foot { color: #6f8f95; }
+.sf-num { color: #ece4cf; }
+.sf-num::before { content: "◆ "; color: #53d36f; }
+
+/* 배경 그림 장(스크림 위): 금빛 제목 유지 */
+.slide-bg.fill ~ .slide-head .slide-title { color: #ebc66f; }
+.slide-bg.fill ~ .page-body strong { color: #ebc66f; }

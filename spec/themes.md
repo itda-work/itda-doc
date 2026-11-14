@@ -91,7 +91,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `formal` | 단정·격식 | 차분하고 격식 있는 — 내장 `slate`·`swiss`·`contrast` |
 | `vivid` | 선명·브랜드 | 브랜드색이 앞에 서는 |
 | `editorial` | 감성·에디토리얼 | 잡지·감성 무드 — 내장 `verdant`·`editorial` |
-| `dark` | 다크 | 어두운 바탕 |
+| `dark` | 다크 | 어두운 바탕 — 내장 `hyrule`(슬라이드만 어둡고 문서는 양피지) |
 <!-- theme-groups:end -->
 
 ## 3. 토큰 — 전체 표
@@ -470,7 +470,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 
 ## 11. 빌드 때 넣기(내장 테마로)
 
-내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`)다. `editorial` 은 제목 글꼴(Noto Serif KR Bold, OFL)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
+내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`), 그리고 `extends` 없이 선 어두운 슬라이드 테마 `hyrule`(묶음 `dark`)이다. `editorial`·`hyrule` 은 제목 글꼴(Noto Serif KR Bold, OFL — 두 폴더에 같은 바이트)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용과 `hyrule` 의 제목은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
 중립 스타일 테마는 아래 「스타일 테마」 레시피를 브랜드 없이 따른 것이다 — 상표·「비공식」 머리말이 없고, 묶음은 그 무드로 고른다.
 
 ### 스타일 테마 — 남의 디자인 시스템에서 테마 만들기
