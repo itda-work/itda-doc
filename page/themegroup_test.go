@@ -22,8 +22,8 @@ func TestBuiltinThemeGroups(t *testing.T) {
 			t.Errorf("%s: Group %q, 경고 %q — basic 이고 경고가 없어야 함", n, th.Group, th.GroupWarning())
 		}
 	}
-	// 중립 스타일 테마는 구조 테마를 extends 하고 자기 무드의 묶음을 적는다(group 은 물려받지 않는다)
-	for n, want := range map[string]struct{ group, extends string }{"slate": {"formal", "classic"}, "swiss": {"formal", "bold"}, "contrast": {"formal", "mono"}, "verdant": {"editorial", "spine"}, "editorial": {"editorial", "classic"}} {
+	// 중립 스타일 테마는 구조 테마를 extends 하고 자기 무드의 묶음을 적는다(group 은 물려받지 않는다). hyrule 은 extends 없이 선 다크 테마다
+	for n, want := range map[string]struct{ group, extends string }{"slate": {"formal", "classic"}, "swiss": {"formal", "bold"}, "contrast": {"formal", "mono"}, "verdant": {"editorial", "spine"}, "editorial": {"editorial", "classic"}, "hyrule": {"dark", ""}} {
 		th, ok := ts.Get(n)
 		if !ok || th.Group != want.group || th.GroupWarning() != "" || th.Extends != want.extends {
 			t.Errorf("%s: Group %q, extends %q(바란 값 %+v), 경고 %q", n, th.Group, th.Extends, want, th.GroupWarning())
