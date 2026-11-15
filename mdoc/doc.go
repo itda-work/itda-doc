@@ -225,15 +225,30 @@ func (d *Doc) Code(n ast.Node) CodeInfo {
 		return CodeInfo{}
 	}
 	info := parseCodeInfo(fenceInfo(fc, d.body))
+	if info.hasSrc && d.st != nil {
+		if _, used := d.st.srcOut[fc]; !used && info.titleFromSrc {
+			info.title = "" // src 를 쓰지 않은 블록(mermaid·수식)은 src 이름을 파일명으로 쓰지 않는다
+		}
+	}
 	lang := cleanLang([]byte(info.lang))
-	if lang == "" && info.title != "" {
-		lang = guessCodeLang(info.title)
+	if lang == "" {
+		lang = info.guessLang()
+	}
+	if cs, ok := d.CodeSource(n); ok && cs.Err != "" {
+		lang = "" // 불러오지 못한 블록의 글은 오류 문구다 — 강조하지 않는다
 	}
 	return CodeInfo{Lang: lang, Title: info.title}
 }
 
-// CodeText 는 코드 블록의 글이다(줄 끝 \n 포함, 렌더러가 내는 글 그대로).
+// CodeText 는 코드 블록의 글이다(줄 끝 \n 포함, 렌더러가 내는 글 그대로). src 로 불러온 블록(itda-hyve#880)은 불러온 글자이고,
+// 불러오지 못한 블록은 오류 칸 문구 한 줄이다(조용히 빈 블록이 되지 않게 — 경고는 Warnings 에 있다, CodeSource 로 가른다).
 func (d *Doc) CodeText(n ast.Node) string {
+	if cs, ok := d.CodeSource(n); ok {
+		if cs.Err != "" {
+			return "코드 파일을 불러오지 못함: " + cs.Err + "\n"
+		}
+		return cs.Text
+	}
 	var b strings.Builder
 	lines := n.Lines()
 	for i := 0; i < lines.Len(); i++ {

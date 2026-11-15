@@ -47,6 +47,11 @@ type state struct {
 	diagramBytes int  // 그린 SVG 의 합 — MaxDiagramBytesPerDoc
 	diagramFull  bool // 합 상한에 닿음(경고는 한 번)
 	diagramDone  map[ast.Node]bool
+	// 코드 블록 src=(codesrc.go): 블록 → 불러온 결과, 한 렌더에서 읽은 파일(정리된 경로 → 바이트·오류), 읽은 바이트 합, 오류 칸으로 그린 블록
+	srcOut   map[*ast.FencedCodeBlock]*codeSrc
+	srcFiles map[string]includeData
+	srcBytes int
+	srcBox   map[*ast.FencedCodeBlock]bool
 	// 글 안 수식 탐색 예산의 남은 양(문단마다) — math.go
 	mathBudget    map[ast.Node]int
 	textPctWarned map[int]bool     // 경고한 \text{…} 속 주석 % 의 원문 자리(textPctLoss — 같은 % 를 여러 시도가 지나도 한 번, itda-hyve#591)
@@ -78,6 +83,9 @@ func newState(src []byte, meta Meta, opts Options) *state {
 		diagramPics:   map[ast.Node]DiagramPic{},
 		codeHL:        map[*ast.FencedCodeBlock]codeHLDirective{},
 		diagramDone:   map[ast.Node]bool{},
+		srcOut:        map[*ast.FencedCodeBlock]*codeSrc{},
+		srcFiles:      map[string]includeData{},
+		srcBox:        map[*ast.FencedCodeBlock]bool{},
 		mathBudget:    map[ast.Node]int{},
 		textPctWarned: map[int]bool{},
 		delims:        map[ast.Node]int{},

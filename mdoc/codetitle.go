@@ -1,9 +1,11 @@
 package mdoc
 
 import (
+	"path"
 	"regexp"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/alecthomas/chroma/v2/lexers"
 	"github.com/yuin/goldmark/ast"
@@ -31,6 +33,24 @@ type codeInfo struct {
 	title string // 머리 띠 파일명(빈 값이면 띠를 그리지 않는다)
 	hl    string // 줄 강조 낱말 {…} 안 글자(codehl.go — 정규화 전)
 	hasHL bool   // 줄 강조 낱말이 있다({} 처럼 비어도 — 펜스 앞 지시어보다 이긴다)
+	// src 는 코드 파일 불러오기 낱말 src="…" 의 값이다(itda-hyve#880 — codesrc.go). hasSrc 는 낱말이 있었는지다(값이 비어도·
+	// 따옴표가 닫히지 않아도 참 — 그 블록은 오류 칸이 된다). titleFromSrc 는 title 이 없어 머리 띠 파일명을 src 의 마지막 이름으로 채웠는지다.
+	src          string
+	hasSrc       bool
+	titleFromSrc bool
+}
+
+// guessLang 은 언어 낱말이 없을 때 짐작한 언어다 — src 파일 이름(itda-hyve#880)을 먼저, 못 하면 머리 띠 파일명으로(guessCodeLang).
+func (ci codeInfo) guessLang() string {
+	if ci.src != "" {
+		if l := guessCodeLang(path.Base(ci.src)); l != "" {
+			return l
+		}
+	}
+	if ci.title != "" {
+		return guessCodeLang(ci.title)
+	}
+	return ""
 }
 
 // titleRe 는 title="…"·title='…'·title=값(공백 없음) 낱말을 찾는다. 낱말 경계(맨 앞 또는 공백)를
@@ -72,6 +92,7 @@ func sanitizeTitle(s string) string {
 //   - 첫 낱말의 첫 `:` 는 줄임 `언어:파일명` 구분이다. 파일명이 비면 띠 없음(언어는 그대로).
 //   - title= 낱말은 첫 낱말이든 나머지든 찾는다. 줄임 파일명과 title= 이 둘 다 있으면 줄임이 이긴다.
 //   - 줄 강조 낱말 `{1,3-5}`(itda-hyve#479 — codehl.go cutHLWord)는 먼저 떼어 내고 나머지를 위 규칙으로 가른다.
+//   - src= 낱말(itda-hyve#880 — srcWord)은 언어·파일명 가르기와 따로 찾는다. title 이 없으면 src 의 마지막 이름이 파일명이다.
 //
 // 기존 출력 불변: 언어만 적힌 info string(`go`·`math`·`mermaid`)은 lang 이 그 첫 낱말 그대로다. {…} 가 없으면
 // 언어·파일명 결과는 줄 강조 이전과 같다.
@@ -79,7 +100,66 @@ func parseCodeInfo(info []byte) codeInfo {
 	rest, hl, hasHL := cutHLWord(string(info))
 	ci := parseCodeLangTitle(rest)
 	ci.hl, ci.hasHL = hl, hasHL
+	if v, _, found := srcWord(rest); found {
+		ci.src, ci.hasSrc = v, true
+		// 파일명을 적지 않은 src 블록은 src 의 마지막 이름을 머리 띠에 그린다 — 내려받기 단추가 그 띠에 붙는다(itda-hyve#880)
+		if ci.title == "" && v != "" {
+			if name := sanitizeTitle(path.Base(v)); name != "" && name != "." && name != "/" {
+				ci.title, ci.titleFromSrc = name, true
+			}
+		}
+	}
 	return ci
+}
+
+// srcWord 는 info string 에서 첫 src= 낱말의 값과 그 값의 원문 범위([from, to) 바이트 — 따옴표 포함)를 돌려준다(itda-hyve#880).
+// 낱말 규칙은 title= 과 같다 — 맨 앞이나 공백 뒤에서 시작하는 src= 만 보고(mysrc= 는 아니다), 값은 "…"·'…'(공백을 품을 수 있다)
+// 또는 따옴표 없는 글자(공백·따옴표 앞까지)다. 다른 낱말의 따옴표 값 안(title="a src=b")은 낱말이 아니다(fenceAttrWords 와 같은
+// 건너뛰기). 따옴표가 닫히지 않으면 found 는 참이고 값은 비어 있다(그 블록은 오류 칸이 된다).
+func srcWord(s string) (val string, rng [2]int, found bool) {
+	i := 0
+	for i < len(s) {
+		r, sz := utf8.DecodeRuneInString(s[i:])
+		if unicode.IsSpace(r) {
+			i += sz
+			continue
+		}
+		if strings.HasPrefix(s[i:], "src=") {
+			j := i + len("src=")
+			if j < len(s) && (s[j] == '"' || s[j] == '\'') {
+				q := s[j]
+				k := strings.IndexByte(s[j+1:], q)
+				if k < 0 {
+					return "", [2]int{j, len(s)}, true
+				}
+				return s[j+1 : j+1+k], [2]int{j, j + 2 + k}, true
+			}
+			k := j
+			for k < len(s) {
+				r2, sz2 := utf8.DecodeRuneInString(s[k:])
+				if unicode.IsSpace(r2) || r2 == '"' || r2 == '\'' {
+					break
+				}
+				k += sz2
+			}
+			return s[j:k], [2]int{j, k}, true
+		}
+		for i < len(s) { // 그 밖의 낱말 — 따옴표 구간을 통째로 지나간다
+			if c := s[i]; c == '"' || c == '\'' {
+				if j := strings.IndexByte(s[i+1:], c); j >= 0 {
+					i += j + 2
+					continue
+				}
+				return "", [2]int{}, false // 닫히지 않은 따옴표 — 줄 끝까지가 그 속성의 값이다
+			}
+			r2, sz2 := utf8.DecodeRuneInString(s[i:])
+			if unicode.IsSpace(r2) {
+				break
+			}
+			i += sz2
+		}
+	}
+	return "", [2]int{}, false
 }
 
 // parseCodeLangTitle 은 줄 강조 낱말을 뗀 info string 을 언어와 파일명으로 가른다(itda-hyve#441).

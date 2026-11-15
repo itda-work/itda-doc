@@ -775,6 +775,14 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   -webkit-user-select: none; user-select: none;
 }
 
+/* 코드 파일 불러오기 오류 칸(itda-hyve#880 — mdoc codesrc.go srcErrorBox): src= 파일을 쓰지 못한 코드 블록 자리. 조용히 빠지지 않게
+   경고 알림과 같은 왼쪽 줄·옅은 바탕으로 까닭 한 문장을 그린다(인쇄·PDF·공유도 같은 모양). */
+:where(.page-body, .sn-body, .pr-notes-body) .code-src-error {
+  margin: 9pt 0; padding: 6pt 11pt; border-left: 3pt solid var(--alert-caution); border-radius: 0 3pt 3pt 0;
+  background: color-mix(in srgb, var(--alert-caution) var(--alert-bg-alpha), var(--paper)); font-size: 0.92em;
+}
+:where(.page-body, .sn-body, .pr-notes-body) .code-src-error > strong { color: var(--alert-caution); margin-right: 0.4em; }
+
 /* Chroma HTML 클래스는 hl- 접두를 쓴다(render.go). 같은 규칙을 슬라이드·공유·인쇄에도 적용한다. */
 :where(.page-body, .sn-body, .pr-notes-body) pre .hl-k,
 :where(.page-body, .sn-body, .pr-notes-body) pre [class^="hl-k"] { color: var(--code-kw); font-weight: 600; }
