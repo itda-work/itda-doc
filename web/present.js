@@ -7,6 +7,17 @@
 //                                   믿을 수 없는 웹뷰가 있다). state.fsCalls 는 발표를 열 때(start·startBoard)의 전체 화면 진입
 //                                   요청 횟수다 — 훅이 없어도 오르고, 끝낼 때의 false 요청은 세지 않는다.
 //   ItdaPresentHost.ownLink(href)   참이면 그 href 는 호스트 전용 앵커라 발표가 링크로 다루지 않는다(누르기는 넘김·크게 보기 그대로).
+//   ItdaPresentHost.ownsKey(e)      발표의 keydown(capture — onKey) 맨 앞에서 부른다. 참이면 발표는 그 키에 아무것도 하지 않는다(넘김·판서 키·
+//                                   preventDefault·stopPropagation 모두 — 키는 호스트 몫이다). 겹침 층을 가린 동안(아래)에도 늘 먼저 부른다.
+//                                   가려진 층의 키를 양보할지는 호스트 몫이다 — 호스트는 훅 안에서 body 의 pr-overlay-hidden 을 읽어 정할 수 있다.
+//                                   가린 동안 참을 돌려주면 그 키로 검은 화면·한눈에 보기·크게 보기를 닫지 못하므로, 가린 동안은 거짓을 권한다.
+// 겹침 층 — 호스트가 발표 위에 띄우는 자기 요소(예: 내장 터미널). body 의 자식에 OVERLAY 속성(data-pr-overlay)을 달면:
+//   · body.presenting 의 숨김에서 빠지고 z-index 101(#present 는 100)로 보인다(present.css — 자리 잡기 position 은 호스트가 준다).
+//   · 그 안의 mousedown·click·auxclick·pointer 는 넘김·판서·링크·크게 보기로 다루지 않는다(onMouse·eatClick·ink.js BLOCKED). #present 의
+//     커서 숨김(pr-idle)은 층에 닿지 않는다(body 의 자식이면 #present 밖이고, 안에 있어도 present.css 가 커서를 되살린다).
+//   · 검은 화면·한눈에 보기·크게 보기 동안 body 에 OVERLAY_HIDDEN 클래스(pr-overlay-hidden)를 달아 층과 그 자손을 모두 가리고(visibility —
+//     display 는 바꾸지 않아 층 안의 크기 재기가 그대로다), 끝나면 뗀다. 호스트는 이 클래스로 가림을 안다(syncOverlay). 자손의 인라인
+//     visibility !important 는 이 가림을 이긴다(CSS 우선순위) — 층 안에서는 쓰지 않는다. 발표가 끝나면 클래스는 떼고 층 요소는 지우지 않는다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
 //
@@ -47,6 +58,8 @@
   const HUD_H = 40;  // 아래 줄(.pr-hud — 진행 막대·번호·시간) 높이(present.css) — 카드는 그 위까지만 옮긴다
   // 라이트박스(그리기·크기 규칙은 호스트의 크게 보기 부품 ItdaLightbox): 크게 볼 수 있는 것은 슬라이드 본문(.page-body)의 ItdaLightbox.SEL
   // (이미지·표·차트·다이어그램 SVG). 머리·꼬리의 로고(.sc-logo·.sf-logo, slides.js)는 아니다. 호스트의 cursor: zoom-in 규칙과 같은 대상이다
+  const OVERLAY = "[data-pr-overlay]", OVERLAY_HIDDEN = "pr-overlay-hidden"; // 겹침 층 표지·가림 클래스(머리 주석 「호스트 계약」)
+  const inOverlay = t => !!(t && t.closest && t.closest(OVERLAY));
   const reduce = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const stepsOf = i => Number(P.slides[i].dataset.steps || 0);
 
@@ -56,6 +69,10 @@
     if (!h || typeof h[name] !== "function") return undefined;
     try { return h[name](...args); } catch (e) { return undefined; }
   }
+
+  // syncOverlay 는 겹침 층 가림 클래스를 지금 상태(검은 화면·한눈에 보기·크게 보기)에 맞춘다. 발표가 끝났으면 뗀다.
+  function overlayHidden() { return !!(P.on && (P.black || P.grid || P.lightbox)); }
+  function syncOverlay() { document.body.classList.toggle(OVERLAY_HIDDEN, overlayHidden()); }
 
   function el(tag, cls, text) {
     const e = document.createElement(tag);
@@ -307,8 +324,9 @@
     hostCall("fullscreen", false);
     if (lb) lb.close();
     P.lightbox = "";
-    root.remove();
+    root.remove(); // 겹침 층(호스트 요소)은 root 밖이라 남는다
     document.body.classList.remove("presenting");
+    syncOverlay(); // P.on 이 내려가 가림 클래스를 뗀다
     const at = P.idx, total = P.slides.length;
     P.slides = [];
     if (onExit) onExit(at);
@@ -330,8 +348,9 @@
     hostCall("fullscreen", false);
     if (lb) lb.close();
     P.lightbox = "";
-    root.remove();
+    root.remove(); // 겹침 층(호스트 요소)은 root 밖이라 남는다
     document.body.classList.remove("presenting");
+    syncOverlay(); // P.on 이 내려가 가림 클래스를 뗀다
     P.slides = [];
     stage = boardBox = null;
     if (onExit) onExit(frac);
@@ -482,6 +501,7 @@
     P.grid = on === undefined ? !P.grid : on;
     root.classList.toggle("pr-grid-on", P.grid);
     if (P.grid) closeLightbox();
+    syncOverlay();
     if (P.grid && ink) ink.pause(); // 그리던 획을 확정한 뒤 복제한다
     if (!P.grid) { gridEl.textContent = ""; return; }
     gridSel = P.idx;
@@ -775,7 +795,7 @@
     if (P.showToc) markToc();
   }
 
-  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); if (P.black && ink) ink.pause(); }
+  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); }
   function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); relayout(); }
 
   // ---- 라이트박스: 슬라이드 안 이미지·표·그림을 눌러 크게 본다. 발표자 화면에만 있다 — 공유 따라가기(onSlide)로 보내지 않는다.
@@ -807,8 +827,8 @@
       card: () => P.slides[P.idx],
       scope: () => deck,
       cls: "pr-lightbox", // 옛 표지 — ink.js BLOCKED(라이트박스 위 판서 입력 제외)·호스트의 YouTube 재생이 이 이름을 본다
-      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); },
-      onClose: () => { P.lightbox = ""; },
+      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); syncOverlay(); },
+      onClose: () => { P.lightbox = ""; syncOverlay(); },
     });
     lbEl = lb.el;
   }
@@ -820,9 +840,11 @@
   // 닫는 순간 P.lightbox 가 비므로 상태가 아니라 자리(lbEl 안)·깃발(lbEat — 다음 누르기에서 내린다)로 가른다.
   // 덱 안 링크의 click·auxclick 도 언제나 먹는다 — 창이 그 주소로 이동하지 않게. 링크는 그 링크 위에서 눌렀을 때(linkDown)만 연다:
   // 넘김으로 누른 자리에 늦게 나타난 링크(숨은 단계)는 뒤따르는 click 으로 열리지 않는다.
+  // 겹침 층(호스트 요소) 안의 click·auxclick 은 건드리지 않는다 — 깃발(lbEat)도 그대로 둔다(층 밖 다음 click 의 몫이다).
   function eatClick(e) {
     if (!P.on) return;
     const t = e.target;
+    if (inOverlay(t)) return;
     // 크게 보기 부품이 없으면 lbEl 이 없다 — 판서가 건 lbEat·덱 안 링크는 그대로 먹는다
     if (lbEat || (lbEl && t && lbEl.contains(t))) {
       lbEat = false;
@@ -840,6 +862,7 @@
   }
 
   function onMouse(e) {
+    if (inOverlay(e.target)) return; // 겹침 층은 호스트 몫 — 넘김·판서·링크·크게 보기·커서 깨우기 모두 아니다
     wake();
     lbEat = false; // 지난 누르기의 깃발은 click 이 오지 않았어도(밖으로 끌어 놓음) 여기서 내린다 — 이 누르기의 click 을 잘못 먹지 않게
     linkDown = null; // 링크 표지도 같다 — 이 누르기의 click 만 그 링크를 연다
@@ -892,8 +915,10 @@
 
   // onKey 는 발표 키를 전부 삼킨다(capture — Tab 도). 발표 중 코드 복사 단추·파일명 띠 단추는 마우스로만 누른다: 발표 키는 단추에 포커스가
   // 있어도 발표가 갖고, 누른 뒤 포커스를 단추에 남기지 않는 건 복사 단추 쪽이 한다.
+  // 호스트가 ownsKey 로 가져간 키는 맨 앞에서 놓아준다(머리 주석 「호스트 계약」 — 겹침 층을 가린 동안에도 묻는다).
   function onKey(e) {
     if (!P.on) return;
+    if (hostCall("ownsKey", e)) return;
     e.preventDefault();
     e.stopPropagation();
     const k = e.key;

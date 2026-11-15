@@ -127,9 +127,11 @@ function drag(w, target, pts, ev) {
   fire(target, "mouseup", { ...a, clientX: xe, clientY: ye });
   return clickEaten(w, target);
 }
+// key 는 키 하나를 document 붙잡기 단계에 보낸다. 돌려주는 e 의 dp·sp 는 preventDefault·stopPropagation 을 불렀는가다.
 function key(w, k, code, mods) {
-  const e = Object.assign({ key: k, code: code || "", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, isComposing: false, preventDefault() {}, stopPropagation() {} }, mods);
+  const e = Object.assign({ key: k, code: code || "", metaKey: false, ctrlKey: false, altKey: false, shiftKey: false, isComposing: false, preventDefault() { this.dp = true; }, stopPropagation() { this.sp = true; } }, mods);
   for (const f of [...(w.doc.on.keydown || [])]) f(e);
+  return e;
 }
 const line = (x0, y0, n) => Array.from({ length: n }, (_, i) => [x0 + i * 10, y0]);
 const page = (w, i) => w.I.pageOf(w.H.ink().book, i).list;
@@ -266,6 +268,136 @@ const shown = P => P.slides[1].querySelectorAll("[data-step]").map(e => (e.class
   H.next();
   ok("ItdaCodeCopy: 있으면 슬라이드마다 노트 칸에 붙인다", armed.length === 2 && armed[0] === armed[1], armed.length);
   H.stop();
+}
+
+// ---- 4. 호스트 계약: 키 양보(ownsKey)·겹침 층([data-pr-overlay])
+// 크게 보기 부품 흉내 — 열고 닫을 때 present.js 의 onOpen·onClose 를 부른다(가림 클래스 전이를 보려고)
+function fakeLightbox(w) {
+  w.win.ItdaLightbox = { SEL: "img", create(root, o) {
+    const el = root.appendChild(new El("div")); el.className = "pr-lightbox";
+    let open = false;
+    return { el, open() { open = true; o.onOpen("img", 1); }, close() { if (open) { open = false; o.onClose(); } }, onScrollbar: () => false, relayout() {} };
+  } };
+}
+const overlayOf = w => { const o = w.body.appendChild(new El("div")); o.dataset.prOverlay = ""; o.attrs["data-pr-overlay"] = ""; return o; };
+const hidden = w => w.body.classList.contains("pr-overlay-hidden");
+{
+  const w = world(), { P, H } = w;
+  let owns = true;
+  w.win.ItdaPresentHost = { ownsKey: () => owns };
+  const ov = overlayOf(w);
+  open(w);
+  let e = key(w, "ArrowRight", "ArrowRight");
+  ok("ownsKey 참: 넘기지 않고 preventDefault·stopPropagation 도 하지 않는다", P.idx === 0 && !e.dp && !e.sp, { idx: P.idx, dp: e.dp, sp: e.sp });
+  key(w, "l", "KeyL");
+  ok("ownsKey 참: 판서 키(L 레이저)도 발표가 받지 않는다", !toolOf(w), toolOf(w));
+  key(w, "Escape", "Escape");
+  ok("ownsKey 참: Esc 로도 끝나지 않는다", P.on);
+  owns = false;
+  e = key(w, "ArrowRight", "ArrowRight");
+  ok("ownsKey 거짓: 지금처럼 넘기고 키를 삼킨다", P.idx === 1 && e.dp && e.sp, { idx: P.idx, dp: e.dp, sp: e.sp });
+  key(w, "l", "KeyL");
+  ok("ownsKey 거짓: 판서 키는 지금처럼", toolOf(w) === "laser", toolOf(w));
+  key(w, "l", "KeyL");
+  // 겹침 층의 click 은 지난 누르기의 깃발(lbEat)로 먹지 않는다 — 펜으로 그리고 click 없이 놓은 뒤(밖으로 끌어 놓음)
+  key(w, "p", "KeyP");
+  const s1 = P.slides[1];
+  fire(s1, "pointerdown", { clientX: 100, clientY: 100, buttons: 1 });
+  fire(s1, "mousedown", { clientX: 100, clientY: 100, buttons: 1 });
+  fire(s1, "pointerup", { clientX: 130, clientY: 100 });
+  ok("겹침 층: 그 안의 click 은 발표가 먹지 않는다(지난 누르기의 깃발이 서 있어도)", !clickEaten(w, ov));
+  ok("겹침 층: 깃발은 층 밖 다음 click 의 몫으로 남는다", clickEaten(w, s1));
+  // #present 안에 놓인 층도 누르기·판서 자리가 아니다
+  const inner = rootOf(w).appendChild(new El("div")); inner.attrs["data-pr-overlay"] = "";
+  const before = page(w, 1).length;
+  drag(w, inner, line(100, 100, 5));
+  ok("겹침 층(#present 안): 펜이 켜져도 그리지 않는다(ink BLOCKED)", page(w, 1).length === before, page(w, 1).length);
+  key(w, "p", "KeyP");
+  const at = P.idx;
+  tap(w, inner);
+  ok("겹침 층(#present 안): 누르기는 넘김이 아니다(onMouse)", P.idx === at, P.idx);
+  ok("겹침 층(#present 안): 누르기는 커서 숨김 타이머를 다시 걸지 않는다", (rootOf(w).classList.add("pr-idle"), tap(w, inner), rootOf(w).classList.contains("pr-idle")));
+  inner.remove();
+  // 가림 전이: 검은 화면·한눈에 보기·크게 보기
+  ok("가림: 평소에는 가림 클래스가 없다", !hidden(w));
+  owns = true; // 가린 동안에도 ownsKey 를 먼저 묻는다 — 양보할지는 호스트 몫이다
+  H.setBlack(true);
+  ok("가림: 검은 화면 동안 겹침 층을 가린다", hidden(w));
+  e = key(w, "b", "KeyB");
+  const d = key(w, "5", "Digit5");
+  ok("가림 + ownsKey 참: 발표는 아무것도 하지 않는다 — 검은 화면 그대로, dp·sp 없음, 번호 입력 없음",
+    P.black && hidden(w) && !e.dp && !e.sp && !d.dp && !rootOf(w).classList.contains("pr-goto-on"), { black: P.black, dp: e.dp, sp: e.sp, goto: rootOf(w).classList.contains("pr-goto-on") });
+  owns = false;
+  e = key(w, "b", "KeyB");
+  ok("가림 + ownsKey 거짓: 지금처럼 B 로 검은 화면이 걷히고 층이 돌아온다", !P.black && !hidden(w) && e.dp && e.sp, { black: P.black, hidden: hidden(w) });
+  H.toggleGrid(true);
+  ok("가림: 한눈에 보기 동안 가린다", hidden(w));
+  owns = true;
+  e = key(w, "Escape", "Escape");
+  ok("가림 + ownsKey 참: 한눈에 보기도 Esc 를 받지 않는다", P.grid && hidden(w) && !e.dp, { grid: P.grid });
+  owns = false;
+  key(w, "Escape", "Escape");
+  ok("가림 + ownsKey 거짓: 한눈에 보기를 Esc 로 닫으면 되돌린다", !P.grid && !hidden(w) && P.on, { grid: P.grid, on: P.on });
+  // 권하는 호스트: 훅 안에서 가림 클래스를 읽어 가린 동안은 양보하지 않는다
+  w.win.ItdaPresentHost = { ownsKey: () => !w.body.classList.contains("pr-overlay-hidden") };
+  H.setBlack(true);
+  key(w, "b", "KeyB");
+  ok("가림 클래스를 읽는 호스트: 가린 동안의 B 는 발표가 받아 검은 화면을 걷는다", !P.black && !hidden(w));
+  e = key(w, "ArrowRight", "ArrowRight");
+  ok("가림 클래스를 읽는 호스트: 평소 키는 호스트가 가져간다", !e.dp && !e.sp);
+  H.setBlack(true);
+  H.stop();
+  ok("끝: 겹침 층 요소는 남고 가림·presenting 클래스는 떨어진다", w.body.kids.includes(ov) && !hidden(w) && !w.body.classList.contains("presenting"));
+}
+{
+  const w = world(), { P, H } = w;
+  fakeLightbox(w);
+  let owns = true;
+  w.win.ItdaPresentHost = { ownsKey: () => owns };
+  open(w, { index: 1 });
+  tap(w, P.slides[1].querySelector("img"));
+  ok("가림: 크게 보기 동안 가린다", P.lightbox === "img" && hidden(w), P.lightbox);
+  let e = key(w, "Escape", "Escape");
+  ok("가림 + ownsKey 참: 크게 보기도 Esc 를 받지 않는다", P.lightbox === "img" && hidden(w) && !e.dp && !e.sp, P.lightbox);
+  owns = false;
+  key(w, "Escape", "Escape");
+  ok("가림 + ownsKey 거짓: 크게 보기를 Esc 로 닫으면 되돌린다", !P.lightbox && !hidden(w) && P.on, { lb: P.lightbox, on: P.on });
+  H.stop();
+}
+{
+  // 보드 발표: 넘김·판서·한눈에 보기가 없다 — 키 양보·검은 화면·크게 보기 가림·끝 뒤 층 유지를 본다
+  const w = world(), { P, H } = w;
+  fakeLightbox(w);
+  let owns = true;
+  w.win.ItdaPresentHost = { ownsKey: () => owns };
+  const ov = overlayOf(w);
+  const board = new El("div"); board.className = "page"; const bb = board.appendChild(new El("div")); bb.className = "page-body"; bb.appendChild(img());
+  H.startBoard({ page: board, ratio: "16:9", onExit() {} });
+  let e = key(w, "Escape", "Escape");
+  ok("보드 ownsKey 참: Esc 로 끝나지 않고 키를 삼키지 않는다", P.on && P.board && !e.dp && !e.sp, { on: P.on, dp: e.dp });
+  key(w, "b", "KeyB");
+  ok("보드 ownsKey 참: B 도 발표가 받지 않는다", !P.black && !hidden(w));
+  owns = false;
+  key(w, "b", "KeyB");
+  ok("보드 가림: 검은 화면 동안 가린다", P.black && hidden(w));
+  owns = true;
+  e = key(w, "b", "KeyB");
+  ok("보드 가림 + ownsKey 참: 검은 화면 그대로, dp·sp 없음", P.black && hidden(w) && !e.dp && !e.sp);
+  owns = false;
+  key(w, "b", "KeyB");
+  ok("보드 가림 + ownsKey 거짓: B 로 되돌린다", !P.black && !hidden(w));
+  tap(w, P.slides[0].querySelector("img"));
+  ok("보드 가림: 크게 보기 동안 가린다", P.lightbox === "img" && hidden(w), P.lightbox);
+  ok("보드 겹침 층: 그 안의 click 은 먹지 않는다(크게 보기를 연 누르기의 깃발이 서 있어도)", !clickEaten(w, ov));
+  owns = true;
+  e = key(w, "Escape", "Escape");
+  ok("보드 가림 + ownsKey 참: 크게 보기도 Esc 를 받지 않는다", P.lightbox === "img" && hidden(w) && !e.dp);
+  owns = false;
+  key(w, "Escape", "Escape");
+  ok("보드 가림: 크게 보기를 닫으면 되돌린다", !P.lightbox && !hidden(w) && P.on);
+  H.setBlack(true);
+  H.stop();
+  ok("보드 끝: 검은 화면에서 끝내도 겹침 층 요소는 남고 가림 클래스는 떨어진다", !P.on && w.body.kids.includes(ov) && !hidden(w));
 }
 
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);
