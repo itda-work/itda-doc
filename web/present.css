@@ -1,0 +1,196 @@
+/* 발표 화면(present.js)·판서(ink.js)의 모양. 호스트가 문서 화면 CSS 뒤에 싣는다.
+   발표는 창 전체를 덮는 검은 바탕 위에 슬라이드를 맞춘다. 움직임은 화면에서만(인쇄에는 이 층이 없다). */
+body.presenting > :not(#present) { visibility: hidden !important; }
+#present { position: fixed; inset: 0; z-index: 100; background: #000; color: #e9edf3; -webkit-user-select: none; user-select: none; overflow: hidden; }
+#present.pr-idle { cursor: none; }
+.pr-stage { position: absolute; inset: 0; overflow: hidden; }
+/* 노트를 오른쪽에 붙였을 때(.pr-dock)만 무대·아래 줄이 칸 너비만큼 줄어든다 — 떠 있는 카드(기본)는 슬라이드 위에 겹친다 */
+#present.pr-notes-on.pr-dock .pr-stage { right: var(--pr-notes-w, 34%); }
+/* 목차를 왼쪽에 붙였을 때(.pr-toc-dock)도 같다 — 무대 왼쪽이 칸 너비만큼. 노트도 붙였으면 양쪽이 다 준다 */
+#present.pr-toc-on.pr-toc-dock .pr-stage { left: var(--pr-toc-w, 22%); }
+/* 보드 발표(present.js startBoard): 무대가 굴림 칸이고 상자(.pr-board-box)가 그린 높이를 갖는다 */
+#present.pr-board .pr-stage { overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: none; }
+#present.pr-board .pr-stage::-webkit-scrollbar { display: none; }
+.pr-board-box { position: relative; width: 100%; overflow: hidden; }
+#present.pr-board .pr-deck .page { position: relative; }
+.pr-deck.pages { position: absolute; left: 0; top: 0; display: block; padding: 0; gap: 0; transform-origin: 0 0; }
+.pr-deck .page { position: absolute; left: 0; top: 0; visibility: hidden; box-shadow: none !important; }
+.pr-deck .page.pr-cur, .pr-deck .page.pr-out { visibility: visible; }
+.pr-deck .page.pr-cur { z-index: 2; }
+.pr-deck .page.pr-out { z-index: 1; }
+/* 전환: fade(겹쳐 사라짐) · slide(옆으로 밀림, 뒤로 가면 반대) · none */
+/* fade: 나가는 슬라이드를 먼저 빨리 지우고(0.2초) 들어오는 슬라이드를 조금 늦게(0.08초) 띄운다 — 두 장이 반씩 겹친 모습이 길게 남지 않게 */
+.t-fade .pr-deck .page.pr-in { animation: pr-fade-in 0.36s ease-out 0.08s both; }
+.t-fade .pr-deck .page.pr-out { animation: pr-fade-out 0.2s ease-in both; }
+.t-slide .pr-deck .page.pr-in { animation: pr-slide-in 0.5s cubic-bezier(0.22, 0.8, 0.26, 1) both; }
+.t-slide .pr-deck .page.pr-in.pr-back { animation-name: pr-slide-in-back; }
+.t-slide .pr-deck .page.pr-out { animation: pr-slide-out 0.34s cubic-bezier(0.4, 0, 1, 1) both; }
+.t-slide .pr-deck .page.pr-out.pr-back { animation-name: pr-slide-out-back; }
+@keyframes pr-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pr-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes pr-slide-in { from { transform: translateX(7%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pr-slide-in-back { from { transform: translateX(-7%); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pr-slide-out { from { transform: none; opacity: 1; } to { transform: translateX(-7%); opacity: 0; } }
+@keyframes pr-slide-out-back { from { transform: none; opacity: 1; } to { transform: translateX(7%); opacity: 0; } }
+/* 차례로 나타내기: 목록 항목은 차례 전에도 흐리게 보이고(앞으로 나올 것을 미리 보여 준다), 멈춤(. . .) 뒤 블록은 자리만 차지하고
+   보이지 않는다(자리가 바뀌지 않게). 차례가 오면 움직임 없이 바로 바뀐다 — 확대된 덱에서 떠오르게 하면 WebKit 이 흐리게 그렸다 다시 그린다 */
+/* 목록 항목은 visibility 를 물려받는다 — 멈춤 뒤 목록처럼 감싼 블록이 아직 숨어 있으면 항목도 숨는다 */
+.pr-deck [data-step].pr-pending { visibility: hidden; opacity: 0; }
+.pr-deck li[data-step].pr-pending { visibility: inherit; opacity: 0.3; }
+.pr-black { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 5; }
+#present.pr-black-on .pr-black { opacity: 1; }
+/* 아래: 진행 막대·번호·경과 시간·조작 안내. 마우스를 가만히 두면 숨는다. */
+.pr-hud { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 18px 4px;
+  font: 12px/1 var(--ui-font); color: rgba(255, 255, 255, 0.78); z-index: 6; transition: opacity 0.3s;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent); }
+#present.pr-idle .pr-hud { opacity: 0; }
+#present.pr-notes-on.pr-dock .pr-hud { right: var(--pr-notes-w, 34%); }
+#present.pr-toc-on.pr-toc-dock .pr-hud { left: var(--pr-toc-w, 22%); }
+.pr-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, 0.14); }
+/* 노트 있는 슬라이드 자리의 눈금 — 막대 위로 솟는다. 아래 줄(.pr-hud)과 함께 숨는다 */
+.pr-bar .pr-tick { position: absolute; bottom: 0; width: 2px; height: 8px; margin-left: -1px; background: #8db4ff; border-radius: 1px; pointer-events: none; }
+.pr-bar i { display: block; height: 100%; width: 0; background: rgba(255, 255, 255, 0.85); transition: width 0.3s ease; }
+.pr-num, .pr-time { font-variant-numeric: tabular-nums; font-weight: 600; }
+.pr-time { color: rgba(255, 255, 255, 0.6); }
+.pr-share { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.pr-share:empty { display: none; }
+.pr-hint { margin-left: auto; min-width: 0; color: rgba(255, 255, 255, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-num, .pr-time { flex: none; white-space: nowrap; } /* 안내 글이 길어도 번호가 접히지 않게 — 좁아지는 것은 안내 글이다 */
+/* 발표자 노트 — N 으로 편다. 기본은 슬라이드 위에 떠 있는 카드(청중과 함께 읽으므로 짙은 바탕에 밝은 글자로 대비를 크게 둔다),
+   머리 단추로 고르면 오른쪽에 붙인 칸(.pr-dock). 카드 자리·높이는 present.js layoutCard 가 --pr-card-x·y·h 로 건다(화면 안에 가둔다) */
+.pr-notes { position: absolute; width: var(--pr-notes-w, 34%); box-sizing: border-box; padding: 22px 26px; overflow: auto; display: none; z-index: 7;
+  font: calc(var(--note-fs, 17) * 1px)/1.65 var(--ui-font); color: #eef1f5; -webkit-user-select: text; user-select: text; }
+#present:not(.pr-dock) .pr-notes { left: var(--pr-card-x, calc(100% - 24px - var(--pr-notes-w, 34%))); top: var(--pr-card-y, 24px);
+  max-height: calc(100% - 88px); padding: 0 22px 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(14, 16, 20, 0.9); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35); }
+#present.pr-dock .pr-notes { top: 0; right: 0; bottom: 0; background: #15181d; border-left: 1px solid #2a2f37; }
+#present.pr-notes-on .pr-notes { display: block; }
+.pr-notes-head { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #a3acba; margin-bottom: 12px; line-height: 1; }
+/* 카드 머리(단추 밖)를 끌어 옮긴다 — 붙인 칸은 옮기지 않는다 */
+/* 머리는 카드를 굴려도 위에 남는다(sticky — 카드 위 여백을 머리 안에 두어 내용 상자 위끝이 카드 위끝이다) */
+#present:not(.pr-dock) .pr-notes-head { cursor: grab; margin: 0 -22px 10px; padding: 14px 22px 10px; position: sticky; top: 0; z-index: 1;
+  background: rgba(14, 16, 20, 0.96); border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+#present.pr-moving, #present.pr-moving .pr-notes-head { cursor: grabbing; }
+#present.pr-moving .pr-notes { -webkit-user-select: none; user-select: none; }
+.pr-notes-head .pr-notes-title { margin-right: 2px; }
+.pr-notes-head .pr-notes-count { letter-spacing: 0; color: #8db4ff; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.pr-notes-head .pr-dock-btn { margin-right: auto; }
+.pr-notes-head button { font: 600 12px/1 var(--ui-font); letter-spacing: 0; color: #c9d0da; background: #232832; border: 1px solid #39404b; border-radius: 5px;
+  padding: 4px 7px; cursor: pointer; }
+.pr-notes-head button:hover { background: #2c323d; }
+.pr-notes-head .pr-fs-val { min-width: 2.4em; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: 0; }
+/* N 칸 왼쪽 경계 — 끌어 너비를 바꾼다(창의 22~60%, 두 번 누르면 34%). 칸과 형제라 칸의 글을 굴려도 그 자리에 있다.
+   떠 있는 카드면 카드의 왼쪽 경계를 따라다닌다(--pr-card-x·y·h — present.js layoutCard) */
+.pr-notes-grip { position: absolute; width: 10px; cursor: col-resize; z-index: 8; display: none; }
+#present.pr-dock .pr-notes-grip { top: 0; bottom: 0; right: var(--pr-notes-w, 34%); margin-right: -5px; }
+#present:not(.pr-dock) .pr-notes-grip { left: calc(var(--pr-card-x, calc(100% - 24px - var(--pr-notes-w, 34%))) - 5px); top: var(--pr-card-y, 24px);
+  height: var(--pr-card-h, 0px); border-radius: 5px; }
+#present.pr-notes-on .pr-notes-grip { display: block; }
+.pr-notes-grip:hover, #present.pr-dragging .pr-notes-grip { background: rgba(141, 180, 255, 0.25); }
+#present.pr-dragging { cursor: col-resize; }
+#present.pr-dragging .pr-notes { -webkit-user-select: none; user-select: none; }
+/* 목차 칸 — T 로 편다. 기본은 슬라이드 위 왼쪽에 떠 있는 카드(노트 카드와 같은 모양), 머리 단추·Shift+D 로 왼쪽에 붙인 칸
+   (.pr-toc-dock). 카드 자리·높이는 present.js layoutToc 이 --pr-toc-x·y·h 로 건다(화면 안에 가둔다). 머리는 위에 남고 항목만 굴린다 */
+.pr-toc { position: absolute; width: var(--pr-toc-w, 22%); box-sizing: border-box; display: none; flex-direction: column; z-index: 7;
+  font: 14px/1.4 var(--ui-font); color: #dfe4ea; }
+#present.pr-toc-on .pr-toc { display: flex; }
+#present:not(.pr-toc-dock) .pr-toc { left: var(--pr-toc-x, 24px); top: var(--pr-toc-y, 24px); max-height: calc(100% - 88px);
+  border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(14, 16, 20, 0.9);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35); }
+#present.pr-toc-dock .pr-toc { top: 0; left: 0; bottom: 0; background: #15181d; border-right: 1px solid #2a2f37; }
+.pr-toc-head { flex: none; display: flex; align-items: center; gap: 6px; padding: 14px 18px 10px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  color: #a3acba; line-height: 1; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+#present:not(.pr-toc-dock) .pr-toc-head { cursor: grab; }
+#present.pr-moving .pr-toc-head { cursor: grabbing; }
+.pr-toc-head .pr-toc-title { margin-right: 2px; }
+.pr-toc-head button { margin-right: auto; font: 600 12px/1 var(--ui-font); letter-spacing: 0; color: #c9d0da; background: #232832; border: 1px solid #39404b;
+  border-radius: 5px; padding: 4px 7px; cursor: pointer; }
+.pr-toc-head button:hover { background: #2c323d; }
+.pr-toc-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 6px 8px 10px; }
+.pr-toc-item { display: flex; align-items: baseline; gap: 8px; width: 100%; box-sizing: border-box; border: 0; border-radius: 6px; padding: 5px 8px; margin: 1px 0;
+  background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.pr-toc-item:hover { background: rgba(255, 255, 255, 0.07); }
+.pr-toc-item.on { background: rgba(75, 134, 245, 0.3); color: #fff; }
+.pr-toc-item.k-section, .pr-toc-item.k-title { font-weight: 700; margin-top: 6px; }
+.pr-toc-item.sub { padding-left: 22px; }
+.pr-toc-n { flex: none; min-width: 1.6em; text-align: right; font-size: 12px; color: #7d8794; font-variant-numeric: tabular-nums; font-weight: 600; }
+.pr-toc-item.on .pr-toc-n { color: #cfe0ff; }
+.pr-toc-t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.pr-toc-dot { flex: none; align-self: center; width: 6px; height: 6px; border-radius: 50%; background: #8db4ff; }
+/* 목차 오른쪽 경계 — 끌어 너비를 바꾼다(창의 16~40%, 두 번 누르면 22%). 떠 있는 카드면 카드의 오른쪽 경계를 따라다닌다 */
+.pr-toc-grip { position: absolute; width: 10px; cursor: col-resize; z-index: 8; display: none; }
+#present.pr-toc-dock .pr-toc-grip { top: 0; bottom: 0; left: var(--pr-toc-w, 22%); margin-left: -5px; }
+#present:not(.pr-toc-dock) .pr-toc-grip { left: calc(var(--pr-toc-x, 24px) + var(--pr-toc-w, 22%) - 5px); top: var(--pr-toc-y, 24px);
+  height: var(--pr-toc-h, 0px); border-radius: 5px; }
+#present.pr-toc-on .pr-toc-grip { display: block; }
+.pr-toc-grip:hover, #present.pr-toc-dragging .pr-toc-grip { background: rgba(141, 180, 255, 0.25); }
+#present.pr-toc-dragging { cursor: col-resize; }
+#present.pr-toc-dragging .pr-toc { -webkit-user-select: none; user-select: none; }
+/* 노트 글의 서식은 호스트의 노트 칸 규칙을 쓰고(있으면), 여기서는 어두운 바탕에 맞게 색만 바꾼다 */
+.pr-notes-body th { background: #232832; font-weight: 600; }
+.pr-notes-body :is(th, td), .pr-notes-body hr { border-color: #39404b; }
+.pr-notes-body code, .pr-notes-body pre { background: #222731; color: #e6e9ee; }
+.pr-notes-body blockquote { border-left-color: #4a5260; color: #b9c0cb; }
+.pr-notes-body a { color: #8db4ff; }
+.pr-notes-body .box { border: 1px solid #39404b; background: #1b1f26; }
+/* 차트 글자·눈금은 문서 글자색(어두움)이라 어두운 바탕에서 안 보인다 — 노트 칸에서만 밝게. 테마 토큰(--chart-*)은 여기서 정하지 않는다
+   (창 틀 CSS 가 정한 변수 이름은 테마가 못 쓰는 예약 이름이 된다 — page.ShellCSS) */
+.pr-notes-body .chart-svg text, .pr-notes-body .chart-svg .val, .pr-notes-body .chart-svg .total { fill: #e6e9ee; }
+.pr-notes-body .chart-svg .tick, .pr-notes-body .chart-svg .unit { fill: #9aa3b1; }
+.pr-notes-body .chart-svg .gl { stroke: #333a45; }
+.pr-notes .pr-none { color: #8b94a3; }
+/* 번호로 가기 */
+.pr-goto { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 14px 26px; border-radius: 12px; z-index: 9;
+  background: rgba(20, 22, 27, 0.9); font: 600 40px/1 var(--ui-font); font-variant-numeric: tabular-nums; display: none; }
+#present.pr-goto-on .pr-goto { display: block; }
+/* 한눈에 보기 */
+.pr-grid { position: absolute; inset: 0; z-index: 8; background: #0b0d10; overflow: auto; padding: 24px; display: none;
+  grid-template-columns: repeat(var(--cols, 4), max-content); gap: 16px; align-content: start; justify-content: center; }
+#present.pr-grid-on .pr-grid { display: grid; }
+#present.pr-grid-on { cursor: default; }
+.pr-cell { position: relative; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 4px; outline: 2px solid transparent; outline-offset: 3px; }
+.pr-cell.on { outline-color: #4b86f5; }
+.pr-thumb { position: relative; overflow: hidden; background: #fff; border-radius: 3px; }
+.pr-thumb .page { position: absolute; left: 0; top: 0; transform-origin: 0 0; visibility: visible !important; animation: none !important; }
+.pr-thumb .page * { animation: none !important; }
+.pr-cell-n { position: absolute; left: 6px; bottom: 6px; font: 600 11px/1 var(--ui-font); color: #fff; background: rgba(0, 0, 0, 0.6); padding: 3px 6px; border-radius: 4px; }
+/* 판서(ink.js). 층은 슬라이드(.page — contain: paint 라 쌓임 맥락) 자식이다. 혼합·투명도는 경로가 아니라 층에 건다: 형광펜 층이 글자·바탕과 섞이고
+   글자를 가리지 않는다. 곱하기는 어두운 바탕에서 보이지 않아 슬라이드 바탕이 어두우면 스크린으로 밝힌다(.ink-dark — ink.js slideDark). 펜은 형광펜 위다 */
+/* 미리보기의 읽기 전용 판서(ink.js preview)도 같은 클래스에 .ink-preview 를 더한다 — 출력에서는 호스트가 숨기고 발표 복제(present.js)가 뗀다 */
+.ink-hl, .ink-pen, .ink-live { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.ink-hl { z-index: 5; mix-blend-mode: multiply; opacity: 0.5; }
+.ink-pen { z-index: 6; }
+.ink-live { z-index: 7; }
+.ink-live.ink-live-hl { z-index: 5; mix-blend-mode: multiply; opacity: 0.5; }
+.ink-hl.ink-dark, .ink-live.ink-live-hl.ink-dark { mix-blend-mode: screen; opacity: 0.6; }
+.pr-thumb .ink-live { display: none; }
+.ink-laser { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+#present.pr-ink-on .pr-hud { pointer-events: none; } /* 아래 줄에 가려 그리지 못하는 자리가 없게 — 아래 줄에는 누를 것이 없다 */
+#present.pr-ink-on .pr-deck { touch-action: none; }
+#present.pr-ink-pen, #present.pr-ink-hl { cursor: crosshair; }
+#present.pr-ink-erase { cursor: cell; }
+#present.pr-ink-pen .pr-deck a, #present.pr-ink-hl .pr-deck a, #present.pr-ink-erase .pr-deck a { cursor: inherit; } /* 링크 위 누르기도 그리기다 — 손가락 커서를 띄우지 않는다 */
+#present.pr-ink-laser:not(.pr-grid-on, .lb-on) { cursor: none; }
+.pr-ink-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: none; align-items: center; gap: 4px; max-width: calc(100% - 24px);
+  flex-wrap: wrap; justify-content: center; padding: 5px 8px; border-radius: 8px; background: rgba(20, 22, 26, 0.88); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4); font: 12px/1 var(--ui-font); color: #e9edf3; cursor: default; }
+#present.pr-ink-on:not(.pr-grid-on, .lb-on, .pr-black-on) .pr-ink-bar { display: flex; }
+.pr-ink-bar button { height: 26px; border: 0; border-radius: 5px; background: transparent; color: inherit; font: inherit; padding: 0 8px; cursor: pointer; }
+.pr-ink-bar button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+.pr-ink-bar button:disabled { opacity: 0.32; cursor: default; }
+.pr-ink-bar button.on { background: rgba(255, 255, 255, 0.24); }
+.pr-ink-gap { width: 1px; height: 18px; margin: 0 4px; background: rgba(255, 255, 255, 0.2); }
+.pr-ink-bar .pr-ink-sw { width: 20px; height: 20px; padding: 0; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35); }
+.pr-ink-bar .pr-ink-sw:hover:not(:disabled) { background: inherit; }
+.pr-ink-bar .pr-ink-sw.on { outline: 2px solid #fff; outline-offset: 1px; }
+.pr-ink-bar .pr-ink-w { display: inline-flex; align-items: center; justify-content: center; width: 28px; padding: 0; }
+.pr-ink-w i { display: block; width: 16px; border-radius: 3px; background: currentColor; }
+.pr-ink-w.w0 i { height: 2px; }
+.pr-ink-w.w1 i { height: 4px; }
+.pr-ink-w.w2 i { height: 7px; }
+.pr-ink-note { display: none; flex-basis: 100%; text-align: center; padding: 4px 0 2px; color: #ffd27a; }
+.pr-ink-bar.has-note .pr-ink-note { display: block; }
+/* 노트 있는 슬라이드 썸네일의 점 */
+.pr-cell-note { position: absolute; right: 7px; bottom: 7px; width: 9px; height: 9px; border-radius: 50%; background: #4b86f5; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
+@media (prefers-reduced-motion: reduce) { #present *, #present .page { animation: none !important; transition: none !important; } }
