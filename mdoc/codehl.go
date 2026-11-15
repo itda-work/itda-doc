@@ -65,6 +65,10 @@ func hlProtected(s string) [][2]int {
 	for _, m := range titleRe.FindAllStringIndex(text, -1) {
 		out = append(out, [2]int{lead + m[0], lead + m[1]})
 	}
+	// src= 값(itda-hyve#880)도 파일 경로라 그 안의 {…} 는 경로 글자 그대로다
+	if _, rng, found := srcWord(s); found {
+		out = append(out, rng)
+	}
 	first := codeInfoFirst(text)
 	if !strings.ContainsRune(first, '=') {
 		if c := strings.IndexByte(first, ':'); c >= 0 {
@@ -112,7 +116,8 @@ type codeHLDirective struct {
 
 // codeHL 은 펜스 코드 블록의 줄 강조 목록(정규화한 "1,3-5", 없으면 "")이다 — info 의 {…} 가 펜스 앞 Deckset
 // 지시어보다 이긴다(codehl.go). 읽지 못한 낱말은 경고하고 버린다.
-func (r *htmlRenderer) codeHL(node ast.Node, info codeInfo) string {
+// n 은 블록의 내용 줄 수다(src 블록은 불러온 파일의 줄 수 — itda-hyve#880).
+func (r *htmlRenderer) codeHL(node ast.Node, info codeInfo, n int) string {
 	fc, ok := node.(*ast.FencedCodeBlock)
 	if !ok {
 		return ""
@@ -125,7 +130,7 @@ func (r *htmlRenderer) codeHL(node ast.Node, info codeInfo) string {
 		}
 		spec, directive, line = d.spec, true, d.line
 	}
-	out, bad := normalizeHL(spec, fc.Lines().Len(), directive)
+	out, bad := normalizeHL(spec, n, directive)
 	if len(bad) > 0 {
 		r.st.warn(line, WarnBadAttribute, fmt.Sprintf("코드 줄 강조 %s 를 읽지 못해 버림(번호 또는 a-b 범위, a ≤ b)", strings.Join(bad, " ")))
 	}

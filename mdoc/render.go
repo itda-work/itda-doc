@@ -2,6 +2,7 @@ package mdoc
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/alecthomas/chroma/v2"
 	"hash/fnv"
 	"io"
@@ -113,6 +114,16 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 			blockIndex = len(r.st.editorTokens)
 			r.st.editorTokens = append(r.st.editorTokens, editorCodeLocation(fc, src, r.st.lines, r.st.fenceCloses[fc]))
 		}
+		// 그림·수식은 src 를 쓰지 않는다(itda-hyve#880) — 블록 안 글로 그리고(그리지 못해 코드로 남아도 블록 안 글) 경고한다
+		if info.hasSrc && (info.lang == "math" || info.lang == "mermaid") {
+			if entering {
+				r.st.warn(r.st.lines.line(fc.Pos()), WarnCodeSrcIgnored, fmt.Sprintf("%s 블록은 src 를 쓰지 않음 — 블록 안 글로 그림", info.lang))
+			}
+			info.src, info.hasSrc = "", false
+			if info.titleFromSrc {
+				info.title, info.titleFromSrc = "", false
+			}
+		}
 	}
 	if fc, ok := node.(*ast.FencedCodeBlock); ok && info.lang == "math" {
 		// ```math 는 GitHub 처럼 블록 수식이다. 그리지 못하면 보통의 코드 블록으로 둔다(원문이 보인다 — 파일명 띠도 그린다)
@@ -149,19 +160,42 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 			}
 		}
 	}
+	// src= 블록(itda-hyve#880, codesrc.go): 파일 내용을 코드 글자로 쓴다. 불러오지 못하면 그 자리에 오류 칸을 그린다(조용히 빠지지 않는다)
+	var cs *codeSrc
+	if fc, ok := node.(*ast.FencedCodeBlock); ok && info.hasSrc {
+		if !entering && r.st.srcBox[fc] {
+			return ast.WalkContinue, nil
+		}
+		if entering {
+			cs = r.st.codeSource(fc, info)
+			if cs.err != nil {
+				r.st.srcBox[fc] = true
+				r.srcErrorBox(w, fc, cs)
+				return ast.WalkSkipChildren, nil
+			}
+		}
+	}
 	if !entering {
 		_, _ = w.WriteString("</code></pre>\n")
 		return ast.WalkContinue, nil
 	}
-	// 언어가 없고 파일명이 있으면 확장자·이름으로 짐작한다(guessed). 짐작 포함 언어는 아래 강조 허용 목록·상한을 그대로 통과한다.
+	// 언어가 없으면 src 파일 이름·파일명 띠의 확장자·이름으로 짐작한다(guessed). 짐작 포함 언어는 아래 강조 허용 목록·상한을 그대로 통과한다.
 	lang := cleanLang([]byte(info.lang))
-	if lang == "" && info.title != "" {
-		lang = guessCodeLang(info.title)
+	if lang == "" {
+		lang = info.guessLang()
+	}
+	lines := node.Lines()
+	nLines := lines.Len()
+	if cs != nil {
+		nLines = cs.n
 	}
 	_, _ = w.WriteString("<pre")
 	dataAttrs(w, node)
 	if info.title != "" {
 		attr(w, "data-title", info.title) // 머리 띠 파일명 — 화면(base.css ::before)이 그리는 표식이다
+	}
+	if cs != nil {
+		srcAttrs(w, cs) // 내려받기 표시(data-src-*) — 화면이 원본 바이트를 되살린다
 	}
 	if fc, ok := node.(*ast.FencedCodeBlock); ok {
 		// 단 나누기(itda-hyve#487): 펜스 줄 cols=2|3 — 화면(codelines.js·base.css)이 N단으로 흘린다(codecols.go)
@@ -173,7 +207,7 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 			r.st.warn(r.st.lines.line(fc.Pos()), WarnBadAttribute, msg)
 		}
 	}
-	if hl := r.codeHL(node, info); hl != "" {
+	if hl := r.codeHL(node, info, nLines); hl != "" {
 		attr(w, "data-hl", hl) // 줄 강조(itda-hyve#479) — 화면(codelines.js)이 줄 span 에 hl 클래스를 단다
 	}
 	_, _ = w.WriteString("><code")
@@ -181,11 +215,13 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 		attr(w, "class", "language-"+lang)
 	}
 	_ = w.WriteByte('>')
-	lines := node.Lines()
 	if fc, ok := node.(*ast.FencedCodeBlock); ok && lang != "" {
-		if lang != "math" && lang != "mermaid" && len(lang) <= 64 && highlightLanguages[strings.ToLower(lang)] && lines.Len() <= maxHighlightBlockLines && r.st.highlightBytes < maxHighlightDocBytes {
+		if lang != "math" && lang != "mermaid" && len(lang) <= 64 && highlightLanguages[strings.ToLower(lang)] && nLines <= maxHighlightBlockLines && r.st.highlightBytes < maxHighlightDocBytes {
 			var code bytes.Buffer
-			for i := 0; i < lines.Len() && code.Len() <= maxHighlightBlockBytes; i++ {
+			if cs != nil {
+				code.WriteString(cs.text)
+			}
+			for i := 0; cs == nil && i < lines.Len() && code.Len() <= maxHighlightBlockBytes; i++ {
 				_, _ = code.Write(segValue(lines.At(i), src))
 			}
 			if code.Len() <= maxHighlightBlockBytes && code.Len() <= maxHighlightDocBytes-r.st.highlightBytes {
@@ -196,8 +232,11 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 						formatter := chromahtml.New(chromahtml.WithClasses(true), chromahtml.ClassPrefix("hl-"), chromahtml.PreventSurroundingPre(true))
 						tokens := iter.Tokens()
 						if formatter.Format(&out, styles.Fallback, chroma.Literator(tokens...)) == nil {
-							if mapped, ok := editorRawTokens(fc, src, r.st.lines, tokens); ok {
-								r.st.editorTokens[blockIndex].Tokens = mapped
+							// 편집기 색 토큰은 원문 펜스 안 글자에 대응한다 — 불러온 글자(src)는 원문에 없으므로 주지 않는다
+							if cs == nil {
+								if mapped, ok := editorRawTokens(fc, src, r.st.lines, tokens); ok {
+									r.st.editorTokens[blockIndex].Tokens = mapped
+								}
 							}
 							r.st.highlightBytes += code.Len()
 							_, _ = io.Copy(w, &out)
@@ -207,6 +246,10 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 				}
 			}
 		}
+	}
+	if cs != nil {
+		_, _ = w.Write(util.EscapeHTML([]byte(cs.text)))
+		return ast.WalkContinue, nil
 	}
 	for i := 0; i < lines.Len(); i++ {
 		_, _ = w.Write(util.EscapeHTML(segValue(lines.At(i), src)))

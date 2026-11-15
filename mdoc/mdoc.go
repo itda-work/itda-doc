@@ -53,6 +53,14 @@ type Options struct {
 	// 렌더 결과(HTML)는 바꾸지 않고 경고만 더한다. DropNotes 와 함께 켜면 뺀 노트 안의 그림은 보지 않는다.
 	// 게시 묶음을 만드는 호출자가 켠다(itda-work/itda-hyve#845). 기본은 거짓 — 이 경고를 내지 않는다.
 	RequireFigureDesc bool
+	// ReadInclude 는 코드 블록 src="상대 경로" 의 파일을 읽는다(itda-hyve#880, codesrc.go). rel 은 문서 폴더 기준의 정리된 상대 경로(슬래시 —
+	// CheckIncludePath 를 통과한 것)다. 렌더러는 디스크를 읽지 않는다 — 경로를 아는 호출자(문서 창·공유·검사는 디스크, 묶기는 커밋)가 넘긴다.
+	// 쓰지 못하면 *IncludeError(까닭)를 돌려준다 — 렌더러가 그 자리에 오류 칸을 그리고 까닭별 경고를 낸다. nil 이면 src 블록마다
+	// 오류 칸과 code-src-unchecked 경고다(붙여넣은 원문 등). 크기(MaxIncludeBytes)·UTF-8 검사는 렌더러도 한다.
+	ReadInclude func(rel string) ([]byte, error)
+	// IncludeHref 가 있으면 불러온 src 블록의 pre 에 data-src-href(원본 바이트 주소)를 단다 — 묶음(강의 사이트)이 첨부 주소를 줄 때 쓴다.
+	// rel 은 ReadInclude 와 같은 값이다(읽기에 성공한 것만 부른다).
+	IncludeHref func(rel string) string
 }
 
 // Result 는 렌더 결과다.
@@ -115,6 +123,19 @@ const (
 	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)
 	WarnTodosBody             = "todos-body"              // :::todos 안에 글이 있어 모음 대신 보통 상자로 그림(todos.go todosContainers, itda-doc#74)
 	WarnFigureNoDesc          = "figure-no-desc"          // 그린 그림에 글 설명이 없음 — accDescr 없는 mermaid·캡션 없는 차트. Options.RequireFigureDesc 를 켠 렌더에서만, 렌더는 그대로(itda-work/itda-hyve#845)
+	// 코드 블록 src=(itda-hyve#880, codesrc.go) — 불러오지 못한 블록은 그 자리에 오류 칸, 경고 줄은 여는 펜스 줄
+	WarnCodeSrcUnchecked   = "code-src-unchecked"   // 문서 경로 없이 렌더해(Options.ReadInclude 가 nil) src 를 확인하지 못함 — 오류 칸
+	WarnCodeSrcMissing     = "code-src-missing"     // src 파일이 없음·경로가 비었음·읽지 못함·보통 파일이 아님 — 오류 칸
+	WarnCodeSrcOutside     = "code-src-outside"     // src 가 문서 폴더 밖(절대 경로·..·주소·역슬래시) — 오류 칸
+	WarnCodeSrcHidden      = "code-src-hidden"      // src 경로에 숨긴 이름(. 으로 시작) — 오류 칸
+	WarnCodeSrcLink        = "code-src-link"        // src 경로가 심볼릭 링크를 거침 — 오류 칸
+	WarnCodeSrcExt         = "code-src-ext"         // src 확장자가 텍스트 코드 파일 목록(CodeSrcExts)에 없음 — 오류 칸
+	WarnCodeSrcTooLarge    = "code-src-too-large"   // src 파일이 256KB(또는 문서 합 4MB)를 넘음 — 오류 칸
+	WarnCodeSrcNotUTF8     = "code-src-not-utf8"    // src 파일이 UTF-8 글이 아님(NUL 포함) — 오류 칸
+	WarnCodeSrcNotAllowed  = "code-src-not-allowed" // 문서 위 lecture.yml 의 files: 에 없음(호출자가 판정) — 오류 칸
+	WarnCodeSrcUncommitted = "code-src-uncommitted" // 커밋에 없음(묶기 — 호출자가 판정) — 오류 칸
+	WarnCodeSrcIgnored     = "code-src-ignored"     // src 와 블록 안 글이 함께(src 를 씀), 또는 mermaid·수식의 src(쓰지 않음 — :::chart 의 src 는 chart 경고) — 렌더는 그대로
+	WarnCodeSrcEOL         = "code-src-eol"         // src 파일의 줄 끝이 섞여 있음 — 화면은 그대로, 내려받으면 많은 쪽 하나로 맞춰짐
 )
 
 // Render 는 마크다운 원문을 렌더한다. 오류는 내부 렌더 실패뿐이다 — 문법 문제는 Warnings 로 알린다.

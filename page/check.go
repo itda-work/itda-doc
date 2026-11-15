@@ -51,6 +51,12 @@ type CheckResult struct {
 // 불러오지 않은 것으로 센다. 폴더 파일은 frontmatter 기본값으로 함께 검사에 얹힌다(itda-hyve#474 — 문서 창과 같은 값).
 // path 가 비면 상속이 없다(붙여넣은 원문 검사는 지금과 같다). ts 는 쓸 테마 묶음이다(nil 이면 내장 테마만).
 func Check(src []byte, path string, ts *Themes) (CheckResult, error) {
+	return CheckOpts(src, path, ts, mdoc.Options{})
+}
+
+// CheckOpts 는 Check 와 같되 렌더 옵션을 받는다 — 호스트 앱이 코드 블록 src= 읽기(mdoc.Options.ReadInclude, itda-hyve#880)를 넘길 때
+// 쓴다. 원격 그림은 늘 불러오지 않은 것으로 세고 그림 주소 머리는 비운다(opts 의 두 값은 쓰지 않는다).
+func CheckOpts(src []byte, path string, ts *Themes, opts mdoc.Options) (CheckResult, error) {
 	if len(src) > MaxCheckBytes {
 		return CheckResult{}, fmt.Errorf("문서가 너무 큼(%d바이트 — 상한 %d)", len(src), MaxCheckBytes)
 	}
@@ -61,7 +67,8 @@ func Check(src []byte, path string, ts *Themes) (CheckResult, error) {
 		}
 	}
 	sum := sha256.Sum256(src)
-	v := renderView(src, path, "", ts, "", false)
+	opts.AllowRemoteImages, opts.LocalImagePrefix = false, ""
+	v := renderViewOpts(src, path, ts, "", opts)
 	out := CheckResult{SourceHash: hex.EncodeToString(sum[:])[:16], SyntaxHash: mdsyntax.Hash(), FolderMeta: v.FolderMeta, Warnings: []CheckWarning{}}
 	if v.Error != "" {
 		return CheckResult{}, errors.New(v.Error) // 렌더러 내부 실패뿐이다 — 문법 문제는 경고로 온다
