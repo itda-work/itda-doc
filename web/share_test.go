@@ -1653,6 +1653,104 @@ func TestShareNoteWidth(t *testing.T) {
 	}
 }
 
+// 노트 「오른쪽」 이 들어가지 않는 너비(itda-work/itda-doc#84): 판정(notesRightFits)은 notesLayout 의 문턱과 같고, 단추 칠하기(notesSwitchState)는
+// 실제 배치에 켜진 표시를 붙이며 좁으면 「오른쪽」 을 비활성으로 둔다. 고른 값은 그대로라 넓히면 오른쪽으로 돌아온다. 단추 칠하기(paintNotesButtons)는
+// 가짜 단추로 실제로 돌린다. applyZoom·ResizeObserver 에서 paintNotesSwitch 로 오는 연결은 글로 본다.
+func TestShareNotesRightFit(t *testing.T) {
+	node := needNode(t)
+	js := `
+  const fs = require("fs"), vm = require("vm");
+  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+  for (const f of ["pager.js", "slides.js", "share.js"]) vm.runInContext(fs.readFileSync(f, "utf8"), ctx);
+  const S = ctx.window.ItdaShare, bad = [];
+  const eq = (name, got, want) => { const a = JSON.stringify(got), b = JSON.stringify(want); if (a !== b) bad.push(name + ": " + a + " ≠ " + b); };
+  // 경계: 보기 1000·여백 56·사이 20·최소 520 → 칸 404 까지 들어감, 405 부터 안 들어감. iPad 11형 세로 834 → 438 이라 안 들어감
+  eq("경계", [S.notesRightFits(1000, 56, 404, 20, 520), S.notesRightFits(1000, 56, 405, 20, 520), S.notesRightFits(834, 56, 320, 20, 520), S.notesRightFits(916, 56, 320, 20, 520), S.notesRightFits(915, 56, 320, 20, 520)],
+    [true, false, false, true, false]);
+  // notesLayout 과 같은 식인가 — 너비를 훑어 오른쪽 배치와 판정이 늘 같다
+  let same = true;
+  for (let w = 300; w <= 1600; w++) for (const nw of [240, 320, 640]) {
+    const g = w < 600 ? 16 : 56;
+    if ((S.notesLayout("right", true, "slides", w, g, nw, 20, 520) === "right") !== S.notesRightFits(w, g, nw, 20, 520)) same = false;
+  }
+  eq("notesLayout 과 같은 문턱", same, true);
+  // 화면 흐름: 고른 값 right, 보기 너비가 바뀔 때마다 배치·판정을 다시 재고 칠한다(applyZoom → paintNotesSwitch 와 같은 순서)
+  const paint = (mode, w) => { const g = w < 600 ? 16 : 56, layout = S.notesLayout(mode, true, "slides", w, g, 320, 20, 520);
+    return Object.assign({ layout }, S.notesSwitchState(mode, layout, S.notesRightFits(w, g, 320, 20, 520))); };
+  const mode = "right";
+  eq("넓음: 오른쪽 켜짐", paint(mode, 1194), { layout: "right", on: "right", rightOff: false, reason: "" });
+  eq("좁음(iPad 세로): 아래 켜짐·오른쪽 비활성·돌아온다는 이유", paint(mode, 834), { layout: "below", on: "below", rightOff: true, reason: "화면이 좁아 노트를 아래에 둔다 — 넓히면 오른쪽으로 돌아온다" });
+  eq("다시 넓힘: 오른쪽으로 돌아옴", paint(mode, 1194), { layout: "right", on: "right", rightOff: false, reason: "" });
+  eq("폰: 아래 켜짐·오른쪽 비활성", paint(mode, 390), { layout: "below", on: "below", rightOff: true, reason: "화면이 좁아 노트를 아래에 둔다 — 넓히면 오른쪽으로 돌아온다" });
+  eq("끔은 좁아도 끔이 켜짐·돌아온다는 말 없음", paint("off", 834), { layout: "off", on: "off", rightOff: true, reason: "화면이 좁아 오른쪽에 둘 수 없다" });
+  eq("아래를 골라 좁음: 돌아온다는 말 없음", paint("below", 834), { layout: "below", on: "below", rightOff: true, reason: "화면이 좁아 오른쪽에 둘 수 없다" });
+  eq("끔·넓음", paint("off", 1194), { layout: "off", on: "off", rightOff: false, reason: "" });
+  eq("아래를 고르면 넓어도 아래", paint("below", 1194), { layout: "below", on: "below", rightOff: false, reason: "" });
+  eq("노트 없음(배치 off)이면 고른 값", S.notesSwitchState("right", "off", true), { on: "right", rightOff: false, reason: "" });
+  // 실제 칠하기(paintNotesButtons)를 가짜 단추로 왕복: 기억에서 읽은 고른 값 right 로 좁음 → 넓음 → 좁음. on·disabled·title·고른 값(저장소)을 본다
+  const store = { "hs-notes": "right" }, np = S.notePrefs(() => ({ getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); } }), [12, 14, 17]);
+  const btn = (notes, title) => { const cls = new Set(); return { dataset: { notes }, title, disabled: false,
+    classList: { toggle: (c, on) => { if (on) cls.add(c); else cls.delete(c); } }, on: () => cls.has("on") }; };
+  const RT = "노트를 슬라이드 오른쪽에(좁은 화면에서는 아래에)";
+  const bs = [btn("off", "노트 끔"), btn("right", RT), btn("below", "노트를 슬라이드 아래에")];
+  const look = w => { const g = w < 600 ? 16 : 56, layout = S.notesLayout(np.mode, true, "slides", w, g, np.width, 20, 520);
+    S.paintNotesButtons(bs, S.notesSwitchState(np.mode, layout, S.notesRightFits(w, g, np.width, 20, 520)));
+    return { on: bs.filter(b => b.on()).map(b => b.dataset.notes), disabled: bs.map(b => b.disabled), title: bs[1].title, mode: np.mode, stored: store["hs-notes"] }; };
+  const wide = { on: ["right"], disabled: [false, false, false], title: RT, mode: "right", stored: "right" };
+  const narrow = { on: ["below"], disabled: [false, true, false], title: "화면이 좁아 노트를 아래에 둔다 — 넓히면 오른쪽으로 돌아온다", mode: "right", stored: "right" };
+  eq("왕복 넓음", look(1194), wide);
+  eq("왕복 좁음", look(834), narrow);
+  eq("왕복 다시 넓음(disabled 풀림·title 되돌림)", look(1194), wide);
+  eq("왕복 다시 좁음", look(834), narrow);
+  np.setMode("off");
+  eq("끔으로 바꾸고 좁음", look(834), { on: ["off"], disabled: [false, true, false], title: "화면이 좁아 오른쪽에 둘 수 없다", mode: "off", stored: "off" });
+  eq("끔·넓음: title 되돌림", look(1194), { on: ["off"], disabled: [false, false, false], title: RT, mode: "off", stored: "off" });
+  process.stdout.write(bad.length ? "FAIL " + bad.join("; ") : "NOTESFIT OK");
+`
+	out, err := exec.Command(node, "-e", js).CombinedOutput()
+	if err != nil || string(out) != "NOTESFIT OK" {
+		t.Fatalf("노트 오른쪽 판정: %v\n%s", err, out)
+	}
+	b, err := os.ReadFile("share.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	for _, want := range []string{
+		// 판정은 notesLayout 안에서도 같은 함수로(식을 두 군데 따로 적지 않는다)
+		`return mode === "right" && !notesRightFits(viewerW, gutter, noteW, gap, narrow) ? "below" : mode;`,
+		// applyZoom 이 배치를 정한 뒤 판정을 재고 칠한다(두 갈래 모두) — 회전·창 크기(afterResize)·칸 끌기(resizer.apply)·보기 꼴 바꿈(draw)이 모두 지난다
+		"state.notesRightFits = notesRightFits(viewer.clientWidth, gutter, noteW, NOTE_GAP, NOTE_NARROW);\n    paintNotesSwitch();",
+		"layout: \"off\" });\n      paintNotesSwitch();\n      return;",
+		// 칠하기: 실제 배치로 켜고, 오른쪽은 disabled·title
+		`paintNotesButtons(document.querySelectorAll("[data-notes]"), notesSwitchState(np.mode, state.notesLayout, state.notesRightFits));`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("share.js 에 %q 가 없음", want)
+		}
+	}
+	if strings.Contains(src, "b.dataset.notes === np.mode") {
+		t.Error("켜진 표시가 아직 고른 값(np.mode)을 본다")
+	}
+	css, err := os.ReadFile(filepath.Join("viewer", "viewer.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(css), ".gbtn:disabled") || !strings.Contains(string(css), ".gbtn:hover:not(:disabled)") {
+		t.Error("viewer.css 에 비활성 .gbtn 모양이 없음")
+	}
+	// 공유 화면은 viewer.css 를 읽지 않는다 — share.css 의 노트 컨트롤 범위에 비활성 모양·hover 제외가 있어야 한다(호스트 창 틀 CSS 에 기대지 않음)
+	scss, err := os.ReadFile("share.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{".share-view .notes-switch .gbtn:disabled { opacity: .45; cursor: default; }", ".share-view .notes-switch .gbtn:disabled:hover { background: var(--ui-panel); }"} {
+		if !strings.Contains(string(scss), want) {
+			t.Errorf("share.css 에 %q 가 없음", want)
+		}
+	}
+}
+
 // 낮은 보기 영역(폰 가로)의 슬라이드 맞춤(slideFit): 높이가 SHORT_VIEW_H 미만이면 높이를 보지 않고 너비를 여백 없이 채우고, 그 밖은
 // slideZoom(⑥ — 너비·높이 둘 다)과 같다. applyZoom 이 slideZoom 대신 slideFit 을 부르는지는 글로 본다. 실제 화면은 Chrome 모바일 흉내(844×390) 실측.
 func TestShareSlideFitShortView(t *testing.T) {

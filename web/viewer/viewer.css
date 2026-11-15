@@ -35,8 +35,8 @@ body { margin: 0; background: var(--ui-bg); color: var(--ui-text); font-family: 
 .spacer { flex: 1; min-width: 0; }
 .btn, .ibtn, .gbtn { font: inherit; color: var(--ui-text); background: var(--ui-panel); border: 1px solid var(--ui-line);
   border-radius: 7px; height: 30px; padding: 0 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.btn:hover:not(:disabled), .ibtn:hover, .gbtn:hover { background: var(--ui-hover); }
-.btn:disabled, .vsel:disabled { opacity: .45; cursor: default; }
+.btn:hover:not(:disabled), .ibtn:hover, .gbtn:hover:not(:disabled) { background: var(--ui-hover); }
+.btn:disabled, .vsel:disabled, .gbtn:disabled { opacity: .45; cursor: default; }
 .btn.primary { background: var(--ui-accent); color: var(--ui-accent-fg); border-color: var(--ui-accent); font-weight: 600; }
 .ibtn { width: 32px; padding: 0; justify-content: center; border-color: transparent; background: transparent; color: var(--ui-muted); }
 .ibtn.on { background: var(--ui-active); color: var(--ui-accent); }
