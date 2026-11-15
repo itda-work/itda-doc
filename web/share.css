@@ -32,6 +32,9 @@
 }
 /* 발표자 노트 컨트롤(itda-hyve#344) — 틀은 호스트 앱 창 틀 CSS 의 .notes-switch·.note-fs. hidden 이면 슬라이드 보기여도 숨긴다(노트가 오지 않음) */
 .share-view .notes-switch[hidden] { display: none !important; }
+/* 비활성 단추(좁아 오른쪽이 들어가지 않는 「오른쪽」·노트 끔일 때의 글자 단추 — share.js paintNotesSwitch): 호스트 창 틀 CSS 에 기대지 않고 흐리게, hover 색 없이 */
+.share-view .notes-switch .gbtn:disabled { opacity: .45; cursor: default; }
+.share-view .notes-switch .gbtn:disabled:hover { background: var(--ui-panel); }
 .share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
 @media (max-width: 600px) {
   .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */

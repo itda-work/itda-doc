@@ -812,7 +812,30 @@
   // 칸(noteW)·사이(gap)를 뺀 슬라이드 자리가 narrow 보다 좁으면 "below"(문서 창 applyZoom 과 같은 규칙).
   function notesLayout(mode, hasNotes, look, viewerW, gutter, noteW, gap, narrow) {
     if (!hasNotes || look !== "slides" || (mode !== "right" && mode !== "below")) return "off";
-    return mode === "right" && viewerW - gutter - noteW - gap < narrow ? "below" : mode;
+    return mode === "right" && !notesRightFits(viewerW, gutter, noteW, gap, narrow) ? "below" : mode;
+  }
+  // notesRightFits 는 오른쪽 배치가 들어가는가다 — 보기 영역 너비에서 여백·칸·사이를 뺀 슬라이드 자리가 narrow 이상이면 참(notesLayout 의 문턱과 같은 식).
+  function notesRightFits(viewerW, gutter, noteW, gap, narrow) {
+    return viewerW - gutter - noteW - gap >= narrow;
+  }
+  // notesSwitchState 는 노트 단추의 칠하기다 — { on: 켜진 단추, rightOff: 「오른쪽」 을 비활성으로, reason: 비활성일 때의 title(아니면 "") }.
+  // 끔이면 「끔」, 그 밖은 실제 배치(layout — 오른쪽을 골랐어도 좁아 아래로 그렸으면 「아래」)가 켜진다. 배치가 "off"(노트 없음·슬라이드 아님)면 고른 값.
+  // 고른 값(mode)은 바꾸지 않는다 — 오른쪽을 골라 둔 경우에만 넓어지면 오른쪽으로 돌아오므로, 그때만 이유에 그 말을 붙인다.
+  function notesSwitchState(mode, layout, fits) {
+    const on = mode === "off" ? "off" : (layout === "right" || layout === "below" ? layout : mode);
+    const reason = fits ? "" : mode === "right" ? "화면이 좁아 노트를 아래에 둔다 — 넓히면 오른쪽으로 돌아온다" : "화면이 좁아 오른쪽에 둘 수 없다";
+    return { on, rightOff: !fits, reason };
+  }
+  // paintNotesButtons 는 노트 모드 단추들(data-notes)에 notesSwitchState 의 st 를 칠한다: 켜진 표시(.on), 「오른쪽」 의 disabled·title(원래 title 은
+  // 처음 칠할 때 data-title 에 두고 들어가면 되돌린다).
+  function paintNotesButtons(buttons, st) {
+    for (const b of buttons) {
+      b.classList.toggle("on", b.dataset.notes === st.on);
+      if (b.dataset.notes !== "right") continue;
+      if (b.dataset.title === undefined) b.dataset.title = b.title;
+      b.disabled = st.rightOff;
+      b.title = st.rightOff ? st.reason : b.dataset.title;
+    }
   }
 
   // 오른쪽 노트 칸 너비(화면 px — itda-hyve#728 실기 후속): 기본·최소·최대. 호스트 앱 문서 창의 끌기 손잡이와 같은 값이다(app.js NOTE_W_*).
@@ -1193,7 +1216,7 @@
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, slideFit, SHORT_VIEW_H, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
-    lookSwitchHidden, afterResize, followLink, notesLayout, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
+    lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
@@ -1214,6 +1237,8 @@
   const state = { view: null, look: "", chosen: "", forced: false, themeFailed: false, ratio: "16:9", landscape: false, ended: false, rendering: null, again: false,
     // 발표자 노트(itda-hyve#344): 받은 view 의 슬라이드마다 노트(slideNotes — 원문 자리의 장, slides.js build itda-hyve#518)·노트가 하나라도 있는지(hasNotes)·지금 그린 배치(notesLayout)
     slideNotes: [], hasNotes: false, notesLayout: "off",
+    // 오른쪽 배치가 지금 보기 영역 너비에 들어가는가(notesRightFits — applyZoom 이 배치를 정할 때 잰다). 아니면 「오른쪽」 단추를 비활성으로(paintNotesSwitch).
+    notesRightFits: true,
     // 지금 화면에 걸린 표 정렬 지정(itda-hyve#349 2단계 — 이 화면만). 없으면 null
     tableSort: null,
     // 첫 view 를 받았는가(firstView)·폴더의 문서 목록({docs, rev, truncated}, 폴더 공유가 아니면 null)·첫 그리기 뒤 옮겨 갈 #제목
@@ -1359,6 +1384,7 @@
       state.notesLayout = "off";
       if (gripDrag) gripDrag.check(); // 오른쪽이 아니게 됐다 — 끌던 것이 있으면 끝낸다
       window.ItdaSlides.layoutNotes(pg, $("notes"), { layout: "off" });
+      paintNotesSwitch();
       return;
     }
     if (viewer.clientWidth === 0) return;
@@ -1370,6 +1396,8 @@
     const side = layout === "right" ? noteW + NOTE_GAP : 0;
     state.notesLayout = layout;
     if (gripDrag) gripDrag.check(); // 아래·끔으로 바뀌었으면 끌던 것을 끝낸다
+    state.notesRightFits = notesRightFits(viewer.clientWidth, gutter, noteW, NOTE_GAP, NOTE_NARROW);
+    paintNotesSwitch(); // 배치가 정해질 때마다(회전·창 크기·칸 너비 끌기·보기 꼴 바꿈 — 모두 applyZoom 을 지난다) 단추를 실제 배치로
     pg.classList.toggle("notes-right", layout === "right");
     pg.classList.toggle("notes-below", layout === "below");
     let w, z;
@@ -1530,10 +1558,11 @@
     if (np.font) r.setProperty("--note-fs", String(np.font)); else r.removeProperty("--note-fs");
     $("note-fs-val").textContent = String(np.font || 14);
   }
-  // paintNotesSwitch 는 노트 컨트롤을 노트가 온 슬라이드 보기에서만 보인다(공유가 끝났으면 숨김).
+  // paintNotesSwitch 는 노트 컨트롤을 노트가 온 슬라이드 보기에서만 보인다(공유가 끝났으면 숨김). 켜진 표시는 실제 배치에 붙고, 오른쪽이 들어가지
+  // 않는 너비에서는 「오른쪽」 을 비활성(disabled)으로 두고 title 을 이유로 바꾼다(notesSwitchState·paintNotesButtons).
   function paintNotesSwitch() {
     $("notes-switch").hidden = state.ended || state.look !== "slides" || !state.hasNotes;
-    for (const b of document.querySelectorAll("[data-notes]")) b.classList.toggle("on", b.dataset.notes === np.mode);
+    paintNotesButtons(document.querySelectorAll("[data-notes]"), notesSwitchState(np.mode, state.notesLayout, state.notesRightFits));
     for (const b of document.querySelectorAll("[data-note-font]")) b.disabled = np.mode === "off";
   }
   // slideAtMiddle 은 보기 영역 가운데에 걸린 슬라이드 번호다(배치를 바꾼 뒤 그 슬라이드로 돌아오려고). 없으면 -1.
