@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -12,9 +13,9 @@ import (
 )
 
 // 발표·판서(present.js·ink.js·inkshape.js): 판서 모형(획 추가·되돌리기·다시 실행·상한·탭 수명)·기하·바탕 밝기와 발표의 넘김·차례로 나타내기,
-// 호스트 훅 계약(present.js 머리 주석 — 전체 화면·호스트 전용 앵커, 크게 보기·코드 복사 부품이 없을 때)을 가짜 DOM 위에서 node 로 돌린다
-// (testdata/present_ink.cjs). 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 49
+// 호스트 훅 계약(present.js 머리 주석 — 전체 화면·호스트 전용 앵커·키 양보 ownsKey·겹침 층, 크게 보기·코드 복사 부품이 없을 때)을
+// 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
+const presentInkCases = 82
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -24,7 +25,7 @@ func TestPresentInk(t *testing.T) {
 		}
 		t.Skip("node 가 없어 실행 검사를 건너뜀")
 	}
-	dir, _ := filepath.Abs(".")
+	dir := presentSources(t)
 	runner, _ := filepath.Abs(filepath.Join("testdata", "present_ink.cjs"))
 	out, err := exec.Command(node, runner, dir).CombinedOutput()
 	if err != nil {
@@ -33,6 +34,45 @@ func TestPresentInk(t *testing.T) {
 	if !strings.HasSuffix(strings.TrimSpace(string(out)), fmt.Sprintf("PRESENT INK DONE cases=%d failed=0", presentInkCases)) {
 		t.Fatalf("사례 %d 개를 모두 마치지 않았다\n%s", presentInkCases, out)
 	}
+}
+
+// presentSources 는 node 실행 검사가 읽을 폴더다 — 보통은 web/ 그대로다. ITDA_DOC_TEST_OVERLAY 가 가리키는 overlay JSON 의 Replace 에
+// present.js·ink.js·inkshape.js 가 있으면 셋을 임시 폴더에 바꿔 끼운 채 모아 그 폴더를 준다(뮤테이션 시험이 디스크의 원문 대신 바꿔 끼운
+// 소스를 보게 — pagerSource 와 같은 약속).
+func presentSources(t *testing.T) string {
+	t.Helper()
+	dir, _ := filepath.Abs(".")
+	p := os.Getenv("ITDA_DOC_TEST_OVERLAY")
+	if p == "" {
+		return dir
+	}
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatalf("ITDA_DOC_TEST_OVERLAY=%s 를 읽지 못함: %v", p, err)
+	}
+	var ov struct {
+		Replace map[string]string `json:"Replace"`
+	}
+	if json.Unmarshal(b, &ov) != nil {
+		t.Fatalf("ITDA_DOC_TEST_OVERLAY=%s 가 overlay JSON 이 아님", p)
+	}
+	tmp := t.TempDir()
+	for _, name := range []string{"present.js", "ink.js", "inkshape.js"} {
+		src := filepath.Join(dir, name)
+		if r, ok := ov.Replace[src]; ok {
+			src = r
+		} else if r, ok := ov.Replace[name]; ok {
+			src = r
+		}
+		c, err := os.ReadFile(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(tmp, name), c, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return tmp
 }
 
 // 발표·판서는 FS 에 들고, 특정 앱의 창 API·이름을 부르지 않는다 — 창 틀은 호스트 훅(window.ItdaPresentHost)으로만 만난다.
@@ -50,5 +90,29 @@ func TestPresentInkFS(t *testing.T) {
 	src, _ := fs.ReadFile(FS, "present.js")
 	if !strings.Contains(string(src), "window.ItdaPresent = {") {
 		t.Error("present.js 의 전역이 window.ItdaPresent 가 아니다")
+	}
+}
+
+// 겹침 층([data-pr-overlay] — present.js 머리 주석 「호스트 계약」)의 CSS: body.presenting 숨김에서 빠지고 #present(z-index 100) 위에 놓이며,
+// 가림 클래스(pr-overlay-hidden — present.js syncOverlay) 동안 층과 그 자손이 모두 가려지고(display 는 바꾸지 않는다), #present 의 커서 숨김을 물려받지 않는다. 가짜 DOM 은 CSS 를 그리지 않아 규칙 글을 본다.
+func TestPresentOverlayCSS(t *testing.T) {
+	b, err := fs.ReadFile(FS, "present.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	css := string(b)
+	for _, want := range []string{
+		"body.presenting > :not(#present):not([data-pr-overlay]) { visibility: hidden !important; }",
+		"body.presenting > [data-pr-overlay] { z-index: 101; }",
+		"body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-hidden [data-pr-overlay] * { visibility: hidden !important; }",
+		"#present.pr-idle [data-pr-overlay] { cursor: auto; }",
+		"#present { position: fixed; inset: 0; z-index: 100;",
+	} {
+		if !strings.Contains(css, want) {
+			t.Errorf("present.css 에 %q 가 없다", want)
+		}
+	}
+	if strings.Contains(css, "body.presenting > :not(#present) {") {
+		t.Error("present.css 의 발표 숨김이 겹침 층까지 가린다")
 	}
 }
