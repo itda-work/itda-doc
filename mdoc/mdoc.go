@@ -122,6 +122,7 @@ const (
 	WarnKPIEmpty              = "kpi-empty"               // 보드 문서의 :::kpi 안에 정의 목록·3열 표가 없어 KPI 로 그리지 않음(kpi.go)
 	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)
 	WarnTodosBody             = "todos-body"              // :::todos 안에 글이 있어 모음 대신 보통 상자로 그림(todos.go todosContainers, itda-doc#74)
+	WarnNoteRefScope          = "note-ref-scope"          // 노트 밖 참조가 발표자 노트 안의 참조 정의에만 맞아 정의 없는 글자로 둠 — 노트 안 정의는 그 노트 안에서만(refscope.go, itda-doc#89)
 	WarnFigureNoDesc          = "figure-no-desc"          // 그린 그림에 글 설명이 없음 — accDescr 없는 mermaid·캡션 없는 차트. Options.RequireFigureDesc 를 켠 렌더에서만, 렌더는 그대로(itda-work/itda-hyve#845)
 	// 코드 블록 src=(itda-hyve#880, codesrc.go) — 불러오지 못한 블록은 그 자리에 오류 칸, 경고 줄은 여는 펜스 줄
 	WarnCodeSrcUnchecked   = "code-src-unchecked"   // 문서 경로 없이 렌더해(Options.ReadInclude 가 nil) src 를 확인하지 못함 — 오류 칸

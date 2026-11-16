@@ -119,7 +119,8 @@ func (st *state) parseGuarded(body []byte) (doc ast.Node, over int) {
 			doc, over = nil, max(a.line, 1)
 		}
 	}()
-	return st.md.Parser().Parse(textReader(body)), 0
+	// 참조 정의에 출처(노트 안·밖)를 다는 Context — 노트 안 정의는 그 노트 안 참조에만 쓴다(refscope.go, itda-doc#89)
+	return st.md.Parser().Parse(textReader(body), parser.WithContext(newRefScopeContext(st))), 0
 }
 
 // frontmatterLines 는 본문에서 frontmatter 자리(빈 줄로 바꾼 줄)의 수다.

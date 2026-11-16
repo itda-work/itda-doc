@@ -110,8 +110,11 @@ func newState(src []byte, meta Meta, opts Options) *state {
 				// fenced 코드(700)보다 앞 — 줄 머리의 $$ 는 코드 표기와 겹치지 않는다
 				util.Prioritized(&mathBlockParser{st: st}, 98),
 			),
+			// 참조 정의 문단(LinkReferenceParagraphTransformer, 100) 바로 앞 — 정의의 출처(노트)를 적는다(refscope.go, #89)
+			parser.WithParagraphTransformers(util.Prioritized(refScopeMarker{}, 99)),
 			// 기본 강조·취소선 파서(500)보다 먼저 돈다 — CJK-friendly 판정(cjk.go)
 			parser.WithInlineParsers(
+				util.Prioritized(refScopeProbe{st: st}, 198),    // ] 의 자리를 적는다 — 노트 안 참조 정의의 범위(refscope.go, #89)
 				util.Prioritized(&linkCloserGuard{st: st}, 199), // 링크(200)보다 앞 — linkclose.go
 				util.Prioritized(cjkEmphasisParser{st}, 499),
 				util.Prioritized(cjkStrikeParser{st}, 499),
