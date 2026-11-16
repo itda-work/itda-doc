@@ -200,3 +200,10 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 /* 노트 있는 슬라이드 썸네일의 점 */
 .pr-cell-note { position: absolute; right: 7px; bottom: 7px; width: 9px; height: 9px; border-radius: 50%; background: #4b86f5; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
 @media (prefers-reduced-motion: reduce) { #present *, #present .page { animation: none !important; transition: none !important; } }
+
+/* 슬라이드 묻기 막대(ask.js armSlides, 모양은 호스트 창 틀 CSS 의 .itda-askbar): 읽기 화면에서는 늘 보이고, 발표 중에는 마우스를 올린
+   장(또는 막대 안 포커스)에서만 보인다. 판서·넘김 제외는 present.js onMouse·ink.js BLOCKED 가 맡는다. 커서를 숨긴 동안(pr-idle)에는 올림이 없다. */
+/* 숨긴 동안은 visibility 로 가린다 — 보이지 않는 단추가 누르기를 받지 않게(그 자리 누르기는 여느 슬라이드 누르기다). 지금 장(.pr-cur)만 다시 보인다(다른 장은 감춘 채다) */
+#present .pr-deck .page > .itda-askbar { visibility: hidden; }
+#present:not(.pr-idle, .pr-grid-on, .lb-on, .pr-black-on) .pr-deck .page.pr-cur:hover > .itda-askbar,
+#present:not(.pr-grid-on, .lb-on, .pr-black-on) .pr-deck .page.pr-cur > .itda-askbar:focus-within { visibility: visible; }
