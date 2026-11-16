@@ -20,6 +20,9 @@
 //     visibility !important 는 이 가림을 이긴다(CSS 우선순위) — 층 안에서는 쓰지 않는다. 발표가 끝나면 클래스는 떼고 층 요소는 지우지 않는다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
+// 묻기 넘침 안내 상자(.itda-asknote — ask.js NOTE)는 겹침 층이고, 그 안에 포커스가 있으면 Esc 밖의 키를 양보한다(askNoteKey — 가린 동안은 아니다).
+// 슬라이드 묻기 막대(.itda-askbar — ask.js armSlides)는 미리보기 장의 자식이라 덱 사본에 함께 온다. 마우스를 올린 장에서만 보이고
+// (present.css), 누르기는 넘김·판서가 아니다(onMouse·ink.js BLOCKED). 한눈에 보기 사본(.pr-static)에는 보이지 않는다(호스트 창 틀 CSS).
 //
 // 조작: → Space PageDown 클릭 = 다음(차례로 나타낼 것이 남았으면 그것부터), ← PageUp Backspace = 이전(이전 슬라이드는 다 나타난 모습),
 //       숫자 + Enter = 그 슬라이드, Home·End = 처음·끝, G = 한눈에 보기, B·. = 검은 화면, N = 발표자 노트, Esc = 끝,
@@ -878,9 +881,9 @@
       return;
     }
     if (P.lightbox) { lbEat = true; closeLightbox(); return; } // 라이트박스가 창을 덮으므로 밖에서 오는 누르기는 드물다(방어)
-    // 코드 복사 단추(.itda-codecopy)·파일명 띠 단추(.itda-codetitle)도 누르기로 치지 않는다 — 눌렀는데 슬라이드가 넘어가지 않게.
-    // 목차 칸·경계도 — 항목 누르기는 그 슬라이드로 가는 것이지 다음 슬라이드가 아니다
-    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .itda-codecopy, .itda-codetitle")) return;
+    // 코드 복사 단추(.itda-codecopy — 묻기 단추 .itda-codeask 도 이 클래스)·파일명 띠 단추(.itda-codetitle)·슬라이드 묻기 막대(.itda-askbar —
+    // ask.js)도 누르기로 치지 않는다 — 눌렀는데 슬라이드가 넘어가지 않게. 목차 칸·경계도 — 항목 누르기는 그 슬라이드로 가는 것이지 다음 슬라이드가 아니다
+    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .itda-codecopy, .itda-codetitle, .itda-askbar")) return;
     // 판서가 링크보다 먼저다 — 펜·형광펜·지우개의 왼쪽 누르기는 링크 위에서도 그리기다: 뒤따르는 click 을 먹어 링크가 열리지 않는다.
     // 레이저는 떼는 때 ink.js 가 클릭인지 판단한다(inkClick). 보드 발표에는 판서가 없다(ink 없음)
     const inking = ink ? ink.takes(e) : "";
@@ -916,9 +919,21 @@
   // onKey 는 발표 키를 전부 삼킨다(capture — Tab 도). 발표 중 코드 복사 단추·파일명 띠 단추는 마우스로만 누른다: 발표 키는 단추에 포커스가
   // 있어도 발표가 갖고, 누른 뒤 포커스를 단추에 남기지 않는 건 복사 단추 쪽이 한다.
   // 호스트가 ownsKey 로 가져간 키는 맨 앞에서 놓아준다(머리 주석 「호스트 계약」 — 겹침 층을 가린 동안에도 묻는다).
+  // askNoteKey 는 묻기 넘침 안내 상자(ask.js NOTE — body 의 자식 .itda-asknote[data-pr-overlay]) 안에 포커스가 있는 키인가다 — 그러면 발표는 그 키를
+  // 양보한다(넘김·판서·preventDefault 모두 하지 않는다 — ⌘C·Ctrl+C 로 질문 글을 복사하고 Tab·Enter·Space 로 단추를 누른다).
+  // Esc 는 양보하지 않는다(발표 끝내기 그대로). 발표가 층을 가린 동안(pr-overlay-hidden)은 양보하지 않는다 — 보이지 않는 상자가 키를 먹지 않게.
+  // 창·공유·묶음 호스트가 같은 규칙을 갖도록 호스트 훅(ownsKey)이 아니라 여기 둔다. 양보한 키는 문서로 올라가므로 호스트 앱의 단축키 처리기도
+  // ItdaPresent.yieldsKey 로 같은 판정을 묻고 손을 뗀다(⌘W 같은 앱 명령이 되지 않게 — 문서 창 app.js onKey, 공유·묶음 share.js keyHandler, A9).
+  function askNoteKey(e) {
+    if (e.key === "Escape" || document.body.classList.contains(OVERLAY_HIDDEN)) return false;
+    const t = e.target && e.target.closest ? e.target : document.activeElement;
+    return !!(t && t.closest && t.closest(".itda-asknote"));
+  }
+
   function onKey(e) {
     if (!P.on) return;
     if (hostCall("ownsKey", e)) return;
+    if (askNoteKey(e)) return;
     e.preventDefault();
     e.stopPropagation();
     const k = e.key;
@@ -971,5 +986,7 @@
     shareSummary = text || "";
     if (shareEl) shareEl.textContent = shareSummary;
   }
-  window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P };
+  window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+    // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다
+    yieldsKey: e => P.on && askNoteKey(e) };
 })();

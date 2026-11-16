@@ -873,7 +873,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
     const el = element();
     r.state = { view: null, look: "", chosen: "", ratio: "16:9", ended: false, rendering: null, again: false, slideNotes: [], hasNotes: false, tableSort: null, fontStale: false };
     const env = { state: r.state, fontGate: S.fontGate, applyTheme: async () => true, $: () => el, docTitle: () => "", app: "", source: {}, fol: { active: () => false },
-      findHeading: { refresh: noop }, jumper: { jump: noop }, TableSort: { mark: noop, apply: (f, sort) => { r.sorts.push(sort); return true; } }, CodeLines: null, CodeCopy: null, boardZoom: null, hook: name => { if (name === "tick") r.ticks++; }, imagesSettled: () => r.imgs ? r.imgs.done : null,
+      findHeading: { refresh: noop }, jumper: { jump: noop }, TableSort: { mark: noop, apply: (f, sort) => { r.sorts.push(sort); return true; } }, CodeLines: null, CodeCopy: null, Ask: null, boardZoom: null, hook: name => { if (name === "tick") r.ticks++; }, imagesSettled: () => r.imgs ? r.imgs.done : null,
       lookFor: (v, w, chosen) => v.look || chosen || "slides",
       document: { fonts: set, title: "", body: el, documentElement: el, createElement: () => element(), createDocumentFragment: () => element(), querySelectorAll: () => [] },
       setTimeout: (f, ms) => { r.timers.push({ f, ms }); return r.timers.length; },

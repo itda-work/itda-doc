@@ -400,4 +400,55 @@ const hidden = w => w.body.classList.contains("pr-overlay-hidden");
   ok("보드 끝: 검은 화면에서 끝내도 겹침 층 요소는 남고 가림 클래스는 떨어진다", !P.on && w.body.kids.includes(ov) && !hidden(w));
 }
 
+// ---- 5. 슬라이드 묻기 막대(itda-hyve#896 — ask.js armSlides 가 장의 마지막 자식으로 단다): 덱 사본에 함께 오고, 그 위 누르기는 넘김이 아니며
+// 펜·레이저 판서도 받지 않는다(present.js onMouse·ink.js BLOCKED). 보이기(마우스 올림)는 present.css — 호스트 앱 selftest 가 본다.
+{
+  const w = world(), { P } = w;
+  const withBar = body => { const p = slide(body); const bar = p.appendChild(new El("div")); bar.className = "itda-askbar"; const b = bar.appendChild(new El("button")); b.className = "itda-ask"; b.attrs["data-ask"] = "claude"; return p; };
+  w.H.start({ pages: [withBar([]), withBar([]), withBar([])], notes: [], index: 0, ratio: "16:9", onExit() {} });
+  const btnOf = i => P.slides[i].querySelector("button.itda-ask");
+  ok("묻기 막대: 덱 사본에 함께 온다", !!btnOf(0) && !!btnOf(1), P.slides.length);
+  tap(w, btnOf(0));
+  ok("묻기 막대: 단추 누르기는 다음 장이 아니다", P.idx === 0, P.idx);
+  fire(btnOf(0), "mousedown", { button: 2, buttons: 2 });
+  ok("묻기 막대: 오른쪽 누르기도 이전 장이 아니다", P.idx === 0, P.idx);
+  tap(w, P.slides[0]);
+  ok("묻기 막대: 막대 밖 누르기는 지금처럼 다음 장", P.idx === 1, P.idx);
+  key(w, "p", "KeyP");
+  const before = page(w, 1).length;
+  drag(w, btnOf(1), line(100, 100, 5));
+  ok("묻기 막대: 펜이 켜져도 단추 위에서는 그리지 않는다(ink BLOCKED)", page(w, 1).length === before && P.idx === 1, { strokes: page(w, 1).length, idx: P.idx });
+  key(w, "p", "KeyP");
+  key(w, "l", "KeyL");
+  tap(w, btnOf(1));
+  ok("묻기 막대: 레이저가 켜져도 단추 누르기는 넘김이 아니다", P.idx === 1, P.idx);
+  key(w, "l", "KeyL");
+  w.H.stop();
+}
+
+// ---- 6. 묻기 넘침 안내 상자(itda-hyve#896 A6 — ask.js NOTE, body 의 자식 .itda-asknote[data-pr-overlay]): 그 안에 포커스가 있으면 발표는 Esc 밖의 키를
+// 양보한다(넘김·판서·preventDefault 없음). 상자 밖은 지금처럼, 가린 동안(검은 화면)은 양보하지 않는다.
+{
+  const w = world(), { P, H } = w;
+  w.H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {} });
+  const box = overlayOf(w);
+  box.className = "itda-asknote";
+  const ta = box.appendChild(new El("textarea")), btn = box.appendChild(new El("button"));
+  const yielded = (k, code, mods) => { const e = key(w, k, code, mods); return !e.dp && !e.sp; };
+  ok("안내 상자: 글 칸 포커스의 ⌘C·Ctrl+C 는 발표가 먹지 않는다(기본 복사)", yielded("c", "KeyC", { metaKey: true, target: ta }) && yielded("c", "KeyC", { ctrlKey: true, target: ta }) && P.idx === 0, P.idx);
+  ok("안내 상자: 단추 포커스의 Tab·Enter·Space 는 넘김이 아니다", yielded("Tab", "Tab", { target: btn }) && yielded("Enter", "Enter", { target: btn }) && yielded(" ", "Space", { target: btn }) && P.idx === 0, P.idx);
+  ok("안내 상자: 판서 키(L)도 받지 않는다", yielded("l", "KeyL", { target: ta }) && !toolOf(w), toolOf(w));
+  w.doc.activeElement = btn;
+  ok("안내 상자: 이벤트 대상이 없으면 document.activeElement 로 본다", yielded("Enter", "Enter") && P.idx === 0, P.idx);
+  w.doc.activeElement = null;
+  let e = key(w, "ArrowRight", "ArrowRight", { target: w.body });
+  ok("안내 상자: 상자 밖 포커스는 지금처럼 넘기고 키를 삼킨다", P.idx === 1 && e.dp && e.sp, { idx: P.idx, dp: e.dp });
+  H.setBlack(true);
+  e = key(w, "Enter", "Enter", { target: btn });
+  ok("안내 상자: 가린 동안(검은 화면)은 양보하지 않는다", e.dp && e.sp, { dp: e.dp });
+  H.setBlack(false);
+  e = key(w, "Escape", "Escape", { target: ta });
+  ok("안내 상자: Esc 는 양보하지 않는다(발표 끝내기)", !P.on && e.dp, { on: P.on });
+}
+
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);
