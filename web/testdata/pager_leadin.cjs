@@ -94,7 +94,11 @@ function run(blocks, o, h) {
   const r = P.paginate(flow, root, o || {});
   const pages = root.children.map(pg => pg.children.find(c => c.classes.has("page-body")).children.map(c =>
     c.getAttribute("data-id") + (c.classes.has("eyebrow") ? "[" + c.children.length + "]" : "") + (c.classes.has("cont") ? "+cont" : "") + (c.classes.has("overflow-clipped") ? "!" : "")));
-  return { pages, r };
+  // leaves 는 모든 쪽의 잎 블록(자식 없는 블록 — 머리표는 그 자식) 이름표를 차례대로 모은 것이다(유실·중복 확인용).
+  const leaves = [];
+  const walk = n => { for (const c of n.children) { if (c.children.length) walk(c); else if (c.hasAttribute("data-id")) leaves.push(c.getAttribute("data-id")); } };
+  for (const pg of root.children) walk(pg.children.find(c => c.classes.has("page-body")));
+  return { pages, r, leaves };
 }
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
@@ -124,9 +128,11 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 }
 // 4. 한 쪽보다 긴 머리표 — 예외 규칙 없이 atomic 넘침 경로(forceFit). 끝나고, 빈 쪽이 없다
 {
-  const { pages, r } = run([B("p", 50, "a"), EB("e", 60, 60), B("h2", 10, "h"), B("p", 10, "b")]);
+  const { pages, r, leaves } = run([B("p", 50, "a"), EB("e", 60, 60), B("h2", 10, "h"), B("p", 10, "b")]);
   ok("4 긴 머리표: 끝남·빈 쪽 없음", pages.length >= 2 && pages.length <= 4 && pages.every(p => p.length > 0), { pages, r });
   ok("4 긴 머리표: 첫 쪽에는 앞 문단만", same(pages[0], ["a"]), pages);
+  // 넘침 경로(forceFit 의 split-forced 자식 나눔)를 타도 머리표 두 자식·뒤 제목·본문이 차례대로 한 번씩 남는다(유실·중복 없음)
+  ok("4 긴 머리표: 머리표 자식·제목·본문 유실 없음", same(leaves, ["a", "e.1", "e.2", "h", "b"]), { leaves, pages });
 }
 // 5. 대조: 제목 앞이 아닌 .eyebrow(뒤가 문단)는 보통 컨테이너처럼 나뉜다 — 특별 취급은 제목 앞 하나뿐
 {
