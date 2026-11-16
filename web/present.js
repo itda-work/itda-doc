@@ -18,6 +18,19 @@
 //   · 검은 화면·한눈에 보기·크게 보기 동안 body 에 OVERLAY_HIDDEN 클래스(pr-overlay-hidden)를 달아 층과 그 자손을 모두 가리고(visibility —
 //     display 는 바꾸지 않아 층 안의 크기 재기가 그대로다), 끝나면 뗀다. 호스트는 이 클래스로 가림을 안다(syncOverlay). 자손의 인라인
 //     visibility !important 는 이 가림을 이긴다(CSS 우선순위) — 층 안에서는 쓰지 않는다. 발표가 끝나면 클래스는 떼고 층 요소는 지우지 않는다.
+// 두 화면 발표(itda-doc#95) — 발표자 화면과 청중 화면을 따로 띄우는 호스트를 위한 세 가지(슬라이드 발표 start 에만, 보드 발표에는 없다):
+//   o.onState(s)        보이는 상태 s = { i, step, steps, total, black, grid, lightbox, on } 가 바뀔 때마다 한 번 부른다(emitState) — 장·단계·
+//                       검은 화면·한눈에 보기·크게 보기·열림. 직전에 보낸 값과 같으면 부르지 않는다. 열 때 첫 상태를 한 번, 끝낼 때 on:false 를 한 번
+//                       보낸다(끝의 black·grid·lightbox 는 false). lightbox 는 크게 보기가 열렸는가(참·거짓)다. onSlide 는 그대로다.
+//   o.audience = true   청중(따라가기) 열기 — 덱·전환·fit·검은 화면 층만 만든다. 노트·목차·아래 줄(HUD)·번호 이동·한눈에 보기·크게 보기·판서를 만들지
+//                       않고, 키·마우스·커서 깨우기 리스너를 걸지 않는다(커서는 늘 숨긴다 — present.css .pr-audience). 덱 사본에 딸려 온 단추·링크·입력
+//                       (묻기 막대·코드 복사 단추 등)은 입력이 아니다: 덱에 inert 를 달고(WebKit 동작은 미검증), 포커스 차례에서 빼며(tabindex -1),
+//                       덮개 안의 click·auxclick 은 창 붙잡기 단계에서 모두 먹는다(eatClick — 문서의 위임 처리기까지 가지 않는다). 묻기 막대·코드 복사
+//                       단추는 보이지 않는다(present.css). 호스트 훅(fullscreen 등)은 그대로 부른다. 넘김은 ItdaPresent.show 로만 한다.
+//   ItdaPresent.show({ i, step, black })  보이는 상태를 덮어쓴다(멱등). 범위 밖 값은 잘라낸다(i 는 0~장 수−1, step 은 0~그 장의 단계 수). 없는 키는
+//                       그대로 둔다(step 이 없으면 같은 장이면 지금 단계, 다른 장이면 0). 같은 장·같은 단계·같은 검은 화면이면 아무것도 하지 않는다(차트도
+//                       다시 돌지 않는다). 장이 바뀌면 go(i, step, dir) 규칙(dir 은 장 번호 차례 — 차트는 앞으로 갈 때만 움직인다), 같은 장의 단계만 바뀌면
+//                       next·prev 와 같다. 검은 화면은 setBlack 과 같은 길이다. 바뀐 것이 여럿이어도 onState 는 한 번이다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
 // 묻기 넘침 안내 상자(.itda-asknote — ask.js NOTE)는 겹침 층이고, 그 안에 포커스가 있으면 Esc 밖의 키를 양보한다(askNoteKey — 가린 동안은 아니다).
@@ -55,6 +68,7 @@
   let opts = {}, notesEl = null, dockBtn = null, cardRO = null, dragEnd = null, lb = null, lbEl = null, lbEat = false, linkDown = null;
   let tocEl = null, tocBody = null, tocDockBtn = null, tocItems = [];
   let ink = null; // 판서(ink.js) — 슬라이드 발표에만 붙는다. 보드 발표에는 없다
+  let onState = null, sentState = "", hold = 0; // 두 화면 발표의 상태 알림(emitState) — 마지막으로 보낸 값(JSON)·묶음 깊이(batch)
   const NOTE_W_DEF = 34, NOTE_W_MIN = 22, NOTE_W_MAX = 60, NOTE_FS_DEF = 17;
   const TOC_W_DEF = 22, TOC_W_MIN = 16, TOC_W_MAX = 40; // 목차 칸 너비(창의 % — 너비를 기억하는 호스트의 범위와 같게 둔다)
   const CARD_M = 24; // 떠 있는 카드의 기본 자리 — 창 위·오른쪽에서 띄우는 px(present.css 의 max-height 여백과 같다)
@@ -63,6 +77,8 @@
   // (이미지·표·차트·다이어그램 SVG). 머리·꼬리의 로고(.sc-logo·.sf-logo, slides.js)는 아니다. 호스트의 cursor: zoom-in 규칙과 같은 대상이다
   const OVERLAY = "[data-pr-overlay]", OVERLAY_HIDDEN = "pr-overlay-hidden"; // 겹침 층 표지·가림 클래스(머리 주석 「호스트 계약」)
   const inOverlay = t => !!(t && t.closest && t.closest(OVERLAY));
+  // 포커스를 받을 수 있는 것 — 청중 열기에서 덱 사본의 이것들을 포커스 차례에서 뺀다(startAudience)
+  const FOCUSABLE = "a[href], area[href], button, input, select, textarea, summary, iframe, audio, video, [tabindex], [contenteditable]";
   const reduce = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const stepsOf = i => Number(P.slides[i].dataset.steps || 0);
 
@@ -77,6 +93,26 @@
   function overlayHidden() { return !!(P.on && (P.black || P.grid || P.lightbox)); }
   function syncOverlay() { document.body.classList.toggle(OVERLAY_HIDDEN, overlayHidden()); }
 
+  // stateOf 는 보이는 상태(머리 주석 「두 화면 발표」 onState)다.
+  function stateOf() {
+    const i = P.idx;
+    return { i, step: P.step, steps: P.slides[i] ? stepsOf(i) : 0, total: P.slides.length, black: !!P.black, grid: !!P.grid, lightbox: !!P.lightbox, on: !!P.on };
+  }
+  // emitState 는 보이는 상태가 지난번 보낸 것과 다르면 onState 로 보낸다. 묶음(batch) 안·첫 장을 보이기 전·보드 발표에는 보내지 않는다.
+  function emitState() {
+    if (!onState || hold || !P.on || P.board || !P.entered) return;
+    const s = stateOf(), j = JSON.stringify(s);
+    if (j === sentState) return;
+    sentState = j;
+    onState(s);
+  }
+  // batch 는 f 안의 상태 바뀜을 모아 끝에 한 번만 알린다(go 안의 크게 보기 닫기, show 의 장·검은 화면 함께 바꾸기).
+  function batch(f) {
+    hold++;
+    try { f(); } finally { hold--; }
+    emitState();
+  }
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -89,12 +125,16 @@
   //   noteDock(참이면 오른쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), onNoteDock(dock)(머리 단추로 바꿀 때),
   //   tocDock(참이면 목차를 왼쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), tocW(목차 칸 너비 % — 없으면 22),
   //   onToc(dock, w)(목차 붙이기·띄우기를 바꿀 때, 너비 끌기를 놓을 때), inkKey(판서가 딸린 탭 id — ink.js bookFor),
-  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때) }
+  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때), onState(s)·audience(머리 주석 「두 화면 발표」) }
   // onSlide(i, total) 는 슬라이드 번호가 바뀔 때마다(첫 슬라이드 포함 — 단계만 바뀌면 부르지 않는다), 끝낼 때 onExit 뒤 (-1, total) 로 부른다.
   function start(o) {
     if (P.on) return;
     P.on = true;
     opts = o;
+    P.audience = !!o.audience;
+    onState = typeof o.onState === "function" ? o.onState : null;
+    sentState = "";
+    hold = 0;
     P.slides = [];
     P.entered = 0; // 지난 발표와 같은 번호에서 다시 열어도 첫 슬라이드를 보인다 — 남은 값이면 go 가 「같은 슬라이드」 로 보고 pr-cur 를 달지 않는다
     // 지난 발표가 남긴 화면 상태(한눈에 보기·검은 화면·노트)는 새 발표가 물려받지 않는다 — root 는 새로 만들지만 P 의 깃발은 남는다
@@ -114,7 +154,7 @@
     onExit = o.onExit;
     onSlide = o.onSlide || null;
     sentIdx = -1;
-    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : ""));
+    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : "") + (P.audience ? " pr-audience" : ""));
     root.id = "present";
     const stage = root.appendChild(el("div", "pr-stage"));
     deck = stage.appendChild(el("div", "pr-deck pages slides " + (o.ratio === "4:3" ? "r43" : "r169")));
@@ -136,6 +176,7 @@
       P.slides.push(c);
     }
     root.appendChild(el("div", "pr-black"));
+    if (P.audience) { startAudience(w, h); return; }
     const notes = notesEl = root.appendChild(el("div", "pr-notes"));
     const head = notes.appendChild(el("div", "pr-notes-head"));
     head.appendChild(el("span", "pr-notes-title", "발표자 노트"));
@@ -209,6 +250,33 @@
     wake();
   }
 
+  // startAudience 는 청중(따라가기) 열기의 나머지다(start 가 덱·검은 화면 층까지 만든 뒤 — 머리 주석 「두 화면 발표」). 노트·목차·아래 줄·번호 이동·
+  // 한눈에 보기·크게 보기·판서는 만들지 않고 키·마우스·커서 깨우기 리스너도 걸지 않는다. 지난 발표가 남긴 부품 참조는 비워 go·stop 이 건너뛰게 한다.
+  function startAudience(w, h) {
+    notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
+    lb = lbEl = null;
+    tocItems = [];
+    // 덱 사본의 단추·입력·링크(묻기 막대·코드 복사 단추 등)는 청중 화면에서 입력이 아니다: 덱을 inert 로 두고(지원하는 웹뷰), 지원하지 않아도
+    // 포커스 차례에서 빼며(tabindex -1), 누르기·키보드 활성화의 click 은 eatClick 이 붙잡기 단계에서 먹는다(문서의 위임 처리기 — ask.js handler — 까지 가지 않는다)
+    deck.setAttribute("inert", "");
+    deck.inert = true;
+    for (const x of deck.querySelectorAll(FOCUSABLE)) x.setAttribute("tabindex", "-1");
+    P.noteW = NOTE_W_DEF;
+    P.tocW = TOC_W_DEF;
+    document.body.appendChild(root);
+    document.body.classList.add("presenting");
+    P.fsCalls++;
+    hostCall("fullscreen", true);
+    P.started = Date.now();
+    window.addEventListener("resize", onResize);
+    // 덱 안 링크의 click 은 먹는다 — 창이 그 주소로 이동하지 않게(누른 링크 표지 linkDown 이 없으니 열지는 않는다)
+    window.addEventListener("click", eatClick, true);
+    window.addEventListener("auxclick", eatClick, true);
+    root.addEventListener("contextmenu", e => e.preventDefault());
+    fit();
+    go(Math.max(0, Math.min(opts.index || 0, P.slides.length - 1)), 0, 1);
+  }
+
   // ---- 보드 발표: 보드는 나누지 않는 긴 한 장이라 넘기지 않고 전체 화면에서 굴린다. 폭을 화면에 맞추고 휠·↑↓·Space·PageUp/Down·Home/End 로
   // 굴린다(↑↓ 는 BOARD_LINE, Space·Page 는 한 화면 안쪽). 진행 막대는 굴림 비율이다. 장 번호를 전제한 것(번호·한눈에 보기·노트·목차·번호 Enter)은 없다.
   // 링크·표·그림 라이트박스는 그대로다 — 눌러도 다음 장이 없으니 그 밖의 누르기는 아무것도 하지 않는다. 타일 크게 보기는 발표 중에 쓰지 않는다.
@@ -220,6 +288,8 @@
     if (P.on) return;
     P.on = true;
     P.board = true;
+    P.audience = false; // 두 화면 발표(onState·audience·show)는 슬라이드 발표에만 있다
+    onState = null;
     opts = o;
     P.slides = [];
     P.notes = [];
@@ -330,10 +400,19 @@
     root.remove(); // 겹침 층(호스트 요소)은 root 밖이라 남는다
     document.body.classList.remove("presenting");
     syncOverlay(); // P.on 이 내려가 가림 클래스를 뗀다
-    const at = P.idx, total = P.slides.length;
+    const at = P.idx, total = P.slides.length, last = { i: at, step: P.step, steps: P.slides[at] ? stepsOf(at) : 0, total, black: false, grid: false, lightbox: false, on: false };
+    // 끝낼 발표의 콜백을 지역으로 쥐고, 공유 상태 정리를 콜백 앞에 끝낸다 — 콜백(onExit·onSlide·onState) 안에서 새 발표를 열어도
+    // 그 발표의 콜백·상태·부품을 이 발표의 끝 처리가 건드리지 않는다. 끝 알림(onState on:false)은 첫 상태를 보낸 발표에만 한 번이다.
+    const exitCb = onExit, slideCb = onSlide, stateCb = onState && sentState ? onState : null;
     P.slides = [];
-    if (onExit) onExit(at);
-    if (onSlide) onSlide(-1, total);
+    onExit = onSlide = onState = null;
+    sentState = "";
+    P.audience = false;
+    notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
+    lb = lbEl = null;
+    if (exitCb) exitCb(at);
+    if (slideCb) slideCb(-1, total);
+    if (stateCb) stateCb(last);
   }
 
   function stopBoard() {
@@ -441,7 +520,9 @@
   // go 는 슬라이드 i 를 step 단계까지 보인다. dir 은 넘기는 방향(1 다음, -1 이전) — 앞으로 갈 때만 차트가 움직인다.
   // 슬라이드 안 블록은 움직이지 않는다 — 확대(transform scale)된 덱에서 움직이는 블록은 WebKit 이 흐리게 그렸다가 끝난 뒤 다시 그려,
   // 넘길 때마다 1~2초 일그러져 보였다. 그래서 블록 떠오름을 뺐고 전환 기본도 none 이다.
-  function go(i, step, dir) {
+  // 상태 알림(onState)은 다 바꾼 뒤 한 번이다(batch — 안의 크게 보기 닫기는 따로 알리지 않는다).
+  function go(i, step, dir) { batch(() => goNow(i, step, dir)); }
+  function goNow(i, step, dir) {
     const t0 = performance.now();
     closeLightbox(); // 슬라이드·단계가 바뀌면 라이트박스는 남지 않는다
     const prev = P.slides[P.idx];
@@ -472,12 +553,15 @@
     } else {
       showSteps(i, step, dir > 0);
     }
-    numEl.textContent = (i + 1) + " / " + P.slides.length;
-    barEl.style.width = ((i + (stepsOf(i) ? step / (stepsOf(i) + 1) : 0) + 1) / P.slides.length * 100).toFixed(2) + "%";
-    notesBody.innerHTML = P.notes[i] || ""; // mdoc 이 만든 HTML(스크립트 없음, CSP 가 2차로 막는다)
-    if (!P.notes[i]) notesBody.appendChild(el("p", "pr-none", "이 슬라이드에는 노트가 없습니다."));
-    // 노트 칸을 매 슬라이드 다시 만들므로 복사 단추도 매번 다시 붙인다(ItdaCodeCopy 가 있을 때) — 노트 코드의 조각 범위는 이 칸 안
-    if (window.ItdaCodeCopy) window.ItdaCodeCopy.arm(notesBody);
+    // 청중 열기에는 아래 줄·노트 칸이 없다(startAudience)
+    if (numEl) numEl.textContent = (i + 1) + " / " + P.slides.length;
+    if (barEl) barEl.style.width = ((i + (stepsOf(i) ? step / (stepsOf(i) + 1) : 0) + 1) / P.slides.length * 100).toFixed(2) + "%";
+    if (notesBody) {
+      notesBody.innerHTML = P.notes[i] || ""; // mdoc 이 만든 HTML(스크립트 없음, CSP 가 2차로 막는다)
+      if (!P.notes[i]) notesBody.appendChild(el("p", "pr-none", "이 슬라이드에는 노트가 없습니다."));
+      // 노트 칸을 매 슬라이드 다시 만들므로 복사 단추도 매번 다시 붙인다(ItdaCodeCopy 가 있을 때) — 노트 코드의 조각 범위는 이 칸 안
+      if (window.ItdaCodeCopy) window.ItdaCodeCopy.arm(notesBody);
+    }
     layoutCard(); // 카드 높이가 노트를 따라 바뀐다(ResizeObserver 가 없는 웹뷰에서도 화면 안에 가둔다)
     // 키 → 화면 전환(DOM·클래스)까지, 그리고 다음 슬라이드가 그려지기까지(다음 그리기 두 번 뒤 — 창이 가려지면 그리기가 미뤄져 재지 않는다)
     P.switchMs.push(Math.round((performance.now() - t0) * 10) / 10);
@@ -498,9 +582,26 @@
   }
   function jump(i) { if (i >= 0 && i < P.slides.length && i !== P.idx) go(i, i > P.idx ? 0 : stepsOf(i), i > P.idx ? 1 : -1); }
 
+  // show 는 보이는 상태를 덮어쓴다(멱등 — 머리 주석 「두 화면 발표」). 청중 화면이 발표자 화면을 따라갈 때 부른다.
+  function show(s) {
+    if (!P.on || P.board || !s || !P.slides.length) return;
+    const n = P.slides.length;
+    const num = v => (v === undefined || v === null || v === "" || !isFinite(Number(v))) ? null : Math.trunc(Number(v));
+    const ri = num(s.i), i = ri === null ? P.idx : Math.max(0, Math.min(ri, n - 1));
+    const rs = num(s.step), step = Math.max(0, Math.min(rs === null ? (i === P.idx ? P.step : 0) : rs, stepsOf(i)));
+    const black = s.black === undefined || s.black === null ? P.black : !!s.black;
+    batch(() => {
+      if (i !== P.idx) go(i, step, i > P.idx ? 1 : -1);
+      else if (step !== P.step) go(i, step, step > P.step ? 1 : -1);
+      if (black !== P.black) setBlack(black);
+    });
+  }
+
   // ---- 한눈에 보기: 슬라이드 사본을 작게. 누르거나 화살표+Enter 로 간다.
   let gridSel = 0;
-  function toggleGrid(on) {
+  // 청중 열기에는 한눈에 보기 칸이 없다 — 켜지 않는다. 상태 알림은 다 바꾼 뒤 한 번이다(batch).
+  function toggleGrid(on) { if (!gridEl) return; batch(() => toggleGridNow(on)); }
+  function toggleGridNow(on) {
     P.grid = on === undefined ? !P.grid : on;
     root.classList.toggle("pr-grid-on", P.grid);
     if (P.grid) closeLightbox();
@@ -798,7 +899,7 @@
     if (P.showToc) markToc();
   }
 
-  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); }
+  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); emitState(); }
   function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); relayout(); }
 
   // ---- 라이트박스: 슬라이드 안 이미지·표·그림을 눌러 크게 본다. 발표자 화면에만 있다 — 공유 따라가기(onSlide)로 보내지 않는다.
@@ -830,8 +931,8 @@
       card: () => P.slides[P.idx],
       scope: () => deck,
       cls: "pr-lightbox", // 옛 표지 — ink.js BLOCKED(라이트박스 위 판서 입력 제외)·호스트의 YouTube 재생이 이 이름을 본다
-      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); syncOverlay(); },
-      onClose: () => { P.lightbox = ""; syncOverlay(); },
+      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); syncOverlay(); emitState(); },
+      onClose: () => { P.lightbox = ""; syncOverlay(); emitState(); },
     });
     lbEl = lb.el;
   }
@@ -848,6 +949,8 @@
     if (!P.on) return;
     const t = e.target;
     if (inOverlay(t)) return;
+    // 청중 열기: 덮개 안의 click·auxclick 은 모두 먹는다 — 덱 사본의 단추(묻기 막대 등)·링크가 아무것도 하지 않게(키보드 활성화도 click 으로 온다)
+    if (P.audience) { if (root && root.contains(t)) { e.preventDefault(); e.stopPropagation(); } return; }
     // 크게 보기 부품이 없으면 lbEl 이 없다 — 판서가 건 lbEat·덱 안 링크는 그대로 먹는다
     if (lbEat || (lbEl && t && lbEl.contains(t))) {
       lbEat = false;
@@ -986,7 +1089,7 @@
     shareSummary = text || "";
     if (shareEl) shareEl.textContent = shareSummary;
   }
-  window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+  window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
     // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다
     yieldsKey: e => P.on && askNoteKey(e) };
 })();

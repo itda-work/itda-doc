@@ -14,8 +14,9 @@ import (
 
 // 발표·판서(present.js·ink.js·inkshape.js): 판서 모형(획 추가·되돌리기·다시 실행·상한·탭 수명)·기하·바탕 밝기와 발표의 넘김·차례로 나타내기,
 // 호스트 훅 계약(present.js 머리 주석 — 전체 화면·호스트 전용 앵커·키 양보 ownsKey·겹침 층, 크게 보기·코드 복사 부품이 없을 때), 슬라이드 묻기 막대(itda-hyve#896 — 누르기·판서 제외)를
+// 두 화면 발표(itda-doc#95 — onState·audience 열기·show 덮어쓰기)를
 // 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 95 // itda-hyve#896 슬라이드 묻기 막대 6·넘침 안내 상자 키 양보 7
+const presentInkCases = 142 // itda-hyve#896 슬라이드 묻기 막대 6·넘침 안내 상자 키 양보 7, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -57,7 +58,7 @@ func presentSources(t *testing.T) string {
 		t.Fatalf("ITDA_DOC_TEST_OVERLAY=%s 가 overlay JSON 이 아님", p)
 	}
 	tmp := t.TempDir()
-	for _, name := range []string{"present.js", "ink.js", "inkshape.js"} {
+	for _, name := range []string{"present.js", "ink.js", "inkshape.js", "ask.js"} {
 		src := filepath.Join(dir, name)
 		if r, ok := ov.Replace[src]; ok {
 			src = r
@@ -107,6 +108,11 @@ func TestPresentOverlayCSS(t *testing.T) {
 		"body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-hidden [data-pr-overlay] * { visibility: hidden !important; }",
 		"#present.pr-idle [data-pr-overlay] { cursor: auto; }",
 		"#present { position: fixed; inset: 0; z-index: 100;",
+		// 청중 열기(present.js 「두 화면 발표」)는 커서 깨우기가 없어 늘 숨기고, 겹침 층은 되살린다
+		"#present.pr-audience { cursor: none; }",
+		"#present.pr-audience [data-pr-overlay] { cursor: auto; }",
+		// 청중 열기의 덱 사본 입력 부품(묻기 막대·코드 복사 단추)은 마우스 올림·포커스로도 드러나지 않는다
+		"#present.pr-audience .pr-deck .itda-askbar, #present.pr-audience .pr-deck .itda-codecopy { display: none !important; }",
 	} {
 		if !strings.Contains(css, want) {
 			t.Errorf("present.css 에 %q 가 없다", want)
