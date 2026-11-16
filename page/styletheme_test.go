@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37 · verdant itda-doc#35 · editorial itda-doc#34)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
+// 중립 스타일 테마(slate itda-doc#33 · swiss itda-doc#36 · contrast itda-doc#37 · verdant itda-doc#35 · editorial itda-doc#34 · graphite itda-doc#92)의 글자·면 조합 대비. 작은 글자에 쓰는 색은
 // 그 바탕 4.5:1(contrast 는 7:1 — 무드의 목표. 보장은 아래 쌍에 적은 조합까지), 차트 계열은 흰 바탕 3:1 이다. 조합은 테마마다 실제로 쓰는 것만 적는다(theme.css 와 base.css 의 어휘 규칙).
 // contrast 의 차트 6~8번(Okabe-Ito 주황·하늘·노랑)은 3:1 에 못 미쳐 이 기준에서 빼고, 대신 그 면을 두르는 테두리 색(--ink)이 3:1 인지 본다 —
 // 테두리가 실제로 그려지는지는 배치와 같이 PNG 로 확인한다.
@@ -25,7 +25,10 @@ func TestStyleThemeContrast(t *testing.T) {
 	type spec struct {
 		min        float64      // 글자 쌍의 최소 대비
 		pairs      []pair       // 글자 / 바탕
-		chartEdged map[int]bool // 흰 바탕 3:1 미달이라 먹색 테두리로 모양을 세우는 차트 계열
+		chartEdged map[int]bool // 면 표식(막대·칸·조각·점·범례)을 먹색 테두리로 세우는 차트 계열 — 그 테두리와 면의 3:1 을 본다
+		// chartLineShort 는 선(.line)이 흰 바탕 3:1 에 못 미쳐도 두는 계열이다. 테두리는 면 표식에만 그려지고 선에는 없으므로(테마 CSS) 면 표식 예외(chartEdged)가
+		// 선까지 덮지 않게 따로 적는다 — 여기 없는 계열은 테두리가 있어도 흰 바탕 3:1 을 본다
+		chartLineShort map[int]bool
 	}
 	cases := map[string]spec{
 		"slate": {min: 4.5, pairs: []pair{
@@ -51,7 +54,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--code-bg"}, {"--code-kw", "--code-bg"}, {"--code-str", "--code-bg"}, {"--code-com", "--code-bg"},
 			{"--code-num", "--code-bg"}, {"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"},
 			{"--code-title-fg", "--paper"},
-		}, chartEdged: map[int]bool{6: true, 7: true, 8: true}},
+		}, chartEdged: map[int]bool{6: true, 7: true, 8: true}, chartLineShort: map[int]bool{6: true, 7: true, 8: true}}, // 선은 itda-doc#43(겹선) 전까지 미달
 		// verdant(spine 바탕): 숲색 --accent 면은 표 머리(결재란 머리는 투명이라 빼고)와 맨 구역 장이고, 잎색 --highlight 는 꼬리표 면(「제 n 장」·슬라이드 제목 번호·맨 구역 장 번호)과
 		// 절 번호·목차 번호 글자에 함께 쓴다. 차트 칸 안 값은 base 의 흰 글자(--chart-on)라 계열 색과의 직접 대비를 본다(테두리 보정 전).
 		// 숲색 면(일반 표 머리·맨 구역 장 제목) 안 code 의 상자(흰색 16% + 숲색 = 5.65:1)와 mark·kbd 안 code 상자는 합성 색이라 여기 넣지 않았다 — 계산과 PNG 로 확인한다.
@@ -83,6 +86,22 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "@base-mark"},      // 빨강 면 안 mark: 노랑 바탕 위 먹 글자·링크(base)
 			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
 			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
+		}},
+		// graphite(classic 바탕, itda-doc#92): 먹 --ink·회색 --muted 와 회색 면(--panel 요약문·결정 상자, --box-bg 상자, --quote-bg 인용, --code-bg 코드)만 쓴다.
+		// 기본 --accent 는 먹색이라 할 일 표 머리·단계 번호 원은 먹 면 위 흰 글자다. 차트 여덟 색은 모두 흰 바탕 3:1 이상이다(8번은 어둡게 한 황토 — 테두리 예외 없음).
+		// 칸 안 흰 값 글자는 1·2번 면과 직접 견준다 — 3번 이후 면 위 값은 먹색 테두리(theme.css 의 .val.in)에 기대므로 여기 넣지 않았다(보고서에 계산).
+		// 간트 막대 안 이름: 완료 막대(--diagram-bar-done)는 먹 글자(theme.css), 진행·위험 막대(먹 면)는 base 의 흰 글자(--chart-on).
+		"graphite": {min: 4.5, pairs: []pair{
+			{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"}, {"--link", "--paper"}, {"--link", "--accent-soft"}, // 링크 가리킴 면(base --link-hover-bg = --accent-soft)
+			{"--ink", "--panel"}, {"--muted", "--panel"}, {"--ink", "--box-bg"}, {"--ink", "--quote-bg"}, {"--ink", "--accent-soft"},
+			{"--ink", "--code-bg"}, {"--code-kw", "--code-bg"}, {"--code-str", "--code-bg"}, {"--code-com", "--code-bg"},
+			{"--code-num", "--code-bg"}, {"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"},
+			{"--code-title-fg", "--code-bg"}, {"--ink", "--code-hl-bg"},
+			{"--accent-ink", "--accent"},                               // 먹 면(할 일 표 머리·단계 번호 원) 위 흰 글자·링크·각주, 머리 안 code·del·kbd(base)
+			{"--ink", "--mark-bg"},                                     // mark: 노랑 대신 회색 면(theme.css) 위 먹 글자 — 할 일 표 머리 안도 base 가 먹 글자로 둔다
+			{"--ink", "--code-diff-add"}, {"--ink", "--code-diff-del"}, // diff 코드 줄 면(회색 둘)
+			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"},
+			{"--diagram-text", "--diagram-bar-done"}, {"--chart-on", "--diagram-bar-active"}, {"--chart-on", "--diagram-bar-crit"},
 		}},
 	}
 	ts := builtin(t)
@@ -116,9 +135,10 @@ func TestStyleThemeContrast(t *testing.T) {
 		for i := 1; i <= 8; i++ {
 			if c.chartEdged[i] {
 				check("--ink", "--chart-"+strconv.Itoa(i), 3) // 면을 두르는 먹색 테두리와 면의 경계
-				continue
 			}
-			check("--chart-"+strconv.Itoa(i), "--paper", 3)
+			if !c.chartLineShort[i] {
+				check("--chart-"+strconv.Itoa(i), "--paper", 3) // 선·테두리 없는 면 표식
+			}
 		}
 	}
 }

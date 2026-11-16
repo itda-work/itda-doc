@@ -31,8 +31,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 - 폴더 이름이 테마 이름이다. 문서는 frontmatter 에 `theme: acme` 로 고른다. 이름은 **소문자 영문·숫자·한글(완성형)·`-`·`_`**, 40자까지.
   대문자는 받지 않는다(대소문자를 가리지 않는 파일 시스템에서 `Acme` 와 `acme` 가 한 폴더가 된다).
-- 내장 구조 테마 다섯(`classic`·`bold`·`mono`·`compact`·`spine`)은 색이 모두 `--accent` 에서 나온다. 그 위에 `extends` 로 얹은 내장 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`)는
-  `--accent` 밖에 자기 색(`slate` 의 청록 `--highlight`, `swiss` 의 글자용 빨강 `--accent-strong`·회색 면 `--panel`, `contrast` 의 알림 색 `--alert-*`·코드 강조 색 `--code-*`, `verdant` 의 잎색 `--highlight`·링크 물색 `--link`, `editorial` 의 크림 바탕 `--paper`·남청 링크 `--link`·제목 글꼴 `--font-heading`)과 차트 색을 따로 둔다 —
+- 내장 구조 테마 다섯(`classic`·`bold`·`mono`·`compact`·`spine`)은 색이 모두 `--accent` 에서 나온다. 그 위에 `extends` 로 얹은 내장 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`·`graphite`)는
+  `--accent` 밖에 자기 색(`slate` 의 청록 `--highlight`, `swiss` 의 글자용 빨강 `--accent-strong`·회색 면 `--panel`, `contrast` 의 알림 색 `--alert-*`·코드 강조 색 `--code-*`, `verdant` 의 잎색 `--highlight`·링크 물색 `--link`, `editorial` 의 크림 바탕 `--paper`·남청 링크 `--link`·제목 글꼴 `--font-heading`, `graphite` 의 회색 면 `--panel`)과 차트 색을 따로 둔다 —
   `--accent` 를 바꾸면 그 파생 색만 따라 바뀐다. `--accent` 하나만 바꿔도
   제목·표 머리·띠·요약문이 그 색 계열로 바뀐다(`mono` 는 흑백이라 강조색을 쓰지 않는다). 옅은 면·제목 번호 같은 파생 색은
   상대 색을 아는 엔진에서만 따라 바뀐다 — 옛 WebKit 에서는 바탕 테마의 색이 남는다(12장). 창의 "회사 테마 만들기" 는 파생 색을
@@ -88,7 +88,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | 값 | 묶음 이름 | 성격 |
 |---|---|---|
 | `basic` | 기본 | 중립 — 내장 다섯(`classic`·`bold`·`compact`·`mono`·`spine`) |
-| `formal` | 단정·격식 | 차분하고 격식 있는 — 내장 `slate`·`swiss`·`contrast` |
+| `formal` | 단정·격식 | 차분하고 격식 있는 — 내장 `slate`·`swiss`·`contrast`·`graphite` |
 | `vivid` | 선명·브랜드 | 브랜드색이 앞에 서는 |
 | `editorial` | 감성·에디토리얼 | 잡지·감성 무드 — 내장 `verdant`·`editorial` |
 | `dark` | 다크 | 어두운 바탕 — 내장 `hyrule`(슬라이드만 어둡고 문서는 양피지) |
@@ -399,6 +399,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 
 내장 테마의 고유 모양: `compact` 는 `decisions`(초록 테두리 상자)·`actions`(첫 칸 앞 ☐, 담당·기한 칸 굵게)를, `spine` 은 `steps`·`result`(호박색 결과 상자)를 자기 `theme.css` 로 덮어 그린다. `spine` 은 `:::steps` 없이도 맨 위 번호 목록을 단계 모양으로 그린다(`spine` 고유).
 쪽 나눔기는 `.keep`·그림·알림·`box`·결재란을 들어갈 쪽으로 통째로 옮긴다. 자기 어휘를 쪼개지 않으려면 문서에서 `:::keep` 으로 감싼다.
+예외로 **제목 바로 앞 형제인 `:::eyebrow`**(내장 `graphite` 의 머리표)는 어느 테마에서나 그 제목과 함께 다닌다 — 쪽 나눔에서 제목과 같은 쪽에 놓이고(`web/pager.js` `leadIn`, 맨 위 흐름만), 슬라이드에서는 그 제목의 장으로 넘어가 내용 장은 머리(`.slide-head`) 안 제목 앞, 구역 장은 큰 번호와 제목 사이(`.slide-section`)에 놓인다(`web/slides.js` `takeLeadIn`). 그래서 머리표는 문서·슬라이드 모두 제목 바로 앞에 적는다. 꾸밈이 없는 테마에서는 제목 위 보통 글 한 줄이다.
+머리표는 나누지 않는다 — 쪽 끝에 다 들어가지 않으면 통째로 제목과 함께 다음 쪽으로 간다.
 
 ## 6. theme.css 에서 할 수 있는 것과 없는 것
 
@@ -470,7 +472,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 
 ## 11. 빌드 때 넣기(내장 테마로)
 
-내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`), 그리고 `extends` 없이 선 어두운 슬라이드 테마 `hyrule`(묶음 `dark`)이다. `editorial`·`hyrule` 은 제목 글꼴(Noto Serif KR Bold, OFL — 두 폴더에 같은 바이트)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용과 `hyrule` 의 제목은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
+내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`·`graphite`), 그리고 `extends` 없이 선 어두운 슬라이드 테마 `hyrule`(묶음 `dark`)이다. `editorial`·`hyrule` 은 제목 글꼴(Noto Serif KR Bold, OFL — 두 폴더에 같은 바이트)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용과 `hyrule` 의 제목은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
 중립 스타일 테마는 아래 「스타일 테마」 레시피를 브랜드 없이 따른 것이다 — 상표·「비공식」 머리말이 없고, 묶음은 그 무드로 고른다.
 
 ### 스타일 테마 — 남의 디자인 시스템에서 테마 만들기

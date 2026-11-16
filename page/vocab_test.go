@@ -58,7 +58,7 @@ func TestStandardVocabRendersInEveryBuiltinTheme(t *testing.T) {
 		}
 	}
 	ts := builtin(t)
-	for _, name := range []string{"classic", "bold", "compact", "mono", "spine"} {
+	for _, name := range []string{"classic", "bold", "compact", "mono", "spine", "graphite"} {
 		v := RenderView([]byte(vocabDoc), "/docs/a.md", "/_doc/", ts, name, false)
 		if v.Theme != name {
 			t.Errorf("%s: 고른 테마가 %s", name, v.Theme)

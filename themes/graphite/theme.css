@@ -1,0 +1,113 @@
+/* 그래파이트: 강조색 없이 먹색(--ink)과 회색 층(--muted·--rule·--panel)만으로 위계를 세운다. 절 제목 위에 굵은 먹 선을 긋고,
+   그 아래 작은 머리표(:::eyebrow — 이 테마의 자기 어휘)·큰 굵은 제목이 온다. 면은 모두 네모이고 왼쪽 막대가 없다.
+   문서 구조(표지·머리글·제목 번호·목차)는 바탕 classic 을 물려받고, 여기서는 classic 의 남색 띠·막대·□ 기호·남색 글자를 걷는다.
+   --accent 는 기본이 먹색(#111)이라 화면은 흑백이다. 회사 테마가 --accent 를 바꾸면 그 색은 머리표 굵은 글·제목 번호·링크에만 든다 —
+   나머지 자리(표준 어휘의 면·기호, 슬라이드 목록 기호, 체크 상자)는 아래에서 --accent 를 먹색으로 되돌린다.
+   머리표 글자는 원문이 적는다 — 테마는 「EXHIBIT」 같은 고정 글자를 찍지 않는다(TestBuiltinThemesNoPurposeText).
+   숫자 고정폭(tabular-nums)은 쓰지 않는다 — 문서 CSS 의 금지선(TestNoNumericFontFeatures). */
+
+/* ---- 표지: classic 의 남색 띠·옅은 막대·제목 왼쪽 굵은 선을 걷고, 제목 위 2pt 먹 선과 큰 굵은 먹 제목만 둔다 */
+.cover::before, .cover::after { content: none; }
+.cover-top { color: var(--muted); font-weight: 600; letter-spacing: 0.04em; }
+.cover-main { border-left: none; padding-left: 0; border-top: 2pt solid var(--ink); padding-top: 12pt; }
+.page-body .cover-title { color: var(--ink); font-size: 32pt; font-weight: 800; letter-spacing: -0.03em; line-height: 1.18; }
+.cover-subtitle { color: var(--muted); }
+.page-body .cover-meta { border-top: 1pt solid var(--ink); border-bottom: 0.5pt solid var(--rule); }
+.page-body .cover-meta dt, .page-body .cover-meta dd { border-bottom-color: #e5e5e5; }
+.page-body .cover-meta .meta-row[data-key="classification"] dd { color: var(--ink); }
+.cover-bottom .cover-org { color: var(--ink); }
+.cover-classification { color: var(--ink); font-weight: 700; }
+
+/* ---- 머리글·바닥글: 작은 글자는 --muted(흰 바탕 7.00:1), 보안 등급·쪽 번호는 먹색. 바닥글 위 가는 선은 --footer-rule(theme.json) */
+.page-header, .page-footer { color: var(--muted); }
+.page-header .slot.left { color: var(--ink); }
+.page-footer .slot.left { color: var(--ink); }
+.page-footer .slot.center { color: var(--ink); }
+
+/* ---- 제목: 장(h1)·절(h2) 위에 2pt 먹 선, 아래 선·왼쪽 막대·□ 기호는 걷는다. 번호는 --accent(기본 먹색).
+   표지·제목 블록·제목 장의 제목(h1)은 빼고, 목차 제목(h2)·구역 장 제목(h2)은 같은 선을 받는다.
+   보드 타일 머리·구역 줄의 제목은 base 의 보드 규칙(특이도가 더 높다)이 선을 지운다 */
+.page-body :is(h1, h2):not(.cover-title, .title, .sc-title) { border-top: 2pt solid var(--ink); border-bottom: none; padding-top: 7pt; padding-bottom: 0; padding-left: 0; }
+.page-body h1 { letter-spacing: -0.025em; }
+.page-body h2 { letter-spacing: -0.015em; }
+.page-body h2::before { content: none; }
+.page-body h3:not(:has(.header-section-number))::before { content: none; }
+.page-body :is(h1, h2, h3) .header-section-number { color: var(--accent); }
+.toc-title { border-bottom: none; letter-spacing: -0.01em; }
+nav.toc > ul > li > a { color: var(--ink); }
+
+/* ---- 머리표(:::eyebrow — 이 테마의 자기 어휘): 제목 바로 앞에 두는 작은 글 한 줄. 위에 2pt 먹 선, 굵은 부분은 --accent·자간 조금,
+   나머지는 --muted. 머리표 바로 뒤의 제목은 제 위 선을 긋지 않는다 — 선이 두 번 그어지지 않게.
+   다른 테마에서는 모르는 이름이라 꾸밈 없는 글 한 줄이다. 제목 바로 앞의 머리표는 쪽 나눔에서 제목과 함께 다니고(web/pager.js leadIn),
+   슬라이드에서는 그 제목의 장으로 넘어간다(web/slides.js takeLeadIn — 내용 장은 머리 안 제목 앞, 구역 장은 큰 번호와 제목 사이) */
+.eyebrow { border-top: 2pt solid var(--ink); padding-top: 6pt; margin: var(--h2-gap-top) 0 0; font-size: 9pt; line-height: 1.45; color: var(--muted); letter-spacing: 0.01em; }
+.eyebrow > p { margin: 0; }
+.eyebrow strong { color: var(--accent); font-weight: 800; letter-spacing: 0.06em; margin-right: 0.45em; }
+.page-body .eyebrow + :is(h1, h2) { border-top: none; padding-top: 2pt; margin-top: 0; }
+/* 본문 형광펜(mark)은 노랑 대신 회색 면(--mark-bg) — 글자는 먹(14.71:1) */
+.page-body mark { background: var(--mark-bg); }
+
+/* ---- 표: 위 2pt 먹(--table-top-rule) · 머리 아래 1pt 먹 · 맨 아래 1pt 먹, 가운데 가로줄은 회색, 세로줄 없음. 머리 칸 왼쪽 정렬(열 정렬 지정은 [align] 이 이긴다).
+   머리 칸 위·마지막 줄 아래의 칸 선은 없앤다 — 화면 배율 1 에서 칸 선과 표 선이 같은 1px 로 반올림되면 겹친 선 다툼(border-collapse)에서 칸의 회색이 이긴다(slate·swiss 와 같다) */
+.page-body th, .page-body td { border-left: none; border-right: none; }
+.page-body th { text-align: left; font-weight: 800; }
+.page-body thead th { border-top: none; border-bottom: 1pt solid var(--ink); }
+.page-body table { border-bottom: 1pt solid var(--ink); }
+.page-body table > :last-child > tr:last-child > td { border-bottom: none; }
+
+/* ---- 요약문·상자·인용: 네모난 옅은 회색 면(--panel)에 가는 회색 테두리, 왼쪽 막대 없음. 요약문은 굵게 */
+.lead { background: var(--panel); border: 0.75pt solid var(--rule); border-radius: 0; padding: 8pt 12pt; font-weight: 600; }
+.box h3, .box h4 { color: var(--ink); }
+.page-body blockquote { border-left-width: 0.75pt; border-radius: 0; }
+.markdown-alert { border-radius: 0; }
+
+/* ---- 표준 어휘: 면·기호는 먹색과 --panel. 회사 강조색이 이 자리에 들지 않게 블록 안에서 --accent 를 먹색으로 되돌린다
+   (링크색 --link 는 바깥에서 이미 정해진 값을 물려받으므로 그대로다). 할 일 표 머리는 먹 면에 흰 글자(18.88:1) */
+.decisions, .result, .steps, .actions { --accent: var(--ink); --accent-soft: var(--panel); }
+.decisions, .result { border: 0.75pt solid var(--rule); border-radius: 0; }
+.page-body input[type="checkbox"] { --accent: var(--ink); }
+
+/* ---- 차트: 계열 1~3 은 먹·진회색·회색, 4~7 은 Okabe-Ito, 8 은 대비를 위해 어둡게 한 황토(#9e6a00) — 여덟 모두 흰 바탕 3:1 이상이라
+   선·면 어디에나 테두리 없이 쓴다(theme.json, page/styletheme_test.go).
+   칸 안 값(흰 글자)·타임라인 상자 글자는 base 의 옅은 검정 테두리 대신 먹색 테두리로 — 흰 글자와 테두리가 18.88:1 이라 3번 회색(흰 글자 3.45:1) 같은 옅은 면 위에서도 선다 */
+.chart-svg .val.in, .diagram-svg .tl-sec-t, .diagram-svg .tl-per-t { stroke: var(--ink); stroke-width: 3px; }
+/* 간트: 완료 막대(#8a8a8a) 안 이름은 흰 글자(3.45:1) 대신 먹(5.47:1). 진행·위험 막대는 먹 면이라 흰 글자 그대로 — 둘을 함께 단 막대는 base 의 흰 글자 */
+.diagram-svg .gt-tname.gt-in.gt-done:not(.gt-active, .gt-crit) { fill: var(--diagram-text); }
+
+/* ---- 이어보기: 표지는 맨 위 제목 영역 — 제목 위 먹 선을 그대로 두고 높이만 내용만큼 */
+.page-body.flow-view .cover { padding-top: 16mm; }
+.page-body.flow-view .cover-classification { position: static; }
+
+/* ---- 슬라이드: 위 띠·막대 없이 제목 위 2pt 먹 선과 굵은 먹 제목, 바닥에 가는 회색 선과 쪽 번호.
+   제목 앞 머리표는 머리(.slide-head) 안 제목 앞에 온다(web/slides.js headBox) — 위 선은 머리표가 긋고 제목은 긋지 않아, 머리표가 있는 장과 없는 장의
+   위 선 높이가 같다(머리 위 끝). 머리 높이는 머리표까지 재므로 본문은 그 아래에서 시작한다 */
+.slide-deco::before, .slide-deco::after { content: none; }
+.slide-title { color: var(--ink); font-weight: 800; letter-spacing: -0.025em; padding-left: 0; padding-top: 8pt; border-top: 2pt solid var(--ink); }
+.slide-title::before { content: none; }
+.slide-title .header-section-number { color: var(--accent); }
+.slide-head > .eyebrow { margin: 0 0 4pt; padding-top: 8pt; font-size: calc(13pt * var(--slide-scale)); }
+.slide-head > .eyebrow + .slide-title { border-top: none; padding-top: 0; }
+.slide-section > .eyebrow { margin: 0; font-size: calc(14pt * var(--slide-scale)); }
+.slide-foot { color: var(--muted); border-top: 0.5pt solid var(--rule); padding-top: 7pt; }
+.sf-num { color: var(--ink); }
+.page-body.k-content h2, .page-body.k-content h3 { color: var(--ink); }
+.page-body:is(.k-content, .k-single, .k-section) > :is(ul, ol) > li { --accent: var(--ink); }
+/* 제목 슬라이드: 띠 없이 제목 위 먹 선, 아래 문서 정보 줄은 가는 회색 선 위 --muted */
+.sc-top { color: var(--muted); font-weight: 600; }
+.sc-class { color: var(--ink); font-weight: 700; }
+.sc-main { border-left: none; padding: 14pt 0 0; border-top: 2pt solid var(--ink); }
+.page-body .sc-title { color: var(--ink); font-weight: 800; letter-spacing: -0.03em; }
+.page-body .sc-sub { color: var(--muted); }
+.sc-meta { border-top: 0.75pt solid var(--rule); color: var(--muted); }
+/* 구역 슬라이드: classic 의 왼쪽 남색 면·띠를 걷고 본문을 바깥 여백 자리로 되돌린다. 큰 번호는 --accent(기본 먹), 제목은 위 먹 선(위 제목 규칙) */
+.slide-deco.k-section ~ .page-body { left: var(--slide-pad-x); }
+.page-body .ss-num { color: var(--accent); }
+.page-body .ss-title { color: var(--ink); font-weight: 800; }
+
+/* ---- 보드: 위 띠·옅은 막대 대신 머리띠 아래 2pt 먹 선, 타일은 위 2pt 먹 선(네모), 타일 머리·구역 줄은 먹색 */
+.board-deco::before, .board-deco::after { content: none; }
+.board-head { border-bottom: 2pt solid var(--ink); }
+.bh-title { color: var(--ink); font-weight: 800; }
+.page-body.board-grid .tile { border-top: 2pt solid var(--ink); }
+.page-body.board-grid .tile-head > :is(h1, h2, h3, h4, h5, h6) { color: var(--ink); }
+.page-body.board-grid .board-section { color: var(--ink); border-bottom: none; border-top: 2pt solid var(--ink); }

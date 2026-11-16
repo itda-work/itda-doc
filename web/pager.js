@@ -12,15 +12,24 @@
 
   const BLOCK_TAGS = new Set(["P", "UL", "OL", "DL", "TABLE", "PRE", "BLOCKQUOTE", "DIV", "FIGURE", "SECTION", "NAV", "HEADER", "H1", "H2", "H3", "H4", "H5", "H6", "HR"]);
   const isHeading = n => n.nodeType === 1 && /^H[1-6]$/.test(n.tagName);
-  // 다음 것과 함께 다녀야 하는 것: 제목, 정의 목록의 용어, 목차 제목
-  const keepWithNext = n => n.nodeType === 1 && (isHeading(n) || n.tagName === "DT" || n.classList.contains("toc-title"));
+  // 다음 것과 함께 다녀야 하는 것: 제목, 정의 목록의 용어, 목차 제목, 제목 바로 앞의 머리표(leadIns)
+  const keepWithNext = n => n.nodeType === 1 && (isHeading(n) || n.tagName === "DT" || n.classList.contains("toc-title") || leadIns.has(n));
+  // leadIn 은 n 이 제목 바로 앞 형제인 머리표(:::eyebrow — 테마 자기 어휘, 내장 graphite)인가다(itda-doc#92). 공통 코드가 머리표를 특별히 다루는 것은
+  // 이 꼴 하나다 — 제목 앞이 아닌 .eyebrow 는 보통 블록이다. 쪽 나눔은 블록을 흐름에서 쪽으로 옮기며 형제가 바뀌므로 paginate 가 시작할 때
+  // 맨 위 흐름에서 한 번 골라 leadIns 에 담는다(컨테이너 안의 머리표는 고르지 않는다).
+  function leadIn(n) {
+    const x = n.nextElementSibling;
+    return n.nodeType === 1 && n.classList.contains("eyebrow") && !!x && /^H[1-6]$/.test(x.tagName);
+  }
+  let leadIns = new WeakSet();
   // 들어갈 수 있는 쪽으로 통째로 옮길 것(그래도 한 쪽보다 크면 나눈다)
   const softKeep = n => n.nodeType === 1 && (n.classList.contains("keep") || n.tagName === "FIGURE" ||
     n.classList.contains("markdown-alert") || n.classList.contains("approval") || n.classList.contains("signature") ||
     n.classList.contains("title-block") || n.tagName === "BLOCKQUOTE" || n.classList.contains("box") || n.classList.contains("columns"));
   // 나누지 않는 것(쪽에 안 들어가면 통째로 다음 쪽)
   // 수식(1.10)은 블록(.math-display)이든 <math> 하나든 나누지 않는다 — MathML 의 자식을 쪽마다 나누면 반쪽 수식이 된다
-  const atomic = n => n.nodeType !== 1 || isHeading(n) || ["FIGURE", "IMG", "HR", "TR", "SVG", "INPUT", "CAPTION"].includes(n.tagName) ||
+  // 제목 앞 머리표(leadIns)도 나누지 않는다 — 나눈 사본은 leadIns 에 없어 제목과 함께 다니지 못한다(itda-doc#92). 쪽 맨 위에서도 안 들어가면 다른 atomic 블록과 같은 넘침 경로(forceFit)다
+  const atomic = n => n.nodeType !== 1 || isHeading(n) || leadIns.has(n) || ["FIGURE", "IMG", "HR", "TR", "SVG", "INPUT", "CAPTION"].includes(n.tagName) ||
     n.localName === "math" || n.classList.contains("math-display") ||
     n.classList.contains("columns") || n.classList.contains("approval") || n.classList.contains("signature") || n.classList.contains("cover");
 
@@ -667,6 +676,7 @@
     root = target; pages = []; overflow = 0;
     adoptWidths(flow);
     const queue = [...flow.childNodes].filter(n => n.nodeType === 1);
+    leadIns = new WeakSet(queue.filter(leadIn));
     newPage(false);
     fitQueueMath(queue);
     let guard = 0;
@@ -684,7 +694,11 @@
       }
       // 장(h1) 앞에서 새 쪽(테마 설정). 쪽이 1/3 도 안 찼으면(요약문 한 덩이 등) 나누지 않는다 — 거의 빈 쪽이 생긴다.
       // 테마가 "always" 면(spine) 그래도 나눈다 — 장은 늘 새 쪽에서 시작한다.
-      if (opts.h1Break && n.tagName === "H1" && !empty && !onlyBreakables() && (opts.h1Always || usedHeight() > bodyHeight * 0.35)) { queue.unshift(n); newPage(false); continue; }
+      // 장 앞의 머리표는 장과 함께 새 쪽으로 간다 — 쪽에 그 머리표뿐이면 나누지 않는다(빈 쪽이 된다)
+      if (opts.h1Break && n.tagName === "H1" && !empty && !onlyBreakables() && !onlyLeadIn() && (opts.h1Always || usedHeight() > bodyHeight * 0.35)) {
+        const lead = body.lastElementChild && leadIns.has(body.lastElementChild) ? [body.removeChild(body.lastElementChild)] : [];
+        queue.unshift(...lead, n); newPage(false); continue;
+      }
       if (opts.fitFill && (n.tagName === "FIGURE" && n.classList.contains("fig-fit") || n.tagName === "P" && n.classList.contains("fit-row"))) {
         if (placeFit(n, queue, empty)) continue;
         queue.unshift(...carryHeadings(), n); newPage(false); continue;
@@ -718,6 +732,7 @@
     return last ? deepBottom(last) - (bodyBottom - bodyHeight) : 0;
   }
   function onlyKeepNext() { return body.children.length > 0 && [...body.children].every(keepWithNext); }
+  function onlyLeadIn() { return body.children.length === 1 && leadIns.has(body.lastElementChild); }
   function onlyBreakables() { return [...body.children].every(c => c.classList.contains("page-break")); }
 
   // carryHeadings 는 쪽 끝에 남은 제목(들)을 떼어 돌려준다. 쪽이 제목뿐이면 그대로 둔다.
