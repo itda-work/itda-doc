@@ -52,8 +52,8 @@
         continue;
       }
       if (el.matches(".page-break, hr")) { cur = null; continue; }
-      if (isHeading(el) && lvl > 0 && level(el) < lvl) { open("section", el); continue; }
-      if (isHeading(el) && level(el) === lvl) { open("content", el); continue; }
+      if (isHeading(el) && lvl > 0 && level(el) < lvl) { const lead = takeLeadIn(el, cur); open("section", el).lead = lead; continue; }
+      if (isHeading(el) && level(el) === lvl) { const lead = takeLeadIn(el, cur); open("content", el).lead = lead; continue; }
       if (el.matches("section.footnotes") || el.matches(".footnotes")) {
         const h = document.createElement("h2");
         h.textContent = lang() ? "주석" : "Notes";
@@ -92,6 +92,23 @@
       }
     }
     return res;
+  }
+
+  // takeLeadIn 은 슬라이드를 여는 제목 h 바로 앞 형제가 머리표(:::eyebrow — 테마 자기 어휘, 내장 graphite)이고 그것이 열린 묶음 cur 의 마지막 블록이면
+  // cur 에서 떼어 돌려준다(없으면 null, itda-doc#92). 머리표는 그 제목의 장으로 넘어가 제목 위에 놓인다 — 내용 장은 머리(.slide-head) 안 제목 앞(headBox),
+  // 구역 장은 큰 번호와 제목 사이(sectionHead). 공통 코드가 머리표를 특별히 다루는 것은 이 꼴 하나다 — 제목 앞이 아닌 .eyebrow 는 보통 블록이다.
+  // 떼어 낸 뒤 cur 가 비면 걸러지는 묶음이 된다(노트는 이웃 묶음으로 옮긴다 — groups 끝).
+  function takeLeadIn(h, cur) {
+    const p = h.previousElementSibling;
+    if (!cur || !p || !p.classList.contains("eyebrow") || cur.blocks[cur.blocks.length - 1] !== p) return null;
+    cur.blocks.pop();
+    return p;
+  }
+  // leadCopy 는 머리표의 사본이다(id 없이) — 머리는 재기·장마다 새로 만들므로 원본은 화면에 넣지 않는다.
+  function leadCopy(e) {
+    const c = e.cloneNode(true);
+    for (const x of [c, ...c.querySelectorAll("[id]")]) x.removeAttribute("id");
+    return c;
   }
 
   // ---- 분할 그림(itda-hyve#550)·배경 그림(itda-hyve#569). 판정은 mdoc(transform.go slideSplits)이 한다: 맨 위 블록이 분할(.left·.right)·배경(.full)
@@ -190,6 +207,12 @@
     return t;
   }
 
+  // headBox 는 내용 장의 머리(.slide-head) 안을 채운다: 머리표(묶음에 있으면) + 제목 사본. 재기(probe)와 장마다 같은 꼴이라 잰 높이가 그린 높이다.
+  function headBox(hd, g, cont) {
+    hd.replaceChildren(...(g.lead ? [leadCopy(g.lead)] : []), headClone(g.title, cont));
+    return hd;
+  }
+
   function el(tag, cls, text) {
     const e = document.createElement(tag);
     if (cls) e.className = cls;
@@ -272,7 +295,8 @@
 
   // sectionHead 는 구역 슬라이드의 머리다: 큰 번호 + 제목. 문서가 제목 번호를 쓰지 않으면 구역 차례(1, 2, …)를 번호 자리에 둔다
   // (테마가 그 자리를 꾸민다 — 보고서의 왼쪽 면, 매뉴얼의 "제 n 장"). 바로 뒤의 내용은 아래에.
-  function sectionHead(h, nth) {
+  // 제목 앞 머리표(lead — takeLeadIn)가 있으면 큰 번호와 제목 사이에 둔다.
+  function sectionHead(h, nth, lead) {
     const head = el("div", "slide-section");
     const num = h.querySelector(".header-section-number");
     head.appendChild(el("div", "ss-num" + (num ? "" : " auto"), num ? num.textContent : String(nth)));
@@ -281,6 +305,7 @@
     if (h.id) t.id = h.id;
     if (h.dataset.line) t.dataset.line = h.dataset.line;
     if (h.dataset.n) t.dataset.n = h.dataset.n; // 내용 앵커(itda-hyve#346) — 구역 제목은 사본으로만 그려진다
+    if (lead) head.appendChild(leadCopy(lead));
     head.appendChild(t);
     return head;
   }
@@ -375,11 +400,11 @@
   }
   // groupEls 는 묶음이 장을 만들 때 읽는 원본 요소 전부다(서명과 위치 기준).
   function groupEls(g) {
-    return [g.src, g.title, g.panel && g.panel.block, g.bg && g.bg.block, ...g.blocks, ...g.notes.map(n => n.el)];
+    return [g.src, g.title, g.lead, g.panel && g.panel.block, g.bg && g.bg.block, ...g.blocks, ...g.notes.map(n => n.el)];
   }
   // groupSig 는 묶음의 서명이다 — 종류, 구역 차례(구역 장은 번호 자리에 차례를 쓸 수 있다), 원본 요소, 노트가 붙는 법(at).
   function groupSig(I, g, nth, b) {
-    const parts = [g.kind, nth, "t", g.src || "", g.title || "", "p", g.panel ? g.panel.block : "", "b", g.bg ? g.bg.block : "", "k", ...g.blocks, "n"];
+    const parts = [g.kind, nth, "t", g.src || "", g.title || "", "l", g.lead || "", "p", g.panel ? g.panel.block : "", "b", g.bg ? g.bg.block : "", "k", ...g.blocks, "n"];
     for (const n of g.notes) parts.push(n.at, n.el);
     return I.sig(parts, b);
   }
@@ -412,7 +437,7 @@
       const f = document.createElement("div");
       f.className = "page-body doc-flow";
       // 구역 슬라이드는 제목을 본문 첫 블록으로 넣는다(뒤의 내용과 함께 나뉜다). 내용 슬라이드의 제목은 머리 자리(slide-head)에.
-      if (g.kind === "section") f.appendChild(sectionHead(g.title, nth));
+      if (g.kind === "section") f.appendChild(sectionHead(g.title, nth, g.lead));
       for (const b of g.blocks) f.appendChild(b);
       // 하나만 있는 슬라이드의 그 블록은 크게 — 쪽을 나누기 전에 붙여야 잰 크기와 그린 크기가 같다(뒤에 붙였더니 표가 넘쳐 잘렸다)
       if (g.kind === "single") for (const b of g.blocks) if (!b.matches(".pause")) b.classList.add("slide-only");
@@ -437,15 +462,14 @@
       if (g.title && g.kind !== "section") {
         const probe = document.createElement("div");
         probe.className = "page " + cls;
-        const hd = probe.appendChild(el("div", "slide-head"));
-        hd.appendChild(headClone(g.title, false));
+        const hd = headBox(probe.appendChild(el("div", "slide-head")), g, false);
         sub.appendChild(probe);
         const plainH = Math.ceil(hd.getBoundingClientRect().height);
         const tagCache = {};
         const tagged = d => {
           if (!(d in tagCache)) {
             const nines = "9".repeat(d);
-            hd.replaceChildren(headClone(g.title, { k: nines, n: nines }));
+            headBox(hd, g, { k: nines, n: nines });
             tagCache[d] = Math.ceil(hd.getBoundingClientRect().height);
           }
           return tagCache[d];
@@ -474,8 +498,7 @@
       const pgs = [...sub.querySelectorAll(":scope > .page")];
       pgs.forEach((pg, i) => {
         if (g.title && g.kind !== "section") {
-          const hd = el("div", "slide-head");
-          hd.appendChild(headClone(g.title, pgs.length > 1 && { k: i + 1, n: pgs.length }));
+          const hd = headBox(el("div", "slide-head"), g, pgs.length > 1 && { k: i + 1, n: pgs.length });
           pg.insertBefore(hd, pg.firstChild);
         }
         if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));
