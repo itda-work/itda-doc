@@ -138,7 +138,7 @@ func TestImagePlacePerSlide(t *testing.T) {
 		}
 	}
 	// 막은 링크 단독 줄(리뷰 3회차): <a> 는 빠지고 표시된 문단에 그림만 남는다 — slides.js 가 이 문단을 통째로 패널로 옮긴다
-	if h := render(t, "## 가\n\n[![설명](a.png){.left}](javascript:alert(1))\n").HTML; !strings.Contains(h, `<p data-slide-panel="1" data-line="3"><img src="a.png" alt="설명" class="img-left"></p>`) || strings.Contains(h, "<a ") {
+	if h := render(t, "## 가\n\n[![설명](a.png){.left}](javascript:alert(1))\n").HTML; !strings.Contains(h, `<p class="img-link" data-slide-panel="1" data-line="3"><img src="a.png" alt="설명" class="img-left"></p>`) || strings.Contains(h, "<a ") {
 		t.Errorf("막은 링크 단독 줄\n%s", h)
 	}
 	// 체크박스 재현 입력은 체크박스·링크·설명을 그대로 낸다(그림만 .fit)
@@ -167,7 +167,7 @@ func TestSlideBackgroundAndRow(t *testing.T) {
 		{"Deckset fit", "## 가\n\n![fit](a.png)\n", 1, 0, 0, nil, 0, []string{`alt="" class="img-full"`}, nil},
 		{"대문자 Fit 은 보통 그림", "## 가\n\n![Fit](a.png)\n", 0, 0, 0, nil, 0, []string{`alt="Fit"`}, []string{"img-full"}},
 		{"캡션 문단과 함께", "## 가\n\n![](a.png){.full}\n\nFigure: 캡션\n", 1, 0, 0, nil, 0, []string{"<figcaption>캡션</figcaption>"}, nil},
-		{"링크 문단", "## 가\n\n[![](a.png){.full}](https://example.com)\n", 1, 0, 0, nil, 0, []string{`<p data-slide-bg="1" data-line="3"><a href="https://example.com">`}, nil},
+		{"링크 문단", "## 가\n\n[![](a.png){.full}](https://example.com)\n", 1, 0, 0, nil, 0, []string{`<p class="img-link" data-slide-bg="1" data-line="3"><a href="https://example.com">`}, nil},
 		{"제목 없는 장(가로줄 뒤)", "## 가\n\n글\n\n---\n\n![](a.png){.full}\n", 1, 0, 0, nil, 0, nil, nil},
 		{"둘째 배경", "## 가\n\n![](a.png){.full}\n\n![](b.png){.full .fill}\n", 1, 0, 0, []string{second}, 1, nil, nil},
 		{"다른 슬라이드", "## 가\n\n![](a.png){.full}\n\n## 나\n\n![](b.png){.full}\n", 2, 0, 0, nil, 0, nil, nil},
@@ -216,6 +216,36 @@ func TestSlideBackgroundAndRow(t *testing.T) {
 		}
 		if !ok {
 			t.Errorf("%s: 배경 %d·패널 %d·가로 %d·fit %d, 기대 %d·%d·%d·%d, 경고 %q\n%s %+v", c.name, bgs, panels, rows, fits, c.bgs, c.panels, c.rows, c.fits, c.warns, r.HTML, r.Warnings)
+		}
+	}
+}
+
+// 링크 단 그림 한 줄(itda-doc#97): 그림 하나만 감싼 링크 하나뿐인 문단에만 class img-link 가 붙는다(base.css 가 그 그림에 그림 테두리를 두른다).
+// 문단은 문단 그대로다(figure 가 아니다) — 글이 섞이거나 그림이 둘이거나 링크 안에 글이 있으면 붙지 않는다. 막은 링크도 문단의 class 는 남는다.
+func TestImgLinkClass(t *testing.T) {
+	cases := []struct {
+		name, src string
+		want      bool
+	}{
+		{"링크 단 그림", "[![](a.png)](https://example.com)\n", true},
+		{"속성 있는 그림", "[![](a.png){.fit}](https://example.com)\n", true},
+		{"앞뒤 공백", "  [![](a.png)](https://example.com)  \n", true},
+		{"목록 항목 문단(느슨한 목록)", "- [![](a.png)](https://example.com)\n\n- 글\n", true},
+		{"막은 링크", "[![](a.png)](javascript:alert(1))\n", true},
+		{"글이 섞임", "글 [![](a.png)](https://example.com)\n", false},
+		{"링크 안에 글", "[![](a.png) 설명](https://example.com)\n", false},
+		{"그림 둘", "[![](a.png)](https://example.com) [![](b.png)](https://example.com)\n", false},
+		{"그림만(figure)", "![](a.png)\n", false},
+		{"글 링크", "[글](https://example.com)\n", false},
+	}
+	for _, c := range cases {
+		r := render(t, c.src)
+		got := strings.Count(r.HTML, `<p class="img-link"`)
+		if (got == 1) != c.want || got > 1 {
+			t.Errorf("%s: img-link %d개, 기대 %v\n%s", c.name, got, c.want, r.HTML)
+		}
+		if strings.Contains(r.HTML, "<figure") && c.want {
+			t.Errorf("%s: 링크 단 그림이 figure 가 됨\n%s", c.name, r.HTML)
 		}
 	}
 }

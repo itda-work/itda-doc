@@ -603,21 +603,106 @@
   // 비율을 못 읽은 그림(아직 안 읽힘·깨짐)은 너비를 비워 두어(CSS width: auto) 나중에 읽히면 제 비율로 서고, 폭 계산에만 4:3 으로 친다. H 는 문단 높이 h 에서 캡션 줄(slides.js rowCaptions 가 단 span.fr-cap 가운데 가장 높은 것 + 줄 사이)을 뺀
   // 높이와, 문단 폭에서 그림 사이 틈을 빼고 비율 합으로 나눈 높이 가운데 작은 쪽이다 — 그래서 그림 줄은 본문 폭 안이다. 캡션은
   // 그림 폭으로 줄이 바뀌므로 그림을 맞춘 뒤 한 번 더 재어 맞춘다. 크기는 CSSOM(style 속성 아님 — CSP 와 무관)으로 건다.
+  // H 는 그림 내용 높이다. 그림마다 테두리(--img-border, itda-doc#97)·안쪽 여백(boxExtra)이 바깥에 붙으므로 폭 예산에서 그 합을, 높이 예산에서
+  // 그 가운데 가장 큰 세로 몫을 먼저 뺀다 — 바깥 상자 줄이 본문 폭·높이 안이다. border-box 테마면 건 크기에 그 몫을 더한다.
   function sizeRow(p, h) {
     const imgs = rowImages(p);
     const cs = getComputedStyle(p);
     const gap = parseFloat(cs.columnGap) || 0, rgap = parseFloat(cs.rowGap) || 0;
     const known = imgs.map(im => im.naturalWidth > 0 && im.naturalHeight > 0);
     const ratios = imgs.map((im, i) => known[i] ? im.naturalWidth / im.naturalHeight : 4 / 3);
+    const ext = imgs.map(boxExtra);
     const sum = ratios.reduce((a, r) => a + r, 0) || 1;
-    const wMax = Math.max(1, p.clientWidth - gap * Math.max(0, imgs.length - 1));
+    const exSum = ext.reduce((a, e) => a + e.x, 0), eyMax = ext.reduce((a, e) => Math.max(a, e.y), 0);
+    const wMax = Math.max(1, p.clientWidth - gap * Math.max(0, imgs.length - 1) - exSum);
     const caps = [...p.querySelectorAll(":scope > .fr-cap")];
     const capH = () => caps.length ? Math.max(...caps.map(c => c.getBoundingClientRect().height)) + rgap : 0;
-    const set = H => imgs.forEach((im, i) => { im.style.height = H + "px"; im.style.width = known[i] ? Math.floor(H * ratios[i]) + "px" : ""; });
-    let H = Math.max(1, Math.floor(Math.min(h - capH(), wMax / sum)));
+    const set = H => imgs.forEach((im, i) => {
+      const e = ext[i];
+      im.style.height = H + (e.bb ? e.y : 0) + "px";
+      im.style.width = known[i] ? Math.floor(H * ratios[i]) + (e.bb ? e.x : 0) + "px" : "";
+    });
+    let H = Math.max(1, Math.floor(Math.min(h - capH() - eyMax, wMax / sum)));
     set(H);
-    if (caps.length) { H = Math.max(1, Math.floor(Math.min(h - capH(), wMax / sum))); set(H); }
+    if (caps.length) { H = Math.max(1, Math.floor(Math.min(h - capH() - eyMax, wMax / sum))); set(H); }
     return H;
+  }
+
+  // boxExtra 는 img 의 내용 상자 바깥 몫 — 좌우(x)·위아래(y) 테두리 + 안쪽 여백(px) — 과 border-box 여부(bb)다.
+  function boxExtra(im) {
+    const cs = getComputedStyle(im);
+    const px = k => parseFloat(cs[k]) || 0;
+    return {
+      x: px("paddingLeft") + px("paddingRight") + px("borderLeftWidth") + px("borderRightWidth"),
+      y: px("paddingTop") + px("paddingBottom") + px("borderTopWidth") + px("borderBottomWidth"),
+      bb: cs.boxSizing === "border-box",
+      // max-height 는 px 로 끝나는 값만 수치 상한으로 쓴다. 계산 스타일은 백분율·calc 를 px 로 풀지 않고 "100%" 처럼 돌려줄 수 있다 —
+      // parseFloat 하면 100% 가 100px 가 된다(리뷰 R2: 패널 그림이 44×100px 로 줄었다). 그런 값과 "none" 은 NaN — 상한을 따로 두지 않고,
+      // 그 효과는 이미 offsetHeight 에 담겨 있다
+      maxH: /^\d+(\.\d+)?(e[+-]?\d+)?px$/i.test(cs.maxHeight || "") ? parseFloat(cs.maxHeight) : NaN,
+    };
+  }
+  // availWidth 는 img 가 놓일 수 있는 폭이다 — 가장 가까운 인라인 아닌 조상(링크 a 가 인라인이면 그 위 문단)의 내용 폭. 못 재면 0.
+  function availWidth(im) {
+    let el = im.parentElement;
+    while (el && /^(inline|contents)$/.test(getComputedStyle(el).display)) el = el.parentElement;
+    if (!el) return 0;
+    const cs = getComputedStyle(el);
+    return el.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+  }
+
+  // ---- 그림 상자를 그림에 붙이기(itda-doc#97). 슬라이드에서 자리를 채우는 그림 — 분할 패널(.slide-panel, cover 인 img-fill 은 뺀다)과
+  // .fit 그림(fit-sized figure·다단 칸·링크 단 줄. 가로 배치 p.fit-row 는 sizeRow 가 따로 맞춘다) — 은 base.css 가 상자를 자리만큼 잡고
+  // object-fit: contain 으로 그림을 그 안에 그린다. 그 img 에 테두리(--img-border)를 두르면 선이 그림이 아니라 빈 띠를 포함한 상자를 감싼다.
+  // fitImages 는 그런 img 마다 CSS 가 잡은 상자(내용 영역)를 재어 그림의 원래 비율(naturalWidth/naturalHeight)로 실제 그려질 크기(containSize)를
+  // 구해 img 의 width·height 로 건다 — 상자 = 그림이라 선이 그림 가장자리에 붙는다. 남는 자리는 margin: auto 로 가운데에 둔다(flex 부모가
+  // 아니면 display: block 을 더한다 — 그래야 margin: auto 가 가로로 먹는다). 크기는 CSSOM(style 속성 아님 — CSP 와 무관, sizeRow 와 같다)으로,
+  // 패널의 width: 100% !important 를 이기도록 important 로 건다(인라인 important 가 스타일시트 important 를 이긴다).
+  //   재기: 전에 건 값을 지우고 바깥 상자(테두리·안쪽 여백 포함)의 예산을 잰다 — 폭은 CSS 상자 폭(offsetWidth)과 부모 가용 폭(availWidth) 가운데
+  //   작은 쪽, 높이는 CSS 상자 높이(offsetHeight)와 max-height 가운데 작은 쪽이다. content-box 의 width: 100%·max-height 는 내용 상자에 걸려
+  //   테두리만큼 부모를 넘으므로(패널은 overflow: hidden 이라 오른쪽 선이 잘렸다 — 리뷰 R1) CSS 상자 그대로를 예산으로 쓰지 않는다. 그 예산에서
+  //   테두리·안쪽 여백을 뺀 내용 영역에 그림을 contain 으로 넣는다(offsetWidth 등은 배치 px — 보기 영역의 transform 배율과 무관).
+  //   그림이 아직 안 읽혔거나 깨져 비율을 모르면(naturalWidth 0) 아무것도 걸지 않는다 — CSS 상자 그대로(테두리는 상자를 감싼다).
+  //     안 읽힌 그림(complete 아님)에는 load 때 그 그림만 한 번 다시 맞추는 듣기를 단다. 그때 쪽이 화면 밖(display: none·떼어 냄)이라
+  //     상자가 0 이면 역시 아무것도 걸지 않는다(다시 만들 때 맞춘다 — slides.js 는 덜 읽힌 장을 재사용하지 않는다).
+  //   창 크기 변경·인쇄: 슬라이드 쪽은 크기가 고정(1280×720 등 — 인쇄도 같은 상자를 pt 로)이고 보기 영역은 transform 으로만 키우므로 건 px 가 그대로 맞다.
+  // slides.js 가 장을 다 꾸민 뒤(패널을 붙이고 쪽 나눔이 fit-sized 높이를 건 뒤) 장마다 부른다. 다시 불러도 된다.
+  const FIT_IMG = ":scope > .slide-panel img:not(.img-fill), .page-body img.img-fit";
+  const FIT_PROPS = ["width", "height", "flex", "margin", "display"];
+  // containSize 는 상자 bw×bh 안에 비율 nw:nh 그림을 줄이거나 키워 넣은(contain) 크기 {w, h} 다(px 내림 — 상자를 넘지 않는다). 하나라도 0 이하면 null.
+  function containSize(bw, bh, nw, nh) {
+    if (!(bw > 0 && bh > 0 && nw > 0 && nh > 0)) return null;
+    const r = nw / nh;
+    if (bw / bh > r) return { w: Math.max(1, Math.floor(bh * r)), h: Math.floor(bh) }; // 상자가 더 넓다 — 높이에 맞추고 좌우가 남는다
+    return { w: Math.floor(bw), h: Math.max(1, Math.floor(bw / r)) };
+  }
+  function fitImage(im) {
+    for (const p of FIT_PROPS) im.style.removeProperty(p);
+    if (!(im.naturalWidth > 0 && im.naturalHeight > 0)) return false;
+    const e = boxExtra(im);
+    const aw = availWidth(im);
+    const outW = aw > 0 ? Math.min(im.offsetWidth, aw) : im.offsetWidth;
+    const outH = e.maxH >= 0 ? Math.min(im.offsetHeight, e.maxH) : im.offsetHeight;
+    const s = containSize(outW - e.x, outH - e.y, im.naturalWidth, im.naturalHeight);
+    if (!s) return false;
+    // border-box 를 쓰는 테마면 안쪽 여백·테두리를 더해 건다(기본은 content-box — 내용 크기를 건다)
+    const bx = e.bb ? e.x : 0, by = e.bb ? e.y : 0;
+    const par = im.parentElement && getComputedStyle(im.parentElement).display;
+    if (!/flex/.test(par || "")) im.style.setProperty("display", "block", "important");
+    im.style.setProperty("width", s.w + bx + "px", "important");
+    im.style.setProperty("height", s.h + by + "px", "important");
+    im.style.setProperty("flex", "none", "important");
+    im.style.setProperty("margin", "auto", "important");
+    return true;
+  }
+  function fitImages(rootEl) {
+    let n = 0;
+    for (const im of rootEl.querySelectorAll(FIT_IMG)) {
+      if (im.closest("a.yt, p.fit-row")) continue; // YouTube 대표 그림(테두리 없음)·가로 배치(sizeRow)
+      if (fitImage(im)) n++;
+      else if (!im.complete) im.addEventListener("load", () => fitImage(im), { once: true });
+    }
+    return n;
   }
 
   function measureHeight(node) {
@@ -971,5 +1056,5 @@
   }
 
   // 정식 이름은 window.ItdaPager 다. window.HyvePager 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입해 둘이 갈라지지 않는다.
-  window.ItdaPager = window.HyvePager = { paginate, prepareTOC, adoptWidths, fitMath, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
+  window.ItdaPager = window.HyvePager = { paginate, prepareTOC, adoptWidths, fitMath, fitImages, containSize, numberBlocks, navKey, typingTarget, hostNavKey, pageNav, pageBandEl, pageBands, currentBandRange, scrollMap, mapScroll };
 })();

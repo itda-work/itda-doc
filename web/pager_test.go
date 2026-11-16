@@ -248,3 +248,48 @@ func TestPagerFitMath(t *testing.T) {
 		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
 	}
 }
+
+// 그림 테두리(itda-doc#97): 문장 속이 아닌 그림 — figure·링크 단 그림 줄(mdoc 의 p.img-link)·슬라이드 가로 배치·분할 패널(cover 인 img-fill 과
+// YouTube 대표 그림 빼고) — 이 --img-border 를 두르는 것을 base.css 글자로 묶고, 자리를 채우는 그림의 상자를 그림 크기로 줄이는 fitImages 를
+// testdata/pager_fitimages.cjs 가 pager.js 를 그대로 돌려 본다(세로·가로 긴 그림 × 패널 1:1·2:1·.fit). slides.js 가 장을 다 꾸민 뒤 부르는 것도 글자로 본다.
+// 실제 레이아웃(flex·object-fit)과 테마별 모양은 화면 판정이 본다.
+func TestImageBorders(t *testing.T) {
+	css, err := os.ReadFile("base.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const rule = ".page-body :where(figure > img, p.img-link > img, p.img-link > a > img, .page.slide .page-body > p.fit-row > img, .page.slide .page-body > p.fit-row > a > img),\n" +
+		":where(.page.slide > .slide-panel) img:where(:not(.img-fill, a.yt *)) { border: var(--img-border); border-radius: var(--img-radius); }"
+	if !strings.Contains(string(css), rule) {
+		t.Errorf("base.css 의 그림 테두리 규칙이 figure·링크 단 그림·가로 배치·패널(img-fill·a.yt 제외)을 특이도 낮게 고르지 않음")
+	}
+	// 테두리를 두르는 다른 img 규칙이 없다 — 로고·배경·글 줄 속 그림은 위 선택자에만 걸리지 않으면 테두리가 없다
+	if n := strings.Count(string(css), "border: var(--img-border)"); n != 1 {
+		t.Errorf("base.css 에 --img-border 를 두르는 규칙이 %d개 — 하나여야 대상·제외 목록이 한곳에 있다", n)
+	}
+	sl, err := os.ReadFile("slides.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(sl)
+	if d, f := strings.Index(s, "decorate(pg, o);\n"), strings.Index(s, "window.ItdaPager.fitImages(pg);"); d < 0 || f < d {
+		t.Errorf("slides.js makeGroup 이 장을 꾸민(decorate) 뒤 fitImages 를 부르지 않음: %d %d", d, f)
+	}
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	js, _ := filepath.Abs("pager.js")
+	runner, _ := filepath.Abs(filepath.Join("testdata", "pager_fitimages.cjs"))
+	out, err := exec.Command(node, runner, js).CombinedOutput()
+	if err != nil {
+		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
+	}
+	m := regexp.MustCompile(`PAGER DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out))
+	if m == nil || m[1] == "0" {
+		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
+	}
+}

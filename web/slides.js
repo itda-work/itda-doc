@@ -520,6 +520,8 @@
       for (const im of pg.querySelectorAll("img")) if (!im.complete || !im.naturalWidth) ok = false;
       target.insertBefore(pg, sub);
       decorate(pg, o);
+      // 패널·.fit 그림의 상자를 그림 크기로 줄인다(itda-doc#97 — 테두리가 빈 띠가 아니라 그림에 붙게). 패널·fit-sized 높이가 다 정해진 뒤라 여기서
+      window.ItdaPager.fitImages(pg);
     }
     sub.remove();
     return { pages, notes, slots, overflow, ok };

@@ -193,8 +193,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--box-border` | `:::box` 테두리 | `0.75pt solid var(--rule)` |
 | `--box-bg` | `:::box` 바탕 | `transparent` |
 | `--box-radius` | `:::box` 모서리 | `3pt` |
-| `--img-border` | 본문 그림 테두리(그림만 있는 문단의 그림 — 글 줄 속 아이콘·로고 제외). 없애려면 `none` | `0.75pt solid color-mix(in srgb, var(--rule) 60%, var(--paper))` |
-| `--img-radius` | 본문 그림 모서리 | `2pt` |
+| `--img-border` | 그림 테두리 — 문장 속이 아닌 그림(그림만 있는 문단, 그림 하나만 감싼 링크 한 줄, 슬라이드의 가로 배치·분할 패널 그림. 글 줄 속 그림·아이콘·로고, 배경 그림, 패널을 꽉 채우는(cover — `.fill`, Deckset `![left]`·`![right]`) 그림, YouTube 대표 그림 제외). 없애려면 `none` | `0.75pt solid color-mix(in srgb, var(--rule) 60%, var(--paper))` |
+| `--img-radius` | 그림 테두리 모서리(`--img-border` 와 같은 그림) | `2pt` |
 | `--lead-size` | `:::lead` 글자 크기 | `11.5pt` |
 | `--lead-bar` | `:::lead` 왼쪽 막대 | `3pt solid var(--accent)` |
 | `--lead-bg` | `:::lead` 바탕 | `transparent` |
