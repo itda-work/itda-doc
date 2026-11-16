@@ -9,6 +9,11 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 #present.pr-idle [data-pr-overlay] { cursor: auto; }
 #present { position: fixed; inset: 0; z-index: 100; background: #000; color: #e9edf3; -webkit-user-select: none; user-select: none; overflow: hidden; }
 #present.pr-idle { cursor: none; }
+/* 청중(따라가기) 열기(present.js 머리 주석 「두 화면 발표」): 커서 깨우기가 없으므로 커서는 늘 숨긴다. 겹침 층은 위 규칙처럼 되살린다 */
+#present.pr-audience { cursor: none; }
+#present.pr-audience [data-pr-overlay] { cursor: auto; }
+/* 청중 열기의 덱 사본에 딸려 온 입력 부품(묻기 막대·코드 복사·묻기 단추)은 보이지 않는다 — 마우스 올림·포커스로도 드러나지 않게 */
+#present.pr-audience .pr-deck .itda-askbar, #present.pr-audience .pr-deck .itda-codecopy { display: none !important; }
 .pr-stage { position: absolute; inset: 0; overflow: hidden; }
 /* 노트를 오른쪽에 붙였을 때(.pr-dock)만 무대·아래 줄이 칸 너비만큼 줄어든다 — 떠 있는 카드(기본)는 슬라이드 위에 겹친다 */
 #present.pr-notes-on.pr-dock .pr-stage { right: var(--pr-notes-w, 34%); }

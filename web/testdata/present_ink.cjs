@@ -78,7 +78,8 @@ function world() {
     ItdaSlides: { SIZE: { "16:9": [1280, 720], "4:3": [960, 720] } }, getComputedStyle: () => ({ backgroundColor: "rgb(255, 255, 255)", width: "0px", height: "0px" }) });
   win.Path2D = class { constructor(d) { this.d = d; } };
   const ctx = vm.createContext({ window: win, document: doc, performance: { now: () => world.clock }, setTimeout: (f, ms) => { const id = ++world.seq; world.timers.set(id, f); return id; }, clearTimeout: id => world.timers.delete(id), setInterval: () => 0, clearInterval() {}, requestAnimationFrame: win.requestAnimationFrame, console, Math, parseFloat, Number, String, Map, WeakMap, Set, Infinity });
-  for (const f of ["inkshape.js", "ink.js", "present.js"]) vm.runInContext(fs.readFileSync(path.join(webDir, f), "utf8"), ctx);
+  // ask.js 는 묻기 단추의 위임 처리기(handler)를 청중 덱에서 시험하려고 싣는다(8절) — 켜기(set) 전에는 아무것도 하지 않는다
+  for (const f of ["inkshape.js", "ink.js", "present.js", "ask.js"]) vm.runInContext(fs.readFileSync(path.join(webDir, f), "utf8"), ctx);
   return { win, doc, body, H: win.ItdaPresent, I: win.ItdaInk, P: win.ItdaPresent.state, raf };
 }
 world.clock = 0;
@@ -449,6 +450,154 @@ const hidden = w => w.body.classList.contains("pr-overlay-hidden");
   H.setBlack(false);
   e = key(w, "Escape", "Escape", { target: ta });
   ok("안내 상자: Esc 는 양보하지 않는다(발표 끝내기)", !P.on && e.dp, { on: P.on });
+}
+
+// ---- 7. 두 화면 발표(itda-doc#95 — present.js 머리 주석 「두 화면 발표」): onState·audience 열기·show 덮어쓰기
+const chartFig = n => { const f = new El("figure"); f.className = "chart"; if (n) f.dataset.step = String(n); return f; };
+// snap 은 덮개 아래 모든 요소의 클래스·데이터를 한 글로 적는다 — 같은 show 를 두 번 불러 DOM 이 바뀌지 않았는지 본다.
+const snap = r => { const out = []; const walk = e => { out.push(e.tag + "." + e.className + JSON.stringify(e.dataset) + e._text); e.kids.forEach(walk); }; walk(r); return out.join("|"); };
+const playing = s => s.querySelectorAll("figure.chart").filter(f => f.classList.contains("chart-play")).length;
+{
+  const w = world(), { P, H } = w, states = [], slides = [];
+  fakeLightbox(w);
+  H.start({ pages: [slide([]), slide([stepped(1), stepped(2), img()], 2), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {},
+    onSlide: (i, n) => slides.push(i), onState: s => states.push(s) });
+  const last = () => states[states.length - 1];
+  ok("onState: 열 때 첫 상태를 한 번 보낸다", states.length === 1 && JSON.stringify(last()) === JSON.stringify({ i: 0, step: 0, steps: 0, total: 3, black: false, grid: false, lightbox: false, on: true }), states);
+  H.next();
+  ok("onState: 장이 바뀌면 한 번(steps 는 그 장의 단계 수)", states.length === 2 && last().i === 1 && last().step === 0 && last().steps === 2, states.length);
+  H.next();
+  ok("onState: 단계만 바뀌어도 한 번 — onSlide 는 지금처럼 부르지 않는다", states.length === 3 && last().step === 1 && slides.join() === "0,1", { n: states.length, slides });
+  H.setBlack(true);
+  ok("onState: 검은 화면 켜기에 한 번", states.length === 4 && last().black === true, states.length);
+  H.setBlack(true);
+  ok("onState: 같은 값이면 부르지 않는다(검은 화면 다시 켜기)", states.length === 4, states.length);
+  H.setBlack(false);
+  H.toggleGrid(true);
+  ok("onState: 한눈에 보기 켜기에 한 번", states.length === 6 && last().grid === true && last().black === false, states.length);
+  H.toggleGrid(false);
+  ok("onState: 한눈에 보기 끄기에 한 번", states.length === 7 && last().grid === false, states.length);
+  H.next(); // 단계 2 — 그림이 보인다
+  tap(w, P.slides[1].querySelector("img"));
+  ok("onState: 크게 보기 열기에 한 번(lightbox 참)", states.length === 9 && last().lightbox === true && P.idx === 1, { n: states.length, s: last() });
+  H.next();
+  ok("onState: 크게 보기가 열린 채 넘기면 닫힘·장 바뀜을 한 번에 보낸다", states.length === 10 && last().lightbox === false && last().i === 2, { n: states.length, s: last() });
+  H.jump(2); H.show({ i: 2, step: 0, black: false });
+  ok("onState: 바뀐 것 없는 jump·show 는 부르지 않는다", states.length === 10, states.length);
+  H.stop();
+  ok("onState: 끝낼 때 on:false 를 한 번", states.length === 11 && JSON.stringify(last()) === JSON.stringify({ i: 2, step: 0, steps: 0, total: 3, black: false, grid: false, lightbox: false, on: false }), last());
+  open(w); H.next(); H.stop();
+  ok("onState: 다음 발표(onState 없음)는 지난 onState 를 부르지 않는다", states.length === 11, states.length);
+}
+{
+  const w = world(), { P, H } = w, calls = [], states = [];
+  fakeLightbox(w);
+  w.win.ItdaPresentHost = { fullscreen: on => calls.push(on) };
+  const a = new El("a"); a.setAttribute("href", "https://example.com/x");
+  H.start({ pages: [slide([img()]), slide([a]), slide([])], notes: ["<p>노트</p>", "", ""], index: 0, ratio: "16:9", onExit() {}, audience: true, onState: s => states.push(s) });
+  const root = rootOf(w);
+  const parts = [".pr-notes", ".pr-notes-grip", ".pr-toc", ".pr-toc-grip", ".pr-hud", ".pr-goto", ".pr-grid", ".pr-lightbox", ".pr-ink-bar"].filter(s => root.querySelector(s));
+  ok("audience: 덱·검은 화면 층만 — 노트·목차·아래 줄·한눈에·크게 보기·판서 도구가 없다", parts.length === 0 && !!root.querySelector(".pr-deck") && !!root.querySelector(".pr-black") && H.ink() === null && root.classList.contains("pr-audience"), parts);
+  ok("audience: 호스트 전체 화면 훅은 그대로 부르고 첫 상태를 보낸다", calls.join() === "true" && P.fsCalls === 1 && states.length === 1 && states[0].i === 0, { calls, n: states.length });
+  const e = key(w, "ArrowRight", "ArrowRight");
+  key(w, "g", "KeyG"); key(w, "n", "KeyN"); key(w, "l", "KeyL"); key(w, "Escape", "Escape");
+  ok("audience: 키로 넘기지·끝내지 않고 키를 삼키지도 않는다", P.on && P.idx === 0 && !P.grid && !P.showNotes && !e.dp && !e.sp && !(w.doc.on.keydown || []).length, { idx: P.idx, dp: e.dp });
+  tap(w, P.slides[0].querySelector("img"));
+  fire(P.slides[0], "mousedown", { button: 2 });
+  ok("audience: 마우스로 넘기거나 크게 보지 않고 커서 깨우기도 없다", P.idx === 0 && !P.lightbox && !(root.on.mousedown || []).length && !(root.on.mousemove || []).length && !root.classList.contains("pr-idle"), { idx: P.idx, lb: P.lightbox });
+  H.toggleGrid(true);
+  ok("audience: 한눈에 보기는 켜지지 않는다", !P.grid && states.length === 1, P.grid);
+  H.show({ i: 1 });
+  ok("audience: show 로만 넘어가고 onState 를 보낸다", P.idx === 1 && states.length === 2 && states[1].i === 1, { idx: P.idx, n: states.length });
+  ok("audience: 덱 안 링크 click 은 먹어 창이 이동하지 않는다", clickEaten(w, P.slides[1].querySelector("a")));
+  H.stop();
+  ok("audience: 끝낼 때 전체 화면 끄기·on:false", !P.on && calls.join() === "true,false" && states.length === 3 && states[2].on === false, { calls, n: states.length });
+  open(w);
+  ok("audience: 다음 보통 발표는 노트·아래 줄을 다시 만든다", !!rootOf(w).querySelector(".pr-notes") && !!rootOf(w).querySelector(".pr-hud") && !rootOf(w).classList.contains("pr-audience"));
+  H.stop();
+}
+{
+  const w = world(), { P, H } = w, states = [];
+  H.start({ pages: [slide([]), slide([stepped(1), chartFig(2)], 2), slide([chartFig()])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState: s => states.push(s) });
+  const root = rootOf(w);
+  H.show({ i: 2, step: 0 });
+  ok("show: 앞으로 간 장은 차트가 움직인다(go 규칙)", P.idx === 2 && P.step === 0 && playing(P.slides[2]) === 1, playing(P.slides[2]));
+  for (const f of root.querySelectorAll("figure.chart")) f.classList.remove("chart-play");
+  let before = snap(root), n0 = states.length;
+  H.show({ i: 2, step: 0 });
+  ok("show 멱등: 같은 값 두 번이면 DOM·차트 재생·onState 변화 없음", snap(root) === before && playing(P.slides[2]) === 0 && states.length === n0, { same: snap(root) === before, n: states.length - n0 });
+  H.show({ i: 1, step: 1 });
+  ok("show: 뒤로 간 장은 그 단계까지 보이고 차트는 움직이지 않는다", P.idx === 1 && P.step === 1 && shown(P) === "10" && playing(P.slides[1]) === 0 && states.length === n0 + 1, { step: P.step, s: shown(P) });
+  before = snap(root);
+  H.show({ i: 1, step: 1, black: false });
+  ok("show 멱등: 뒤로 간 장에서도 두 번째는 변화 없음", snap(root) === before && states.length === n0 + 1);
+  H.show({ step: 2 });
+  ok("show: 같은 장의 단계 앞으로 — 새로 보인 차트만 움직인다(next 와 같다)", P.idx === 1 && P.step === 2 && shown(P) === "11" && playing(P.slides[1]) === 1, { s: shown(P), p: playing(P.slides[1]) });
+  H.show({ i: 99, step: -5 });
+  ok("show: 범위 밖 장·단계는 잘라낸다(위)", P.idx === 2 && P.step === 0, { idx: P.idx, step: P.step });
+  H.show({ i: -3 });
+  H.show({ i: 1, step: 99 });
+  ok("show: 범위 밖 단계는 그 장의 단계 수로", P.idx === 1 && P.step === 2, { idx: P.idx, step: P.step });
+  H.show({ i: "x", step: null });
+  ok("show: 숫자가 아닌 값은 그대로 둔다", P.idx === 1 && P.step === 2);
+  const n1 = states.length;
+  H.show({ i: 0, black: true });
+  ok("show: 장·검은 화면을 함께 바꿔도 onState 는 한 번", P.idx === 0 && P.black && root.classList.contains("pr-black-on") && states.length === n1 + 1 && states[n1].black && states[n1].i === 0, states.length - n1);
+  H.show({ black: false });
+  ok("show: 검은 화면 끄기(setBlack 과 같은 길)", !P.black && !root.classList.contains("pr-black-on") && states.length === n1 + 2);
+  H.stop();
+  H.show({ i: 1 });
+  ok("show: 발표 밖에서는 아무것도 하지 않는다", !P.on && states.length === n1 + 3);
+}
+
+// ---- 8. 끝 콜백 안에서 새 발표 열기(리뷰 [1]): 옛 발표는 끝 on:false 를 받고, 새 발표는 옛 끝 알림을 받지 않으며 이후 알림·audience 표식이 이어진다
+for (const via of ["onExit", "onSlide"]) {
+  const w = world(), { P, H } = w, recA = [], recB = [];
+  const three = () => [slide([]), slide([]), slide([])];
+  const openB = () => H.start({ pages: three(), notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState: s => recB.push(s) });
+  H.start({ pages: three(), notes: [], index: 0, ratio: "16:9", onState: s => recA.push(s),
+    onExit: () => { if (via === "onExit") openB(); }, onSlide: i => { if (via === "onSlide" && i === -1) openB(); } });
+  H.next();
+  H.stop();
+  ok(via + " 안에서 새 발표: 옛 발표는 끝 on:false 를 받는다", recA.length === 3 && recA[2].on === false && recA[2].i === 1, recA);
+  ok(via + " 안에서 새 발표: 새 발표는 첫 상태만 받고 옛 끝 알림은 받지 않는다", recB.length === 1 && recB[0].on === true && recB[0].i === 0, recB);
+  H.show({ i: 1 });
+  ok(via + " 안에서 새 발표: 새 발표의 알림이 이어지고 audience 표식이 남는다", P.on && P.audience && rootOf(w).classList.contains("pr-audience") && !rootOf(w).querySelector(".pr-hud") && recB.length === 2 && recB[1].i === 1, { on: P.on, aud: P.audience, n: recB.length });
+  H.stop();
+  ok(via + " 안에서 새 발표: 새 발표를 끝내면 그 발표에 on:false, 옛 발표에는 더 없다", recB.length === 3 && recB[2].on === false && recA.length === 3, { a: recA.length, b: recB.length });
+}
+
+// ---- 9. 청중 덱의 입력 부품(리뷰 [2]): 덱 사본의 묻기 단추·링크는 포커스 차례에서 빠지고, 누르기·키보드 활성화의 click 이 문서의 위임 처리기
+// (ask.js handler)까지 가지 않는다. 실제 WebKit 의 inert·Tab 순서는 미검증(가짜 DOM 은 inert 속성을 다는지만 본다).
+{
+  const w = world(), { P, H } = w, A = w.win.ItdaAsk, opened = [];
+  A.set({ services: ["claude"], course: "과정", doc: "교안" });
+  w.doc.addEventListener("click", A.handler({ open: u => opened.push(u) })); // 호스트가 문서에 한 번 거는 위임 처리기(거품 단계)
+  const asked = () => { const p = slide([]); p.className = "page slide"; const bar = p.appendChild(new El("div")); bar.className = "itda-askbar";
+    const b = bar.appendChild(new El("button")); b.className = "itda-ask"; b.setAttribute("data-ask", "claude"); const a = p.appendChild(new El("a")); a.setAttribute("href", "https://example.com/"); return p; };
+  // dispatch 는 click 하나를 창 붙잡기 단계 → 문서 거품 단계 차례로 보낸다(앞에서 stopPropagation 하면 멈춘다). detail 0 은 키보드 활성화(Enter·Space)다.
+  const dispatch = (t, detail) => { const e = { type: "click", target: t, button: 0, detail, dp: false, sp: false, preventDefault() { this.dp = true; }, stopPropagation() { this.sp = true; } };
+    for (const f of [...(w.win.on.click || [])]) { f(e); if (e.sp) return e; }
+    for (const f of [...(w.doc.on.click || [])]) { f(e); if (e.sp) return e; }
+    return e; };
+  const src = [asked(), asked()];
+  H.start({ pages: src, notes: [], index: 0, ratio: "16:9", onExit() {} });
+  dispatch(P.slides[0].querySelector("button.itda-ask"), 1);
+  ok("묻기 위임(대조): 보통 발표의 덱 단추는 지금처럼 ask 로 간다", opened.length === 1, opened.length);
+  H.stop();
+  H.start({ pages: src, notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true });
+  const deck = rootOf(w).querySelector(".pr-deck"), btn = P.slides[0].querySelector("button.itda-ask"), link = P.slides[0].querySelector("a");
+  ok("audience: 덱에 inert 를 단다", "inert" in deck.attrs && deck.inert === true, deck.attrs);
+  ok("audience: 덱 사본의 단추·링크는 포커스 차례에서 빠지고 원본은 그대로다", btn.getAttribute("tabindex") === "-1" && link.getAttribute("tabindex") === "-1" && src[0].querySelector("button.itda-ask").getAttribute("tabindex") === undefined);
+  let e = dispatch(btn, 1);
+  ok("audience: 복제 묻기 단추의 위임 클릭은 ask 로 가지 않는다(붙잡기 단계에서 먹는다)", opened.length === 1 && e.dp && e.sp, { n: opened.length, dp: e.dp });
+  e = dispatch(btn, 0);
+  ok("audience: 키보드 활성화(detail 0 click)도 ask 로 가지 않는다", opened.length === 1 && e.dp && e.sp && P.idx === 0, opened.length);
+  e = dispatch(P.slides[0], 1);
+  ok("audience: 덱의 여느 누르기도 넘김이 아니고 먹는다", P.idx === 0 && e.dp, P.idx);
+  H.stop();
+  dispatch(src[0].querySelector("button.itda-ask"), 1);
+  ok("audience 끝: 발표 밖(원본 단추)의 위임 클릭은 지금처럼 ask 로 간다", opened.length === 2, opened.length);
 }
 
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);
