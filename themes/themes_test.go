@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -174,5 +176,41 @@ func TestBuiltinWoff2TrueType(t *testing.T) {
 	}
 	if seen == 0 { // 경로가 어긋나 아무것도 안 보고 통과하지 않게
 		t.Error("내장 테마에서 woff2 를 하나도 찾지 못함")
+	}
+}
+
+// 내장 테마는 그림 테두리 규칙을 따로 두지 않는다(itda-doc#101) — 그림 테두리는 base.css 한 규칙이 테마의 --img-border·--img-radius 로
+// 대상(본문 figure·링크 단 그림·가로 배치·패널) 모두에 같은 모양으로 그린다. 테마 CSS 가 img 를 고르는 규칙에서 border·padding 을 적으면
+// 그 규칙이 고르는 그림만 모양이 갈리고 --img-border: none 으로 꺼지지 않는다(옛 spine 의 .page-body figure img).
+// CSS 를 해석하지 않는 회귀 방지 시험이다 — 선택자에 img 타입이 적힌 규칙만 본다(클래스·속성만으로 고르는 규칙, CSS 중첩은 보지 않는다).
+func TestBuiltinNoImageBorderRule(t *testing.T) {
+	ruleRe := regexp.MustCompile(`(?s)([^{}]*)\{([^{}]*)\}`)
+	n := 0
+	err := fs.WalkDir(FS, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || path.Base(p) != "theme.css" {
+			return err
+		}
+		n++
+		b, err := fs.ReadFile(FS, p)
+		if err != nil {
+			return err
+		}
+		css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
+		for _, m := range ruleRe.FindAllStringSubmatch(css, -1) {
+			sel, body := m[1], m[2]
+			if !regexp.MustCompile(`(^|[\s,>+~(])img\b`).MatchString(sel) {
+				continue
+			}
+			if regexp.MustCompile(`(^|[;\s])(border|padding)(-[a-z-]+)?\s*:`).MatchString(body) {
+				t.Errorf("%s: 그림 규칙이 테두리·여백을 직접 적음 — --img-border 를 쓴다: %s{%s}", p, strings.TrimSpace(sel), strings.TrimSpace(body))
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n == 0 {
+		t.Fatal("theme.css 를 하나도 못 찾음")
 	}
 }
