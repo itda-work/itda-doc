@@ -72,7 +72,6 @@ nav.toc > ul > li > a .toc-section-number { min-width: 14mm; color: var(--highli
 
 /* ---- 코드·화면 그림·표 */
 .page-body pre { border-left: 3pt solid var(--accent); border-radius: 0 3pt 3pt 0; }
-.page-body figure img { border: 0.75pt solid var(--rule); padding: 1.5mm; background: #fff; }
 .page-body figcaption::before { color: var(--accent); }
 .page-body th { border-color: var(--accent); }
 .page-body kbd { background: #fff; color: var(--accent); font-weight: 600; }
