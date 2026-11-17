@@ -102,9 +102,11 @@ function open(w, o) {
   const root = rootOf(w);
   return { root, deck: root.querySelector(".pr-deck"), slides: w.P.slides };
 }
+// pointer 꼴이 아닌 이벤트(mousedown 등 — 실제 MouseEvent)에는 pointerType·pointerId·pressure 가 없다: 넘겨도 뺀다.
 function fire(target, type, ev) {
   const e = Object.assign({ type, target, button: 0, buttons: 0, clientX: 0, clientY: 0, pointerId: 1, pointerType: "mouse", pressure: 0.5, defaultPrevented: false,
     preventDefault() { this.defaultPrevented = true; }, stopPropagation() { this.stopped = true; } }, ev);
+  if (!/^pointer|^lostpointercapture$/.test(type)) { delete e.pointerType; delete e.pointerId; delete e.pressure; }
   for (let n = target; n && !e.stopped; n = n.parentNode) for (const f of [...(n.on[type] || [])]) f(e);
   return e;
 }
@@ -598,6 +600,141 @@ for (const via of ["onExit", "onSlide"]) {
   H.stop();
   dispatch(src[0].querySelector("button.itda-ask"), 1);
   ok("audience 끝: 발표 밖(원본 단추)의 위임 클릭은 지금처럼 ask 로 간다", opened.length === 2, opened.length);
+}
+
+// ---- 10. 펜만 판서(itda-doc#100 — present.js 머리 주석 「펜만 판서」): penOnly 면 판서는 pointerType "pen" 만 받는다. 판서 도구가 켜진 동안 펜이 아닌
+// 누르기(손가락·마우스, 그 호환 mousedown·click)는 장을 넘기지 않고 먹고, 도구를 끄면 누르기 = 다음이다. 손가락 밀기는 호스트 몫이라 발표가 판정하지 않고,
+// 호스트는 inkHeld() 로 펜 입력 진행을 묻는다. 옵션이 없으면 지금 그대로다. mousedown 은 실제 MouseEvent 꼴(pointerType 없음 — fire)이다.
+// swipeBy 는 손가락 하나의 밀기다 — 실제 웹뷰처럼 밀기 뒤에는 mousedown 을 보내지 않는다.
+function swipeBy(target, x0, x1, ev) {
+  const a = Object.assign({ pointerType: "touch", pointerId: 2, button: 0 }, ev);
+  fire(target, "pointerdown", { ...a, buttons: 1, clientX: x0, clientY: 300 });
+  for (let k = 1; k <= 4; k++) fire(target, "pointermove", { ...a, buttons: 1, clientX: x0 + (x1 - x0) * k / 4, clientY: 300 });
+  fire(target, "pointerup", { ...a, clientX: x1, clientY: 300 });
+}
+{
+  const w = world(), { P, H, I } = w;
+  // 대조: 옵션이 없으면 손가락도 그린다
+  ok("inkHeld: 발표 밖에서는 거짓", H.inkHeld() === false);
+  open(w);
+  key(w, "p", "KeyP");
+  drag(w, P.slides[0], line(100, 300, 6), { pointerType: "touch", pointerId: 2 });
+  ok("penOnly 없음: 손가락 끌기는 지금처럼 획이다", page(w, 0).length === 1 && P.idx === 0 && !rootOf(w).classList.contains("pr-pen-only"), { n: page(w, 0).length, idx: P.idx });
+  H.stop();
+  // penOnly: 손가락·마우스는 판서가 아니다
+  const lasers = [];
+  I.relay("pen-only", { ink: () => "", laser: (...a) => lasers.push(a) });
+  open(w, { penOnly: true, inkKey: "pen-only" });
+  const root = rootOf(w), s0 = () => P.slides[P.idx];
+  ok("penOnly: 덮개에 pr-pen-only 가 붙는다", root.classList.contains("pr-pen-only"));
+  key(w, "p", "KeyP");
+  const touchDraw = drag(w, s0(), line(100, 300, 6), { pointerType: "touch", pointerId: 2 });
+  ok("penOnly + 펜 도구: 손가락 끌기는 획을 만들지 않는다", page(w, 0).length === 0 && !w.H.ink().held(), page(w, 0).length);
+  ok("penOnly + 펜 도구: 손가락 끌기의 mousedown 은 넘기지 않고 click 을 먹는다", P.idx === 0 && touchDraw, { idx: P.idx, eaten: touchDraw });
+  let eaten = tap(w, s0(), { pointerType: "touch", pointerId: 2 });
+  ok("penOnly + 펜 도구: 손가락 누르기는 장을 넘기지 않고 click 을 먹는다", P.idx === 0 && eaten && page(w, 0).length === 0, { idx: P.idx, eaten });
+  eaten = tap(w, s0(), { pointerType: "mouse" });
+  ok("penOnly + 펜 도구: 마우스 누르기도 획이 아니고 넘기지도 않는다", P.idx === 0 && eaten && page(w, 0).length === 0, { idx: P.idx, n: page(w, 0).length });
+  eaten = tap(w, s0(), { pointerType: "mouse", button: 2 });
+  ok("penOnly + 펜 도구: 오른쪽 누르기도 이전으로 가지 않는다", P.idx === 0, P.idx);
+  swipeBy(s0(), 600, 200);
+  ok("penOnly: 손가락 밀기는 획이 아니고, 발표가 넘기지도 않는다(밀기는 호스트 몫)", P.idx === 0 && page(w, 0).length === 0 && !H.inkHeld(), { idx: P.idx, n: page(w, 0).length });
+  // 도구를 끄면 지금처럼 누르기 = 다음
+  key(w, "p", "KeyP");
+  eaten = tap(w, s0(), { pointerType: "touch", pointerId: 2 });
+  ok("penOnly + 도구 끔: 손가락 누르기는 다음이다", P.idx === 1 && !eaten, { idx: P.idx, eaten });
+  tap(w, s0(), { pointerType: "mouse" });
+  ok("penOnly + 도구 끔: 마우스 누르기도 다음이다", P.idx === 2, P.idx);
+  key(w, "p", "KeyP");
+  H.jump(0);
+  // 지우개: 손가락은 지우지 않는다
+  drag(w, s0(), line(100, 100, 6), { pointerType: "pen", pointerId: 1 });
+  ok("penOnly + 펜 도구: 펜 끌기는 획이다", page(w, 0).length === 1, page(w, 0).length);
+  key(w, "e", "KeyE");
+  fire(s0(), "pointerdown", { pointerType: "touch", pointerId: 2, buttons: 1, clientX: 120, clientY: 100 });
+  fire(s0(), "pointermove", { pointerType: "touch", pointerId: 2, buttons: 1, clientX: 140, clientY: 100 });
+  fire(s0(), "pointerup", { pointerType: "touch", pointerId: 2, clientX: 140, clientY: 100 });
+  ok("penOnly + 지우개: 손가락은 지우지 않는다", page(w, 0).length === 1 && !w.H.ink().drawing(), page(w, 0).length);
+  // 레이저: 손가락은 레이저를 움직이지 않는다, 펜은 움직인다
+  key(w, "l", "KeyL");
+  runTimers(); lasers.length = 0;
+  fire(s0(), "pointerdown", { pointerType: "touch", pointerId: 2, buttons: 1, clientX: 300, clientY: 300 });
+  fire(s0(), "pointermove", { pointerType: "touch", pointerId: 2, buttons: 1, clientX: 340, clientY: 300 });
+  runTimers();
+  ok("penOnly + 레이저: 손가락은 레이저 누르기·자리를 만들지 않는다", lasers.length === 0 && !w.H.ink().held(), lasers);
+  fire(s0(), "pointerup", { pointerType: "touch", pointerId: 2, clientX: 340, clientY: 300 });
+  fire(s0(), "pointermove", { pointerType: "pen", pointerId: 1, buttons: 0, clientX: 300, clientY: 300 });
+  runTimers();
+  ok("penOnly + 레이저: 펜은 레이저를 움직인다", lasers.length === 1 && lasers[0][0] === 0 && lasers[0][1] === 300, lasers);
+  eaten = tap(w, s0(), { pointerType: "mouse" });
+  ok("penOnly + 레이저: 마우스 누르기는 넘기지 않는다(레이저가 켜진 동안)", P.idx === 0 && eaten, P.idx);
+  eaten = tap(w, s0(), { pointerType: "pen", pointerId: 1 });
+  ok("penOnly + 레이저: 펜 누르기는 지금처럼 레이저 클릭 — 한 번만 넘긴다", P.idx === 1, P.idx);
+  H.jump(0);
+  // 펜 필압은 지금처럼 담는다
+  key(w, "p", "KeyP");
+  drag(w, s0(), line(100, 500, 6), { pointerType: "pen", pointerId: 1, pressure: 0.8 });
+  const last = page(w, 0)[page(w, 0).length - 1];
+  ok("penOnly: 펜 획은 필압을 담는다", !!last.press && last.press.length === last.pts.length / 2 && last.press.every(v => v === 0.8), last.press);
+  // 펜 획 진행 중 손가락: 획이 끊기지 않고 장이 넘어가지 않는다
+  const n0 = page(w, 0).length, pen = { pointerType: "pen", pointerId: 1 }, fin = { pointerType: "touch", pointerId: 2 };
+  fire(s0(), "pointerdown", { ...pen, buttons: 1, clientX: 100, clientY: 600 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 130, clientY: 600 });
+  // 실제 순서: 손가락 down → up → (뗀 뒤) 호환 mousedown — pointerType 이 없는 MouseEvent 다 → click
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 700, clientY: 300 });
+  fire(s0(), "pointerup", { ...fin, clientX: 700, clientY: 300 });
+  fire(s0(), "mousedown", { buttons: 1, clientX: 700, clientY: 300 });
+  const finEaten = clickEaten(w, s0());
+  ok("penOnly: 펜 획 중 손가락 누르기는 넘기지 않는다(뒤따르는 click 도 먹는다)", P.idx === 0 && finEaten && w.H.ink().drawing(), { idx: P.idx, eaten: finEaten });
+  ok("inkHeld: 펜 획 진행 중에는 참 — 호스트가 이때의 손가락 밀기를 버린다", H.inkHeld() === true);
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 160, clientY: 600 });
+  fire(s0(), "pointerup", { ...pen, clientX: 160, clientY: 600 });
+  const one = page(w, 0)[page(w, 0).length - 1];
+  // 흔들림 보정(SMOOTH)으로 셋째 점은 160 이 아니라 둘째 점과 160 사이다
+  ok("penOnly: 펜 획 중 손가락이 닿아도 획은 하나로 이어진다", page(w, 0).length === n0 + 1 && one.pts.length === 6 && one.pts[4] > one.pts[2], { n: page(w, 0).length, pts: one.pts });
+  ok("inkHeld: 펜을 떼면 거짓", H.inkHeld() === false);
+  // 리뷰 1회차 [1] 순서: 펜 down(+ 호환 mousedown) → 손가락 down → 펜 up → 손가락 up → 손가락 호환 mousedown → click — 장 유지·click 먹음
+  fire(s0(), "pointerdown", { ...pen, buttons: 1, clientX: 100, clientY: 650 });
+  fire(s0(), "mousedown", { buttons: 1, clientX: 100, clientY: 650 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 140, clientY: 650 });
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 500, clientY: 300 });
+  fire(s0(), "pointerup", { ...pen, clientX: 140, clientY: 650 });
+  fire(s0(), "pointerup", { ...fin, clientX: 500, clientY: 300 });
+  fire(s0(), "mousedown", { buttons: 1, clientX: 500, clientY: 300 });
+  eaten = clickEaten(w, s0());
+  ok("리뷰 1회차 순서: 펜을 먼저 떼도 겹친 손가락의 호환 mousedown 은 넘기지 않고 click 도 먹는다", P.idx === 0 && eaten, { idx: P.idx, eaten });
+  // 리뷰 2회차 [1] 순서: … 손가락 A up 뒤 A 의 호환 mousedown 앞에 다른 손가락 B 가 닿는다 → A 의 호환 mousedown·click — 장 유지·click 먹음
+  fire(s0(), "pointerdown", { pointerType: "pen", pointerId: 11, buttons: 1, clientX: 100, clientY: 100 });
+  fire(s0(), "mousedown", { buttons: 1, clientX: 100, clientY: 100 });
+  fire(s0(), "pointerdown", { pointerType: "touch", pointerId: 22, buttons: 1, clientX: 700, clientY: 300 });
+  fire(s0(), "pointerup", { pointerType: "pen", pointerId: 11, clientX: 100, clientY: 100 });
+  fire(s0(), "pointerup", { pointerType: "touch", pointerId: 22, clientX: 700, clientY: 300 });
+  world.clock += 50;
+  fire(s0(), "pointerdown", { pointerType: "touch", pointerId: 33, buttons: 1, clientX: 900, clientY: 400 });
+  fire(s0(), "mousedown", { buttons: 1, clientX: 700, clientY: 300 });
+  eaten = clickEaten(w, s0());
+  ok("리뷰 2회차 순서: 다른 손가락이 끼어도 겹친 손가락의 늦은 호환 mousedown 은 넘기지 않고 click 도 먹는다", P.idx === 0 && eaten, { idx: P.idx, eaten });
+  fire(s0(), "pointerup", { pointerType: "touch", pointerId: 33, clientX: 900, clientY: 400 });
+  // 시각·자리를 짐작하지 않는다: 오래 지나 다른 자리에 온 mousedown 도 도구가 켜져 있으면 먹는다
+  world.clock += 5000;
+  const n1 = page(w, 0).length;
+  eaten = tap(w, s0(), { pointerType: "touch", pointerId: 4, clientX: 1000, clientY: 50 });
+  ok("penOnly + 도구 켜짐: 펜과 겹치지 않은 새 손가락 누르기도 넘기지 않는다(획도 없다)", P.idx === 0 && eaten && page(w, 0).length === n1, { idx: P.idx, eaten });
+  // 도구를 끈 직후 누르기는 다음 — 겹친 접촉의 흔적이 남지 않는다
+  fire(s0(), "pointerdown", { ...pen, buttons: 1, clientX: 100, clientY: 690 });
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 500, clientY: 300 });
+  fire(s0(), "pointerup", { ...pen, clientX: 100, clientY: 690 });
+  fire(s0(), "pointerup", { ...fin, clientX: 500, clientY: 300 });
+  key(w, "p", "KeyP");
+  fire(s0(), "mousedown", { buttons: 1, clientX: 500, clientY: 300 });
+  eaten = clickEaten(w, s0());
+  ok("penOnly + 도구 끈 직후: 누르기는 다음이다", P.idx === 1 && !eaten && !toolOf(w), { idx: P.idx, eaten });
+  H.stop();
+  ok("inkHeld: 발표가 끝나면 거짓(판서가 떨어진다)", H.inkHeld() === false);
+  // 청중 열기에는 판서가 없다 — penOnly 를 받지 않는다
+  open(w, { penOnly: true, audience: true });
+  ok("penOnly + audience: 받지 않는다(pr-pen-only 없음)", !rootOf(w).classList.contains("pr-pen-only") && !P.penOnly);
+  H.stop();
 }
 
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);

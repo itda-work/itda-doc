@@ -31,6 +31,17 @@
 //                       그대로 둔다(step 이 없으면 같은 장이면 지금 단계, 다른 장이면 0). 같은 장·같은 단계·같은 검은 화면이면 아무것도 하지 않는다(차트도
 //                       다시 돌지 않는다). 장이 바뀌면 go(i, step, dir) 규칙(dir 은 장 번호 차례 — 차트는 앞으로 갈 때만 움직인다), 같은 장의 단계만 바뀌면
 //                       next·prev 와 같다. 검은 화면은 setBlack 과 같은 길이다. 바뀐 것이 여럿이어도 onState 는 한 번이다.
+// 펜만 판서(itda-doc#100) — o.penOnly = true(슬라이드 발표 start 에만, 청중 열기·보드 발표에는 없다):
+//   · 판서(펜·형광펜·지우개·레이저)는 pointerType "pen" 입력만 받는다(ink.js notPen) — 손가락·마우스는 획·지우개·레이저를 만들지 않는다.
+//   · 판서 도구가 켜진 동안 펜이 아닌 누르기(손가락·마우스, 그 호환 mousedown·click)는 장을 넘기지 않고 먹는다 — 링크·크게 보기도 아니다(펜·형광펜·
+//     지우개가 켜진 동안의 기존 누르기와 같다). 호환 mousedown 에는 pointerType 이 없어 출처를 가리지 않는다 — 도구가 켜져 있으면 먹는다(ink.js takes).
+//     그래서 손바닥이 닿거나 펜을 먼저 떼도 획이 끊기거나 장이 넘어가지 않는다. 도구를 끄면 지금처럼 누르기 = 다음이다. 쉬는 화면(검은 화면)의 누르기는 지금처럼 다음이다.
+//     도구가 켜진 동안의 장 넘김은 키·호스트의 밀기·단추 몫이다.
+//   · 덮개에 pr-pen-only 클래스를 단다(호스트 CSS 가 쓸 수 있다 — present.css 에는 이 클래스의 규칙이 없다).
+//   · 손가락 밀기(좌우로 넘기기)는 발표가 판정하지 않는다 — 옵션이 없을 때와 같이 호스트 몫이다. 호스트는 ItdaPresent.inkHeld() 가 참인 동안
+//     (펜 입력이 진행 중) 밀기를 버릴 수 있다.
+//   · 옵션이 없으면 지금 그대로다(마우스·손가락도 그린다). Pencil 이 없는 기기에서 판서 도구를 숨길지는 호스트 몫이다.
+//   ItdaPresent.inkHeld()  판서 입력(포인터를 쥔 획·지우개·레이저 누르기)이 진행 중인가 — penOnly 면 펜 입력뿐이다. 발표 밖·판서가 없으면 거짓.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
 // 묻기 넘침 안내 상자(.itda-asknote — ask.js NOTE)는 겹침 층이고, 그 안에 포커스가 있으면 Esc 밖의 키를 양보한다(askNoteKey — 가린 동안은 아니다).
@@ -125,13 +136,14 @@
   //   noteDock(참이면 오른쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), onNoteDock(dock)(머리 단추로 바꿀 때),
   //   tocDock(참이면 목차를 왼쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), tocW(목차 칸 너비 % — 없으면 22),
   //   onToc(dock, w)(목차 붙이기·띄우기를 바꿀 때, 너비 끌기를 놓을 때), inkKey(판서가 딸린 탭 id — ink.js bookFor),
-  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때), onState(s)·audience(머리 주석 「두 화면 발표」) }
+  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때), onState(s)·audience(머리 주석 「두 화면 발표」), penOnly(머리 주석 「펜만 판서」) }
   // onSlide(i, total) 는 슬라이드 번호가 바뀔 때마다(첫 슬라이드 포함 — 단계만 바뀌면 부르지 않는다), 끝낼 때 onExit 뒤 (-1, total) 로 부른다.
   function start(o) {
     if (P.on) return;
     P.on = true;
     opts = o;
     P.audience = !!o.audience;
+    P.penOnly = !!o.penOnly && !P.audience; // 청중 열기에는 판서가 없다
     onState = typeof o.onState === "function" ? o.onState : null;
     sentState = "";
     hold = 0;
@@ -154,7 +166,7 @@
     onExit = o.onExit;
     onSlide = o.onSlide || null;
     sentIdx = -1;
-    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : "") + (P.audience ? " pr-audience" : ""));
+    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : "") + (P.audience ? " pr-audience" : "") + (P.penOnly ? " pr-pen-only" : ""));
     root.id = "present";
     const stage = root.appendChild(el("div", "pr-stage"));
     deck = stage.appendChild(el("div", "pr-deck pages slides " + (o.ratio === "4:3" ? "r43" : "r169")));
@@ -289,6 +301,7 @@
     P.on = true;
     P.board = true;
     P.audience = false; // 두 화면 발표(onState·audience·show)는 슬라이드 발표에만 있다
+    P.penOnly = false; // 보드 발표에는 판서가 없다
     onState = null;
     opts = o;
     P.slides = [];
@@ -1006,7 +1019,7 @@
   function attachInk(w, h) {
     const I = window.ItdaInk;
     if (!I) return;
-    ink = I.attach({ root, deck, size: [w, h], book: I.bookFor(opts.inkKey),
+    ink = I.attach({ root, deck, size: [w, h], book: I.bookFor(opts.inkKey), penOnly: P.penOnly,
       slides: () => P.slides, idx: () => P.idx, scale: () => P.scale, paused: () => !!(P.grid || P.lightbox || P.black),
       click: inkClick, eatClick: () => { lbEat = true; }, wake });
   }
@@ -1091,5 +1104,7 @@
   }
   window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
     // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다
-    yieldsKey: e => P.on && askNoteKey(e) };
+    yieldsKey: e => P.on && askNoteKey(e),
+    // inkHeld 는 판서 입력이 진행 중인가다(머리 주석 「펜만 판서」) — 호스트가 손가락 밀기를 버릴지 정할 때 묻는다
+    inkHeld: () => !!(P.on && ink && ink.held()) };
 })();
