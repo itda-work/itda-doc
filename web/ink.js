@@ -247,7 +247,8 @@
   }
 
   // ---- 발표에 붙이기. o = { root, deck, size: [w, h](설계 px), book, slides()(복제된 .page 들), idx(), scale(), paused()(라이트박스·한눈에 보기·검은 화면),
-  //   click(target, button)(레이저의 클릭 — 넘김·크게 보기), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단) }
+  //   click(target, button)(레이저의 클릭 — 넘김·크게 보기), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단),
+  //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100) }
   function attach(o) {
     const { root, deck, book } = o, [W, H] = o.size;
     const mac = /Mac/.test(window.navigator ? window.navigator.platform : "");
@@ -468,7 +469,11 @@
 
     // ---- 입력(Pointer Events — 펜 필압·getCoalescedEvents 가 여기서 온다. 뒤따르는 mousedown 은 present.js onMouse 가 takes 로 받는다)
     function canStart(e) { return !o.paused() && !(e.target && e.target.closest && e.target.closest(BLOCKED)); }
+    // penOnly(itda-doc#100)면 펜이 아닌 입력(손가락·마우스)은 판서가 아니다 — 획·지우개·레이저를 만들지도 움직이지도 않는다.
+    // 그 누르기가 발표 입력이 되는가는 takes 가 정한다(도구가 켜진 동안은 먹는다).
+    const notPen = e => !!o.penOnly && e.pointerType !== "pen";
     function onDown(e) {
+      if (notPen(e)) return; // 진행 중인 펜 획은 그대로 — 손바닥·손가락이 끊지 않는다
       if (pointer === e.pointerId) settle(); // 떼기를 놓쳤다
       if (!tool || pointer !== null || !canStart(e)) return; // 진행 중인 입력이 있으면 둘째 손가락은 받지 않는다
       if (tool === "laser") {
@@ -487,7 +492,7 @@
     }
     const other = e => pointer !== null && e.pointerId !== pointer;
     function onMove(e) {
-      if (other(e)) return;
+      if (other(e) || notPen(e)) return;
       if (pointer !== null && (e.buttons === 0 || o.paused())) settle(); // 창 밖에서 놓아 pointerup 을 놓쳤거나 쉬는 화면으로 들어갔다 — 클릭으로 치지 않는다
       if (stroke) moveTo(e);
       else if (wiped) eraseAt(toDesign(e));
@@ -497,7 +502,7 @@
       }
     }
     function onUp(e) {
-      if (other(e)) return;
+      if (other(e) || notPen(e)) return;
       const p = press;
       if (!p || e.type !== "pointerup" || o.paused()) { settle(); return; }
       press = null;
@@ -641,8 +646,12 @@
 
     // ---- present.js 가 부르는 것
     // takes 는 onMouse 가 이 누르기를 넘김·크게 보기로 쓰면 안 되는가다 — "draw"(펜·형광펜·지우개의 왼쪽 단추) · "laser"(떼는 때로 미룬다) · ""(지금처럼).
+    // penOnly 면 도구가 켜진 동안 누르기는 출처(손가락·마우스·펜)를 가리지 않고 "draw"(먹는다 — 장이 넘어가지 않고 뒤따르는 click 도 먹는다)다.
+    // 누르기(mousedown — MouseEvent)에는 pointerType 이 없어 출처를 알 수 없다 — 시각·자리로 짐작하지 않는다. 펜의 호환 mousedown 도 원래 판서 몫이라
+    // 넘기지 않는다(레이저의 펜 클릭은 onUp 의 o.click 이 넘긴다). 도구가 꺼졌거나 쉬는 화면(검은 화면)이면 지금처럼 ""(누르기 = 다음)다.
     function takes(e) {
       if (!tool || o.paused()) return "";
+      if (o.penOnly) return "draw";
       if (tool === "laser") return e.button === 0 || e.button === 2 ? "laser" : "";
       return e.button === 0 ? "draw" : "";
     }
@@ -678,7 +687,7 @@
     setNote("");
     paintBar();
     return { tool: () => tool, setTool, setColor, setWidth, undo: () => history(undo), redo: () => history(redo), clearPage, key, takes, slide, pause, resize, detach,
-      drawing: () => !!(stroke || wiped), note: () => note, book };
+      drawing: () => !!(stroke || wiped), held: () => pointer !== null, note: () => note, book };
   }
 
   window.ItdaInk = { LIMIT, COLORS, WIDTHS, HL_SKIP, newBook, pageOf, room, commit, undo, redo, bookFor, drop, preview, relay, pathOf, filled, hits, parseColor, luminance, slideDark, attach };
