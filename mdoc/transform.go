@@ -97,6 +97,8 @@ func (st *state) transform(doc *ast.Document) {
 		if p.Parent() != nil {
 			if f := st.figure(p); f != nil {
 				figs = append(figs, f)
+			} else {
+				st.imgLink(p)
 			}
 		}
 	}
@@ -983,6 +985,20 @@ func (st *state) figure(p *ast.Paragraph) *Figure {
 	}
 	p.Parent().ReplaceChild(p.Parent(), p, f)
 	return f
+}
+
+// imgLink 는 그림 하나만 감싼 링크 하나뿐인 문단(링크 단 그림 한 줄 — [![](a.png)](url))에 class img-link 를 단다(itda-doc#97).
+// 판정은 분할 패널 후보(slotImage)의 문단 꼴과 같다 — 빈 글자는 세지 않는다. 문단(노드 종류)은 그대로 두고 HTML 출력의 class 만 더한다:
+// base.css 가 이 문단의 그림에 그림 테두리(--img-border)를 두른다(figure 와 같은 대접 — 문장 속 그림이 아니다). 사용자가 쓰는 어휘가 아니다.
+func (st *state) imgLink(p *ast.Paragraph) {
+	l, ok := st.soleChild(p).(*ast.Link)
+	if !ok {
+		return
+	}
+	if _, ok := st.soleChild(l).(*ast.Image); !ok {
+		return
+	}
+	p.SetAttributeString("class", []byte("img-link"))
 }
 
 // ---- 그림 캡션 문단 (1.7, itda-hyve#466)

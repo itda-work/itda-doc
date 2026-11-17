@@ -259,10 +259,18 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
 .page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--kbd-line, var(--rule)); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
 .page-body hr { border: 0; border-top: 0.75pt solid var(--rule); margin: 10pt 0; }
 .page-body img { max-width: 100%; max-height: var(--img-max-h, 200mm); }
-/* 본문 그림 테두리: 흰 바탕 스크린샷이 쪽과 섞이지 않게 테마의 가는 선(--rule)을 바탕 쪽으로 옅게 두른다.
-   그림만 있는 문단은 mdoc 이 figure 로 바꾼다(mdoc/transform.go figure) — 글 줄 속 아이콘·배지와 로고는 걸리지 않는다.
-   :where 라 특이도 (0,1,0) — 테마 CSS 의 그림 규칙(예: spine 의 figure img 테·여백)이 이긴다 */
-.page-body :where(figure > img) { border: var(--img-border); border-radius: var(--img-radius); }
+/* 그림 테두리(itda-doc#97): 흰 바탕 스크린샷이 쪽과 섞이지 않게 테마의 가는 선(--rule)을 바탕 쪽으로 옅게 두른다. 문장 속이 아닌 그림만 고른다:
+     - 그림만 있는 문단 — mdoc 이 figure 로 바꾼다(mdoc/transform.go figure)
+     - 링크 단 그림 한 줄([![](a.png)](url)) — mdoc 이 그 문단에 class img-link 를 단다(transform.go imgLink — 막은 링크면 p > img)
+     - 슬라이드 가로 배치(p.fit-row 의 그림)와 분할 패널(.slide-panel 의 그림 — cover 인 img-fill 은 뺀다)
+   걸리지 않는 것: 글 줄 속 그림·아이콘·배지, 로고(.cover-logo·.title-logo·.sf-logo), 배경 그림(.slide-bg), 차트·다이어그램(svg),
+   YouTube 대표 그림(a.yt — figure·패널 모두 a 안이라 위 선택자에 닿지 않고, 패널은 따로 뺀다).
+   자리를 채우는 그림(패널·.fit)은 상자가 그림보다 커서 선이 빈 띠를 감싸므로 pager.js fitImages 가 상자를 그림 크기로 줄인다.
+   이 규칙의 선은 --img-border: none 으로 끈다. 특이도는 :where 로 (0,1,0)·(0,0,1)이라 테마 CSS 의 그림 규칙이 고르는 그림에서는 그 규칙이 이긴다
+   — 예: spine 의 .page-body figure img(테·여백·흰 바탕, border 를 직접 적어 --img-border 로 꺼지지 않는다)는 본문 figure 그림에만 닿고,
+   패널·링크 단 그림·가로 배치는 이 규칙의 --img-border 다 */
+.page-body :where(figure > img, p.img-link > img, p.img-link > a > img, .page.slide .page-body > p.fit-row > img, .page.slide .page-body > p.fit-row > a > img),
+:where(.page.slide > .slide-panel) img:where(:not(.img-fill, a.yt *)) { border: var(--img-border); border-radius: var(--img-radius); }
 .page-body ul, .page-body ol { margin: 0 0 var(--paragraph-gap); }
 /* 목록의 들여쓰기·기호 꼴은 특이도 0(:where)이다 — 아래 사다리와 함께, 테마 CSS 의 목록 규칙이 단계와 무관하게 이긴다(itda-hyve#141) */
 :where(.page-body ul, .page-body ol) { padding-left: var(--list-indent); }
@@ -1002,7 +1010,8 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 /* 슬라이드의 그림은 자리를 채운다(글자가 슬라이드 글자만큼 커지되 높이는 쪽 본문까지 — 남는 너비는 가운데 여백) */
 .page.slide .diagram-svg { width: 100%; }
 /* 슬라이드 그림 배치(itda-hyve#550). 클래스는 mdoc(img-fit·img-left·img-right·img-fill)과 slides.js(no-cap·fig-fit·has-panel·panel-*·split-*)가
-   달고, pager.js 가 맨 위 .fit 그림의 상자 높이(fit-sized)를 건다. 모두 .page.slide 안에서만 고른다 — 문서(A4·이어보기)는 보통 그림.
+   달고, pager.js 가 맨 위 .fit 그림의 상자 높이(fit-sized)를 건다. 장을 만든 뒤 pager.js fitImages 가 .fit img 상자를 그림 비율대로 줄인다
+   (테두리가 그림에 붙게 — itda-doc#97, 위 「그림 테두리」 주석). 모두 .page.slide 안에서만 고른다 — 문서(A4·이어보기)는 보통 그림.
    패널·장식·머리·본문·바닥은 쪽의 직접 자식(>)으로만 고른다 — 본문 안 사용자 컨테이너(:::slide-panel 등)는 걸리지 않는다.
    16px 는 슬라이드 figure 위아래 여백(6pt + 6pt), 60px 는 캡션 자리(pager.js --img-max-h 와 같다). */
 .page.slide .page-body figure.no-cap > img { max-height: calc(var(--body-h, 200mm) - 16px); }
@@ -1038,7 +1047,8 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .page.slide.panel-left > .slide-panel { left: 0; }
 .page.slide.panel-right > .slide-panel { right: 0; }
 /* 패널에는 mdoc 이 표시한 맨 위 블록이 통째로 온다 — figure(그림 + 캡션)·p > img(막은 링크)·p > a > img(링크 단독 줄). 종류와 상관없이
-   블록과 그 안의 링크를 세로 flex 로 두어 img 가 남은 높이를 채운다 */
+   블록과 그 안의 링크를 세로 flex 로 두어 img 가 남은 높이를 채운다. 테두리를 두르는 img(img-fill 이 아닌 것)는 장을 만든 뒤 pager.js fitImages 가
+   이 상자를 그림 비율대로 줄여 인라인 important 로 건다(가운데 — margin: auto). 그 전·비율을 모를 때는 아래 규칙 그대로(상자를 채우고 contain) */
 .page.slide > .slide-panel > * { flex: 1 1 0; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .page.slide > .slide-panel > * > a { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .page.slide > .slide-panel img { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; /* 블록을 고치지 않고 옮긴다 — width 속성(CSP 가 막는 style)이 남아도 패널 폭 */ max-width: none; max-height: none; object-fit: contain; }
