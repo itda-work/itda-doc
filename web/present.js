@@ -91,6 +91,9 @@
   // 포커스를 받을 수 있는 것 — 청중 열기에서 덱 사본의 이것들을 포커스 차례에서 뺀다(startAudience)
   const FOCUSABLE = "a[href], area[href], button, input, select, textarea, summary, iframe, audio, video, [tabindex], [contenteditable]";
   const reduce = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 장 넘김 전환(present.css .t-*). 모르는 값은 none 이다 — mdoc 이 이미 걸러 주지만 호스트가 다른 값을 넘겨도 클래스가 새지 않게.
+  // OUT_MS 는 나가는 장(pr-out)을 보이게 두는 시간 — present.css 의 나가는 움직임(지연 포함)은 이 안에 끝난다(present_test.go 가 묶는다)
+  const TRANSITIONS = ["none", "fade", "slide", "zoom", "push", "cover"], OUT_MS = 450;
   const stepsOf = i => Number(P.slides[i].dataset.steps || 0);
 
   // hostCall 은 호스트 훅 window.ItdaPresentHost[name] 을 부른다(머리 주석 「호스트 계약」). 훅이 없으면 undefined, 훅의 예외는 삼킨다.
@@ -162,7 +165,7 @@
     P.tocW = TOC_W_DEF; // 노트 너비를 먼저 놓을 때(applyWidths) 목차 값이 비지 않게 — 아래 setTocW 가 기억한 값으로 바꾼다
     P.tocCard = null; // 끌어 옮긴 목차 카드 자리 — null 이면 기본 자리(위·왼쪽 CARD_M)
     P.notes = o.notes || [];
-    P.transition = reduce() ? "none" : (o.transition || "none");
+    P.transition = reduce() || !TRANSITIONS.includes(o.transition) ? "none" : o.transition;
     onExit = o.onExit;
     onSlide = o.onSlide || null;
     sentIdx = -1;
@@ -535,6 +538,8 @@
   // 넘길 때마다 1~2초 일그러져 보였다. 그래서 블록 떠오름을 뺐고 전환 기본도 none 이다.
   // 상태 알림(onState)은 다 바꾼 뒤 한 번이다(batch — 안의 크게 보기 닫기는 따로 알리지 않는다).
   function go(i, step, dir) { batch(() => goNow(i, step, dir)); }
+  const outTimer = new WeakMap(); // 장 → 나가는 장 정리 타이머(goNow)
+  function dropOut(s) { const t = outTimer.get(s); if (t !== undefined) { clearTimeout(t); outTimer.delete(s); } }
   function goNow(i, step, dir) {
     const t0 = performance.now();
     closeLightbox(); // 슬라이드·단계가 바뀌면 라이트박스는 남지 않는다
@@ -545,13 +550,17 @@
     P.step = step;
     if (ink) ink.slide(i);
     if (!same) {
-      for (const s of P.slides) if (s !== next && s !== prev) s.classList.remove("pr-cur", "pr-out", "pr-in", "pr-back");
+      // 빠른 연달아 넘김: 넘길 때마다 지금(next)·바로 앞(prev) 밖의 장은 곧바로 숨긴다 — 보이는 장은 늘 둘 이하다.
+      // 나가는 장 정리 타이머는 장마다 하나 — 앞 넘김에서 건 것이 남아 있다가 다시 나가는 그 장의 움직임을 중간에 끊지 않게 새로 걸 때 지운다
+      for (const s of P.slides) if (s !== next && s !== prev) { s.classList.remove("pr-cur", "pr-out", "pr-in", "pr-back"); dropOut(s); }
       if (prev && prev !== next) {
         prev.classList.remove("pr-cur", "pr-in");
         prev.classList.add("pr-out");
         prev.classList.toggle("pr-back", dir < 0);
-        setTimeout(() => { if (P.slides[P.idx] !== prev) prev.classList.remove("pr-out", "pr-back"); }, 450);
+        dropOut(prev);
+        outTimer.set(prev, setTimeout(() => { outTimer.delete(prev); if (P.slides[P.idx] !== prev) prev.classList.remove("pr-out", "pr-back"); }, OUT_MS));
       }
+      dropOut(next);
       next.classList.remove("pr-out", "pr-in", "pr-back");
       void next.offsetWidth;
       next.classList.add("pr-cur", "pr-in");

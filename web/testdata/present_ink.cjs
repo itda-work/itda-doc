@@ -737,4 +737,107 @@ function swipeBy(target, x0, x1, ev) {
   H.stop();
 }
 
+// ---- 11. 장 넘김 전환(itda-doc#99 — present.css .t-*·present.js TRANSITIONS·OUT_MS): 가짜 DOM 은 CSS 를 그리지 않으므로 보이는 장을
+// 클래스로 본다(present.css: pr-cur·pr-out 이면 보인다). 어느 전환이든 넘긴 직후에는 지금 장(pr-cur 하나) + 바로 앞 장(pr-out) 둘 이하,
+// 정리 타이머 뒤에는 지금 장 하나다 — 겹쳐 남은 장·빈 화면이 없다. 움직임 길이(지연 포함 ≤ OUT_MS)는 present_test.go 가 CSS 글로 본다.
+{
+  const vis = P => P.slides.map((s, i) => (s.classList.contains("pr-cur") || s.classList.contains("pr-out") ? i : -1)).filter(i => i >= 0).join(",");
+  const cls = (P, i) => ["pr-cur", "pr-in", "pr-out", "pr-back"].filter(c => P.slides[i].classList.contains(c)).join(" ");
+  const curOk = P => P.slides.filter(s => s.classList.contains("pr-cur")).length === 1 && P.slides[P.idx].classList.contains("pr-cur") && !P.slides[P.idx].classList.contains("pr-out");
+  const pages = () => [slide([]), slide([stepped(1), stepped(2)], 2), slide([]), slide([])];
+  for (const t of ["fade", "slide", "zoom", "push", "cover"]) {
+    const w = world(), { P, H } = w;
+    runTimers();
+    H.start({ pages: pages(), notes: [], index: 0, ratio: "16:9", onExit() {}, transition: t });
+    const root = rootOf(w);
+    ok(t + ": 덮개에 t-" + t + " 이 붙는다", root.classList.contains("t-" + t) && P.transition === t, root.className);
+    // 앞으로
+    H.next();
+    ok(t + " 앞으로: 새 장 pr-cur pr-in, 옛 장 pr-out(pr-back 없음)", cls(P, 1) === "pr-cur pr-in" && cls(P, 0) === "pr-out" && vis(P) === "0,1" && curOk(P), { a: cls(P, 0), b: cls(P, 1) });
+    runTimers();
+    ok(t + " 앞으로: 정리 뒤 지금 장만 보인다", vis(P) === "1" && curOk(P), vis(P));
+    // 단계 넘김: 같은 장 안에서는 다른 장을 건드리지 않는다
+    H.next(); H.next();
+    ok(t + " 단계: 같은 장의 단계 넘김은 나가는 장을 만들지 않는다", P.idx === 1 && P.step === 2 && vis(P) === "1" && cls(P, 1) === "pr-cur pr-in", { v: vis(P), c: cls(P, 1) });
+    H.prev();
+    ok(t + " 단계: 같은 장의 단계 거두기도", P.idx === 1 && P.step === 1 && vis(P) === "1", vis(P));
+    // 뒤로: 단계를 다 거두고 앞 장으로
+    H.prev(); H.prev();
+    ok(t + " 뒤로: 새 장 pr-cur pr-in pr-back, 옛 장 pr-out pr-back", P.idx === 0 && cls(P, 0) === "pr-cur pr-in pr-back" && cls(P, 1) === "pr-out pr-back" && vis(P) === "0,1" && curOk(P), { a: cls(P, 0), b: cls(P, 1) });
+    runTimers();
+    ok(t + " 뒤로: 정리 뒤 지금 장만", vis(P) === "0" && curOk(P), vis(P));
+    // 빠른 연달아 넘김: 정리 타이머가 돌기 전에 세 번 넘기고 한 번 돌아온다
+    H.jump(1); H.jump(2); H.jump(3);
+    ok(t + " 연달아 앞으로: 보이는 장은 지금·바로 앞 둘뿐", vis(P) === "2,3" && cls(P, 3) === "pr-cur pr-in" && cls(P, 2) === "pr-out" && curOk(P), { v: vis(P) });
+    H.prev();
+    ok(t + " 연달아 되돌아옴: 나가던 장이 다시 지금 장(pr-out 이 떨어진다)", P.idx === 2 && vis(P) === "2,3" && cls(P, 2) === "pr-cur pr-in pr-back" && cls(P, 3) === "pr-out pr-back" && curOk(P), { c2: cls(P, 2), c3: cls(P, 3) });
+    runTimers();
+    ok(t + " 연달아: 앞 넘김의 정리 타이머가 지금 장을 숨기지 않는다", vis(P) === "2" && curOk(P), vis(P));
+    // 장마다 정리 타이머 하나: A→B 뒤 B→A→B 로 다시 나가는 A 의 움직임을 첫 넘김의 타이머가 끊지 않는다
+    H.jump(0); runTimers();
+    H.jump(1);
+    const first = [...world.timers.keys()];
+    H.jump(0); H.jump(1);
+    for (const id of first) { const f = world.timers.get(id); if (f) { world.timers.delete(id); f(); } }
+    ok(t + " 다시 나가는 장: 지난 넘김의 정리 타이머는 지워져 지금 나가는 움직임을 끊지 않는다", cls(P, 0) === "pr-out" && vis(P) === "0,1", { c0: cls(P, 0) });
+    runTimers();
+    ok(t + " 다시 나가는 장: 새 타이머 뒤에는 숨는다", vis(P) === "1" && curOk(P), vis(P));
+    // 검은 화면 동안 넘기고 걷기
+    H.setBlack(true);
+    H.next(); H.next(); H.next();
+    ok(t + " 검은 화면 동안 넘김: 보이는 장은 둘 이하", P.black && vis(P).split(",").length <= 2 && curOk(P), vis(P));
+    H.setBlack(false);
+    runTimers();
+    ok(t + " 검은 화면 걷기: 지금 장 하나만", !P.black && vis(P) === String(P.idx) && curOk(P), { v: vis(P), idx: P.idx });
+    H.stop();
+    // 청중 열기의 show 덮어쓰기: 같은 전환 클래스, 같은 정리 길
+    const a = world();
+    runTimers();
+    a.H.start({ pages: pages(), notes: [], index: 0, ratio: "16:9", onExit() {}, transition: t, audience: true, onState() {} });
+    ok(t + " 청중: 같은 전환 클래스", rootOf(a).classList.contains("t-" + t));
+    a.H.show({ i: 3 }); a.H.show({ i: 1, step: 2 }); a.H.show({ i: 2 });
+    ok(t + " 청중 show 연달아: 보이는 장은 둘 이하, 지금 장 하나", a.P.idx === 2 && vis(a.P) === "1,2" && curOk(a.P), vis(a.P));
+    a.H.show({ i: 2, black: true }); a.H.show({ black: false });
+    runTimers();
+    ok(t + " 청중 검은 화면 들고 남: 지금 장 하나만", vis(a.P) === "2" && curOk(a.P), vis(a.P));
+    a.H.stop();
+  }
+  // 동작 줄이기·모르는 값·없는 값은 none
+  {
+    const w = world(), { P, H } = w;
+    w.win.matchMedia = q => ({ matches: /prefers-reduced-motion: reduce/.test(q) });
+    open(w, { transition: "push" });
+    ok("동작 줄이기: push 를 넘겨도 t-none", P.transition === "none" && rootOf(w).classList.contains("t-none") && !rootOf(w).classList.contains("t-push"), rootOf(w).className);
+    H.stop();
+    w.win.matchMedia = () => ({ matches: false });
+    // 발표 중에 동작 줄이기를 켠 뒤 넘김(리뷰 1회차 [1]): present.js 는 시작 때만 읽어 루트의 t-* 와 나가는 장(pr-out)이 남는다.
+    // 화면은 present.css 동작 줄이기 규칙(pr-out 숨김 — present_test.go 가 글로 본다)을 얹어 본다: 보이는 장 = pr-cur 이고 pr-out 아닌 것.
+    // 그 화면이 none 과 같게 지금 장 하나여야 한다 — cover 뒤로·push 앞으로·청중 show 를 포함해 다섯 전환 모두
+    const visReduce = P => P.slides.map((s, i) => (s.classList.contains("pr-cur") && !s.classList.contains("pr-out") ? i : -1)).filter(i => i >= 0).join(",");
+    for (const t of ["fade", "slide", "zoom", "push", "cover"]) {
+      for (const aud of [false, true]) {
+        w.win.matchMedia = () => ({ matches: false });
+        runTimers();
+        H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 1, ratio: "16:9", onExit() {}, transition: t, audience: aud, onState() {} });
+        const c = rootOf(w).classList.contains("t-" + t);
+        w.win.matchMedia = q => ({ matches: /prefers-reduced-motion: reduce/.test(q) });
+        if (aud) H.show({ i: 0 }); else H.prev();
+        const back = visReduce(P), backOut = P.slides[1].classList.contains("pr-out") && P.slides[1].classList.contains("pr-back");
+        if (aud) H.show({ i: 1 }); else H.next();
+        const fwd = visReduce(P);
+        ok(t + (aud ? " 청중 show" : "") + ": 발표 중 동작 줄이기 뒤 뒤로·앞으로 넘김도 지금 장 하나만(나가는 장은 CSS 가 숨긴다)",
+          c && backOut && back === "0" && fwd === "1" && P.idx === 1, { c, backOut, back, fwd });
+        H.stop();
+      }
+    }
+    w.win.matchMedia = () => ({ matches: false });
+    for (const v of ["flip", "zoom pr-dock", "", undefined, 3]) {
+      open(w, { transition: v });
+      const c = rootOf(w).className;
+      ok("모르는 전환 " + JSON.stringify(v) + ": t-none 이고 다른 클래스가 새지 않는다", P.transition === "none" && rootOf(w).classList.contains("t-none") && !rootOf(w).classList.contains("pr-dock") && !/t-(?!none)/.test(c), c);
+      H.stop();
+    }
+  }
+}
+
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);

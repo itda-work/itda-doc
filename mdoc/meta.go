@@ -54,7 +54,7 @@ type Meta struct {
 type SlidesMeta struct {
 	Ratio       string `json:"ratio"`       // "16:9"(기본) · "4:3"
 	Level       int    `json:"level"`       // 슬라이드를 여는 제목 단계(1~6). 0 이면 문서에서 정한다(Result.SlideLevel)
-	Transition  string `json:"transition"`  // none(기본) · fade · slide
+	Transition  string `json:"transition"`  // none(기본) · fade · slide · zoom · push · cover
 	Incremental bool   `json:"incremental"` // 모든 목록을 차례로
 	// FontScale 은 슬라이드 글자 배율(0.6~1.5)이다. 0 이면 기본(0.9 — base.css --slide-scale). 1 이면 글자 토큰 그대로(본문 23pt)
 	FontScale float64 `json:"font_scale"`
@@ -580,10 +580,10 @@ func parseSlides(v *yaml.Node, srcs metaSrc) (*SlidesMeta, []Warning) {
 			sm.Level = n
 		case "transition":
 			switch s {
-			case "fade", "slide", "none":
+			case "fade", "slide", "zoom", "push", "cover", "none":
 				sm.Transition = s
 			default:
-				bad(vv, kk.Value, "fade·slide·none")
+				bad(vv, kk.Value, "none·fade·slide·zoom·push·cover")
 			}
 		case "incremental":
 			var b bool
