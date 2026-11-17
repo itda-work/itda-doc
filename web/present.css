@@ -29,7 +29,9 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-deck .page.pr-cur, .pr-deck .page.pr-out { visibility: visible; }
 .pr-deck .page.pr-cur { z-index: 2; }
 .pr-deck .page.pr-out { z-index: 1; }
-/* 전환: fade(겹쳐 사라짐) · slide(옆으로 밀림, 뒤로 가면 반대) · none */
+/* 전환: fade(겹쳐 사라짐) · slide(옆으로 밀림, 뒤로 가면 반대) · zoom(커지며 나타남) · push(두 장이 붙어 밀림) · cover(덮음, 뒤로 가면 걷어냄) · none
+   모두 transform·opacity 만 움직인다(합성기에서 돈다). 나가는 장(pr-out)의 움직임은 지연 포함 0.45초 안에 끝난다 —
+   present.js OUT_MS(450) 뒤에 pr-out 이 떨어져 그 장이 숨는다(web/present_test.go TestPresentTransitionsCSS 가 묶는다) */
 /* fade: 나가는 슬라이드를 먼저 빨리 지우고(0.2초) 들어오는 슬라이드를 조금 늦게(0.08초) 띄운다 — 두 장이 반씩 겹친 모습이 길게 남지 않게 */
 .t-fade .pr-deck .page.pr-in { animation: pr-fade-in 0.36s ease-out 0.08s both; }
 .t-fade .pr-deck .page.pr-out { animation: pr-fade-out 0.2s ease-in both; }
@@ -43,6 +45,34 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 @keyframes pr-slide-in-back { from { transform: translateX(-7%); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes pr-slide-out { from { transform: none; opacity: 1; } to { transform: translateX(-7%); opacity: 0; } }
 @keyframes pr-slide-out-back { from { transform: none; opacity: 1; } to { transform: translateX(7%); opacity: 0; } }
+/* zoom: 옛 장은 조금 커지며 빨리 옅어지고(0.24초) 새 장은 작게서 제 크기로 떠오른다(0.06초 뒤 0.4초). 뒤로 가면 반대 — 새 장이 커 보이던
+   자리에서 줄어들며 나타나고 옛 장은 줄어들며 옅어진다 */
+.t-zoom .pr-deck .page.pr-in { animation: pr-zoom-in 0.4s cubic-bezier(0.22, 0.8, 0.26, 1) 0.06s both; }
+.t-zoom .pr-deck .page.pr-in.pr-back { animation-name: pr-zoom-in-back; }
+.t-zoom .pr-deck .page.pr-out { animation: pr-zoom-out 0.24s ease-in both; }
+.t-zoom .pr-deck .page.pr-out.pr-back { animation-name: pr-zoom-out-back; }
+@keyframes pr-zoom-in { from { transform: scale(0.94); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pr-zoom-in-back { from { transform: scale(1.04); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes pr-zoom-out { from { transform: none; opacity: 1; } to { transform: scale(1.04); opacity: 0; } }
+@keyframes pr-zoom-out-back { from { transform: none; opacity: 1; } to { transform: scale(0.94); opacity: 0; } }
+/* push: 새 장이 옆에서 들어오며 옛 장을 같은 길이·같은 곡선으로 밀어낸다 — 두 장이 붙어 움직인다. 뒤로 가면 반대쪽에서.
+   push·cover 는 장 너비만큼 옮기므로 덱 밖(비율이 달라 남는 검은 띠)으로 나간 부분을 덱 테두리에서 자른다(덱에는 장만 있다 — present.js start) */
+.t-push .pr-deck, .t-cover .pr-deck { overflow: hidden; }
+.t-push .pr-deck .page.pr-in { animation: pr-push-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.t-push .pr-deck .page.pr-in.pr-back { animation-name: pr-push-in-back; }
+.t-push .pr-deck .page.pr-out { animation: pr-push-out 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+.t-push .pr-deck .page.pr-out.pr-back { animation-name: pr-push-out-back; }
+@keyframes pr-push-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes pr-push-in-back { from { transform: translateX(-100%); } to { transform: none; } }
+@keyframes pr-push-out { from { transform: none; } to { transform: translateX(-100%); } }
+@keyframes pr-push-out-back { from { transform: none; } to { transform: translateX(100%); } }
+/* cover: 앞으로 가면 새 장(위 층 pr-cur)이 오른쪽에서 옛 장 위로 덮으며 들어오고 옛 장은 제자리에 있다. 뒤로 가면 걷어낸다 —
+   옛 장을 새 장보다 위 층에 올려 오른쪽으로 빼고, 그 아래 새 장은 제자리에 있다 */
+.t-cover .pr-deck .page.pr-in { animation: pr-cover-in 0.4s cubic-bezier(0.22, 0.8, 0.26, 1) both; }
+.t-cover .pr-deck .page.pr-in.pr-back { animation: none; }
+.t-cover .pr-deck .page.pr-out.pr-back { z-index: 3; animation: pr-cover-out-back 0.4s cubic-bezier(0.4, 0, 0.2, 1) both; }
+@keyframes pr-cover-in { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes pr-cover-out-back { from { transform: none; } to { transform: translateX(100%); } }
 /* 차례로 나타내기: 목록 항목은 차례 전에도 흐리게 보이고(앞으로 나올 것을 미리 보여 준다), 멈춤(. . .) 뒤 블록은 자리만 차지하고
    보이지 않는다(자리가 바뀌지 않게). 차례가 오면 움직임 없이 바로 바뀐다 — 확대된 덱에서 떠오르게 하면 WebKit 이 흐리게 그렸다 다시 그린다 */
 /* 목록 항목은 visibility 를 물려받는다 — 멈춤 뒤 목록처럼 감싼 블록이 아직 숨어 있으면 항목도 숨는다 */
@@ -204,7 +234,13 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-ink-bar.has-note .pr-ink-note { display: block; }
 /* 노트 있는 슬라이드 썸네일의 점 */
 .pr-cell-note { position: absolute; right: 7px; bottom: 7px; width: 9px; height: 9px; border-radius: 50%; background: #4b86f5; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
-@media (prefers-reduced-motion: reduce) { #present *, #present .page { animation: none !important; transition: none !important; } }
+/* 동작 줄이기: 움직임을 끄고, 나가는 장(pr-out)은 곧바로 숨긴다 — 전환 종류와 무관하게 none 과 같은 화면이다. present.js 는 시작할 때만
+   설정을 읽어 t-none 으로 여므로, 발표 중에 설정을 켜면 t-cover 등이 남는다. 그때 움직이지 않는 나가는 장이 OUT_MS 동안 남아
+   cover 뒤로(z-index 3)처럼 새 장을 가리지 않게 여기서 숨긴다(itda-doc#99 리뷰 1회차) */
+@media (prefers-reduced-motion: reduce) {
+  #present *, #present .page { animation: none !important; transition: none !important; }
+  #present .pr-deck .page.pr-out { visibility: hidden !important; }
+}
 
 /* 슬라이드 묻기 막대(ask.js armSlides, 모양은 호스트 창 틀 CSS 의 .itda-askbar): 읽기 화면에서는 늘 보이고, 발표 중에는 마우스를 올린
    장(또는 막대 안 포커스)에서만 보인다. 판서·넘김 제외는 present.js onMouse·ink.js BLOCKED 가 맡는다. 커서를 숨긴 동안(pr-idle)에는 올림이 없다. */

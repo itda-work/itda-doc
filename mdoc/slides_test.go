@@ -37,7 +37,14 @@ func TestSlidesMeta(t *testing.T) {
 		{"slides: false", nil, 0},
 		{"slides:\n  ratio: \"4:3\"\n  level: 2\n  transition: slide\n  incremental: true", &SlidesMeta{Ratio: "4:3", Level: 2, Transition: "slide", Incremental: true}, 0},
 		{"slides:\n  ratio: 16/9", &SlidesMeta{Ratio: "16:9"}, 0},
-		{"slides:\n  ratio: \"21:9\"\n  level: 9\n  transition: zoom\n  incremental: 예\n  theme: dark", &SlidesMeta{}, 5},
+		{"slides:\n  ratio: \"21:9\"\n  level: 9\n  transition: flip\n  incremental: 예\n  theme: dark", &SlidesMeta{}, 5},
+		// 장 넘김 전환(itda-doc#99): zoom·push·cover 를 받는다. flip 은 1차 범위 밖이라 모르는 값
+		{"slides:\n  transition: zoom", &SlidesMeta{Transition: "zoom"}, 0},
+		{"slides:\n  transition: push", &SlidesMeta{Transition: "push"}, 0},
+		{"slides:\n  transition: cover", &SlidesMeta{Transition: "cover"}, 0},
+		{"slides:\n  transition: none", &SlidesMeta{Transition: "none"}, 0},
+		{"slides:\n  transition: Zoom", &SlidesMeta{Transition: "zoom"}, 0}, // 값은 대소문자를 가리지 않는다(fade·slide 와 같다)
+		{"slides:\n  transition: wipe", &SlidesMeta{}, 1},
 		{"slides: 발표", nil, 1},
 		// 소수·따옴표 숫자는 정수가 아니다 — 잘라 받지 않는다(yamlInt, itda-work/itda-hyve#362)
 		{"slides:\n  level: 2.9", &SlidesMeta{}, 1},
@@ -66,6 +73,33 @@ func TestSlidesMeta(t *testing.T) {
 		}
 		if len(r.Warnings) != c.warns {
 			t.Errorf("%q 경고 %d, 기대 %d: %+v", c.fm, len(r.Warnings), c.warns, r.Warnings)
+		}
+	}
+}
+
+// 모르는 전환은 frontmatter 값 경고이고, 문구가 받는 값 여섯(스키마 열거와 같은 차례)을 모두 적는다(itda-doc#99)
+func TestSlidesTransitionWarning(t *testing.T) {
+	r := render(t, "---\ntitle: t\nslides:\n  transition: flip\n---\n\n본문\n")
+	if len(r.Warnings) != 1 {
+		t.Fatalf("경고 %+v", r.Warnings)
+	}
+	w := r.Warnings[0]
+	if w.Code != WarnFrontmatterValue || w.Line != 4 || !strings.Contains(w.Message, "slides.transition: none·fade·slide·zoom·push·cover 이어야") {
+		t.Errorf("모르는 전환 경고 %+v", w)
+	}
+	var vals []string
+	for _, k := range FrontmatterSchema {
+		if k.Group == "slides" && k.Key == "transition" {
+			vals = k.Values
+		}
+	}
+	if strings.Join(vals, "·") != "none·fade·slide·zoom·push·cover" {
+		t.Errorf("스키마 열거 %v", vals)
+	}
+	for _, v := range vals {
+		r := render(t, "---\ntitle: t\nslides:\n  transition: "+v+"\n---\n\n본문\n")
+		if r.Meta.Slides == nil || r.Meta.Slides.Transition != v || len(r.Warnings) != 0 {
+			t.Errorf("스키마 값 %q 를 받지 않는다: %+v %+v", v, r.Meta.Slides, r.Warnings)
 		}
 	}
 }

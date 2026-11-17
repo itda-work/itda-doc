@@ -100,7 +100,7 @@ type SlideView struct {
 	Present     bool   `json:"present"`     // frontmatter 에 slides: 가 있다 — 슬라이드 미리보기로 연다
 	Ratio       string `json:"ratio"`       // 16:9 · 4:3
 	Level       int    `json:"level"`       // 슬라이드를 여는 제목 단계(slides.level 또는 문서에서 정한 것). 제목이 없으면 0
-	Transition  string `json:"transition"`  // fade · slide · none
+	Transition  string `json:"transition"`  // none · fade · slide · zoom · push · cover
 	Incremental bool   `json:"incremental"` // 모든 목록을 차례로
 	// FontScale 은 slides.font-scale 이다. 0 이면 화면이 base.css 의 기본(--slide-scale 0.9)을 쓴다
 	FontScale float64 `json:"font_scale,omitempty"`
