@@ -14,9 +14,10 @@ import (
 
 // 발표·판서(present.js·ink.js·inkshape.js): 판서 모형(획 추가·되돌리기·다시 실행·상한·탭 수명)·기하·바탕 밝기와 발표의 넘김·차례로 나타내기,
 // 호스트 훅 계약(present.js 머리 주석 — 전체 화면·호스트 전용 앵커·키 양보 ownsKey·겹침 층, 크게 보기·코드 복사 부품이 없을 때), 슬라이드 묻기 막대(itda-hyve#896 — 누르기·판서 제외)를
-// 두 화면 발표(itda-doc#95 — onState·audience 열기·show 덮어쓰기)를, 펜만 판서(itda-doc#100 — penOnly 입력 나눔·inkHeld)를
+// 두 화면 발표(itda-doc#95 — onState·audience 열기·show 덮어쓰기)를, 펜만 판서(itda-doc#100 — penOnly 입력 나눔·inkHeld)를,
+// 판서 받아 그리기(itda-doc#108 — ink.js view 연산·멱등·reset·레이저, 청중 열기의 붙이기, 발표자·청중의 같은 경로)를
 // 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 444 // itda-hyve#896 슬라이드 묻기 막대 6·넘침 안내 상자 키 양보 7, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28, itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173
+const presentInkCases = 541 // itda-hyve#896 슬라이드 묻기 막대 6·넘침 안내 상자 키 양보 7, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28, itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")
