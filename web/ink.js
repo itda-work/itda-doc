@@ -248,7 +248,7 @@
 
   // ---- 발표에 붙이기. o = { root, deck, size: [w, h](설계 px), book, slides()(복제된 .page 들), idx(), scale(), paused()(라이트박스·한눈에 보기·검은 화면),
   //   click(target, button)(레이저의 클릭 — 넘김·크게 보기), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단),
-  //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100) }
+  //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100), settleTransition()(진행 중인 장 넘김 전환을 곧바로 끝낸다 — itda-doc#105, 없어도 된다) }
   function attach(o) {
     const { root, deck, book } = o, [W, H] = o.size;
     const mac = /Mac/.test(window.navigator ? window.navigator.platform : "");
@@ -476,11 +476,13 @@
       if (notPen(e)) return; // 진행 중인 펜 획은 그대로 — 손바닥·손가락이 끊지 않는다
       if (pointer === e.pointerId) settle(); // 떼기를 놓쳤다
       if (!tool || pointer !== null || !canStart(e)) return; // 진행 중인 입력이 있으면 둘째 손가락은 받지 않는다
+      if (e.button !== 0 && !(tool === "laser" && e.button === 2)) return;
+      // 판서 입력을 받기 전에 장 넘김 전환을 끝낸다(itda-doc#105) — toDesign 은 멈춘 덱 기준이라, 움직이는 장 위 획은 펜 끝에서 어긋난다.
+      // penOnly 의 펜 아닌 입력은 위(notPen)에서 이미 돌아갔다 — 판서가 아니므로 전환을 끊지 않는다
+      if (o.settleTransition) o.settleTransition();
       if (tool === "laser") {
-        if (e.button !== 0 && e.button !== 2) return;
         press = { x: e.clientX, y: e.clientY, target: e.target, button: e.button, line: false };
       } else {
-        if (e.button !== 0) return;
         const p = toDesign(e);
         if (tool === "erase") { wiped = book.wiped = { list: pageOf(book, o.idx()).list.slice(), at: o.idx() }; eraseAt(p); }
         else if (inSlide(p)) begin(e, p);

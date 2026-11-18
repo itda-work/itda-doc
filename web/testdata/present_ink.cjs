@@ -840,4 +840,67 @@ function swipeBy(target, x0, x1, ev) {
   }
 }
 
+// ---- 11. 전환 중 판서 입력(itda-doc#105 — present.js settleTransition): 펜·형광펜·지우개·레이저 누름이 오면 진행 중인 전환을 곧바로 끝낸 뒤
+// 좌표를 잰다. 가짜 DOM 의 getBoundingClientRect 는 고정값이라, 덱 상자를 재는 순간에 아직 움직이는 장(pr-in·pr-out)이 있었는가를 적어 본다.
+// 실제 WebKit 의 화면 좌표 비교는 저장소 밖 탐침이 했다(시험에 넣지 않는다 — 외부 런타임).
+{
+  const w = world(), { P, H } = w;
+  const moving = () => P.slides.filter(s => ["pr-in", "pr-out", "pr-back"].some(c => s.classList.contains(c))).length;
+  const visible = () => P.slides.map((s, i) => (s.classList.contains("pr-cur") || s.classList.contains("pr-out") ? i : -1)).filter(i => i >= 0).join(",");
+  // spy 는 덱 상자를 잴 때(toDesign) 움직이는 장의 수를 적는다
+  function spy(deck) { const seen = []; deck.getBoundingClientRect = () => { seen.push(moving()); return { left: 0, top: 0, right: 1280, bottom: 720, width: 1280, height: 720 }; }; return seen; }
+  // outIds 는 넘김(go) 동안 새로 걸린 타이머다 — 나가는 장 정리 타이머가 들어 있다
+  function step(fn) { const before = new Set(world.timers.keys()); fn(); return [...world.timers.keys()].filter(k => !before.has(k)); }
+  const pen = { pointerType: "pen", pointerId: 1 };
+  for (const t of ["push", "cover", "zoom", "slide", "fade"]) {
+    for (const [tk, tool] of [["p", "펜"], ["h", "형광펜"], ["e", "지우개"], ["l", "레이저"]]) {
+      for (const dir of [1, -1]) {
+        runTimers();
+        const { deck } = open(w, { transition: t, index: dir > 0 ? 0 : 1, inkKey: "tr-" + t });
+        key(w, tk, tk === "p" ? "KeyP" : tk === "h" ? "KeyH" : tk === "e" ? "KeyE" : "KeyL");
+        const outIds = step(() => { if (dir > 0) H.next(); else H.prev(); });
+        const was = moving(), out = P.slides[dir > 0 ? 0 : 1], cur = P.slides[P.idx];
+        const seen = spy(deck);
+        // cover 뒤로는 나가는 장이 위 층이다 — 그 장 위를 눌러도 같다
+        const target = t === "cover" && dir < 0 ? out : cur;
+        fire(target, "pointerdown", { ...pen, buttons: 1, clientX: 320, clientY: 300 });
+        fire(target, "pointermove", { ...pen, buttons: 1, clientX: 360, clientY: 300 });
+        const name = t + (dir > 0 ? " 앞으로" : " 뒤로") + " + " + tool + ": 전환 중 펜 누름";
+        ok(name + " — 움직이는 장 클래스가 정리되고 지금 장 하나만 보인다", was === 2 && moving() === 0 && visible() === String(P.idx) && cur.classList.contains("pr-cur"), { was, now: moving(), vis: visible() });
+        ok(name + " — 덱 상자를 재기 전에 전환이 끝났다", (tk === "l" || seen.length > 0) && seen.every(n => n === 0), seen);
+        ok(name + " — 나가는 장 정리 타이머가 지워졌다", outIds.length > 0 && outIds.some(id => !world.timers.has(id)), { outIds, left: outIds.filter(id => world.timers.has(id)) });
+        fire(target, "pointerup", { ...pen, clientX: 360, clientY: 300 });
+        if (tk === "p") {
+          const s = page(w, P.idx)[0];
+          ok(name + " — 획 첫 점은 덱 기준 좌표다", !!s && s.pts[0] === Math.round(320 / P.scale * 10) / 10, s && s.pts);
+        }
+        // 뒤늦은 타이머가 돌아도 장을 건드리지 않는다
+        const snap = P.slides.map(s => s.className).join("|");
+        runTimers();
+        ok(name + " — 뒤늦은 타이머가 장을 건드리지 않는다", P.slides.map(s => s.className).join("|") === snap && visible() === String(P.idx), { snap, now: P.slides.map(s => s.className) });
+        H.stop();
+      }
+    }
+  }
+  // penOnly 의 펜 아닌 입력·도구 끔은 판서가 아니다 — 전환을 끊지 않는다
+  for (const [label, o, tk, ev] of [["penOnly + 펜 도구: 손가락 누름", { penOnly: true }, "p", { pointerType: "touch", pointerId: 2 }],
+    ["도구 끔: 펜 누름", {}, "", pen]]) {
+    runTimers();
+    open(w, Object.assign({ transition: "push", inkKey: "tr-none" }, o));
+    if (tk) key(w, tk, "KeyP");
+    H.next();
+    fire(P.slides[1], "pointerdown", { ...ev, buttons: 1, clientX: 320, clientY: 300 });
+    ok(label + "은 전환을 끊지 않는다", P.slides[1].classList.contains("pr-in") && P.slides[0].classList.contains("pr-out"), P.slides.map(s => s.className));
+    fire(P.slides[1], "pointerup", { ...ev, clientX: 320, clientY: 300 });
+    H.stop();
+  }
+  // 청중 열기에는 판서가 없다 — 전환은 그대로다
+  runTimers();
+  H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, transition: "push", audience: true, onState() {} });
+  H.show({ i: 1 });
+  fire(P.slides[1], "pointerdown", { ...pen, buttons: 1, clientX: 320, clientY: 300 });
+  ok("청중 열기: 판서가 없고 펜 누름이 전환을 끊지 않는다", H.ink() === null && P.slides[1].classList.contains("pr-in") && P.slides[0].classList.contains("pr-out"), P.slides.map(s => s.className));
+  H.stop();
+}
+
 console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);
