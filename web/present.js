@@ -61,6 +61,11 @@
 //   · 손가락 밀기(좌우로 넘기기)는 발표가 판정하지 않는다 — 옵션이 없을 때와 같이 호스트 몫이다. 호스트는 ItdaPresent.inkHeld() 가 참인 동안
 //     (펜 입력이 진행 중) 밀기를 버릴 수 있다.
 //   · 옵션이 없으면 지금 그대로다(마우스·손가락도 그린다). Pencil 이 없는 기기에서 판서 도구를 숨길지는 호스트 몫이다.
+//   ItdaPresent.setPenOnly(b)  발표 중에 펜만 판서를 켜고 끈다(호스트의 「손가락으로도 그리기」 토글 같은 것) — 발표를 다시 열지 않으므로 장·단계·판서·
+//     도구는 그대로다. P.penOnly·pr-pen-only 클래스·판서(ink.js)의 판정이 함께 바뀐다. 진행 중인 입력(쥔 획·지우개·레이저)은 바뀌기 전 판정으로
+//     끝까지 가고, 바뀐 판정은 다음 누르기부터다. 슬라이드 발표 중에만 듣는다 — 발표 밖·보드 발표·청중 열기에는 아무것도 하지 않고 false 를
+//     돌려준다(적용하면 true). 다음 발표는 물려받지 않는다(start 의 o.penOnly 가 정한다). onState 의 보이는 상태에는 넣지 않는다 — 청중 화면이 쓰는
+//     값이 아니고, 바꾼 것은 부른 호스트가 안다(P.penOnly 로도 읽는다).
 //   ItdaPresent.inkHeld()  판서 입력(포인터를 쥔 획·지우개·레이저 누르기)이 진행 중인가 — penOnly 면 펜 입력뿐이다. 발표 밖·판서가 없으면 거짓.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
@@ -1157,7 +1162,15 @@
     shareSummary = text || "";
     if (shareEl) shareEl.textContent = shareSummary;
   }
-  window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+  // setPenOnly 는 발표 중 펜만 판서를 바꾼다(머리 주석 「펜만 판서」 setPenOnly).
+  function setPenOnly(b) {
+    if (!P.on || P.board || P.audience) return false;
+    P.penOnly = !!b;
+    if (root) root.classList.toggle("pr-pen-only", P.penOnly);
+    if (ink) ink.setPenOnly(P.penOnly);
+    return true;
+  }
+  window.ItdaPresent = { setShareSummary, setPenOnly, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
     // inkView 는 청중 화면이 발표자 판서를 받아 그리는 view(ink.js view)다 — 머리 주석 「두 화면 발표」 판서 받기. ink.js 가 없으면 null
     inkView: inkViewOf,
     // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다

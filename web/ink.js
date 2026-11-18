@@ -609,7 +609,7 @@
 
   // ---- 발표에 붙이기. o = { root, deck, size: [w, h](설계 px), book, slides()(복제된 .page 들), idx(), scale(), paused()(라이트박스·한눈에 보기·검은 화면),
   //   click(target, button)(레이저의 클릭 — 넘김·크게 보기), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단),
-  //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100), settleTransition()(진행 중인 장 넘김 전환을 곧바로 끝낸다 — itda-doc#105, 없어도 된다) }
+  //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100. 시작 값이고 발표 중에는 돌려준 setPenOnly(b) 로 바꾼다), settleTransition()(진행 중인 장 넘김 전환을 곧바로 끝낸다 — itda-doc#105, 없어도 된다) }
   function attach(o) {
     const { root, deck, book } = o, [W, H] = o.size;
     const mac = /Mac/.test(window.navigator ? window.navigator.platform : "");
@@ -832,14 +832,20 @@
     function canStart(e) { return !o.paused() && !(e.target && e.target.closest && e.target.closest(BLOCKED)); }
     // penOnly(itda-doc#100)면 펜이 아닌 입력(손가락·마우스)은 판서가 아니다 — 획·지우개·레이저를 만들지도 움직이지도 않는다.
     // 그 누르기가 발표 입력이 되는가는 takes 가 정한다(도구가 켜진 동안은 먹는다).
-    const notPen = e => !!o.penOnly && e.pointerType !== "pen";
+    // penOnly 는 발표 중에 바뀐다(setPenOnly — present.js 머리 주석 「펜만 판서」). 이미 쥔 포인터(pointer)는 바뀌기 전 판정 그대로 끝까지 간다 —
+    // 손가락 획 도중 펜만으로 바꿔도 그 획은 떼기까지 이어지고, 바뀐 판정은 다음 누르기부터다.
+    // 그 예외(쥔 포인터)는 진행 중 입력을 마치는 길(move·up·cancel·lostpointercapture — notPen)에만 둔다. 새 누르기(onDown)는 늘 지금 정책
+    // (refused)으로 본다 — 떼기를 놓친 같은 id 의 새 down 은 앞 입력을 먼저 정리한 뒤 판정한다.
+    let penOnly = !!o.penOnly;
+    const refused = e => penOnly && e.pointerType !== "pen";
+    const notPen = e => refused(e) && e.pointerId !== pointer;
     function onDown(e) {
-      if (notPen(e)) return; // 진행 중인 펜 획은 그대로 — 손바닥·손가락이 끊지 않는다
-      if (pointer === e.pointerId) settle(); // 떼기를 놓쳤다
+      if (pointer === e.pointerId) settle(); // 떼기를 놓쳤다 — 같은 포인터의 새 누르기이므로 앞 입력을 확정한다(다른 id 는 여기 오지 않는다)
+      if (refused(e)) return; // 진행 중인 펜 획은 그대로 — 다른 id 의 손바닥·손가락은 위 settle 에 닿지 않아 끊지 않는다
       if (!tool || pointer !== null || !canStart(e)) return; // 진행 중인 입력이 있으면 둘째 손가락은 받지 않는다
       if (e.button !== 0 && !(tool === "laser" && e.button === 2)) return;
       // 판서 입력을 받기 전에 장 넘김 전환을 끝낸다(itda-doc#105) — toDesign 은 멈춘 덱 기준이라, 움직이는 장 위 획은 펜 끝에서 어긋난다.
-      // penOnly 의 펜 아닌 입력은 위(notPen)에서 이미 돌아갔다 — 판서가 아니므로 전환을 끊지 않는다
+      // penOnly 의 펜 아닌 입력은 위(refused)에서 이미 돌아갔다 — 판서가 아니므로 전환을 끊지 않는다
       if (o.settleTransition) o.settleTransition();
       if (tool === "laser") {
         press = { x: e.clientX, y: e.clientY, target: e.target, button: e.button, line: false };
@@ -1014,7 +1020,7 @@
     // 넘기지 않는다(레이저의 펜 클릭은 onUp 의 o.click 이 넘긴다). 도구가 꺼졌거나 쉬는 화면(검은 화면)이면 지금처럼 ""(누르기 = 다음)다.
     function takes(e) {
       if (!tool || o.paused()) return "";
-      if (o.penOnly) return "draw";
+      if (penOnly) return "draw";
       if (tool === "laser") return e.button === 0 || e.button === 2 ? "laser" : "";
       return e.button === 0 ? "draw" : "";
     }
@@ -1049,8 +1055,10 @@
     book.paint = () => setNote(note === RELAY_NOTE ? "" : note);
     setNote("");
     paintBar();
+    // setPenOnly 는 펜만 판서를 켜고 끈다(present.js setPenOnly 가 부른다). 진행 중인 입력은 끊지 않는다(notPen).
     return { tool: () => tool, setTool, setColor, setWidth, undo: () => history(undo), redo: () => history(redo), clearPage, key, takes, slide, pause, resize, detach,
-      drawing: () => !!(stroke || wiped), held: () => pointer !== null, note: () => note, book };
+      drawing: () => !!(stroke || wiped), held: () => pointer !== null, note: () => note, book,
+      setPenOnly: b => { penOnly = !!b; }, penOnly: () => penOnly };
   }
 
   window.ItdaInk = { LIMIT, COLORS, WIDTHS, HL_SKIP, newBook, pageOf, room, commit, undo, redo, bookFor, drop, preview, relay, view, pathOf, filled, hits, parseColor, luminance, slideDark, attach };
