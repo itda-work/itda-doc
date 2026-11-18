@@ -903,4 +903,454 @@ function swipeBy(target, x0, x1, ev) {
   H.stop();
 }
 
-console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed);
+// ---- 12. 판서 받아 그리기(itda-doc#108 — ink.js view·present.js 머리 주석 「판서 받기」): relay 묶음·레이저를 받아 다른 표면의 장 위에
+// 발표자와 같은 층·경로로 그린다. 그리기는 rAF 에 모아 한 번이다. 가짜 DOM 은 그리지 않으므로 층·경로 속성·canvas 명령을 본다(실제 그림은 저장소 밖 탐침).
+const runRaf = w => { const r = w.raf.splice(0); r.forEach(g => g()); return r.length; };
+const layerKids = (pg, cls) => { const l = pg.kids.find(k => k.classList.contains(cls)); return l ? l.kids : []; };
+// inkOf 는 장의 끝난 획 SVG 를 [층, d, fill, stroke, 굵기] 로 적는다 — 두 표면의 모양을 견준다.
+const inkOf = pg => ["ink-hl", "ink-pen"].flatMap(c => layerKids(pg, c).map(p => [c, p.attrs.d, p.attrs.fill, p.attrs.stroke || "", p.attrs["stroke-width"] || ""].join(" ")));
+const liveOf = pg => pg.kids.find(k => k.classList.contains("ink-live"));
+const spotOf = pg => pg.kids.find(k => k.classList.contains("ink-laser-page"));
+const B = (k, ops) => JSON.stringify({ k, ops });
+const inkKids = pg => pg.kids.filter(k => /(^| )ink-/.test(k.className)).length;
+{
+  const w = world(), { I } = w, pages = [slide([]), slide([]), slide([])];
+  let cur = 0, black = false;
+  const v = I.view();
+  const at = { slides: () => pages, size: [1280, 720], scale: () => 2, idx: () => cur, paused: () => black };
+  // 붙이기 전에 온 연산은 모델에 남는다
+  v.apply(B("reset", [["s", 0, 1, "pen", 0, 1, [10, 10, 50, 10, 90, 30], 0, 1]]));
+  ok("view: 붙이기 전에는 층을 만들지 않고 모델에 남긴다", inkKids(pages[0]) === 0 && v.ids(0).join() === "1" && w.raf.length === 0, inkKids(pages[0]));
+  v.mount(at);
+  runRaf(w);
+  const s1 = { tool: "pen", color: 0, width: 1, pts: [10, 10, 50, 10, 90, 30], press: null };
+  ok("view: 붙이면 받아 둔 획을 그 장 .ink-pen 에 발표자와 같은 경로로 그린다", inkOf(pages[0]).join() === "ink-pen " + I.pathOf(s1) + " none #e5342b 5", inkOf(pages[0]));
+  // 진행 중인 획: 묶음 여러 개 → 프레임 한 번
+  v.apply(B("", [["b", 0, 2, "pen", 4, 0, 0], ["a", 2, [100, 100, 110, 100]]]));
+  v.apply(B("", [["a", 2, [120, 104]]]));
+  v.apply(B("", [["a", 2, [130, 110]]]));
+  ok("view: 묶음이 여럿 와도 프레임 요청은 하나다", w.raf.length === 1, w.raf.length);
+  const live0 = liveOf(pages[0]);
+  ok("view: 프레임 전에는 진행 중 획을 그리지 않는다", !live0, !!live0);
+  runRaf(w);
+  const live = liveOf(pages[0]), s2 = { tool: "pen", color: 4, width: 0, pts: [100, 100, 110, 100, 120, 104, 130, 110], press: null };
+  ok("view: 진행 중 획은 그 장의 .ink-live canvas 에 발표자 pathOf 경로로 그린다", live && live.ctx.paints.length === 1 && live.ctx.paints[0].d === I.pathOf(s2) && live.ctx.paints[0].color === "#1f6fe0" && live.ctx.paints[0].width === 2.5, live && live.ctx.paints);
+  ok("view: canvas 뒷버퍼는 설계×배율×dpr 이다", live.width === 1280 * 2 * 2 && live.height === 720 * 2 * 2, [live.width, live.height]);
+  ok("view: 진행 중 획은 SVG 에 아직 없다", inkOf(pages[0]).length === 1, inkOf(pages[0]).length);
+  // 같은 id 의 b 가 다시 와도 획을 새로 만들지 않는다(a 는 순서·한 번 전달을 전제한다 — 다시 온 a 는 겹친다, 머리 주석 「전달 계약」)
+  ok("view: 같은 b 가 다시 와도 획이 늘지 않는다", v.apply(B("", [["b", 0, 2, "pen", 4, 0, 0]])) === true && v.ids(0).join() === "1,2", v.ids(0));
+  runRaf(w);
+  ok("view: 다시 온 b 는 진행 중 획을 비우지 않는다", live.ctx.paints.length === 1 && live.ctx.paints[0].d === I.pathOf(s2), live.ctx.paints);
+  v.apply(B("", [["e", 2]]));
+  ok("view: 끝(e)도 프레임에 그린다", inkOf(pages[0]).length === 1);
+  runRaf(w);
+  ok("view: 끝난 획은 같은 프레임에 SVG 로 옮기고 canvas 를 지운다", inkOf(pages[0]).length === 2 && inkOf(pages[0])[1] === "ink-pen " + I.pathOf(s2) + " none #1f6fe0 2.5" && live.ctx.paints.length === 0, { svg: inkOf(pages[0]), live: live.ctx.paints });
+  v.apply(B("", [["e", 2], ["b", 0, 1, "hl", 2, 0, 0]]));
+  runRaf(w);
+  ok("view: 끝난 획의 e·b 가 다시 와도 겹쳐 그리지 않는다", inkOf(pages[0]).length === 2 && v.ids(0).join() === "1,2", { svg: inkOf(pages[0]), ids: v.ids(0) });
+  // 형광펜: 층·혼합 클래스, 어두운 바탕
+  w.win.getComputedStyle = e => ({ backgroundColor: e === pages[1] ? "rgb(5, 20, 31)" : "rgb(255, 255, 255)", width: "0px", height: "0px" });
+  v.apply(B("", [["b", 1, 3, "hl", 2, 1, 0], ["a", 3, [200, 200, 260, 200]]]));
+  runRaf(w);
+  const live1 = liveOf(pages[1]);
+  ok("view: 진행 중 형광펜은 canvas 가 그 장으로 옮겨 ink-live-hl·어두운 바탕 ink-dark 를 단다", live1 === live && live.className === "ink-live ink-live-hl ink-dark" && !liveOf(pages[0]), live.className);
+  v.apply(B("", [["a", 3, [300, 210]], ["e", 3]]));
+  runRaf(w);
+  const hl1 = pages[1].kids.find(k => k.classList.contains("ink-hl"));
+  ok("view: 끝난 형광펜은 .ink-hl 층(어두운 바탕이면 ink-dark)이다", hl1 && hl1.className === "ink-hl ink-dark" && inkOf(pages[1]).length === 1 && inkOf(pages[1])[0].startsWith("ink-hl "), { cls: hl1 && hl1.className, svg: inkOf(pages[1]) });
+  ok("view: 밝은 바탕의 형광펜 층은 ink-dark 가 없다", pages[0].kids.find(k => k.classList.contains("ink-hl")).className === "ink-hl");
+  // 필압 획
+  v.apply(B("", [["b", 0, 4, "pen", 6, 1, 1], ["a", 4, [400, 400, 420, 410], [0.3, 0.8]], ["e", 4]]));
+  runRaf(w);
+  const s4 = { tool: "pen", color: 6, width: 1, pts: [400, 400, 420, 410], press: [0.3, 0.8] };
+  ok("view: 필압 획은 채운 조각 경로다(발표자와 같다)", inkOf(pages[0])[2] === "ink-pen " + I.pathOf(s4) + " #111111 none ", inkOf(pages[0])[2]);
+  // 삭제·복구·장 지우기
+  v.apply(B("", [["d", 0, [2]]]));
+  runRaf(w);
+  ok("view: d 는 그 장 목록에서 뺀다", v.ids(0).join() === "1,4" && inkOf(pages[0]).length === 2, v.ids(0));
+  v.apply(B("", [["r", 0, [1, 2, 4]]]));
+  runRaf(w);
+  ok("view: r 은 지운 획을 id 로 되살려 그 차례로 그린다", v.ids(0).join() === "1,2,4" && inkOf(pages[0])[1] === "ink-pen " + I.pathOf(s2) + " none #1f6fe0 2.5", inkOf(pages[0]));
+  ok("view: r 은 겹친 id·다른 장의 id 를 뺀다(신호 없음)", v.apply(B("", [["r", 0, [1, 2, 4, 4, 3]]])) === true && v.ids(0).join() === "1,2,4", v.ids(0));
+  v.apply(B("clear", [["c", 0]]));
+  v.apply(B("clear", [["c", 0]]));
+  runRaf(w);
+  ok("view: c 는 그 장만 비운다(두 번 와도 같다)", v.ids(0).length === 0 && inkOf(pages[0]).length === 0 && inkOf(pages[1]).length === 1);
+  v.apply(B("", [["r", 0, [1, 2, 4]]]));
+  runRaf(w);
+  ok("view: 전부 지우기 뒤 r(되돌리기)로 다시 보인다", inkOf(pages[0]).length === 3);
+  // 그리다 취소(진행 중 획의 d)는 버린다 — 뒤의 a 는 버린다
+  v.apply(B("", [["b", 0, 5, "pen", 0, 0, 0], ["a", 5, [1, 1, 30, 30]]]));
+  runRaf(w);
+  ok("view: 진행 중 획의 d(취소)는 신호 없이 받는다", v.apply(B("", [["d", 0, [5]]])) === true);
+  runRaf(w);
+  ok("view: 진행 중 획의 d(취소)는 canvas 에서 지우고 모델에서 버린다", v.ids(0).join() === "1,2,4" && live.ctx.paints.length === 0 && inkOf(pages[0]).length === 3 && v.held().live === 0, { ids: v.ids(0), live: live.ctx.paints });
+  // 틀린 연산·묶음
+  ok("view: 읽지 못하는 묶음은 거짓", v.apply("{") === false && v.apply({ k: "" }) === false && v.apply(B("", [])) === true);
+  v.apply(B("", [["b", 0, 6, "pen", "red", 0, 0], ["b", 0, 7, "pen", 0, 9, 0], ["b", -1, 8, "pen", 0, 0, 0], ["b", 0, 9, "brush", 0, 0, 0], ["s", 0, 10, "pen", 0, 0, [-5, 1], 0, 1],
+    ["s", 0, 11, "pen", 0, 0, [1, 2, 3], 0, 1], ["s", 0, 12, "pen", 0, 0, [1, 2, 3, 4], [0.5], 1], ["x", 0], "b", null]));
+  ok("view: 틀린 색·굵기·장·도구·좌표·필압의 연산은 버린다", v.ids(0).join() === "1,2,4", v.ids(0));
+  // 없는 장: 모델에만 남고 그 장이 생기면 그린다
+  v.apply(B("", [["s", 5, 20, "pen", 0, 0, [5, 5, 9, 9], 0, 1]]));
+  runRaf(w);
+  ok("view: 덱에 없는 장의 판서는 모델에만 남는다", v.ids(5).join() === "20" && !pages[0].kids.some(k => k.attrs.d), v.ids(5));
+  // 레이저
+  v.laser(0, 300, 200, false);
+  runRaf(w);
+  const sp = spotOf(pages[0]);
+  ok("view: 레이저는 지금 장의 .ink-laser-page canvas 에 점(두 원)을 그린다", sp && sp.ctx.paints.filter(p => p.op === "fill").length === 2, sp && sp.ctx.paints);
+  v.laser(0, 320, 210, true);
+  runRaf(w);
+  ok("view: 레이저가 움직이면 꼬리 선(끈 선 굵기 4 를 배율로 나눈 값)을 그린다", sp.ctx.paints.some(p => p.op === "stroke" && p.width === 2), sp.ctx.paints);
+  cur = 1; v.wake(); runRaf(w);
+  ok("view: 청중 화면이 다른 장이면 레이저를 지운다", sp.ctx.paints.length === 0, sp.ctx.paints);
+  cur = 0; black = true; v.wake(); runRaf(w);
+  ok("view: 쉬는 화면(검은 화면)이면 레이저를 지운다", sp.ctx.paints.length === 0);
+  black = false; v.laser(-1, 0, 0, false); runRaf(w);
+  ok("view: 꺼진 레이저(i = -1)는 점을 그리지 않는다", !sp.ctx.paints.some(p => p.op === "fill"), sp.ctx.paints);
+  // reset: 전체를 바꿔 그린다 — 진행 중 획도 이어 받는다
+  v.apply(B("reset", [["s", 2, 30, "pen", 1, 2, [10, 10, 20, 20], 0, 1], ["s", 0, 31, "hl", 3, 0, [5, 5, 15, 5], 0, 0]]));
+  runRaf(w);
+  ok("view: reset 은 앞의 판서를 모두 버리고 새 상태로 그린다", v.ids(0).join() === "31" && v.ids(1).length === 0 && v.ids(5).length === 0 && inkOf(pages[0]).length === 0 && inkOf(pages[1]).length === 0 && inkOf(pages[2]).length === 1, { a: inkOf(pages[0]), b: inkOf(pages[1]), c: inkOf(pages[2]) });
+  ok("view: reset 의 진행 중 획(끝남 0)은 canvas 로 그린다", liveOf(pages[0]) === live && live.ctx.paints.length === 1 && live.className === "ink-live ink-live-hl", { cls: live.className, p: live.ctx.paints });
+  v.apply(B("", [["a", 31, [25, 5]], ["e", 31]]));
+  runRaf(w);
+  ok("view: reset 뒤 이어 온 a·e 로 그 획을 마친다", inkOf(pages[0]).length === 1 && inkOf(pages[0])[0] === "ink-hl " + I.pathOf({ tool: "hl", color: 3, width: 0, pts: [5, 5, 15, 5, 25, 5], press: null }) + " none #2fa84f 14", inkOf(pages[0]));
+  // 끝난 획이 그 장 목록의 맨 끝이 아니면(reset 이 진행 중 획 뒤에 끝난 획을 실었다) 그 장을 다시 맞춰 차례를 지킨다
+  v.apply(B("reset", [["s", 0, 50, "pen", 0, 0, [1, 1, 9, 9], 0, 0], ["s", 0, 51, "pen", 1, 0, [2, 2, 8, 8], 0, 1]]));
+  runRaf(w);
+  v.apply(B("", [["e", 50]]));
+  runRaf(w);
+  ok("view: 맨 끝이 아닌 획이 끝나면 목록 차례로 다시 그린다", inkOf(pages[0]).map(x => x.match(/#\w+/)[0]).join() === "#e5342b,#f28c1e", inkOf(pages[0]));
+  // 배율이 바뀌면(resize) canvas 뒷버퍼를 맞춘다
+  let k2 = 2;
+  v.mount(Object.assign({}, at, { scale: () => k2 }));
+  v.apply(B("", [["b", 0, 52, "pen", 0, 0, 0], ["a", 52, [3, 3, 30, 3]]]));
+  runRaf(w);
+  k2 = 3; v.resize();
+  ok("view: resize 는 진행 중 canvas 를 새 배율로 다시 맞춘다", live.width === 1280 * 3 * 2 && live.ctx.paints.length === 1, [live.width, live.ctx.paints.length]);
+  v.apply(B("", [["e", 52]]));
+  runRaf(w);
+  // 떼기·다시 붙이기
+  v.unmount();
+  ok("view: 떼면 층·canvas 를 장에서 뗀다", pages.every(p => inkKids(p) === 0), pages.map(inkKids));
+  v.apply(B("", [["s", 1, 40, "pen", 0, 0, [1, 1, 2, 2], 0, 1]]));
+  ok("view: 뗀 동안에는 프레임을 요청하지 않는다", w.raf.length === 0, w.raf.length);
+  v.mount(at);
+  runRaf(w);
+  ok("view: 다시 붙이면 모든 장을 다시 그린다", inkOf(pages[0]).length === 3 && inkOf(pages[1]).length === 1 && inkOf(pages[2]).length === 0, pages.map(p => inkOf(p).length));
+  v.reset();
+  runRaf(w);
+  ok("view: reset() 은 모두 비운다", pages.every(p => inkOf(p).length === 0) && v.ids(0).length === 0);
+}
+// present.js 청중 열기: inkView 를 덱에 붙이고, 장 넘김·검은 화면·닫기·다시 열기를 따른다
+{
+  const w = world(), { P, H } = w;
+  const v = H.inkView();
+  ok("청중: inkView 는 하나다(발표 밖에서도 받는다)", v && H.inkView() === v && v.mounted() === false);
+  v.apply(B("reset", [["s", 0, 1, "pen", 0, 1, [10, 10, 50, 50], 0, 1], ["s", 1, 2, "hl", 2, 1, [10, 10, 90, 10], 0, 1]]));
+  H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  runRaf(w);
+  ok("청중: 열기 전에 받은 판서를 덱의 장에 그린다", v.mounted() && inkOf(P.slides[0]).length === 1 && inkOf(P.slides[1]).length === 1 && H.ink() === null, [inkOf(P.slides[0]), inkOf(P.slides[1])]);
+  v.laser(1, 100, 100, false);
+  runRaf(w);
+  ok("청중: 레이저의 장이 지금 장이 아니면 그리지 않는다", !spotOf(P.slides[1]) && !spotOf(P.slides[0]));
+  H.show({ i: 1 });
+  runRaf(w);
+  ok("청중: 그 장으로 넘기면(show) 레이저가 보인다", spotOf(P.slides[1]) && spotOf(P.slides[1]).ctx.paints.filter(p => p.op === "fill").length === 2);
+  ok("청중: 넘긴 장의 판서는 그 장에 남는다", inkOf(P.slides[0]).length === 1 && inkOf(P.slides[1]).length === 1);
+  H.show({ black: true });
+  runRaf(w);
+  ok("청중: 검은 화면이면 레이저를 지운다", spotOf(P.slides[1]).ctx.paints.length === 0);
+  H.show({ black: false, i: 0 });
+  v.apply(B("", [["b", 0, 3, "pen", 0, 0, 0], ["a", 3, [200, 200, 210, 220]]]));
+  runRaf(w);
+  ok("청중: 진행 중 획을 그 장 canvas 에 그린다", liveOf(P.slides[0]) && liveOf(P.slides[0]).ctx.paints.length === 1);
+  const stage = rootOf(w).querySelector(".pr-stage");
+  stage.clientWidth = 2560; stage.clientHeight = 1440;
+  for (const f of w.win.on.resize || []) f();
+  ok("청중: 창 크기가 바뀌면(fit) canvas 뒷버퍼를 새 배율에 맞춘다", P.scale === 2 && liveOf(P.slides[0]).width === 1280 * 2 * 2, [P.scale, liveOf(P.slides[0]).width]);
+  const old = P.slides.slice();
+  H.stop();
+  ok("청중: 닫으면 층을 떼고 모델은 남긴다", !v.mounted() && old.every(s => !s.kids.some(k => /ink-/.test(k.className))) && v.ids(0).join() === "1,3");
+  v.apply(B("", [["e", 3]]));
+  H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 1, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  runRaf(w);
+  ok("청중: 다시 열면 닫은 동안 끝난 획까지 그린다", inkOf(P.slides[0]).length === 2 && inkOf(P.slides[1]).length === 1, inkOf(P.slides[0]));
+  H.stop();
+  open(w);
+  runRaf(w);
+  ok("청중: 발표자 열기에는 inkView 를 붙이지 않는다(받은 판서를 발표자 장에 그리지 않는다)", !v.mounted() && P.slides.every(s => inkOf(s).length === 0));
+  H.stop();
+}
+// 받는 경계(itda-doc#108 1회차 리뷰 [1]·[2]·[4]·[5]): 큰 묶음·상한·지운 획 예산·레이저 꼬리. 상한에 닿으면 조용히 버리지 않고 apply 가 "reset" 을 돌려준다.
+{
+  const w = world(), { I } = w;
+  const pts = n => { const a = new Array(n * 2); for (let j = 0; j < n; j++) { a[2 * j] = j % 1000; a[2 * j + 1] = Math.floor(j / 1000) % 700; } return a; };
+  const mountOn = (v, pg) => { v.mount({ slides: () => [pg], size: [1280, 720], scale: () => 1, idx: () => 0, paused: () => false }); v.flush(); };
+  // [1] 상한 안의 큰 a(20만 점)·필압 a 는 예외 없이 받는다
+  {
+    const v = I.view(), pg = slide([]);
+    let r, err = null;
+    try { r = v.apply({ k: "", ops: [["b", 0, 1, "pen", 0, 0, 0], ["a", 1, pts(I.LIMIT.points)], ["e", 1]] }); } catch (e) { err = String(e); }
+    mountOn(v, pg);
+    ok("경계[1]: 20만 점 a 는 예외 없이 받고 뒤의 e·그리기까지 간다", err === null && r === true && v.held().points === I.LIMIT.points && inkOf(pg).length === 1, { err, r, held: v.held() });
+    const press = new Array(1000).fill(0.5);
+    let r2;
+    err = null;
+    try { r2 = v.apply({ k: "", ops: [["b", 0, 2, "pen", 0, 0, 1], ["a", 2, pts(1000), press], ["e", 2]] }); } catch (e) { err = String(e); }
+    ok("경계[1]: 필압 a 도 펼치기 없이 붙인다", err === null && r2 === true && v.ids(0).join() === "1,2" && v.held().points === I.LIMIT.points + 1000, { err, r2, ids: v.ids(0) });
+  }
+  {
+    const v = I.view();
+    v.apply(B("", [["s", 0, 1, "pen", 0, 0, [1, 1], 0, 1]]));
+    // 입력 예산(2회차 리뷰 [2]): 연산 수 + 연산 안 배열 원소 수 합계 하나(LIMIT.points×4 = 80만)
+    const r = v.apply({ k: "", ops: [["s", 0, 2, "pen", 0, 0, [2, 2], 0, 1], ["b", 0, 3, "pen", 0, 0, 0], ["a", 3, pts(I.LIMIT.points * 2)]] });
+    ok("예산: 원소 합계가 예산을 넘으면 그 묶음을 하나도 적용하지 않고 \"reset\"", r === "reset" && v.ids(0).join() === "1" && v.needsReset(), { r, ids: v.ids(0) });
+    ok("예산: 다시 맞춤 전까지는 다음 묶음도 \"reset\"", v.apply(B("", [["c", 0]])) === "reset");
+    ok("예산: reset 묶음을 받으면 신호가 풀린다", v.apply(B("reset", [["s", 0, 9, "pen", 0, 0, [3, 3], 0, 1]])) === true && !v.needsReset() && v.ids(0).join() === "9");
+    const many = Array.from({ length: 270000 }, () => ["c", 0]);
+    ok("예산: 작은 연산도 연산 수가 예산에 들어간다", v.apply({ k: "", ops: many }) === "reset" && v.ids(0).join() === "9");
+    v.apply(B("reset", [["s", 0, 1, "pen", 0, 0, [1, 1], 0, 1]]));
+    const ids1M = new Array(1000000).fill(1);
+    ok("예산: 100만 id 의 r 은 모델을 바꾸기 전에 \"reset\"", v.apply({ k: "", ops: [["c", 0], ["r", 0, ids1M]] }) === "reset" && v.ids(0).join() === "1", v.ids(0));
+    v.apply(B("reset", [["s", 0, 1, "pen", 0, 0, [1, 1], 0, 1]]));
+    ok("예산: 100만 id 의 d 도 같다(서로 다른 id)", v.apply({ k: "", ops: [["d", 0, Array.from({ length: 1000000 }, (_, i) => i)]] }) === "reset" && v.ids(0).join() === "1");
+    v.apply(B("reset", [["s", 0, 1, "pen", 0, 0, [1, 1], 0, 1]]));
+    ok("예산: 칸이 아주 많은 연산도 같다", v.apply({ k: "", ops: [new Array(900000).fill(0)] }) === "reset");
+    v.apply(B("reset", [["s", 0, 1, "pen", 0, 0, [1, 1], 0, 1]]));
+    const huge = JSON.stringify({ k: "", ops: [["c", 0]] }) + " ".repeat(8 << 20);
+    ok("예산: 글자 수 상한(8Mi)을 넘는 문자열은 읽기 전에 \"reset\"", v.apply(huge) === "reset" && v.ids(0).join() === "1");
+    // 발표자 상태 전체(2천 획·20만 점·필압)를 담은 reset 은 예산 안이다
+    const full = [];
+    for (let i = 0; i < I.LIMIT.strokes; i++) full.push(["s", 0, i + 1, "pen", 0, 0, pts(100), new Array(100).fill(0.5), 1]);
+    const fullJ = JSON.stringify({ k: "reset", ops: full });
+    ok("예산: 발표자 상한 꽉 찬 reset(필압 포함)은 받는다", fullJ.length <= 8 << 20 && v.apply(fullJ) === true && v.ids(0).length === I.LIMIT.strokes && v.held().points === I.LIMIT.points, { len: fullJ.length, held: v.held() });
+  }
+  // [2] 점 없는 b·빈 획·보관 획 수 상한
+  {
+    const v = I.view();
+    const r = v.apply({ k: "", ops: Array.from({ length: 20000 }, (_, i) => ["b", 0, i, "pen", 0, 0, 0]) });
+    ok("경계[2]: 진행 중 획은 상한(4)까지만 받고 넘으면 \"reset\"", r === "reset" && v.held().live === 4 && v.ids(0).length === 4, { r, held: v.held() });
+    v.apply(B("reset", []));
+    let all = true;
+    for (let i = 0; i < 3000; i++) all = v.apply(B("", [["b", 0, 100 + i, "pen", 0, 0, 0], ["e", 100 + i]])) === true && all;
+    ok("경계[2]: 점 없이 끝난 획(b·e)은 e 에서 버려 쌓이지 않는다", all && v.held().strokes === 0 && v.ids(0).length === 0, v.held());
+    const sOps = from => Array.from({ length: 2001 }, (_, i) => ["s", 0, from + i, "pen", 0, 0, [1, 1], 0, 1]);
+    const r1 = v.apply({ k: "", ops: sOps(10000) }), r2 = v.apply({ k: "", ops: sOps(20000) });
+    ok("경계[2]: 보관 획 수는 상한(4천)을 넘지 않고, 넘치면 \"reset\"", r1 === true && r2 === "reset" && v.held().strokes === I.LIMIT.strokes * 2, { r1, r2, held: v.held() });
+    v.apply(B("reset", []));
+    const rs = v.apply({ k: "reset", ops: Array.from({ length: 5 }, (_, i) => ["s", 0, i, "pen", 0, 0, [1, 1], 0, 0]) });
+    ok("경계[2]: s 의 진행 중 획도 같은 상한이다", rs === "reset" && v.held().live === 4, { rs, held: v.held() });
+  }
+  // [4] 그리기·지우기를 되풀이해도 새 획이 보인다 — 지운 획을 오래된 것부터 버려 자리를 만든다. 버린 획을 r 이 가리키면 "reset"
+  {
+    const v = I.view(), pg = slide([]), rets = [];
+    for (let i = 1; i <= 4; i++) {
+      rets.push(v.apply(B("", [["b", 0, i, "pen", 0, 0, 0]])));
+      for (let j = 0; j < 20; j++) rets.push(v.apply({ k: "", ops: [["a", i, pts(10000)]] }));
+      rets.push(v.apply(B("clear", [["e", i], ["c", 0]])));
+    }
+    const r = v.apply(B("", [["b", 0, 5, "pen", 0, 0, 0], ["a", 5, [10, 10, 20, 20]], ["e", 5]]));
+    mountOn(v, pg);
+    ok("경계[4]: 20만 점 그리기·지우기 네 번 뒤에도 새 획을 받고 보인다", rets.every(x => x === true) && r === true && v.ids(0).join() === "5" && inkOf(pg).length === 1 && v.held().points <= I.LIMIT.points * 2, { bad: rets.filter(x => x !== true).length, r, held: v.held(), svg: inkOf(pg).length });
+    ok("경계[4]: 남은 지운 획은 r 로 되살아난다", v.apply(B("", [["r", 0, [4, 5]]])) === true && v.ids(0).join() === "4,5");
+    ok("경계[4]: 버린 지운 획을 r 이 가리키면 \"reset\"(남는 획만 그린다)", v.apply(B("", [["r", 0, [1, 4, 5]]])) === "reset" && v.ids(0).join() === "4,5", v.ids(0));
+    ok("경계[4]: 모르는 id 의 a·e 도 \"reset\"", (v.apply(B("reset", [])), v.apply(B("", [["a", 77, [1, 1]]])) === "reset") && (v.apply(B("reset", [])), v.apply(B("", [["e", 77]])) === "reset"));
+    v.apply(B("reset", []));
+    // 지운 획이 없는데 보관 점이 모자라면(목록에 남은 획만으로 넘친다) 그 a 를 버리고 "reset"
+    v.apply(B("", [["s", 0, 1, "pen", 0, 0, pts(150000), 0, 1]]));
+    v.apply(B("", [["s", 0, 2, "pen", 0, 0, pts(150000), 0, 1]]));
+    const rr = v.apply(B("", [["b", 0, 3, "pen", 0, 0, 0], ["a", 3, pts(150000)]]));
+    ok("경계[4]: 지울 획이 없어 모자라면 그 a 를 버리고 \"reset\"", rr === "reset" && v.held().points === 300000, { rr, held: v.held() });
+  }
+  // [5] 레이저 꼬리: 받을 때 만료·개수 상한, 붙지 않은 동안은 마지막 위치만, reset·떼기가 꼬리를 비운다
+  {
+    const v = I.view(), pg = slide([]);
+    for (let i = 0; i < 1000; i++) { world.clock += 10; v.laser(0, i % 500, 10, false); }
+    ok("경계[5]: 붙지 않은 동안은 꼬리를 쌓지 않는다", v.held().trail === 0, v.held());
+    v.mount({ slides: () => [pg], size: [1280, 720], scale: () => 1, idx: () => 0, paused: () => false });
+    for (let i = 0; i < 1000; i++) { world.clock += 10; v.laser(0, i % 500, 10, false); }
+    ok("경계[5]: 붙은 동안도 받을 때 수명 지난 점을 뺀다(꼬리 0.3초)", v.held().trail <= 31, v.held());
+    for (let i = 0; i < 1000; i++) v.laser(0, i % 500, 10, true);
+    ok("경계[5]: 같은 순간에 많이 와도 개수 상한(240)을 넘지 않는다", v.held().trail === 240, v.held());
+    v.reset();
+    ok("경계[5]: reset() 은 꼬리를 비운다", v.held().trail === 0);
+    v.laser(0, 1, 1, true);
+    v.unmount();
+    ok("경계[5]: 떼면 꼬리를 비운다", v.held().trail === 0);
+    world.clock = 0;
+    w.raf.length = 0;
+  }
+}
+// 발표자 화면과 청중 화면의 끝난 획 SVG 경로가 같다 — 같은 relay 연산에서 같은 path d(펜·형광펜·필압·지우개·되돌리기·다시 실행·전부 지우기).
+// relay 는 앞 묶음의 Promise 가 풀린 뒤 다음을 보내므로 마이크로태스크를 돌린다(pump).
+async function mirrorCases() {
+  const tick = () => new Promise(r => setImmediate(r));
+  const pump = async () => { for (let k = 0; k < 8; k++) { runTimers(); await tick(); } };
+  const pw = world(), { P } = pw, sent = [], lasers = [];
+  open(pw, { inkKey: "mirror" });
+  pw.I.relay("mirror", { ink: j => { sent.push(j); return ""; }, laser: (...a) => lasers.push(a) });
+  await pump();
+  const aw = world(), av = aw.H;
+  av.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  const feed = () => { for (const j of sent.splice(0)) av.inkView().apply(j); runRaf(aw); };
+  const same = (name) => {
+    feed();
+    const a = P.slides.map(inkOf), b = aw.P.slides.map(inkOf);
+    ok("거울: " + name + " — 끝난 획 SVG 가 같다", JSON.stringify(a) === JSON.stringify(b) && a.flat().length > 0, { presenter: a, audience: b });
+  };
+  key(pw, "p", "KeyP");
+  drag(pw, P.slides[0], line(100, 300, 8));
+  await pump();
+  same("펜");
+  key(pw, "h", "KeyH");
+  drag(pw, P.slides[0], line(100, 340, 6));
+  await pump();
+  same("형광펜");
+  key(pw, "p", "KeyP");
+  drag(pw, P.slides[0], [[400, 100], [420, 130], [450, 170], [470, 220]], { pointerType: "pen", pressure: 0.8 });
+  await pump();
+  same("필압 펜");
+  // 그리는 중(끝나기 전)의 점 스트림: 청중 canvas 가 발표자와 같은 경로를 그린다
+  fire(P.slides[0], "pointerdown", { buttons: 1, clientX: 600, clientY: 500 });
+  fire(P.slides[0], "pointermove", { buttons: 1, clientX: 640, clientY: 520 });
+  fire(P.slides[0], "pointermove", { buttons: 1, clientX: 690, clientY: 530 });
+  await pump();
+  feed();
+  const pl = liveOf(P.slides[0]), al = liveOf(aw.P.slides[0]);
+  runRaf(pw);
+  ok("거울: 그리는 중인 획의 canvas 경로가 같다", pl && al && pl.ctx.paints.length === 1 && JSON.stringify(pl.ctx.paints) === JSON.stringify(al.ctx.paints), { p: pl && pl.ctx.paints, a: al && al.ctx.paints });
+  fire(P.slides[0], "pointerup", { clientX: 690, clientY: 530 });
+  await pump();
+  same("그리던 획 끝");
+  key(pw, "z", "KeyZ", { metaKey: true });
+  await pump();
+  same("되돌리기");
+  key(pw, "z", "KeyZ", { metaKey: true, shiftKey: true });
+  await pump();
+  same("다시 실행");
+  key(pw, "e", "KeyE");
+  drag(pw, P.slides[0], [[100, 300], [130, 300], [160, 300]]);
+  await pump();
+  same("지우개");
+  key(pw, "p", "KeyP");
+  pw.H.next();
+  drag(pw, P.slides[1], line(200, 200, 5));
+  await pump();
+  same("다음 장에 그리기");
+  pw.H.prev();
+  key(pw, "x", "KeyX");
+  await pump();
+  feed();
+  ok("거울: 전부 지우기 — 두 쪽 모두 그 장이 빈다", inkOf(P.slides[0]).length === 0 && inkOf(aw.P.slides[0]).length === 0 && inkOf(aw.P.slides[1]).length === 1);
+  key(pw, "z", "KeyZ", { metaKey: true });
+  await pump();
+  same("전부 지우기 되돌리기");
+  // 늦게 붙은 청중: relay 를 다시 이으면 reset 하나로 같은 상태가 된다
+  const lw = world();
+  lw.H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  const late = [];
+  pw.I.relay("mirror", { ink: j => { late.push(j); return ""; }, laser: (...a) => lasers.push(a) });
+  await pump();
+  for (const j of late) lw.H.inkView().apply(j);
+  runRaf(lw);
+  ok("거울: 늦게 붙은 청중은 reset 하나로 같은 상태를 받는다", late.length === 1 && JSON.parse(late[0]).k === "reset" && JSON.stringify(P.slides.map(inkOf)) === JSON.stringify(lw.P.slides.map(inkOf)), { n: late.length });
+  // 레이저 값이 그대로 넘어온다
+  key(pw, "l", "KeyL");
+  fire(P.slides[0], "pointermove", { clientX: 300, clientY: 200 });
+  await pump();
+  const lv = lasers[lasers.length - 1];
+  ok("거울: 레이저는 (장, x, y, 선) 으로 넘어온다", lv && lv[0] === 0 && lv[1] === 300 && lv[2] === 200 && lv[3] === false, lasers);
+  av.inkView().laser(...lv);
+  runRaf(aw);
+  ok("거울: 넘어온 레이저를 청중 화면 지금 장에 그린다", spotOf(aw.P.slides[0]) && spotOf(aw.P.slides[0]).ctx.paints.some(p => p.op === "fill"));
+  pw.H.stop();
+  av.stop();
+  lw.H.stop();
+  await repeatCases(pump);
+  await laserTurnCases(pump);
+}
+// 2회차 리뷰 [1]: 레이저가 꺼짐(-1)을 거쳐 장을 넘긴 뒤 새 장의 첫 점에, 앞 장의 꼬리를 잇지 않는다 — 실제 attach → relay → view.
+async function laserTurnCases(pump) {
+  const pw = world(), aw = world();
+  open(pw, { inkKey: "laser-turn" });
+  aw.H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  const v = aw.H.inkView(), sent = [];
+  pw.I.relay("laser-turn", { ink: j => { v.apply(j); return ""; }, laser: (...a) => { sent.push(a); v.laser(...a); } });
+  await pump();
+  key(pw, "l", "KeyL");
+  fire(pw.P.slides[0], "pointermove", { clientX: 100, clientY: 100 });
+  await pump();
+  fire(pw.P.slides[0], "pointermove", { clientX: 120, clientY: 120 });
+  await pump();
+  runRaf(aw);
+  const before = spotOf(aw.P.slides[0]).ctx.paints.filter(p => p.op === "stroke").length;
+  pw.H.next();
+  aw.H.show({ i: 1 });
+  await pump();
+  runRaf(aw);
+  fire(pw.P.slides[1], "pointermove", { clientX: 300, clientY: 300 });
+  await pump();
+  runRaf(pw);
+  runRaf(aw);
+  const turn = sent.map(a => a[0]).join(), ap = spotOf(aw.P.slides[1]).ctx.paints, pp = rootOf(pw).querySelector(".ink-laser").ctx.paints;
+  ok("레이저 넘김: 전달이 앞 장 → 꺼짐 → 새 장이다(시험 전제)", /^0,0,-1,1$/.test(turn) && before === 1, { sent, before });
+  ok("레이저 넘김: 새 장에는 앞 장의 꼬리를 잇지 않고 점만 그린다(발표자와 같다)", !ap.some(p => p.op === "stroke") && ap.filter(p => p.op === "fill").length === 2 && !pp.some(p => p.op === "stroke") && pp.filter(p => p.op === "fill").length === 2, { audience: ap, presenter: pp });
+  pw.H.stop();
+  aw.H.stop();
+  // 그릴 때도 점마다 장을 본다: 꼬리에 다른 장의 점이 섞여 있어도 지금 장의 점만 잇는다
+  const w = world(), vv = w.I.view(), pages = [slide([]), slide([])];
+  let cur = 0;
+  vv.mount({ slides: () => pages, size: [1280, 720], scale: () => 1, idx: () => cur, paused: () => false });
+  vv.laser(0, 10, 10, false); vv.laser(0, 20, 20, false); vv.laser(-1, 0, 0, false);
+  cur = 1; vv.wake(); runRaf(w);
+  ok("레이저 넘김: 꺼진 뒤 다른 장으로 넘기면 앞 장 꼬리 때문에 새 장에 레이저 층을 만들지 않는다", !spotOf(pages[1]), pages[1].kids.map(k => k.className));
+  vv.laser(1, 300, 300, false);
+  ok("레이저 넘김: 꺼짐 뒤 다른 장의 첫 점은 앞 장 꼬리를 비운다(꼬리 = 새 점 하나)", vv.held().trail === 1, vv.held());
+  w.raf.length = 0;
+}
+// 1회차 리뷰 [3]: 되돌아와 같은 좌표를 다시 지나는 정상 입력(두 묶음의 a 가 같은 점들)을 청중이 버리지 않는다. 같은 묶음을 다시 넘기는 것은 계약 밖이고,
+// 그때는 relay 를 다시 불러 reset 으로 맞춘다.
+async function repeatCases(pump) {
+  const pw = world(), aw = world(), P = pw.P;
+  open(pw, { inkKey: "repeat" });
+  aw.H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  const av = aw.H.inkView(), batches = [], rets = [];
+  pw.I.relay("repeat", { ink: j => { batches.push(j); rets.push(av.apply(j)); return ""; }, laser() {} });
+  await pump();
+  key(pw, "p", "KeyP");
+  const pg = P.slides[0];
+  fire(pg, "pointerdown", { buttons: 1, clientX: 100, clientY: 100 });
+  fire(pg, "pointermove", { buttons: 1, clientX: 120, clientY: 100 });
+  fire(pg, "pointermove", { buttons: 1, clientX: 110, clientY: 120 });
+  await pump();
+  fire(pg, "pointermove", { buttons: 1, clientX: 90, clientY: 90 });
+  fire(pg, "pointermove", { buttons: 1, clientX: 120, clientY: 100 });
+  fire(pg, "pointermove", { buttons: 1, clientX: 110, clientY: 120 });
+  await pump();
+  fire(pg, "pointerup", { clientX: 120, clientY: 100 });
+  await pump();
+  av.flush();
+  const as = batches.map(j => JSON.parse(j).ops.filter(o => o[0] === "a").map(o => JSON.stringify(o[2]))).flat();
+  ok("되풀이: 두 묶음의 a 가 같은 점들이다(시험 전제)", as.length >= 2 && as[0] === as[1], as);
+  ok("되풀이: 같은 점을 다시 지나는 정상 입력도 청중 경로가 발표자와 같다", inkOf(pg).length === 1 && JSON.stringify(inkOf(pg)) === JSON.stringify(inkOf(aw.P.slides[0])) && rets.every(r => r === true), { p: inkOf(pg), a: inkOf(aw.P.slides[0]), rets });
+  // 계약 밖: 같은 a 묶음을 다시 넘기면 점이 겹친다 — relay 를 다시 부르면 reset 으로 맞는다
+  key(pw, "p", "KeyP"); key(pw, "p", "KeyP");
+  fire(pg, "pointerdown", { buttons: 1, clientX: 300, clientY: 300 });
+  fire(pg, "pointermove", { buttons: 1, clientX: 340, clientY: 300 });
+  await pump();
+  av.apply(batches[batches.length - 1]); // 호스트가 잘못 다시 넘겼다
+  fire(pg, "pointerup", { clientX: 340, clientY: 300 });
+  await pump();
+  av.flush();
+  const differ = JSON.stringify(inkOf(pg)) !== JSON.stringify(inkOf(aw.P.slides[0]));
+  pw.I.relay("repeat", { ink: j => { av.apply(j); return ""; }, laser() {} });
+  await pump();
+  av.flush();
+  ok("되풀이: 다시 넘긴 묶음은 겹치고(계약 밖), relay 를 다시 부르면 reset 으로 같아진다", differ && JSON.stringify(inkOf(pg)) === JSON.stringify(inkOf(aw.P.slides[0])), { differ, p: inkOf(pg), a: inkOf(aw.P.slides[0]) });
+  pw.H.stop();
+  aw.H.stop();
+}
+
+mirrorCases().then(() => console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed), e => { console.log("실패 거울 시험 예외 — " + (e && e.stack)); process.exit(1); });

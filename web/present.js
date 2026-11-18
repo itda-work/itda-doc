@@ -27,10 +27,30 @@
 //                       (묻기 막대·코드 복사 단추 등)은 입력이 아니다: 덱에 inert 를 달고(WebKit 동작은 미검증), 포커스 차례에서 빼며(tabindex -1),
 //                       덮개 안의 click·auxclick 은 창 붙잡기 단계에서 모두 먹는다(eatClick — 문서의 위임 처리기까지 가지 않는다). 묻기 막대·코드 복사
 //                       단추는 보이지 않는다(present.css). 호스트 훅(fullscreen 등)은 그대로 부른다. 넘김은 ItdaPresent.show 로만 한다.
+//                       판서 입력·도구 막대는 없지만 발표자의 판서를 받아 그린다(아래 「판서 받기」).
 //   ItdaPresent.show({ i, step, black })  보이는 상태를 덮어쓴다(멱등). 범위 밖 값은 잘라낸다(i 는 0~장 수−1, step 은 0~그 장의 단계 수). 없는 키는
 //                       그대로 둔다(step 이 없으면 같은 장이면 지금 단계, 다른 장이면 0). 같은 장·같은 단계·같은 검은 화면이면 아무것도 하지 않는다(차트도
 //                       다시 돌지 않는다). 장이 바뀌면 go(i, step, dir) 규칙(dir 은 장 번호 차례 — 차트는 앞으로 갈 때만 움직인다), 같은 장의 단계만 바뀌면
 //                       next·prev 와 같다. 검은 화면은 setBlack 과 같은 길이다. 바뀐 것이 여럿이어도 onState 는 한 번이다.
+// 판서 받기(itda-doc#108) — 발표자 화면의 판서·레이저를 청중 화면에 같은 모양으로 그린다. 둘 사이 길(창·기기 사이 전달)은 호스트 몫이다.
+//   발표자 표면: start 에 inkKey 를 주고, 청중 화면이 붙으면 같은 키로 ItdaInk.relay(inkKey, send) 를 부른다. send =
+//     · ink(json)            묶음 JSON 문자열 한 줄({"k", "ops"} — ink.js 「중계」). 그대로 청중 표면에 넘기고 ""(받음)·"full"(다음에 전체 상태를 다시
+//                            보내라)·"stopped"(그만 보낸다) 또는 그 Promise 를 돌려준다. relay 는 앞 묶음의 값이 오기 전에는 다음 묶음을 보내지 않는다
+//                            (그사이 연산은 다음 묶음에 합쳐진다) — 순서를 지키는 길이면 넘기자마자 "" 를 돌려줘도 된다. 던지거나 거부하면 그 묶음이 빠진
+//                            것으로 보고 다음에 전체 상태(reset)를 보낸다(reset 묶음까지 거부되면 멈추고 stopped 를 부른다).
+//     · laser(i, x, y, line) 레이저의 마지막 값(장·설계 px·끈 선인가) — 꺼지면 i = -1. 그대로 청중 표면에 넘긴다(잃어도 다음 값이 덮는다).
+//     · stopped()            (없어도 된다) relay 가 전달을 멈췄다.
+//     잇자마자 지금 상태 전체를 reset 묶음으로 보낸다. 돌려받은 close() 로 끊는다. 청중 화면이 새로 붙거나 끊겼다 다시 붙거나, 청중 쪽 apply 가 true 가
+//     아닌 값을 돌려주면 relay 를 다시 부른다(앞 길은 저절로 닫히고 새 reset 이 빠진 연산을 메운다).
+//   청중 표면: ItdaPresent.inkView() 가 받는 쪽(ink.js view)을 준다(ink.js 가 없으면 null). 받은 것을 그대로 넘긴다 —
+//     inkView().apply(json)  묶음(문자열이나 객체) · inkView().laser(i, x, y, line) 레이저 · inkView().reset() 판서를 모두 비운다(다른 문서·발표로 바꿀 때).
+//     호스트가 순서와 한 번 전달을 보장한다 — 받는 쪽은 재전송에 멱등이 아니다(전송 꼴에 순번이 없다). 묶음은 relay 가 낸 차례대로 한 번씩 넘기고
+//     같은 묶음을 다시 넘기지 않는다(점 추가 a 가 다시 오면 점이 겹치고 apply 는 알아채지 못한다). 빠졌거나 차례가
+//     흐트러졌으면 재전송 대신 발표자 쪽 relay 를 다시 불러 reset 을 받는다. apply 가 true 가 아닌 값(false 읽지 못함·"reset" 받는 쪽 상한·모르는 id —
+//     ink.js 「다시 맞춤 신호」)을 돌려줘도 같다: 발표자 쪽에 알려 relay 를 다시 부른다. "reset" 은 reset 묶음이 올 때까지 이어진다.
+//     받는 쪽은 발표 밖에서도 받는다: 청중 열기(audience) 동안 덱의 장 위에 그리고, 열기 전·닫은 뒤에 온 판서도 모델에 남아 다시 열면 그린다.
+//     장 번호는 발표자와 같은 덱 차례다(두 표면이 같은 문서를 연다고 본다). 장 넘김은 show 가 하고, 넘긴 장의 판서는 그 장에 남아 돌아오면 다시 보인다
+//     (발표자와 같다). 레이저는 청중 화면의 지금 장이 레이저의 장이고 검은 화면이 아닐 때만 보인다. 그리기는 프레임(rAF)마다 한 번이다.
 // 펜만 판서(itda-doc#100) — o.penOnly = true(슬라이드 발표 start 에만, 청중 열기·보드 발표에는 없다):
 //   · 판서(펜·형광펜·지우개·레이저)는 pointerType "pen" 입력만 받는다(ink.js notPen) — 손가락·마우스는 획·지우개·레이저를 만들지 않는다.
 //   · 판서 도구가 켜진 동안 펜이 아닌 누르기(손가락·마우스, 그 호환 mousedown·click)는 장을 넘기지 않고 먹는다 — 링크·크게 보기도 아니다(펜·형광펜·
@@ -79,6 +99,12 @@
   let opts = {}, notesEl = null, dockBtn = null, cardRO = null, dragEnd = null, lb = null, lbEl = null, lbEat = false, linkDown = null;
   let tocEl = null, tocBody = null, tocDockBtn = null, tocItems = [];
   let ink = null; // 판서(ink.js) — 슬라이드 발표에만 붙는다. 보드 발표에는 없다
+  // 받아 그리는 판서(ink.js view — itda-doc#108). 청중 열기에만 붙인다(inkMounted). 모델은 발표를 닫아도 남는다 — 청중 화면을 다시 열면 그대로 그린다
+  let inkView = null, inkMounted = false;
+  function inkViewOf() {
+    if (!inkView && window.ItdaInk && window.ItdaInk.view) inkView = window.ItdaInk.view();
+    return inkView;
+  }
   let onState = null, sentState = "", hold = 0; // 두 화면 발표의 상태 알림(emitState) — 마지막으로 보낸 값(JSON)·묶음 깊이(batch)
   const NOTE_W_DEF = 34, NOTE_W_MIN = 22, NOTE_W_MAX = 60, NOTE_FS_DEF = 17;
   const TOC_W_DEF = 22, TOC_W_MIN = 16, TOC_W_MAX = 40; // 목차 칸 너비(창의 % — 너비를 기억하는 호스트의 범위와 같게 둔다)
@@ -266,7 +292,7 @@
   }
 
   // startAudience 는 청중(따라가기) 열기의 나머지다(start 가 덱·검은 화면 층까지 만든 뒤 — 머리 주석 「두 화면 발표」). 노트·목차·아래 줄·번호 이동·
-  // 한눈에 보기·크게 보기·판서는 만들지 않고 키·마우스·커서 깨우기 리스너도 걸지 않는다. 지난 발표가 남긴 부품 참조는 비워 go·stop 이 건너뛰게 한다.
+  // 한눈에 보기·크게 보기·판서 입력은 만들지 않고(받은 판서는 inkView 가 그린다) 키·마우스·커서 깨우기 리스너도 걸지 않는다. 지난 발표가 남긴 부품 참조는 비워 go·stop 이 건너뛰게 한다.
   function startAudience(w, h) {
     notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
     lb = lbEl = null;
@@ -289,6 +315,12 @@
     window.addEventListener("auxclick", eatClick, true);
     root.addEventListener("contextmenu", e => e.preventDefault());
     fit();
+    // 발표자 판서를 받아 그린다(머리 주석 「두 화면 발표」 판서 받기). 붙이기 전에 받은 연산도 여기서 그린다
+    const v = inkViewOf();
+    if (v) {
+      v.mount({ slides: () => P.slides, size: [w, h], scale: () => P.scale || 1, idx: () => P.idx, paused: () => !!P.black });
+      inkMounted = true;
+    }
     go(Math.max(0, Math.min(opts.index || 0, P.slides.length - 1)), 0, 1);
   }
 
@@ -405,6 +437,7 @@
     window.removeEventListener("auxclick", eatClick, true);
     lbEat = false;
     if (ink) { ink.detach(); ink = null; }
+    if (inkMounted) { inkView.unmount(); inkMounted = false; } // 층만 뗀다 — 받은 판서(모델)는 남는다
     linkDown = null;
     endDrag(); // 끄는 중에 끝내도 document 리스너가 남아 다음 발표를 건드리지 않게
     if (cardRO) { cardRO.disconnect(); cardRO = null; }
@@ -497,6 +530,7 @@
     P.scale = s;
     deck.style.transform = "translate(" + Math.round((W - w * s) / 2) + "px," + Math.round((H - h * s) / 2) + "px) scale(" + s + ")";
     if (ink) ink.resize();
+    if (inkMounted) inkView.resize();
   }
 
   function tick() {
@@ -560,6 +594,7 @@
     P.idx = i;
     P.step = step;
     if (ink) ink.slide(i);
+    if (inkMounted) inkView.wake(); // 레이저는 지금 장일 때만 보인다
     if (!same) {
       // 빠른 연달아 넘김: 넘길 때마다 지금(next)·바로 앞(prev) 밖의 장은 곧바로 숨긴다 — 보이는 장은 늘 둘 이하다.
       // 나가는 장 정리 타이머는 장마다 하나 — 앞 넘김에서 건 것이 남아 있다가 다시 나가는 그 장의 움직임을 중간에 끊지 않게 새로 걸 때 지운다
@@ -932,7 +967,7 @@
     if (P.showToc) markToc();
   }
 
-  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); emitState(); }
+  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); if (inkMounted) inkView.wake(); emitState(); }
   function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); relayout(); }
 
   // ---- 라이트박스: 슬라이드 안 이미지·표·그림을 눌러 크게 본다. 발표자 화면에만 있다 — 공유 따라가기(onSlide)로 보내지 않는다.
@@ -1123,6 +1158,8 @@
     if (shareEl) shareEl.textContent = shareSummary;
   }
   window.ItdaPresent = { setShareSummary, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+    // inkView 는 청중 화면이 발표자 판서를 받아 그리는 view(ink.js view)다 — 머리 주석 「두 화면 발표」 판서 받기. ink.js 가 없으면 null
+    inkView: inkViewOf,
     // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다
     yieldsKey: e => P.on && askNoteKey(e),
     // inkHeld 는 판서 입력이 진행 중인가다(머리 주석 「펜만 판서」) — 호스트가 손가락 밀기를 버릴지 정할 때 묻는다

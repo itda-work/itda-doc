@@ -2,6 +2,7 @@
 // 판서는 메모리에만 있고 md 원문·저장 상태를 건드리지 않는다. 발표 슬라이드는 복제본이라 모델은 DOM 밖에(슬라이드 번호 + 설계 px) 둔다 — 공유 중계(relay)가 그대로 쓴다.
 // 획 모양(경로·색·바탕 밝기)은 inkshape.js 에 있다 — 공유 보는 화면과 같은 규칙이다.
 // 중계: relay 로 나가는 길을 이으면 모델을 바꿀 때마다 연산을 낸다. 공유·DOM 을 모른다 — 잇지 않으면 연산을 만들지 않는다(공유가 꺼져 있으면 비용이 없다).
+// 받아 그리기: view 가 그 연산·레이저를 받아 다른 발표 표면(청중 화면 — present.js 「두 화면 발표」)의 슬라이드에 같은 층·같은 경로로 그린다(itda-doc#108).
 //
 // 층(슬라이드 .page 의 자식 — .page 는 contain: paint 로 쌓임 맥락이다):
 //   .ink-hl   끝난 형광펜 SVG. 혼합(곱하기, 어두운 바탕은 스크린)·투명도를 경로가 아니라 층에 건다 — 층이 .page 맥락에서 글자·바탕과 섞이고,
@@ -244,6 +245,366 @@
     if (book.paint) book.paint();
     wakeOut(book, o);
     return { close: () => { if (book.out === o) closeOut(book); } };
+  }
+
+  // ---- 받아 그리기(view — itda-doc#108). 다른 발표 표면(청중 화면 — present.js 「두 화면 발표」)이 relay 의 묶음·레이저를 받아 슬라이드 위에 그린다.
+  // 모델은 DOM 밖(장 번호 → 획 id 목록, id → 획)이라 붙이기(mount) 전·뗀 뒤에 온 연산도 남고, 붙이면 그 장들을 그린다. 없는 장의 판서는 모델에만 남는다.
+  // 층은 발표자(attach)와 같다: 끝난 획은 그 장 .page 의 .ink-hl·.ink-pen SVG(경로는 dress — pathOf), 진행 중인 획은 .ink-live canvas 하나(그 획의 장으로 옮겨
+  // 다닌다), 형광펜 층의 어두운 바탕 판정(slideDark → .ink-dark)도 같다. 레이저만 다르다: 창 전체가 아니라 그 장 .page 의 canvas(.ink-laser-page)라 배율·전환을 탄다.
+  // apply·laser 는 모델만 바꾸고 그리기는 다음 프레임(rAF)에 한 번이다 — 묶음이 잦아도 프레임마다 한 번 그린다.
+  // 전달 계약: 받는 쪽은 relay 가 낸 묶음을 낸 차례대로 한 번씩 받는다고 본다(relay 는 앞 묶음이 끝난 뒤에야 다음을 낸다). 연산에는 순번이 없어
+  // 다시 온 묶음·빠진 묶음을 가려낼 수 없다 — 재전송에 대한 멱등은 보장하지 않는다. 호스트가 순서·한 번 전달을 보장하고 재전송하지 않으며, 빠졌거나 순서가 흐트러졌으면 보내는 쪽 relay 를 다시 이어 reset(전체 상태)으로만 되돌린다.
+  // (b·s 는 이미 있는 id 면 버리고, e·d·r·c 는 다시 와도 결과가 같지만, a(점 추가)가 다시 오면 점이 겹친다.)
+  // 다시 맞춤 신호: apply 는 적용했으면 true, 읽지 못하면 false, 받은 상태를 믿을 수 없게 되면 "reset" 을 돌려준다 — 호스트는 true 가 아니면 relay 를 다시
+  // 부른다. "reset" 은 reset 묶음을 받을 때까지 계속 돌려준다(그동안 오는 연산도 할 수 있는 만큼 적용한다). 까닭:
+  //   · 묶음이 입력 예산을 넘었다 — 그 묶음은 하나도 적용하지 않는다. 예산은 연산 종류를 가리지 않는 두 가지다: 문자열은 읽기(JSON.parse) 전 길이 V_CHARS,
+  //     묶음은 「연산 수 + 연산 안 배열들의 원소 수」(a·s 의 점·필압, d·r 의 id 모두) 합계 V_ELEMS — 모델을 바꾸기 전에 센다.
+  //   · 보관 상한(획 수 V_KEEP·점 수 V_POINTS·진행 중 획 V_LIVE)을 넘는다 — 먼저 지운 획(d·c 로 목록에서 빠진 끝난 획)을 오래된 것부터 버려 자리를 만들고,
+  //     그래도 모자라면 그 연산을 버린다.
+  //   · 모르는 id 를 가리키는 a·e·r — 앞 연산이 빠졌거나, 위에서 버린 지운 획을 되돌리기(r)가 되살리려 한다.
+  // 받은 값은 숫자·범위만 받는다(색은 팔레트 번호 — 문자열 CSS 를 받지 않는다). 모양이 틀린 연산은 그 연산만 버린다(신호 없음 — 다시 받아도 같다).
+  const V_PAGE = 1 << 16, V_ID = 2 ** 31, V_COORD = 1 << 14; // 받는 값의 범위
+  // 상한: 발표자 상한(LIMIT)의 두 배까지 보관한다 — 지운 획을 되돌리기에 대비해 남기는 몫이다.
+  const V_POINTS = LIMIT.points * 2, V_KEEP = LIMIT.strokes * 2, V_LIVE = 4;
+  // 입력 예산: 묶음 하나가 발표자 상태 전체(reset — 20만 점의 좌표 40만·필압 20만 + 획마다 연산 하나)를 담을 수 있게 둔다. 글자 수는 좌표 한 개를
+  // 「1279.5,」 일곱 글자로 잡은 크기의 두 배쯤이다
+  const V_ELEMS = LIMIT.points * 4, V_CHARS = 8 << 20;
+  const V_TRAIL = 240; // 레이저 꼬리 점 상한(끈 선 1.5초를 프레임마다 받아도 넉넉하다)
+  const vInt = (v, top) => Number.isInteger(v) && v >= 0 && v <= top;
+  const vCoords = a => Array.isArray(a) && a.length % 2 === 0 && a.every(v => typeof v === "number" && v >= 0 && v <= V_COORD);
+  const vWeights = (a, n) => Array.isArray(a) && a.length === n && a.every(v => typeof v === "number" && v >= 0 && v <= 1);
+  const vLook = (tool, color, width) => (tool === "pen" || tool === "hl") && vInt(color, COLORS.length - 1) && vInt(width, WIDTHS[tool].length - 1);
+  const vIds = a => Array.isArray(a) && a.every(v => vInt(v, V_ID));
+  function view() {
+    const strokes = new Map(), lists = new Map(); // id → {page, tool, color, width, pts, press|null, done} · 장 → [id…](그리는 차례)
+    const live = new Set();                       // 끝나지 않은 획 id(받은 차례)
+    const layers = new Map(), paths = new Map();  // 장 → {pg, hl, pen, dark} · id → SVG path
+    const dirty = new Set(), ended = new Set();   // 다시 그릴 장 · 이번 프레임에 끝난 획
+    const spot = { at: null, trail: [], el: null, ctx: null, raf: 0 };
+    const removed = new Set(); // 지운 획 — 목록에서 빠진 끝난 획 id(빠진 차례 — 앞이 오래된 것). 보관 상한에 닿으면 앞에서부터 버린다
+    let m = null, raf = 0, liveStale = false, points = 0, liveEl = null, lctx = null, stale = false;
+
+    // ---- 모델
+    function add(page, id, s) {
+      s.page = page;
+      strokes.set(id, s);
+      let l = lists.get(page);
+      if (!l) lists.set(page, l = []);
+      l.push(id);
+      points += s.pts.length / 2;
+      if (!s.done) { live.add(id); liveStale = true; }
+      dirty.add(page);
+    }
+    function forget(id) {
+      const s = strokes.get(id);
+      if (!s) return;
+      strokes.delete(id);
+      paths.delete(id);
+      live.delete(id);
+      removed.delete(id);
+      ended.delete(id);
+      points -= s.pts.length / 2;
+      liveStale = true;
+    }
+    function clearModel() {
+      for (const i of lists.keys()) dirty.add(i);
+      strokes.clear(); lists.clear(); live.clear(); paths.clear(); ended.clear(); removed.clear();
+      points = 0;
+      liveStale = true;
+    }
+    // setList 는 장 i 의 목록을 next 로 바꾸고 지운 획 표(removed)를 맞춘다 — 빠진 끝난 획은 표 끝(가장 새것)에, 다시 든 획은 표에서 뺀다.
+    function setList(i, next) {
+      const keep = new Set(next);
+      for (const id of lists.get(i) || []) if (!keep.has(id)) { const s = strokes.get(id); if (s && s.done) { removed.delete(id); removed.add(id); } }
+      for (const id of next) removed.delete(id);
+      lists.set(i, next);
+      liveStale = true;
+      dirty.add(i);
+    }
+    // fits 는 획 n 개·점 k 개를 더 보관할 자리를 만든다 — 모자라면 지운 획을 오래된 것부터 버린다. 그래도 모자라면 거짓(다시 맞춤 신호를 단다).
+    function fits(n, k) {
+      for (const id of removed) {
+        if (strokes.size + n <= V_KEEP && points + k <= V_POINTS) break;
+        forget(id);
+      }
+      if (strokes.size + n <= V_KEEP && points + k <= V_POINTS) return true;
+      stale = true;
+      return false;
+    }
+    // pushAll 은 src 를 dst 끝에 붙인다 — 인자 펼치기(push(...src))는 긴 배열에서 엔진의 인자 수 한도를 넘는다.
+    function pushAll(dst, src) { for (let j = 0; j < src.length; j++) dst.push(src[j]); }
+    function op1(op) {
+      if (!Array.isArray(op)) return;
+      const [kind, a, b, c] = op;
+      switch (kind) {
+        case "b": { // 획 시작
+          const [, page, id, tool, color, width, pressed] = op;
+          if (!vInt(page, V_PAGE) || !vInt(id, V_ID) || strokes.has(id) || !vLook(tool, color, width) || (pressed !== 0 && pressed !== 1)) return;
+          if (live.size >= V_LIVE) { stale = true; return; } // 발표자는 한 번에 한 획만 그린다
+          if (fits(1, 0)) add(page, id, { tool, color, width, pts: [], press: pressed ? [] : null, done: false });
+          return;
+        }
+        case "a": { // 점 추가
+          const s = strokes.get(a);
+          if (!vInt(a, V_ID) || !vCoords(b) || !b.length) return;
+          if (!s) { stale = true; return; } // 그 획의 b 를 받지 못했다
+          if (s.done || (s.press && !vWeights(c, b.length / 2))) return;
+          if (!fits(0, b.length / 2)) return;
+          pushAll(s.pts, b);
+          if (s.press) pushAll(s.press, c);
+          points += b.length / 2;
+          liveStale = true;
+          return;
+        }
+        case "e": { // 획 끝 — 점 없는 획은 그릴 것이 없어 버린다(발표자는 첫 점 없이 획을 끝내지 않는다)
+          if (!vInt(a, V_ID)) return;
+          const s = strokes.get(a);
+          if (!s) { stale = true; return; }
+          if (s.done) return;
+          if (!s.pts.length) { const l = lists.get(s.page); forget(a); if (l) setList(s.page, l.filter(id => id !== a)); return; }
+          s.done = true;
+          live.delete(a);
+          liveStale = true;
+          ended.add(a);
+          return;
+        }
+        case "d": { // 삭제 — 끝난 획은 되돌리기(r)가 id 로 되살리므로 지운 획 표에 남긴다. 끝나지 않은 획(그리다 취소)은 버린다
+          if (!vInt(a, V_PAGE) || !vIds(b) || !lists.has(a)) return;
+          const gone = new Set(b);
+          for (const id of b) { const s = strokes.get(id); if (s && !s.done && s.page === a) forget(id); }
+          setList(a, lists.get(a).filter(id => !gone.has(id)));
+          return;
+        }
+        case "r": { // 그 장의 목록을 이 차례로(되돌리기·다시 실행) — 다른 장의 id·겹친 id 는 뺀다. 모르는 id 는 빼고 다시 맞춤 신호를 단다
+          if (!vInt(a, V_PAGE) || !vIds(b)) return;
+          const seen = new Set();
+          setList(a, b.filter(id => {
+            const s = strokes.get(id);
+            if (!s) { stale = true; return false; }
+            if (s.page !== a || seen.has(id)) return false;
+            seen.add(id);
+            return true;
+          }));
+          return;
+        }
+        case "c": // 장 지우기 — 끝난 획은 되돌리기(r)를 위해 지운 획 표에 남긴다
+          if (!vInt(a, V_PAGE) || !lists.has(a)) return;
+          setList(a, []);
+          return;
+        case "s": { // 획 전체(reset 안)
+          const [, page, id, tool, color, width, pts, press, done] = op;
+          if (!vInt(page, V_PAGE) || !vInt(id, V_ID) || strokes.has(id) || !vLook(tool, color, width) || !vCoords(pts) || (done !== 0 && done !== 1)) return;
+          if (done === 1 && !pts.length) return;
+          if (press !== 0 && !vWeights(press, pts.length / 2)) return;
+          if (!done && live.size >= V_LIVE) { stale = true; return; }
+          if (fits(1, pts.length / 2)) add(page, id, { tool, color, width, pts: pts.slice(), press: press === 0 ? null : press.slice(), done: done === 1 });
+          return;
+        }
+        default:
+      }
+    }
+    // tooBig 은 묶음이 입력 예산(머리 주석 — 연산 수 + 연산 안 배열들의 원소 수)을 넘는가다. 연산 종류·모양은 보지 않는다 — 어느 자리의 배열이든 센다.
+    // 원소를 훑지 않고 길이만 더하므로 비용은 연산 수에 비례하고, 연산 수도 예산에 들어 있다.
+    function tooBig(ops) {
+      if (ops.length > V_ELEMS) return true;
+      let n = ops.length;
+      for (const op of ops) {
+        if (!Array.isArray(op)) continue;
+        n += op.length;
+        if (n > V_ELEMS) return true; // 칸이 아주 많은 연산은 칸을 훑기 전에 거른다
+        for (const f of op) if (Array.isArray(f)) n += f.length;
+        if (n > V_ELEMS) return true;
+      }
+      return false;
+    }
+    // apply 는 묶음 하나를 받는다 — relay 가 낸 JSON 문자열이나 그 객체. k 가 "reset" 이면 지금 모델을 버리고 묶음으로 바꾼다.
+    // 돌려주는 값: true 적용함 · false 읽지 못함 · "reset" 다시 맞춤이 필요하다(머리 주석 「다시 맞춤 신호」). true 가 아니면 호스트는 relay 를 다시 부른다.
+    function apply(batch) {
+      let b = batch;
+      if (typeof b === "string") {
+        if (b.length > V_CHARS) { stale = true; return "reset"; } // 읽기 전에 거른다 — 하나도 적용하지 않는다
+        try { b = JSON.parse(b); } catch (e) { return false; }
+      }
+      if (!b || typeof b !== "object" || !Array.isArray(b.ops)) return false;
+      if (tooBig(b.ops)) { stale = true; return "reset"; } // 하나도 적용하지 않는다
+      if (b.k === "reset") { clearModel(); stale = false; }
+      for (const op of b.ops) op1(op);
+      queue();
+      return stale ? "reset" : true;
+    }
+    function reset() {
+      clearModel();
+      stale = false;
+      spot.trail = [];
+      laser(-1, 0, 0, false);
+      queue();
+    }
+
+    // ---- 그리기(프레임마다 한 번)
+    function layerOf(i) {
+      let l = layers.get(i);
+      if (l) return l;
+      const pg = m && m.slides()[i];
+      if (!pg) return null;
+      const [W, H] = m.size, dark = slideDark(pg, W, H);
+      l = { pg, hl: svgLayer("ink-hl" + (dark ? " ink-dark" : ""), W, H), pen: svgLayer("ink-pen", W, H), dark };
+      pg.appendChild(l.hl);
+      pg.appendChild(l.pen);
+      layers.set(i, l);
+      return l;
+    }
+    function pathFor(id, s) {
+      let p = paths.get(id);
+      if (!p) { p = document.createElementNS(SVG_NS, "path"); dress(p, s); paths.set(id, p); }
+      return p;
+    }
+    // paintPage 는 장 i 의 SVG 층을 목록에 맞춘다 — 끝난 획만, 목록 차례로(경로 요소는 획마다 하나를 다시 쓴다).
+    function paintPage(i) {
+      const list = lists.get(i);
+      const l = list && list.length ? layerOf(i) : layers.get(i);
+      if (!l) return;
+      l.hl.textContent = "";
+      l.pen.textContent = "";
+      if (list) for (const id of list) {
+        const s = strokes.get(id);
+        if (s && s.done && s.pts.length) (s.tool === "hl" ? l.hl : l.pen).appendChild(pathFor(id, s));
+      }
+    }
+    const scaleNow = () => (m && m.scale()) || 1;
+    function fitCanvas(c, x) {
+      const [W, H] = m.size, k = scaleNow() * (window.devicePixelRatio || 1), bw = Math.round(W * k), bh = Math.round(H * k);
+      if (c.width !== bw || c.height !== bh) { c.width = bw; c.height = bh; }
+      x.setTransform(k, 0, 0, k, 0, 0);
+    }
+    // paintLive 는 끝나지 않은 획을 발표자 paintLive 와 같은 경로·색으로 다시 그린다. canvas 는 가장 늦게 시작한 진행 중 획의 장으로 옮긴다
+    // (발표자는 한 번에 한 획만 그린다 — 다른 장에 남은 진행 중 획은 그 장의 획이 끝나거나 다시 그 장이 될 때 그린다).
+    function paintLive() {
+      liveStale = false;
+      if (!m) return;
+      let last = null;
+      for (const id of live) { const s = strokes.get(id); if (s && s.pts.length && (lists.get(s.page) || []).includes(id)) last = s; }
+      const l = last && layerOf(last.page);
+      if (!l) { if (lctx && liveEl) lctx.clearRect(0, 0, m.size[0], m.size[1]); return; }
+      if (!liveEl) { liveEl = document.createElement("canvas"); lctx = liveEl.getContext ? liveEl.getContext("2d") : null; }
+      const hl = last.tool === "hl";
+      liveEl.className = "ink-live" + (hl ? " ink-live-hl" : "") + (hl && l.dark ? " ink-dark" : "");
+      if (liveEl.parentNode !== l.pg) l.pg.appendChild(liveEl);
+      if (!lctx) return;
+      fitCanvas(liveEl, lctx);
+      lctx.lineCap = "round";
+      lctx.lineJoin = "round";
+      lctx.clearRect(0, 0, m.size[0], m.size[1]);
+      for (const id of lists.get(last.page)) {
+        const s = strokes.get(id);
+        if (!s || s.done || !s.pts.length) continue;
+        const p = new window.Path2D(pathOf(s));
+        lctx.strokeStyle = lctx.fillStyle = COLORS[s.color];
+        if (filled(s)) lctx.fill(p);
+        else { lctx.lineWidth = widthOf(s); lctx.stroke(p); }
+      }
+    }
+    // frame 은 모인 바뀜을 한 번에 그린다. 끝난 획이 그 장 목록의 맨 끝이면 경로 하나만 붙이고(발표자 finish 와 같다), 아니면 그 장을 다시 맞춘다.
+    // 끝난 획을 SVG 로 옮기는 것과 canvas 를 다시 그리는 것이 같은 프레임이라 두 층이 함께 그려지는 틈이나 빈 틈이 없다.
+    function frame() {
+      raf = 0;
+      if (!m) return;
+      for (const id of ended) {
+        const s = strokes.get(id);
+        if (!s || dirty.has(s.page)) continue;
+        const list = lists.get(s.page) || [], l = list[list.length - 1] === id ? layerOf(s.page) : null;
+        if (l) (s.tool === "hl" ? l.hl : l.pen).appendChild(pathFor(id, s));
+        else dirty.add(s.page);
+      }
+      ended.clear();
+      for (const i of dirty) paintPage(i);
+      dirty.clear();
+      if (liveStale) paintLive();
+    }
+    function queue() {
+      if (!m || raf) return;
+      if (window.requestAnimationFrame) raf = window.requestAnimationFrame(frame);
+      else frame();
+    }
+
+    // ---- 레이저: 마지막 값 + 사라지는 꼬리. 발표자 drawLaser 와 같은 색·굵기·크기(화면 px — 배율로 나눈다)다. 지금 장에 있고 쉬는 화면이 아닐 때만 보인다.
+    function laser(i, x, y, line) {
+      const on = Number.isInteger(i) && i >= 0 && i <= V_PAGE && typeof x === "number" && typeof y === "number" && x >= 0 && y >= 0 && x <= V_COORD && y <= V_COORD;
+      // 받을 때도 꼬리를 줄인다 — 수명이 지난 점을 빼고 V_TRAIL 개만 남긴다. 붙지 않은 동안은 꼬리를 쌓지 않고 마지막 위치만 둔다(그릴 프레임이 없다)
+      const now = performance.now();
+      spot.trail = m ? spot.trail.filter(t => now - t.t < t.life) : [];
+      if (!on) spot.at = null;
+      else {
+        // 장이 바뀌면 꼬리를 비운다 — 지금 점이 없어도(꺼짐을 거쳐 넘긴 장) 꼬리 끝 점의 장으로 본다(발표자 slide 도 꼬리를 비운다)
+        const tail = spot.trail[spot.trail.length - 1];
+        if ((spot.at && spot.at.i !== i) || (tail && tail.i !== i)) spot.trail = [];
+        if (m) spot.trail.push({ x, y, t: now, life: line ? LASER_LINE : LASER_TAIL, brk: !spot.at, i });
+        if (spot.trail.length > V_TRAIL) spot.trail.splice(0, spot.trail.length - V_TRAIL);
+        spot.at = { i, x, y };
+      }
+      wakeSpot();
+    }
+    function wakeSpot() { if (m && !spot.raf && window.requestAnimationFrame) spot.raf = window.requestAnimationFrame(drawSpot); }
+    function drawSpot() {
+      spot.raf = 0;
+      if (!m) return;
+      const now = performance.now(), at = spot.at;
+      spot.trail = spot.trail.filter(t => now - t.t < t.life);
+      if (m.paused()) spot.trail = []; // 쉬는 화면 동안의 자취는 남기지 않는다(발표자 drawLaser 와 같다)
+      // 꼬리는 장이 바뀌면 비우지만(laser), 그릴 때도 점마다 장을 본다 — 지금 장의 점만 잇는다
+      const i = m.idx(), pg = m.slides()[i], here = !m.paused() && (at ? at.i === i : spot.trail.some(t => t.i === i));
+      if (!here || !pg) { if (spot.ctx) spot.ctx.clearRect(0, 0, m.size[0], m.size[1]); return; }
+      if (!spot.el) { spot.el = document.createElement("canvas"); spot.el.className = "ink-laser-page"; spot.ctx = spot.el.getContext ? spot.el.getContext("2d") : null; }
+      if (spot.el.parentNode !== pg) pg.appendChild(spot.el);
+      const c = spot.ctx;
+      if (!c) return;
+      fitCanvas(spot.el, c);
+      c.clearRect(0, 0, m.size[0], m.size[1]);
+      const k = scaleNow();
+      c.lineCap = "round";
+      for (let j = 1; j < spot.trail.length; j++) {
+        const a = spot.trail[j - 1], b = spot.trail[j];
+        if (b.brk || a.i !== i || b.i !== i) continue;
+        c.strokeStyle = "rgba(255, 40, 40, " + (0.9 * (1 - (now - b.t) / b.life)).toFixed(3) + ")";
+        c.lineWidth = (b.life === LASER_LINE ? 4 : 3) / k;
+        c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
+      }
+      if (at) {
+        c.fillStyle = "rgba(255, 30, 30, 0.28)";
+        c.beginPath(); c.arc(at.x, at.y, 13 / k, 0, 7); c.fill();
+        c.fillStyle = "rgba(255, 30, 30, 0.95)";
+        c.beginPath(); c.arc(at.x, at.y, 5.5 / k, 0, 7); c.fill();
+      }
+      if (spot.trail.length) wakeSpot();
+    }
+
+    // ---- 붙이기. o = { slides()(장 .page 들 — 장 번호 차례), size: [w, h](설계 px), scale()(화면 배율), idx()(지금 장), paused()(검은 화면 등 — 레이저를 숨긴다) }
+    function unmount() {
+      if (raf && window.cancelAnimationFrame) window.cancelAnimationFrame(raf);
+      if (spot.raf && window.cancelAnimationFrame) window.cancelAnimationFrame(spot.raf);
+      raf = spot.raf = 0;
+      for (const l of layers.values()) { l.hl.remove(); l.pen.remove(); }
+      layers.clear();
+      if (liveEl) liveEl.remove();
+      if (spot.el) spot.el.remove();
+      spot.trail = []; // 붙지 않은 동안은 마지막 위치만 둔다
+      m = null;
+    }
+    function mount(o) {
+      unmount();
+      m = o;
+      for (const i of lists.keys()) dirty.add(i);
+      ended.clear();
+      liveStale = true;
+      queue();
+      wakeSpot();
+    }
+    // resize 는 배율이 바뀐 뒤(fit) — canvas 뒷버퍼를 맞춰 다시 그린다. wake 는 장·쉬는 화면이 바뀐 뒤 — 레이저를 다시 본다.
+    function resize() { if (m) { paintLive(); wakeSpot(); } }
+    // flush 는 기다리는 프레임을 지금 그린다(호스트가 곧바로 화면을 찍을 때).
+    function flush() { if (raf && window.cancelAnimationFrame) window.cancelAnimationFrame(raf); raf = 0; frame(); }
+    // needsReset 은 다시 맞춤을 기다리는가(apply 가 "reset" 을 돌려준 뒤 reset 묶음 전까지)다. held 는 보관량이다(시험·진단용).
+    return { apply, laser, reset, mount, unmount, resize, wake: wakeSpot, flush, ids: i => (lists.get(i) || []).slice(), mounted: () => !!m, needsReset: () => stale,
+      held: () => ({ strokes: strokes.size, points, live: live.size, removed: removed.size, trail: spot.trail.length }) };
   }
 
   // ---- 발표에 붙이기. o = { root, deck, size: [w, h](설계 px), book, slides()(복제된 .page 들), idx(), scale(), paused()(라이트박스·한눈에 보기·검은 화면),
@@ -692,5 +1053,5 @@
       drawing: () => !!(stroke || wiped), held: () => pointer !== null, note: () => note, book };
   }
 
-  window.ItdaInk = { LIMIT, COLORS, WIDTHS, HL_SKIP, newBook, pageOf, room, commit, undo, redo, bookFor, drop, preview, relay, pathOf, filled, hits, parseColor, luminance, slideDark, attach };
+  window.ItdaInk = { LIMIT, COLORS, WIDTHS, HL_SKIP, newBook, pageOf, room, commit, undo, redo, bookFor, drop, preview, relay, view, pathOf, filled, hits, parseColor, luminance, slideDark, attach };
 })();
