@@ -540,6 +540,17 @@
   function go(i, step, dir) { batch(() => goNow(i, step, dir)); }
   const outTimer = new WeakMap(); // 장 → 나가는 장 정리 타이머(goNow)
   function dropOut(s) { const t = outTimer.get(s); if (t !== undefined) { clearTimeout(t); outTimer.delete(s); } }
+  // settleTransition 은 진행 중인 장 넘김 전환을 곧바로 끝낸다(itda-doc#105) — 판서 입력(ink.js onDown)이 좌표를 재기 전에 부른다.
+  // 판서 좌표(ink.js toDesign)는 멈춘 덱 기준이라, 움직이는 장(pr-in·pr-out 의 transform) 위 획은 펜 끝에서 어긋난다. 그래서 지금 장은
+  // pr-in·pr-back 을 떼어 제자리에 두고, 나가는 장은 pr-out·pr-back 을 떼어 숨기며 그 정리 타이머도 지운다 — 보이는 장은 지금 장 하나다.
+  function settleTransition() {
+    const cur = P.slides[P.idx];
+    for (const s of P.slides) {
+      if (s === cur) s.classList.remove("pr-in", "pr-back");
+      else s.classList.remove("pr-out", "pr-back");
+      dropOut(s);
+    }
+  }
   function goNow(i, step, dir) {
     const t0 = performance.now();
     closeLightbox(); // 슬라이드·단계가 바뀌면 라이트박스는 남지 않는다
@@ -1030,7 +1041,7 @@
     if (!I) return;
     ink = I.attach({ root, deck, size: [w, h], book: I.bookFor(opts.inkKey), penOnly: P.penOnly,
       slides: () => P.slides, idx: () => P.idx, scale: () => P.scale, paused: () => !!(P.grid || P.lightbox || P.black),
-      click: inkClick, eatClick: () => { lbEat = true; }, wake });
+      click: inkClick, eatClick: () => { lbEat = true; }, wake, settleTransition });
   }
   // inkClick 은 움직이지 않은 레이저 클릭이다 — 도구가 꺼진 클릭과 같다: 링크가 넘김·크게 보기보다 먼저다. 다만 여는 것은 뒤따르는 click(eatClick)이 아니라
   // 여기다: 레이저는 포인터를 잡고 있어 click 이 링크가 아니라 root 로 올 수 있다. 그 click 은 깃발로 먹는다
