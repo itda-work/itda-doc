@@ -71,6 +71,8 @@ def resolve(path, cwd):
     if "$" in p or "`" in p:
         return None
     if not os.path.isabs(p):
+        if cwd is None:
+            return None
         p = os.path.join(cwd, p)
     # 없는 파일도 다룰 수 있게 부모 디렉터리만 실경로로 푼다
     head, tail = os.path.split(os.path.normpath(p))
@@ -94,7 +96,7 @@ def in_repo(path, cwd, roots):
 
 
 def expand(token, cwd):
-    if any(c in token for c in "*?["):
+    if any(c in token for c in "*?[") and (cwd is not None or os.path.isabs(token)):
         base = token if os.path.isabs(token) else os.path.join(cwd, token)
         hits = glob.glob(os.path.expanduser(base))
         return hits or [token]
@@ -192,8 +194,11 @@ def check(command, cwd, roots):
             continue
         if name in {"cd", "pushd"} and args:
             nxt = resolve(args[0], cwd)
-            if nxt:
-                cwd = os.path.realpath(nxt)
+            if nxt is None:
+                # $VAR 등으로 옮겨 간 곳을 모른다 — 뒤의 상대 경로는 판정하지 않는다
+                cwd = None
+                continue
+            cwd = os.path.realpath(nxt)
             continue
         opts = [a for a in args if a.startswith("-") and a != "-"]
         plain = [a for a in args if not (a.startswith("-") and a != "-")]
