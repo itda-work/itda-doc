@@ -734,6 +734,110 @@ function swipeBy(target, x0, x1, ev) {
   // 청중 열기에는 판서가 없다 — penOnly 를 받지 않는다
   open(w, { penOnly: true, audience: true });
   ok("penOnly + audience: 받지 않는다(pr-pen-only 없음)", !rootOf(w).classList.contains("pr-pen-only") && !P.penOnly);
+  ok("setPenOnly: 청중 열기에는 듣지 않는다(false)", H.setPenOnly(true) === false && !P.penOnly && !rootOf(w).classList.contains("pr-pen-only"));
+  H.stop();
+}
+
+// ---- 10-2. 발표 중 펜만 판서 바꾸기(present.js 머리 주석 「펜만 판서」 setPenOnly): 발표를 다시 열지 않고 판정·클래스가 바뀌고, 장·판서·도구는 그대로다.
+// 진행 중인 획은 바뀌기 전 판정으로 끝까지 가고, 바뀐 판정은 다음 누르기부터다.
+{
+  const w = world(), { P, H } = w;
+  ok("setPenOnly: 발표 밖에서는 듣지 않는다(false)", H.setPenOnly(true) === false && !P.penOnly);
+  open(w, { penOnly: true, inkKey: "live-pen" });
+  const root = rootOf(w), s0 = () => P.slides[P.idx], fin = { pointerType: "touch", pointerId: 2 }, pen = { pointerType: "pen", pointerId: 1 };
+  H.jump(2);
+  key(w, "p", "KeyP");
+  drag(w, s0(), line(100, 100, 6), fin);
+  ok("setPenOnly 앞: 펜만이면 손가락 끌기는 획이 아니다", page(w, 2).length === 0, page(w, 2).length);
+  ok("setPenOnly(false): 적용하면 true, 클래스·P.penOnly·판서 판정이 함께 바뀐다",
+    H.setPenOnly(false) === true && !P.penOnly && !root.classList.contains("pr-pen-only") && w.H.ink().penOnly() === false && rootOf(w) === root);
+  ok("setPenOnly: 장·도구는 그대로다(발표를 다시 열지 않는다)", P.idx === 2 && toolOf(w) === "pen" && P.on);
+  const eaten = drag(w, s0(), line(100, 200, 6), fin);
+  ok("손가락 모드: 손가락 끌기는 획이고 장이 넘어가지 않는다", page(w, 2).length === 1 && P.idx === 2 && eaten, { n: page(w, 2).length, idx: P.idx });
+  // 두 손가락: 첫 손가락이 쥔 동안 둘째 포인터는 획을 만들지 않는다
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 100, clientY: 300 });
+  fire(s0(), "pointerdown", { pointerType: "touch", pointerId: 3, buttons: 1, clientX: 600, clientY: 300 });
+  fire(s0(), "pointermove", { pointerType: "touch", pointerId: 3, buttons: 1, clientX: 650, clientY: 300 });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 140, clientY: 300 });
+  fire(s0(), "pointerup", { pointerType: "touch", pointerId: 3, clientX: 650, clientY: 300 });
+  fire(s0(), "pointerup", { ...fin, clientX: 140, clientY: 300 });
+  ok("손가락 모드: 둘째 손가락은 획을 더 만들지 않는다", page(w, 2).length === 2, page(w, 2).length);
+  // 손가락 획 도중 펜만으로 바꿔도 그 획은 떼기까지 이어진다
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 100, clientY: 400 });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 140, clientY: 400 });
+  H.setPenOnly(true);
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 180, clientY: 400 });
+  ok("획 도중 펜만으로: 쥔 손가락 획은 이어진다(inkHeld 참)", H.inkHeld() === true && w.H.ink().drawing());
+  fire(s0(), "pointerup", { ...fin, clientX: 180, clientY: 400 });
+  const mid = page(w, 2)[page(w, 2).length - 1];
+  ok("획 도중 펜만으로: 떼면 한 획으로 확정된다(점 셋)", page(w, 2).length === 3 && mid.pts.length === 6 && H.inkHeld() === false, { n: page(w, 2).length, pts: mid && mid.pts });
+  drag(w, s0(), line(100, 500, 6), fin);
+  ok("바뀐 뒤 다음 누르기부터 펜만: 손가락 끌기는 획이 아니다", page(w, 2).length === 3, page(w, 2).length);
+  // 리뷰 1회차 [1]: 손가락 획 도중 펜만으로 바꾼 뒤 그 떼기를 놓치고 같은 id 로 새 손가락이 닿는다 — 앞 획만 확정하고 새 접촉은 거부한다
+  H.setPenOnly(false);
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 100, clientY: 450 });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 140, clientY: 450 });
+  H.setPenOnly(true);
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 300, clientY: 450 }); // 떼기(up·cancel·lostpointercapture)를 놓쳤다
+  ok("떼기 놓친 같은 id 의 새 손가락 down: 앞 획은 확정되고 새 접촉은 쥐지 않는다", page(w, 2).length === 4 && !H.inkHeld() && !w.H.ink().drawing(), { n: page(w, 2).length, held: H.inkHeld() });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 340, clientY: 450 });
+  fire(s0(), "pointerup", { ...fin, clientX: 340, clientY: 450 });
+  ok("떼기 놓친 같은 id 의 새 손가락: 펜만이라 획이 늘지 않는다", page(w, 2).length === 4, page(w, 2).length);
+  // 지우개·레이저도 같은 onDown 경계 — 손가락 지우개 도중 펜만으로, 떼기를 놓친 같은 id 의 새 down 은 지우지 않는다
+  H.setPenOnly(false);
+  key(w, "e", "KeyE");
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 900, clientY: 900 }); // 획이 없는 자리 — 지우개 누르기만 쥔다
+  ok("손가락 지우개 누르기를 쥔다(시험 전제)", H.inkHeld() && w.H.ink().drawing());
+  H.setPenOnly(true);
+  const nE = page(w, 2).length;
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 120, clientY: 450 }); // 떼기를 놓친 채 위 획(y 450) 위에 닿는다
+  ok("떼기 놓친 같은 id 의 새 손가락 지우개 down: 앞 입력만 정리되고 새 누르기는 쥐지 않는다", !H.inkHeld() && !w.H.ink().drawing(), { held: H.inkHeld() });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 140, clientY: 450 });
+  fire(s0(), "pointerup", { ...fin, clientX: 140, clientY: 450 });
+  ok("떼기 놓친 같은 id 의 새 손가락 지우개: 펜만이라 지우지 않는다", page(w, 2).length === nE && nE === 4, { n: page(w, 2).length, nE });
+  H.setPenOnly(false);
+  key(w, "l", "KeyL");
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 300, clientY: 300 });
+  ok("손가락 레이저 누르기를 쥔다(시험 전제)", H.inkHeld());
+  H.setPenOnly(true);
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 320, clientY: 300 });
+  ok("떼기 놓친 같은 id 의 새 손가락 레이저 down: 앞 누르기는 거두고 새 누르기는 쥐지 않는다", !H.inkHeld() && P.idx === 2, { held: H.inkHeld(), idx: P.idx });
+  fire(s0(), "pointerup", { ...fin, clientX: 320, clientY: 300 });
+  ok("레이저: 그 떼기도 클릭(넘김)이 되지 않는다", P.idx === 2, P.idx);
+  key(w, "p", "KeyP");
+  ok("펜 도구로 돌아온다(시험 전제)", toolOf(w) === "pen");
+  // 다른 id 의 거부된 손가락은 진행 중인 펜 획을 정리하지 않는다(이미 위 「펜 획 중 손가락」 이 보지만, 같은 id 회수 뒤에도 그대로인지)
+  fire(s0(), "pointerdown", { ...pen, buttons: 1, clientX: 100, clientY: 650 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 140, clientY: 650 });
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 600, clientY: 650 });
+  ok("펜만: 다른 id 의 손가락 down 은 진행 중인 펜 획을 끊지 않는다", H.inkHeld() && w.H.ink().drawing() && page(w, 2).length === 4);
+  fire(s0(), "pointerup", { ...fin, clientX: 600, clientY: 650 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 180, clientY: 650 });
+  fire(s0(), "pointerup", { ...pen, clientX: 180, clientY: 650 });
+  const penOne = page(w, 2)[page(w, 2).length - 1];
+  ok("펜만: 그 펜 획은 하나로 확정된다", page(w, 2).length === 5 && penOne.pts.length === 6, { n: page(w, 2).length, pts: penOne && penOne.pts });
+  // 펜 획 도중 손가락 모드로 바꿔도 그 펜 획은 이어지고, 겹친 손가락은 끼어들지 않는다
+  fire(s0(), "pointerdown", { ...pen, buttons: 1, clientX: 100, clientY: 600 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 140, clientY: 600 });
+  H.setPenOnly(false);
+  fire(s0(), "pointerdown", { ...fin, buttons: 1, clientX: 700, clientY: 300 });
+  fire(s0(), "pointermove", { ...fin, buttons: 1, clientX: 720, clientY: 300 });
+  fire(s0(), "pointerup", { ...fin, clientX: 720, clientY: 300 });
+  fire(s0(), "pointermove", { ...pen, buttons: 1, clientX: 180, clientY: 600 });
+  fire(s0(), "pointerup", { ...pen, clientX: 180, clientY: 600 });
+  const penLine = page(w, 2)[page(w, 2).length - 1];
+  ok("펜 획 도중 손가락 모드로: 펜 획은 하나로 이어지고 손가락은 끼어들지 않는다", page(w, 2).length === 6 && penLine.pts.length === 6, { n: page(w, 2).length, pts: penLine && penLine.pts });
+  ok("바꾸기를 오가도 장·판서가 남는다", P.idx === 2 && page(w, 2).length === 6);
+  H.stop();
+  open(w, { inkKey: "live-pen" });
+  ok("다음 발표는 setPenOnly 를 물려받지 않는다(start 의 o.penOnly)", !P.penOnly && w.H.ink().penOnly() === false && page(w, 2).length === 6);
+  H.stop();
+  open(w, { penOnly: true, inkKey: "live-pen" });
+  ok("다음 발표가 penOnly 로 열면 펜만이다", P.penOnly && w.H.ink().penOnly() === true);
+  H.stop();
+  // 보드 발표에는 판서가 없다
+  H.startBoard({ page: slide([]), ratio: "16:9", onExit() {} });
+  ok("setPenOnly: 보드 발표에는 듣지 않는다(false)", H.setPenOnly(true) === false && !P.penOnly);
   H.stop();
 }
 
