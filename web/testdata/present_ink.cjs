@@ -41,7 +41,16 @@ class El {
   appendChild(k) { if (k.parentNode) k.remove(); k.parentNode = this; this.kids.push(k); return k; }
   remove() { const p = this.parentNode; if (p) { p.kids.splice(p.kids.indexOf(this), 1); this.parentNode = null; } }
   contains(x) { for (let e = x; e; e = e.parentNode) if (e === this) return true; return false; }
-  matches(s) { return s.split(",").some(x => matchOne(this, x)); }
+  // 자손 결합자(빈칸)도 받는다 — 마지막 조각은 이 요소, 앞 조각들은 조상에서 차례로 찾는다(present.js NEXT_COUNTERS 의 ".page-body figcaption")
+  matches(s) {
+    return s.split(",").some(x => {
+      const parts = x.trim().split(/\s+/);
+      if (!matchOne(this, parts.pop())) return false;
+      let e = this.parentNode;
+      while (parts.length) { while (e && !(e.classList && matchOne(e, parts[parts.length - 1]))) e = e.parentNode; if (!e) return false; parts.pop(); e = e.parentNode; }
+      return true;
+    });
+  }
   closest(s) { for (let e = this; e; e = e.parentNode) if (e.matches && e.matches(s)) return e; return null; }
   querySelectorAll(s) { const out = []; const walk = e => { for (const k of e.kids) { if (k.matches(s)) out.push(k); walk(k); } }; walk(this); return out; }
   querySelector(s) { return this.querySelectorAll(s)[0] || null; }
@@ -465,7 +474,7 @@ const playing = s => s.querySelectorAll("figure.chart").filter(f => f.classList.
   H.start({ pages: [slide([]), slide([stepped(1), stepped(2), img()], 2), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {},
     onSlide: (i, n) => slides.push(i), onState: s => states.push(s) });
   const last = () => states[states.length - 1];
-  ok("onState: 열 때 첫 상태를 한 번 보낸다", states.length === 1 && JSON.stringify(last()) === JSON.stringify({ i: 0, step: 0, steps: 0, total: 3, black: false, grid: false, lightbox: false, on: true }), states);
+  ok("onState: 열 때 첫 상태를 한 번 보낸다", states.length === 1 && JSON.stringify(last()) === JSON.stringify({ i: 0, step: 0, steps: 0, total: 3, next: 1, black: false, grid: false, lightbox: false, on: true }), states);
   H.next();
   ok("onState: 장이 바뀌면 한 번(steps 는 그 장의 단계 수)", states.length === 2 && last().i === 1 && last().step === 0 && last().steps === 2, states.length);
   H.next();
@@ -487,7 +496,7 @@ const playing = s => s.querySelectorAll("figure.chart").filter(f => f.classList.
   H.jump(2); H.show({ i: 2, step: 0, black: false });
   ok("onState: 바뀐 것 없는 jump·show 는 부르지 않는다", states.length === 10, states.length);
   H.stop();
-  ok("onState: 끝낼 때 on:false 를 한 번", states.length === 11 && JSON.stringify(last()) === JSON.stringify({ i: 2, step: 0, steps: 0, total: 3, black: false, grid: false, lightbox: false, on: false }), last());
+  ok("onState: 끝낼 때 on:false 를 한 번", states.length === 11 && JSON.stringify(last()) === JSON.stringify({ i: 2, step: 0, steps: 0, total: 3, next: -1, black: false, grid: false, lightbox: false, on: false }), last());
   open(w); H.next(); H.stop();
   ok("onState: 다음 발표(onState 없음)는 지난 onState 를 부르지 않는다", states.length === 11, states.length);
 }
@@ -1286,6 +1295,143 @@ const inkKids = pg => pg.kids.filter(k => /(^| )ink-/.test(k.className)).length;
     world.clock = 0;
     w.raf.length = 0;
   }
+}
+// ---- 13. 발표자 보조(itda-hyve-ios#24 — present.js 머리 주석 「발표자 보조」): 다음 장 미리보기(nextPreview·setNextPreview)·현재 시각(clock·setClock)·
+// onState 의 next. 기본 꺼짐, 다음 장이 바뀔 때만 사본을 바꾸고(연달아 넘김에도 곧바로), 사본은 판서 층·입력 부품·id·움직임을 떼며, 청중·보드에는 없다.
+const marked = (n, kids, steps) => { const p = slide(kids || [], steps); p.dataset.n = String(n); return p; };
+const nextBoxOf = w => rootOf(w).querySelector(".pr-next-box");
+const nextShown = w => { const b = nextBoxOf(w), c = b && b.firstElementChild; return !c ? "비었음" : c.classList.contains("page") ? "장" + c.dataset.n : c.textContent; };
+{
+  const w = world(), { P, H } = w;
+  H.start({ pages: [marked(0), marked(1), marked(2)], notes: [], index: 0, ratio: "16:9", onExit() {} });
+  const root = rootOf(w);
+  ok("보조: 기본은 미리보기·시각 꺼짐(칸은 있으나 비고 클래스가 없다)", !P.nextPreview && !P.clock && !root.classList.contains("pr-next-on") && !root.classList.contains("pr-clock-on")
+    && nextShown(w) === "비었음" && root.querySelector(".pr-clock").textContent === "", { n: nextShown(w) });
+  H.next();
+  ok("보조: 꺼진 동안 넘겨도 사본을 만들지 않는다", nextShown(w) === "비었음", nextShown(w));
+  ok("보조: setNextPreview(true) 는 발표 중 켜고 지금의 다음 장을 담는다", H.setNextPreview(true) === true && root.classList.contains("pr-next-on") && nextShown(w) === "장2", nextShown(w));
+  ok("보조: setClock(true) 는 HH:mm 을 곧바로 적는다", H.setClock(true) === true && root.classList.contains("pr-clock-on") && /^\d\d:\d\d$/.test(root.querySelector(".pr-clock").textContent), root.querySelector(".pr-clock").textContent);
+  H.setNextPreview(false); H.setClock(false);
+  ok("보조: 끄면 클래스를 떼고 사본·시각 글을 비운다", !root.classList.contains("pr-next-on") && !root.classList.contains("pr-clock-on") && nextShown(w) === "비었음" && root.querySelector(".pr-clock").textContent === "", nextShown(w));
+  H.stop();
+  ok("보조: 발표 밖에서는 setNextPreview·setClock 이 false", H.setNextPreview(true) === false && H.setClock(true) === false && !P.nextPreview && !P.clock);
+}
+{
+  const w = world(), { P, H } = w, states = [];
+  H.start({ pages: [marked(0), marked(1, [stepped(1), stepped(2)], 2), marked(2), marked(3)], notes: [], index: 0, ratio: "16:9", onExit() {},
+    nextPreview: true, clock: true, onState: s => states.push(s) });
+  const root = rootOf(w), last = () => states[states.length - 1];
+  ok("보조: start 옵션으로 켜면 첫 장의 다음 장(1)을 담고 시각을 적는다", P.nextPreview && P.clock && root.classList.contains("pr-next-on") && root.classList.contains("pr-clock-on")
+    && nextShown(w) === "장1" && /^\d\d:\d\d$/.test(root.querySelector(".pr-clock").textContent), { n: nextShown(w), c: root.querySelector(".pr-clock").textContent });
+  ok("보조: 미리보기 칸은 노트 칸 안 머리 다음·노트 위이고 aria-hidden·inert 다", (() => { const n = root.querySelector(".pr-notes"), k = n.kids.map(x => x.className); const e = root.querySelector(".pr-next");
+    return k.indexOf("pr-next") === 1 && k.indexOf("pr-notes-body") === 2 && e.attrs["aria-hidden"] === "true" && "inert" in e.attrs && e.inert === true; })(), root.querySelector(".pr-notes").kids.map(x => x.className));
+  ok("onState next: 첫 상태의 next 는 1", last().next === 1, last());
+  H.next();
+  const c1 = nextBoxOf(w).firstElementChild;
+  ok("보조: 단계가 있는 장(1)으로 가면 다음 장(2)", nextShown(w) === "장2" && last().i === 1 && last().next === 2, { n: nextShown(w), s: last() });
+  H.next(); H.next();
+  ok("보조: 장 안 단계를 넘겨도 「다음 단계」 가 아니라 다음 장이고 사본을 다시 만들지 않는다", P.idx === 1 && P.step === 2 && nextShown(w) === "장2" && nextBoxOf(w).firstElementChild === c1 && last().next === 2, { idx: P.idx, step: P.step, same: nextBoxOf(w).firstElementChild === c1 });
+  H.jump(3);
+  ok("보조: 마지막 장이면 「끝」, onState next 는 -1", nextShown(w) === "끝" && nextBoxOf(w).classList.contains("pr-next-end") && last().next === -1, { n: nextShown(w), s: last() });
+  // 빠른 연달아 넘김: 넘김마다 곧바로(동기) 맞는다 — 늦게 따라와 앞 장의 다음 장을 보이지 않는다
+  const seen = [];
+  for (const f of [() => H.jump(0), () => H.next(), () => H.next(), () => H.next(), () => H.next(), () => H.prev(), () => H.jump(2), () => H.prev()]) { f(); seen.push(P.idx + ">" + nextShown(w)); }
+  ok("보조: 연달아 넘겨도 넘김마다 그 장의 다음 장(타이머·프레임을 기다리지 않는다)", seen.every(x => { const [i, n] = x.split(">"); return Number(i) === 3 ? n === "끝" : n === "장" + (Number(i) + 1); }), seen);
+  ok("보조: 사본은 하나뿐", nextBoxOf(w).kids.length === 1, nextBoxOf(w).kids.length);
+  H.stop();
+  ok("보조: 끝내면 깃발을 내리고 다음 발표는 물려받지 않는다", !P.nextPreview && !P.clock);
+  open(w);
+  ok("보조: 다음 발표(옵션 없음)는 꺼진 채", !P.nextPreview && !P.clock && !rootOf(w).classList.contains("pr-next-on") && nextShown(w) === "비었음", nextShown(w));
+  H.stop();
+}
+{
+  // 사본 정리: 덱 장(P.slides)에 발표 중 붙은 판서 층·묻기 막대·코드 복사 단추·id·차트 재생·단계 표식이 사본에 남지 않고, 덱 장은 그대로다
+  const w = world(), { P, H } = w;
+  const btn = new El("button"), a = new El("a"); a.setAttribute("href", "https://example.com/");
+  H.start({ pages: [marked(0), marked(1, [stepped(1), chartFig(), btn, a], 1), marked(2)], notes: [], index: 2, ratio: "16:9", onExit() {}, nextPreview: true });
+  const s1 = P.slides[1];
+  const layer = c => { const e = new El("svg"); e.className = c; return e; };
+  for (const c of ["ink-hl", "ink-pen", "ink-live", "ink-laser-page", "itda-askbar", "itda-codecopy"]) s1.appendChild(layer(c));
+  const body = s1.querySelector(".page-body"), tagged = body.appendChild(new El("div")); tagged.setAttribute("id", "dup");
+  body.querySelector("figure").classList.add("chart-play");
+  body.querySelector("p").classList.add("pr-pending");
+  H.jump(0);
+  const c = nextBoxOf(w).firstElementChild;
+  const left = [".ink-hl", ".ink-pen", ".ink-live", ".ink-laser-page", ".itda-askbar", ".itda-codecopy", "[id]", ".chart-play", ".pr-pending", ".pr-shown"].filter(s => c.querySelector(s));
+  ok("보조 사본: 판서 층·입력 부품·id·차트 재생·단계 표식이 없다(다 나타난 모습)", nextShown(w) === "장1" && left.length === 0 && c.classList.contains("pr-static") && !c.classList.contains("pr-cur"), left);
+  ok("보조 사본: 단추·링크는 포커스 차례에서 빠진다", c.querySelector("button").attrs.tabindex === "-1" && c.querySelector("a").attrs.tabindex === "-1");
+  ok("보조 사본: 덱의 장은 건드리지 않는다", !!s1.querySelector(".ink-pen") && !!s1.querySelector("[id]") && !s1.querySelector("button").attrs.tabindex, Object.keys(s1.querySelector("button").attrs));
+  // 크기: 노트 칸이 숨어 있으면 맞추지 않고, 보이면 칸 너비에 맞춰 줄인다(가짜 DOM 의 clientWidth 를 칸 너비로 쓴다)
+  ok("보조 크기: 노트를 접은 동안은 배율을 걸지 않는다", !c.style.transform, c.style.transform);
+  nextBoxOf(w).clientWidth = 320;
+  H.setNotes(true);
+  ok("보조 크기: 노트를 펴면 칸 너비에 맞춘다(320/1280 — 높이 180px·scale(0.25))", nextBoxOf(w).style.height === "180px" && c.style.transform === "scale(0.25)", { h: nextBoxOf(w).style.height, t: c.style.transform });
+  nextBoxOf(w).clientWidth = 640;
+  H.setDock(true);
+  ok("보조 크기: 칸 너비가 바뀌면(relayout) 다시 맞춘다", nextBoxOf(w).style.height === "360px" && c.style.transform === "scale(0.5)", { h: nextBoxOf(w).style.height, t: c.style.transform });
+  H.next(); // 장 1 — 다음 장 2 의 새 사본도 지금 칸 너비로 곧바로 맞춘다
+  ok("보조 크기: 새 사본도 곧바로 맞춘다", nextShown(w) === "장2" && nextBoxOf(w).firstElementChild.style.transform === "scale(0.5)", nextBoxOf(w).firstElementChild.style.transform);
+  H.stop();
+}
+{
+  // 그림·표 번호(1회차 리뷰 [1]): 미리보기 상자는 독립 카운터 범위이고, 덱에서 다음 장 앞까지의 캡션 수로 시작한다(base.css 의 증가 선택자와 같은 것만 센다).
+  // 가짜 DOM 은 CSS 카운터를 계산하지 않는다 — 상자의 counter-reset 글을 본다(실제 번호는 앱 WebKit E2E 몫)
+  const w = world(), { P, H } = w;
+  const cap = (tag, inner) => { const f = new El(tag); f.appendChild(new El(inner)); return f; };
+  const fig = () => cap("figure", "figcaption"), tbl = () => cap("table", "caption");
+  const s0 = marked(0, [fig(), fig(), tbl()]);
+  const stray = s0.appendChild(new El("div")); stray.appendChild(new El("figcaption")); // 장 본문(.page-body) 밖 — base.css 규칙이 세지 않는다
+  const hidden = fig(); hidden.dataset.step = "1"; // 아직 나타나지 않은 단계(visibility hidden)도 카운터는 오른다
+  H.start({ pages: [s0, marked(1, [hidden], 1), marked(2, [tbl()]), marked(3, [tbl(), fig()])], notes: [], index: 0, ratio: "16:9", onExit() {}, nextPreview: true });
+  const cr = () => nextBoxOf(w).style["counter-reset"];
+  ok("보조 번호: 첫 장 → 다음 장(1) 앞 캡션 수(본문 밖 figcaption 은 빼고)", nextShown(w) === "장1" && cr() === "fig 2 tbl 1", cr());
+  H.next();
+  ok("보조 번호: 장 1 → 다음 장(2) 앞 — 단계 장의 아직 숨은 캡션도 센다", P.idx === 1 && P.step === 0 && cr() === "fig 3 tbl 1", cr());
+  H.next();
+  ok("보조 번호: 단계만 넘기면 그대로", P.step === 1 && cr() === "fig 3 tbl 1", cr());
+  H.next();
+  ok("보조 번호: 장 2 → 다음 장(3) 앞", P.idx === 2 && cr() === "fig 3 tbl 2", cr());
+  H.jump(0);
+  ok("보조 번호: 되돌아가면 다시 맞춘다", cr() === "fig 2 tbl 1", cr());
+  ok("보조 번호: 덱·장의 카운터는 건드리지 않는다", P.slides.every(s => !s.style["counter-reset"]) && !rootOf(w).querySelector(".pr-deck").style["counter-reset"]);
+  H.stop();
+}
+{
+  // 2회차 리뷰 [1]: 배치되지 않은 캡션(display: none — 예: 결재란 캡션)은 카운터를 올리지 않으므로 세지 않는다. 판정은 브라우저의 getClientRects 다
+  // (가짜 DOM 에서는 그 함수를 단 요소만 판정한다 — 없으면 센다). 장별 수는 발표 동안 한 번만 잰다(같은 장을 다시 재지 않는다)
+  const w = world(), { H } = w;
+  // data-boxes 를 단 요소에만 getClientRects 를 준다(복제에도 따라간다 — 덱은 사본이다). 다른 시험의 요소는 지금처럼 그 함수가 없다
+  let asked = 0;
+  Object.defineProperty(El.prototype, "getClientRects", { configurable: true, get() { return "boxes" in this.dataset ? () => { asked++; return new Array(Number(this.dataset.boxes)); } : undefined; } });
+  const cap = (tag, inner, boxes) => { const f = new El(tag), c = f.appendChild(new El(inner)); c.dataset.boxes = String(boxes); return f; };
+  const s0 = marked(0, [cap("table", "caption", 0), cap("table", "caption", 1), cap("figure", "figcaption", 0)]);
+  H.start({ pages: [s0, marked(1, [cap("table", "caption", 1)]), marked(2), marked(3)], notes: [], index: 0, ratio: "16:9", onExit() {}, nextPreview: true });
+  const cr = () => nextBoxOf(w).style["counter-reset"];
+  ok("보조 번호: 상자가 없는 캡션(display: none)은 세지 않고 상자가 있는 것만 센다", cr() === "fig 0 tbl 1", cr());
+  H.next(); H.next();
+  ok("보조 번호: 장 2 앞까지 — 앞 장들의 배치된 캡션만", cr() === "fig 0 tbl 2", cr());
+  const n0 = asked;
+  H.jump(0); H.jump(2);
+  ok("보조 번호: 이미 잰 장은 다시 재지 않는다(장별 캐시)", asked === n0 && cr() === "fig 0 tbl 2", { asked, n0 });
+  H.stop();
+  H.start({ pages: [s0, marked(1), marked(2)], notes: [], index: 0, ratio: "16:9", onExit() {}, nextPreview: true });
+  ok("보조 번호: 새 발표는 캐시를 버리고 다시 잰다", asked > n0 && cr() === "fig 0 tbl 1", { asked, n0 });
+  H.stop();
+}
+{
+  // 청중 열기·보드 발표에는 없다
+  const w = world(), { P, H } = w;
+  H.start({ pages: [marked(0), marked(1)], notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true, nextPreview: true, clock: true });
+  const root = rootOf(w);
+  ok("보조: 청중 열기는 옵션을 줘도 미리보기·시각이 없고 set* 은 false", !P.nextPreview && !P.clock && !root.querySelector(".pr-next") && !root.querySelector(".pr-clock")
+    && !root.classList.contains("pr-next-on") && H.setNextPreview(true) === false && H.setClock(true) === false);
+  H.show({ i: 1 });
+  ok("보조: 청중 넘김에도 미리보기가 생기지 않는다", !root.querySelector(".pr-next-box"));
+  H.stop();
+  const pg = new El("div"); pg.className = "page";
+  w.H.startBoard({ page: pg, ratio: "16:9", onExit() {} });
+  ok("보조: 보드 발표에는 없고 set* 은 false", !rootOf(w).querySelector(".pr-next") && !rootOf(w).querySelector(".pr-clock") && H.setNextPreview(true) === false && H.setClock(true) === false && !P.nextPreview);
+  H.stop();
 }
 // 발표자 화면과 청중 화면의 끝난 획 SVG 경로가 같다 — 같은 relay 연산에서 같은 path d(펜·형광펜·필압·지우개·되돌리기·다시 실행·전부 지우기).
 // relay 는 앞 묶음의 Promise 가 풀린 뒤 다음을 보내므로 마이크로태스크를 돌린다(pump).
