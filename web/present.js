@@ -19,9 +19,11 @@
 //     display 는 바꾸지 않아 층 안의 크기 재기가 그대로다), 끝나면 뗀다. 호스트는 이 클래스로 가림을 안다(syncOverlay). 자손의 인라인
 //     visibility !important 는 이 가림을 이긴다(CSS 우선순위) — 층 안에서는 쓰지 않는다. 발표가 끝나면 클래스는 떼고 층 요소는 지우지 않는다.
 // 두 화면 발표(itda-doc#95) — 발표자 화면과 청중 화면을 따로 띄우는 호스트를 위한 세 가지(슬라이드 발표 start 에만, 보드 발표에는 없다):
-//   o.onState(s)        보이는 상태 s = { i, step, steps, total, black, grid, lightbox, on } 가 바뀔 때마다 한 번 부른다(emitState) — 장·단계·
+//   o.onState(s)        보이는 상태 s = { i, step, steps, total, next, black, grid, lightbox, on } 가 바뀔 때마다 한 번 부른다(emitState) — 장·단계·
 //                       검은 화면·한눈에 보기·크게 보기·열림. 직전에 보낸 값과 같으면 부르지 않는다. 열 때 첫 상태를 한 번, 끝낼 때 on:false 를 한 번
 //                       보낸다(끝의 black·grid·lightbox 는 false). lightbox 는 크게 보기가 열렸는가(참·거짓)다. onSlide 는 그대로다.
+//                       next 는 다음 장 번호(i+1 — 지금 장이 마지막이면 -1)다. 단계가 남아도 다음 「장」 이다(아래 「발표자 보조」 의 미리보기와 같은 장 —
+//                       호스트가 그 장의 그림을 뜰 때 쓴다). i 에서 정해지므로 next 만 바뀌어 따로 알리는 일은 없다.
 //   o.audience = true   청중(따라가기) 열기 — 덱·전환·fit·검은 화면 층만 만든다. 노트·목차·아래 줄(HUD)·번호 이동·한눈에 보기·크게 보기·판서를 만들지
 //                       않고, 키·마우스·커서 깨우기 리스너를 걸지 않는다(커서는 늘 숨긴다 — present.css .pr-audience). 덱 사본에 딸려 온 단추·링크·입력
 //                       (묻기 막대·코드 복사 단추 등)은 입력이 아니다: 덱에 inert 를 달고(WebKit 동작은 미검증), 포커스 차례에서 빼며(tabindex -1),
@@ -67,6 +69,19 @@
 //     돌려준다(적용하면 true). 다음 발표는 물려받지 않는다(start 의 o.penOnly 가 정한다). onState 의 보이는 상태에는 넣지 않는다 — 청중 화면이 쓰는
 //     값이 아니고, 바꾼 것은 부른 호스트가 안다(P.penOnly 로도 읽는다).
 //   ItdaPresent.inkHeld()  판서 입력(포인터를 쥔 획·지우개·레이저 누르기)이 진행 중인가 — penOnly 면 펜 입력뿐이다. 발표 밖·판서가 없으면 거짓.
+// 발표자 보조 — 두 화면 발표의 발표자 화면을 위한 두 가지(슬라이드 발표 start 에만, 청중 열기·보드 발표에는 없다). 둘 다 기본 꺼짐이다.
+//   o.nextPreview = true · ItdaPresent.setNextPreview(b)  다음 장 미리보기 — 노트 칸 머리 아래·노트 위의 「다음」 칸에 다음 장(i+1)의 축소 사본을 둔다.
+//                       단계가 남았어도 다음 「단계」 가 아니라 다음 장이고, 사본은 다 나타난 모습이다(한눈에 보기 사본과 같다). 마지막 장이면 「끝」 이다.
+//                       노트 칸 안이라 노트를 접으면 함께 숨는다. 사본은 하나만 두고 다음 장 번호가 바뀔 때만 넘김 안에서 곧바로 바꾼다(빠른 연달아 넘김에도
+//                       늦게 따라오지 않는다 — 단계만 바뀌면 그대로). 사본은 판서 층·묻기 막대·코드 복사 단추를 떼고, id 를 지우며, 칸에 aria-hidden·inert 를
+//                       달고 그 안의 포커스 가능한 것을 포커스 차례에서 뺀다(tabindex -1). 차트 재생 클래스를 떼고 움직임을 끈다(present.css .pr-thumb).
+//                       판서는 넣지 않는다. 노트 칸 너비가 바뀌면 칸 너비에 맞춰 다시 줄인다(relayout). 그림·표 번호(CSS 카운터 fig·tbl)는 상자에 독립
+//                       범위를 두고 덱에서 다음 장 앞까지의 캡션 수로 시작해 덱의 번호와 같게 한다(NEXT_COUNTERS — 덱·원문 카운터는 건드리지 않는다).
+//                       캡션은 브라우저가 실제로 배치한 것만 센다(display: none 은 빠지고 visibility: hidden 은 남는다 — laidOut).
+//   o.clock = true · ItdaPresent.setClock(b)  아래 줄(HUD)의 경과 시간 옆에 현재 시각(HH:mm — 기기 시각, 24시간)을 보인다(.pr-clock — present.css 는
+//                       #present.pr-clock-on 일 때만 보인다). 경과 시간과 같은 타이머(tick)로 고친다.
+//   setNextPreview·setClock 은 발표를 다시 열지 않고 바꾼다 — 슬라이드 발표 중에만 듣고(발표 밖·보드 발표·청중 열기면 false), 적용하면 true. 다음 발표는
+//   물려받지 않는다(start 의 o 가 정한다). P.nextPreview·P.clock 으로 읽는다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
 // 묻기 넘침 안내 상자(.itda-asknote — ask.js NOTE)는 겹침 층이고, 그 안에 포커스가 있으면 Esc 밖의 키를 양보한다(askNoteKey — 가린 동안은 아니다).
@@ -103,6 +118,8 @@
   let root, deck, gridEl, notesBody, numEl, timeEl, barEl, gotoEl, fsVal, timer = 0, idleT = 0, digits = "", onExit = null, onSlide = null, sentIdx = -1;
   let opts = {}, notesEl = null, dockBtn = null, cardRO = null, dragEnd = null, lb = null, lbEl = null, lbEat = false, linkDown = null;
   let tocEl = null, tocBody = null, tocDockBtn = null, tocItems = [];
+  // 발표자 보조(머리 주석) — 다음 장 미리보기 칸·축소 상자·지금 담은 장 번호(-1 끝, -2 비었음)·현재 시각 칸
+  let nextEl = null, nextBox = null, nextAt = -2, clockEl = null;
   let ink = null; // 판서(ink.js) — 슬라이드 발표에만 붙는다. 보드 발표에는 없다
   // 받아 그리는 판서(ink.js view — itda-doc#108). 청중 열기에만 붙인다(inkMounted). 모델은 발표를 닫아도 남는다 — 청중 화면을 다시 열면 그대로 그린다
   let inkView = null, inkMounted = false;
@@ -141,8 +158,10 @@
   // stateOf 는 보이는 상태(머리 주석 「두 화면 발표」 onState)다.
   function stateOf() {
     const i = P.idx;
-    return { i, step: P.step, steps: P.slides[i] ? stepsOf(i) : 0, total: P.slides.length, black: !!P.black, grid: !!P.grid, lightbox: !!P.lightbox, on: !!P.on };
+    return { i, step: P.step, steps: P.slides[i] ? stepsOf(i) : 0, total: P.slides.length, next: nextIndex(), black: !!P.black, grid: !!P.grid, lightbox: !!P.lightbox, on: !!P.on };
   }
+  // nextIndex 는 다음 장 번호다 — 마지막 장이면 -1(머리 주석 「두 화면 발표」 onState 의 next).
+  function nextIndex() { return P.idx + 1 < P.slides.length ? P.idx + 1 : -1; }
   // emitState 는 보이는 상태가 지난번 보낸 것과 다르면 onState 로 보낸다. 묶음(batch) 안·첫 장을 보이기 전·보드 발표에는 보내지 않는다.
   function emitState() {
     if (!onState || hold || !P.on || P.board || !P.entered) return;
@@ -170,7 +189,8 @@
   //   noteDock(참이면 오른쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), onNoteDock(dock)(머리 단추로 바꿀 때),
   //   tocDock(참이면 목차를 왼쪽에 붙인 칸 — 없거나 거짓이면 떠 있는 카드), tocW(목차 칸 너비 % — 없으면 22),
   //   onToc(dock, w)(목차 붙이기·띄우기를 바꿀 때, 너비 끌기를 놓을 때), inkKey(판서가 딸린 탭 id — ink.js bookFor),
-  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때), onState(s)·audience(머리 주석 「두 화면 발표」), penOnly(머리 주석 「펜만 판서」) }
+  //   onLink(href)(지금 슬라이드의 외부 링크·# 링크를 눌렀을 때), onState(s)·audience(머리 주석 「두 화면 발표」), penOnly(머리 주석 「펜만 판서」),
+  //   nextPreview·clock(머리 주석 「발표자 보조」) }
   // onSlide(i, total) 는 슬라이드 번호가 바뀔 때마다(첫 슬라이드 포함 — 단계만 바뀌면 부르지 않는다), 끝낼 때 onExit 뒤 (-1, total) 로 부른다.
   function start(o) {
     if (P.on) return;
@@ -178,6 +198,10 @@
     opts = o;
     P.audience = !!o.audience;
     P.penOnly = !!o.penOnly && !P.audience; // 청중 열기에는 판서가 없다
+    P.nextPreview = !!o.nextPreview && !P.audience; // 발표자 보조는 발표자 화면에만(머리 주석)
+    P.clock = !!o.clock && !P.audience;
+    nextAt = -2;
+    capCache = []; // 미리보기 번호용 장별 캡션 수(capsOf) — 새 덱이다
     onState = typeof o.onState === "function" ? o.onState : null;
     sentState = "";
     hold = 0;
@@ -200,7 +224,7 @@
     onExit = o.onExit;
     onSlide = o.onSlide || null;
     sentIdx = -1;
-    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : "") + (P.audience ? " pr-audience" : "") + (P.penOnly ? " pr-pen-only" : ""));
+    root = el("div", "present t-" + P.transition + (P.noteDock ? " pr-dock" : "") + (P.tocDock ? " pr-toc-dock" : "") + (P.audience ? " pr-audience" : "") + (P.penOnly ? " pr-pen-only" : "") + (P.nextPreview ? " pr-next-on" : "") + (P.clock ? " pr-clock-on" : ""));
     root.id = "present";
     const stage = root.appendChild(el("div", "pr-stage"));
     deck = stage.appendChild(el("div", "pr-deck pages slides " + (o.ratio === "4:3" ? "r43" : "r169")));
@@ -245,6 +269,7 @@
     fsVal = head.appendChild(el("span", "pr-fs-val"));
     fsBtn("A+", 1, "노트 글자 크게(+)");
     paintFont();
+    buildNext(notes, w, h); // 머리 아래·노트 위
     notesBody = notes.appendChild(el("div", "pr-notes-body"));
     const grip = root.appendChild(el("div", "pr-notes-grip"));
     grip.title = "끌어 노트 너비 바꾸기 — 두 번 누르면 기본 너비";
@@ -260,6 +285,8 @@
     if (nNoted) P.slides.forEach((_, i) => { if (hasNote(i)) { const t = bar.appendChild(el("b", "pr-tick")); t.style.left = ((i + 0.5) / P.slides.length * 100).toFixed(3) + "%"; } });
     numEl = hud.appendChild(el("span", "pr-num"));
     timeEl = hud.appendChild(el("span", "pr-time", "00:00"));
+    clockEl = hud.appendChild(el("span", "pr-clock")); // 현재 시각 — pr-clock-on 일 때만 보인다(머리 주석 「발표자 보조」)
+    clockEl.title = "현재 시각";
     shareEl = hud.appendChild(el("span", "pr-share", shareSummary));
     hud.appendChild(el("span", "pr-hint", "← → 넘기기 · 번호 Enter 이동 · G 한눈에 · T 목차(⇧D 붙이기/띄우기) · N 노트(+/− 글자 · D 붙이기/띄우기 · 머리 끌어 옮기기) · 그림·표 클릭 크게 · B 검은 화면 · L 레이저 · P 펜 · H 형광펜 · E 지우개(켠 동안 X 전부 지우기 · C 색 · ⌘Z 되돌리기) · Esc 끝"));
     gotoEl = root.appendChild(el("div", "pr-goto"));
@@ -285,7 +312,7 @@
     window.addEventListener("auxclick", eatClick, true);
     // 카드 높이는 내용·글자 크기를 따른다 — 바뀌면 화면 안에 다시 가두고 경계(grip)를 맞춘다
     // 목차 카드 높이도 같다
-    if (window.ResizeObserver) { cardRO = new ResizeObserver(() => { layoutCard(); layoutToc(); }); cardRO.observe(notes); cardRO.observe(tocEl); }
+    if (window.ResizeObserver) { cardRO = new ResizeObserver(() => { layoutCard(); layoutToc(); fitNext(); }); cardRO.observe(notes); cardRO.observe(tocEl); }
     document.addEventListener("keydown", onKey, true);
     root.addEventListener("mousemove", wake);
     root.addEventListener("mousedown", onMouse);
@@ -300,6 +327,7 @@
   // 한눈에 보기·크게 보기·판서 입력은 만들지 않고(받은 판서는 inkView 가 그린다) 키·마우스·커서 깨우기 리스너도 걸지 않는다. 지난 발표가 남긴 부품 참조는 비워 go·stop 이 건너뛰게 한다.
   function startAudience(w, h) {
     notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
+    nextEl = nextBox = clockEl = null;
     lb = lbEl = null;
     tocItems = [];
     // 덱 사본의 단추·입력·링크(묻기 막대·코드 복사 단추 등)는 청중 화면에서 입력이 아니다: 덱을 inert 로 두고(지원하는 웹뷰), 지원하지 않아도
@@ -342,6 +370,8 @@
     P.board = true;
     P.audience = false; // 두 화면 발표(onState·audience·show)는 슬라이드 발표에만 있다
     P.penOnly = false; // 보드 발표에는 판서가 없다
+    P.nextPreview = P.clock = false; // 발표자 보조도 없다
+    nextEl = nextBox = clockEl = null;
     onState = null;
     opts = o;
     P.slides = [];
@@ -454,7 +484,7 @@
     root.remove(); // 겹침 층(호스트 요소)은 root 밖이라 남는다
     document.body.classList.remove("presenting");
     syncOverlay(); // P.on 이 내려가 가림 클래스를 뗀다
-    const at = P.idx, total = P.slides.length, last = { i: at, step: P.step, steps: P.slides[at] ? stepsOf(at) : 0, total, black: false, grid: false, lightbox: false, on: false };
+    const at = P.idx, total = P.slides.length, last = { i: at, step: P.step, steps: P.slides[at] ? stepsOf(at) : 0, total, next: nextIndex(), black: false, grid: false, lightbox: false, on: false };
     // 끝낼 발표의 콜백을 지역으로 쥐고, 공유 상태 정리를 콜백 앞에 끝낸다 — 콜백(onExit·onSlide·onState) 안에서 새 발표를 열어도
     // 그 발표의 콜백·상태·부품을 이 발표의 끝 처리가 건드리지 않는다. 끝 알림(onState on:false)은 첫 상태를 보낸 발표에만 한 번이다.
     const exitCb = onExit, slideCb = onSlide, stateCb = onState && sentState ? onState : null;
@@ -463,6 +493,9 @@
     sentState = "";
     P.audience = false;
     notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
+    nextEl = nextBox = clockEl = null;
+    nextAt = -2;
+    P.nextPreview = P.clock = false;
     lb = lbEl = null;
     if (exitCb) exitCb(at);
     if (slideCb) slideCb(-1, total);
@@ -522,7 +555,7 @@
     root.style.setProperty("--pr-toc-w", e.t + "%");
   }
   // relayout 은 칸 너비·켬·도킹·창 크기가 바뀐 뒤 한 번에 다시 놓는다: 실제 너비 → 슬라이드 맞춤 → 떠 있는 카드 가두기.
-  function relayout() { if (P.board) { fitBoard(); return; } applyWidths(); fit(); layoutCard(); layoutToc(); }
+  function relayout() { if (P.board) { fitBoard(); return; } applyWidths(); fit(); layoutCard(); layoutToc(); fitNext(); }
 
   // fit 은 슬라이드를 화면(노트를 오른쪽에·목차를 왼쪽에 붙였으면 남은 자리 — 떠 있는 카드면 화면 전체)에 비율을 지켜 맞춘다.
   function fit() {
@@ -542,6 +575,81 @@
     const t = Math.floor((Date.now() - P.started) / 1000);
     const mm = String(Math.floor(t / 60)).padStart(2, "0"), ss = String(t % 60).padStart(2, "0");
     timeEl.textContent = (t >= 3600 ? Math.floor(t / 3600) + ":" : "") + mm + ":" + ss;
+    if (clockEl && P.clock) clockEl.textContent = clockText(new Date());
+  }
+  // clockText 는 현재 시각 글(HH:mm, 24시간 — 머리 주석 「발표자 보조」)이다.
+  function clockText(d) { return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); }
+
+  // ---- 다음 장 미리보기(머리 주석 「발표자 보조」). 칸은 노트 칸 안(머리 아래)에 늘 만들고, 보이기는 pr-next-on(present.css)이다.
+  // 상자는 한눈에 보기 썸네일(.pr-thumb)과 같은 규칙으로 사본을 그린다 — 덱 밖이라 쪽 크기 변수를 상자에 건다(한눈에 보기 칸과 같다).
+  // 사본에서 떼는 것: 판서 층(발표자의 판서를 미리보기에 넣지 않는다)·묻기 막대·코드 복사 단추(입력 부품)
+  const NEXT_DROP = ".ink-hl, .ink-pen, .ink-live, .ink-laser-page, .ink-preview, .itda-askbar, .itda-codecopy";
+  // 장을 넘어 이어지는 CSS 카운터 — 이름과 그 카운터를 올리는 요소의 선택자. base.css 의 증가 규칙과 정확히 같은 선택자다:
+  //   fig ← `.page-body figcaption::before { counter-increment: fig }`(base.css 388 부근), tbl ← `.page-body caption::before { counter-increment: tbl }`(678 부근).
+  //   둘의 시작은 `.pages { counter-reset: fig tbl }`(384 부근 — 덱 .pr-deck.pages 가 이것을 받는다). base.css 의 다른 카운터(list-item)는 목록마다 새로
+  //   세므로 장을 넘지 않는다. base.css 에 장을 넘는 카운터를 더하면 여기에도 더한다(present_test.go TestPresentCountersCSS 가 묶는다).
+  // 사본만 따로 두면 앞 장의 캡션 수를 잃어 「그림 1.」 부터 다시 센다 — 미리보기 상자에 독립 범위를 두고 다음 장 앞까지의 수로 시작한다(paintNext).
+  const NEXT_COUNTERS = [["fig", ".page-body figcaption"], ["tbl", ".page-body caption"]];
+  // 「카운터를 올리는 캡션」 = 증가 선택자에 맞고 브라우저가 실제로 배치한 것(getClientRects 가 하나 이상)이다. CSS 숨김 규칙을 여기서 흉내 내지 않는다:
+  //   덱의 장은 visibility: hidden 으로 숨는다(present.css 28 부근 `.pr-deck .page { … visibility: hidden }`) — 배치는 살아 있어 지금 장이 아닌 장·아직
+  //   나타나지 않은 단계(visibility hidden)의 캡션은 상자가 있고 카운터도 오른다. 자신이나 조상이 display: none 인 캡션(예: 결재란 캡션 — base.css)은
+  //   상자도 ::before 도 없어 카운터가 오르지 않고 여기서도 빠진다. 판정은 브라우저 몫이라 개별 예외를 적지 않는다.
+  //   getClientRects 가 없는 환경(시험의 가짜 DOM)은 선택자에 맞는 것을 모두 센다 — 실제 판정은 호스트 앱의 WebKit 시험이 본다.
+  const laidOut = x => typeof x.getClientRects !== "function" || x.getClientRects().length > 0;
+  // capCache[i] 는 장 i 의 카운터별 수다 — 발표마다 새로(start). 발표 동안 덱은 바뀌지 않는다(문서 갱신은 새 발표의 새 덱이다)
+  let capCache = [];
+  function capsOf(i) {
+    if (!capCache[i]) capCache[i] = NEXT_COUNTERS.map(([, sel]) => { let k = 0; for (const x of P.slides[i].querySelectorAll(sel)) if (laidOut(x)) k++; return k; });
+    return capCache[i];
+  }
+  // countersBefore 는 덱에서 장 n 앞(0~n−1 장)까지 각 카운터를 올리는 캡션 수로 만든 counter-reset 글이다(예: "fig 3 tbl 1").
+  function countersBefore(n) {
+    const sum = NEXT_COUNTERS.map(() => 0);
+    for (let i = 0; i < n; i++) capsOf(i).forEach((k, j) => { sum[j] += k; });
+    return NEXT_COUNTERS.map(([name], j) => name + " " + sum[j]).join(" ");
+  }
+  function buildNext(notes, w, h) {
+    nextEl = notes.appendChild(el("div", "pr-next"));
+    nextEl.setAttribute("aria-hidden", "true"); // 읽어 주지 않는다 — 미리 보는 그림이다
+    nextEl.setAttribute("inert", "");
+    nextEl.inert = true;
+    nextEl.appendChild(el("div", "pr-next-label", "다음"));
+    nextBox = nextEl.appendChild(el("div", "pr-thumb pr-next-box"));
+    nextBox.style.setProperty("--page-w", w + "px");
+    nextBox.style.setProperty("--page-h", h + "px");
+  }
+  // paintNext 는 미리보기를 지금 장의 다음 장으로 맞춘다 — 담은 장과 같으면 아무것도 하지 않는다(단계 넘김·같은 장). 꺼져 있으면 비운다.
+  // 넘김(goNow) 안에서 곧바로(동기) 부르므로 연달아 넘겨도 마지막 장의 다음 장이 남는다.
+  function paintNext() {
+    if (!nextBox) return;
+    if (!P.nextPreview) { if (nextAt !== -2) { nextBox.textContent = ""; nextAt = -2; } return; }
+    const n = nextIndex();
+    if (n === nextAt) return;
+    nextAt = n;
+    nextBox.textContent = "";
+    nextBox.classList.toggle("pr-next-end", n < 0);
+    if (n < 0) { nextBox.appendChild(el("span", "pr-next-end-t", "끝")); fitNext(); return; }
+    const c = P.slides[n].cloneNode(true);
+    c.classList.remove("pr-cur", "pr-out", "pr-in", "pr-back");
+    c.classList.add("pr-static");
+    for (const x of c.querySelectorAll(NEXT_DROP)) x.remove();
+    for (const x of c.querySelectorAll(".pr-pending, .pr-shown, .chart-play, .chart-wait")) x.classList.remove("pr-pending", "pr-shown", "chart-play", "chart-wait");
+    for (const x of c.querySelectorAll("[id]")) x.removeAttribute("id"); // 덱 사본에서 이미 지웠지만 뒤에 붙은 것이 있어도 겹치지 않게
+    for (const x of c.querySelectorAll(FOCUSABLE)) x.setAttribute("tabindex", "-1");
+    // 그림·표 번호: 상자가 새 카운터 범위다(덱·원문 카운터는 건드리지 않는다) — 사본의 첫 캡션이 덱의 같은 캡션과 같은 번호가 되게 앞 장까지의 수로 시작한다
+    nextBox.style.setProperty("counter-reset", countersBefore(n));
+    nextBox.appendChild(c);
+    fitNext();
+  }
+  // fitNext 는 미리보기 상자를 노트 칸 너비에 맞춘다(높이는 쪽 비율, 사본은 같은 배율로 줄인다). 칸이 숨어 너비가 0 이면 다음에 보일 때(relayout) 맞춘다.
+  function fitNext() {
+    if (!nextBox || !P.nextPreview || !P.showNotes || !deck) return;
+    const bw = nextBox.clientWidth;
+    if (!bw) return;
+    const w = parseFloat(deck.style.width), h = parseFloat(deck.style.height), s = bw / w;
+    nextBox.style.height = Math.round(h * s) + "px";
+    const c = nextBox.firstElementChild;
+    if (c && c.classList.contains("page")) c.style.transform = "scale(" + s + ")";
   }
 
   // wake 는 마우스·HUD 를 보이고 2초 뒤 숨긴다. 판서 도구가 켜진 동안은 숨기지 않는다.
@@ -635,6 +743,7 @@
       // 노트 칸을 매 슬라이드 다시 만들므로 복사 단추도 매번 다시 붙인다(ItdaCodeCopy 가 있을 때) — 노트 코드의 조각 범위는 이 칸 안
       if (window.ItdaCodeCopy) window.ItdaCodeCopy.arm(notesBody);
     }
+    paintNext(); // 다음 장 미리보기(머리 주석 「발표자 보조」) — 다음 장이 바뀔 때만 사본을 바꾼다
     layoutCard(); // 카드 높이가 노트를 따라 바뀐다(ResizeObserver 가 없는 웹뷰에서도 화면 안에 가둔다)
     // 키 → 화면 전환(DOM·클래스)까지, 그리고 다음 슬라이드가 그려지기까지(다음 그리기 두 번 뒤 — 창이 가려지면 그리기가 미뤄져 재지 않는다)
     P.switchMs.push(Math.round((performance.now() - t0) * 10) / 10);
@@ -1170,7 +1279,24 @@
     if (ink) ink.setPenOnly(P.penOnly);
     return true;
   }
-  window.ItdaPresent = { setShareSummary, setPenOnly, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+  // setNextPreview·setClock 은 발표 중 발표자 보조를 바꾼다(머리 주석 「발표자 보조」).
+  function presenterOn() { return P.on && !P.board && !P.audience && !!root; }
+  function setNextPreview(b) {
+    if (!presenterOn()) return false;
+    P.nextPreview = !!b;
+    root.classList.toggle("pr-next-on", P.nextPreview);
+    paintNext();
+    relayout(); // 카드 높이·미리보기 크기
+    return true;
+  }
+  function setClock(b) {
+    if (!presenterOn()) return false;
+    P.clock = !!b;
+    root.classList.toggle("pr-clock-on", P.clock);
+    if (clockEl) clockEl.textContent = P.clock ? clockText(new Date()) : "";
+    return true;
+  }
+  window.ItdaPresent = { setShareSummary, setPenOnly, setNextPreview, setClock, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
     // inkView 는 청중 화면이 발표자 판서를 받아 그리는 view(ink.js view)다 — 머리 주석 「두 화면 발표」 판서 받기. ink.js 가 없으면 null
     inkView: inkViewOf,
     // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다

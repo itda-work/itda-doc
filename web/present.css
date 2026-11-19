@@ -97,6 +97,9 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-share:empty { display: none; }
 .pr-hint { margin-left: auto; min-width: 0; color: rgba(255, 255, 255, 0.5); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pr-num, .pr-time { flex: none; white-space: nowrap; } /* 안내 글이 길어도 번호가 접히지 않게 — 좁아지는 것은 안내 글이다 */
+/* 현재 시각(present.js 머리 주석 「발표자 보조」 — 기본 꺼짐, 켜면 #present.pr-clock-on) — 경과 시간 옆 */
+.pr-clock { display: none; flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; color: rgba(255, 255, 255, 0.82); }
+#present.pr-clock-on .pr-clock { display: inline; }
 /* 발표자 노트 — N 으로 편다. 기본은 슬라이드 위에 떠 있는 카드(청중과 함께 읽으므로 짙은 바탕에 밝은 글자로 대비를 크게 둔다),
    머리 단추로 고르면 오른쪽에 붙인 칸(.pr-dock). 카드 자리·높이는 present.js layoutCard 가 --pr-card-x·y·h 로 건다(화면 안에 가둔다) */
 .pr-notes { position: absolute; width: var(--pr-notes-w, 34%); box-sizing: border-box; padding: 22px 26px; overflow: auto; display: none; z-index: 7;
@@ -182,6 +185,15 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-notes-body .chart-svg .tick, .pr-notes-body .chart-svg .unit { fill: #9aa3b1; }
 .pr-notes-body .chart-svg .gl { stroke: #333a45; }
 .pr-notes .pr-none { color: #8b94a3; }
+/* 다음 장 미리보기(present.js 머리 주석 「발표자 보조」 — 기본 꺼짐, 켜면 #present.pr-next-on): 노트 칸 머리 아래 칸. 상자는 .pr-thumb(한눈에 보기 썸네일 —
+   사본 자리·움직임 끔)이고 높이·배율은 present.js fitNext 가 칸 너비에 맞춰 건다. 누르기·포커스를 받지 않는다(inert·pointer-events) */
+.pr-next { display: none; margin: 0 0 14px; pointer-events: none; }
+#present.pr-next-on .pr-next { display: block; }
+.pr-next-label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #a3acba; margin-bottom: 6px; line-height: 1; }
+.pr-next-box { width: 100%; box-shadow: 0 0 0 1px #39404b; }
+.pr-next-box .page * { transition: none !important; }
+.pr-next-box.pr-next-end { display: flex; align-items: center; justify-content: center; background: #1b1f26; min-height: 60px; }
+.pr-next-end-t { font: 600 15px/1 var(--ui-font); color: #8b94a3; }
 /* 번호로 가기 */
 .pr-goto { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 14px 26px; border-radius: 12px; z-index: 9;
   background: rgba(20, 22, 27, 0.9); font: 600 40px/1 var(--ui-font); font-variant-numeric: tabular-nums; display: none; }
