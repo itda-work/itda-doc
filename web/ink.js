@@ -24,9 +24,9 @@
   const LASER_DRAG = 6;    // 레이저: 이만큼(화면 px) 움직이면 클릭이 아니라 선이다
   const RELAY_MS = 33;     // 중계 묶음 간격(ms)
   const SVG_NS = "http://www.w3.org/2000/svg";
-  // 판서가 받지 않는 자리 — 노트·목차·막대·코드 단추·슬라이드 묻기 단추(.itda-askbar — ask.js) 등은 present.js onMouse 의 제외 목록과 같고, YouTube 재생(a.yt·.yt-play)은 호스트가 mousedown 을 창 단계에서 가로채므로 여기서 뺀다.
+  // 판서가 받지 않는 자리 — 노트·목차·막대·코드 단추 등은 present.js onMouse 의 제외 목록과 같고, YouTube 재생(a.yt·.yt-play)은 호스트가 mousedown 을 창 단계에서 가로채므로 여기서 뺀다.
   // 호스트의 겹침 층([data-pr-overlay] — present.js 머리 주석 「호스트 계약」)도 판서 자리가 아니다
-  const BLOCKED = ".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .pr-lightbox, .itda-codecopy, .itda-codetitle, .itda-askbar, a.yt, .yt-play, [data-pr-overlay]";
+  const BLOCKED = ".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .pr-lightbox, .itda-codecopy, .itda-codetitle, a.yt, .yt-play, [data-pr-overlay]";
   const LIMIT_NOTE = "판서 상한(2천 획·20만 점)에 닿았습니다 — 지우면 다시 그릴 수 있습니다";
   const RELAY_NOTE = "판서가 공유 상한을 넘어 보는 사람에게 보내지 못합니다 — 공유 패널의 「판서 함께 보이기」 를 껐다 켜면 다시 시도합니다";
 

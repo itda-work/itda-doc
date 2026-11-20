@@ -12,8 +12,8 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 /* 청중(따라가기) 열기(present.js 머리 주석 「두 화면 발표」): 커서 깨우기가 없으므로 커서는 늘 숨긴다. 겹침 층은 위 규칙처럼 되살린다 */
 #present.pr-audience { cursor: none; }
 #present.pr-audience [data-pr-overlay] { cursor: auto; }
-/* 청중 열기의 덱 사본에 딸려 온 입력 부품(묻기 막대·코드 복사·묻기 단추)은 보이지 않는다 — 마우스 올림·포커스로도 드러나지 않게 */
-#present.pr-audience .pr-deck .itda-askbar, #present.pr-audience .pr-deck .itda-codecopy { display: none !important; }
+/* 발표에서는 섹션 묻기 단추를 숨긴다. 청중 화면에서는 코드 복사 단추도 숨긴다. */
+#present .itda-section-ask, #present.pr-audience .pr-deck .itda-codecopy { display: none !important; }
 .pr-stage { position: absolute; inset: 0; overflow: hidden; }
 /* 노트를 오른쪽에 붙였을 때(.pr-dock)만 무대·아래 줄이 칸 너비만큼 줄어든다 — 떠 있는 카드(기본)는 슬라이드 위에 겹친다 */
 #present.pr-notes-on.pr-dock .pr-stage { right: var(--pr-notes-w, 34%); }
@@ -255,10 +255,3 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
   #present *, #present .page { animation: none !important; transition: none !important; }
   #present .pr-deck .page.pr-out { visibility: hidden !important; }
 }
-
-/* 슬라이드 묻기 막대(ask.js armSlides, 모양은 호스트 창 틀 CSS 의 .itda-askbar): 읽기 화면에서는 늘 보이고, 발표 중에는 마우스를 올린
-   장(또는 막대 안 포커스)에서만 보인다. 판서·넘김 제외는 present.js onMouse·ink.js BLOCKED 가 맡는다. 커서를 숨긴 동안(pr-idle)에는 올림이 없다. */
-/* 숨긴 동안은 visibility 로 가린다 — 보이지 않는 단추가 누르기를 받지 않게(그 자리 누르기는 여느 슬라이드 누르기다). 지금 장(.pr-cur)만 다시 보인다(다른 장은 감춘 채다) */
-#present .pr-deck .page > .itda-askbar { visibility: hidden; }
-#present:not(.pr-idle, .pr-grid-on, .lb-on, .pr-black-on) .pr-deck .page.pr-cur:hover > .itda-askbar,
-#present:not(.pr-grid-on, .lb-on, .pr-black-on) .pr-deck .page.pr-cur > .itda-askbar:focus-within { visibility: visible; }

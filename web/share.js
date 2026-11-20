@@ -47,7 +47,7 @@
 // 호스트 부품: 표 복사·표 정렬·코드 복사·코드 줄·YouTube 재생(share.html 이 share.js 앞에 싣는 호스트의 script)은 정식 이름 window.Itda*(ItdaTableCopy·
 // ItdaTableSort·ItdaCodeCopy·ItdaCodeLines·ItdaYT)로 찾고, 없으면 옛 이름 window.Hyve* 로 물러선다(hostPart·extInit — 둘 다 pick). 이 파일은 window.ItdaShare 로
 // 내보내고 옛 이름 window.HyveShare 도 같은 객체다. 호스트 부품이 없으면(설치 없는 뷰어 — web/viewer) 그 기능만 빠지고 그리기는 이어 간다.
-// 묻기 단추(itda-hyve#896): 이 모듈의 ask.js(window.ItdaAsk)가 있고 받은 view 에 ask 가 있을 때만 코드 블록(codecopy.js)·슬라이드(ask.js armSlides)에 단다.
+// 강의 MCP와 번들 문서 id를 받은 경우 ask.js가 원문 제목에 서비스별 단추를 단다.
 // YouTube 재생 부품(ItdaYT)의 꼴: init(o)(o = { inScope(a), src(id, start), referrerPolicy, noSrc() } — 누른 블록 a 를 그 자리 틀로 바꾼다)·
 // stop()(지금 틀을 떼고 대표 그림을 되살린다). 부품이 없으면 YouTube 블록은 보통 링크다.
 // View 원천(itda-hyve#577 2b): 받은 View 를 그리는 것(아래 「화면」 — render·draw·보기 꼴·목차·노트·표 정렬·쪽 넘김 키)과 View 를 어디서
@@ -965,8 +965,7 @@
   // 아니면 "center".
   function followSpot(layout, noteShown) { return layout === "below" && noteShown ? "top" : "center"; }
 
-  // keyHandler 는 보는 화면의 keydown 이다(⑨). deps: pager(ItdaPager — navKey·typingTarget)·fol·jumper·closeDrawer()·ended()·turn(dir)·
-  // yields(e)(있으면 — 발표가 이 키를 묻기 넘침 안내 상자에 양보했는가, present.js yieldsKey: 그러면 넘기지도 풀지도 막지도 않는다, itda-hyve#896).
+  // keyHandler 는 보는 화면의 keydown 이다(⑨). deps: pager(ItdaPager — navKey·typingTarget)·fol·jumper·closeDrawer()·ended()·turn(dir).
   // Esc 는 목차 서랍을 닫는다(전과 같다). 입력란에 포커스가 있으면 나머지는 건드리지 않는다. 쪽 넘김 키(navKey — ←/→·PageUp/PageDown·
   // Space/Shift+Space·Home/End)면 브라우저 굴림을 막고 ③ 규칙대로 이 화면의 따라가기를 먼저 풀고(jumper.clear·fol.moved) turn(dir) 로
   // 넘긴다(공유가 끝난 화면은 넘기지 않는다). 단추·링크에 포커스가 있을 때의 Space 는 그것을 누르는 키라 넘기지도, 따라가기를 풀지도
@@ -974,7 +973,6 @@
   function keyHandler(deps) {
     const onBtn = el => !!(el && el.closest && el.closest("button, a[href], summary"));
     return e => {
-      if (deps.yields && deps.yields(e)) return;
       if (e.key === "Escape") { deps.closeDrawer(); return; }
       if (deps.pager.typingTarget(e.target)) return;
       const dir = deps.ended() || e.defaultPrevented || e.isComposing ? "" : deps.pager.navKey(e, true);
@@ -1234,7 +1232,7 @@
   // 호스트 부품은 정식 이름 window.Itda* 를 먼저, 없으면 옛 이름 window.Hyve* 를 본다(머리 주석 「호스트 부품」).
   const hostPart = name => pick(window, name);
   const TableCopy = hostPart("TableCopy"), TableSort = hostPart("TableSort"), CodeCopy = hostPart("CodeCopy"), CodeLines = hostPart("CodeLines");
-  const Ask = window.ItdaAsk && typeof window.ItdaAsk.set === "function" ? window.ItdaAsk : null; // 묻기 단추(itda-hyve#896 — 이 모듈의 ask.js, 없으면 단추 없음)
+  const Ask = window.ItdaAsk && typeof window.ItdaAsk.set === "function" ? window.ItdaAsk : null;
   const appMeta = document.querySelector('meta[name="application-name"]');
   const app = appName(appMeta && appMeta.getAttribute("content"));
   if (app) document.title = app; // 문서를 받기 전의 탭 제목 — 앱 이름이 없으면 share.html 의 title 그대로
@@ -1494,6 +1492,10 @@
     // 코드 줄 번호(itda-hyve#435 — 호스트 부품 CodeLines): 쪽 나눔·슬라이드 나눔 전에 감싼다(호스트 앱 창과 같은 자리).
     // frontmatter code.line-numbers: false 면 줄 강조(itda-hyve#479 data-hl)·단 나누기(itda-hyve#487 data-cols) 블록만 번호 없이 감싼다. 스크립트가 404 여도(허용 목록 누락 — 리뷰 R1) 렌더는 깨지 않는다.
     if (CodeLines) CodeLines.wrap(flow, { numbers: (v.code || {}).line_numbers !== false });
+    if (Ask) {
+      Ask.set(v.ask, { title: v.title });
+      Ask.armSections(flow);
+    }
     if (state.look === "dashboard") {
       window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info });
     } else if (state.look === "slides") {
@@ -1531,14 +1533,8 @@
     closeTableMenu();
     pagesEl.replaceChildren(frag);
     placeSlideNotes(pagesEl); // 노트 칸(슬라이드 보기 밖이면 지우기만)은 쪽을 바꿔 끼운 뒤에 — 칸은 #notes 에 있어 쪽과 함께 갈리지 않는다
-    // 묻기 단추(itda-hyve#896 — ask.js): 받은 view 의 ask(호스트가 lecture.yml 로 채운다 — 없으면 끔)를 코드 블록 단추보다 먼저 건다. 노트는 이 화면이
-    // 받은 슬라이드 노트(state.slideNotes)이고, 질문 글에 넣을지는 ask.notes 가 정한다(ask.js forSlide).
-    if (Ask) Ask.set(v.ask, { notes: i => state.slideNotes[i] || "", title: v.title || "" });
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
-    // 쪽·이어보기·슬라이드(발표 공유) 모두. 묻기가 켜져 있으면 codecopy.js 가 복사 단추 옆에 묻기 단추도 단다.
     if (CodeCopy) { CodeCopy.arm(pagesEl); CodeCopy.arm($("notes")); }
-    // 슬라이드 묻기 막대(itda-hyve#896)는 장을 다 나눈 뒤 장마다 — 장 수·쪽 높이에 끼지 않는다
-    if (Ask) Ask.armSlides(pagesEl);
     if (boardZoom && state.look === "dashboard") boardZoom.arm(); // 크게 보기 단추 — 새 보드의 타일마다(옛 보드는 떨어져 열린 상태도 버려진다)
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
@@ -1949,8 +1945,7 @@
   bindNoteGrip();
   // 쪽 넘김 키(⑨ — keyHandler): 쪽·슬라이드·이어보기 규칙은 pager.js pageNav(문서 창 보기 모드와 같다)
   document.addEventListener("keydown", keyHandler({ pager: window.ItdaPager, fol, jumper, closeDrawer: () => closeTocDrawer(),
-    ended: () => state.ended || !state.view, turn: dir => pageTurn(dir),
-    yields: e => !!(window.ItdaPresent && window.ItdaPresent.yieldsKey && window.ItdaPresent.yieldsKey(e)) }));
+    ended: () => state.ended || !state.view, turn: dir => pageTurn(dir) }));
   $("follow-back").addEventListener("click", () => { jumper.resume(); scheduleTocOn(); });
 
   // ---- 표 복사(itda-hyve#349): 표 위 오른쪽 클릭에만 우리 메뉴(tablecopy.js — 쪽 나눔으로 잘린 표는 조각을 모아 전체). 표 밖·글자를 고른 상태는
@@ -1986,8 +1981,8 @@
   // ---- 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 위임 클릭 하나를 문서(document)에 단다 — 본문을 다시 그려도 살아 있다.
   // 이 화면은 http(비보안 컨텍스트)라 navigator.clipboard 가 없다 — 누른 처리 안에서 바로 execCommand 로 쓴다(tablecopy.js write).
   if (CodeCopy) document.addEventListener("click", CodeCopy.handler({ toast }));
-  // 슬라이드 묻기 단추(itda-hyve#896)의 위임 클릭 — 새 탭은 window.open(…, "noopener"), 넘침의 클립보드는 표 복사의 길(없으면 navigator.clipboard)
-  if (Ask) document.addEventListener("click", Ask.handler({ toast, write: TableCopy && TableCopy.write ? t => TableCopy.write(t) : undefined }));
+
+  if (Ask) document.addEventListener("click", Ask.handler());
   // ---- 표 열 정렬(itda-hyve#349 2단계 — tablesort.js): 머리 칸 왼쪽 클릭(키보드는 Enter·Space)으로 오름 → 내림 → 해제. 보는 사람 각자(이 화면의
   // 메모리에만 — 서버에 보내지 않는다). 슬라이드 보기에는 없다(표시를 달지 않는다). 다시 그린 뒤 누른 조각의 머리가 같은 높이에 남게 굴린다 —
   // 발표자를 따라가는 중이면 render 가 따라가는 자리로 굴리므로 굴리지 않는다(블록 번호 data-n 은 정렬과 상관없이 같다). 키보드로 눌렀으면

@@ -26,8 +26,8 @@
 //                       호스트가 그 장의 그림을 뜰 때 쓴다). i 에서 정해지므로 next 만 바뀌어 따로 알리는 일은 없다.
 //   o.audience = true   청중(따라가기) 열기 — 덱·전환·fit·검은 화면 층만 만든다. 노트·목차·아래 줄(HUD)·번호 이동·한눈에 보기·크게 보기·판서를 만들지
 //                       않고, 키·마우스·커서 깨우기 리스너를 걸지 않는다(커서는 늘 숨긴다 — present.css .pr-audience). 덱 사본에 딸려 온 단추·링크·입력
-//                       (묻기 막대·코드 복사 단추 등)은 입력이 아니다: 덱에 inert 를 달고(WebKit 동작은 미검증), 포커스 차례에서 빼며(tabindex -1),
-//                       덮개 안의 click·auxclick 은 창 붙잡기 단계에서 모두 먹는다(eatClick — 문서의 위임 처리기까지 가지 않는다). 묻기 막대·코드 복사
+//                       (섹션 묻기 단추·코드 복사 단추 등)은 입력이 아니다: 덱에 inert 를 달고(WebKit 동작은 미검증), 포커스 차례에서 빼며(tabindex -1),
+//                       덮개 안의 click·auxclick 은 창 붙잡기 단계에서 모두 먹는다(eatClick — 문서의 위임 처리기까지 가지 않는다). 섹션 묻기 단추·코드 복사
 //                       단추는 보이지 않는다(present.css). 호스트 훅(fullscreen 등)은 그대로 부른다. 넘김은 ItdaPresent.show 로만 한다.
 //                       판서 입력·도구 막대는 없지만 발표자의 판서를 받아 그린다(아래 「판서 받기」).
 //   ItdaPresent.show({ i, step, black })  보이는 상태를 덮어쓴다(멱등). 범위 밖 값은 잘라낸다(i 는 0~장 수−1, step 은 0~그 장의 단계 수). 없는 키는
@@ -73,7 +73,7 @@
 //   o.nextPreview = true · ItdaPresent.setNextPreview(b)  다음 장 미리보기 — 노트 칸 머리 아래·노트 위의 「다음」 칸에 다음 장(i+1)의 축소 사본을 둔다.
 //                       단계가 남았어도 다음 「단계」 가 아니라 다음 장이고, 사본은 다 나타난 모습이다(한눈에 보기 사본과 같다). 마지막 장이면 「끝」 이다.
 //                       노트 칸 안이라 노트를 접으면 함께 숨는다. 사본은 하나만 두고 다음 장 번호가 바뀔 때만 넘김 안에서 곧바로 바꾼다(빠른 연달아 넘김에도
-//                       늦게 따라오지 않는다 — 단계만 바뀌면 그대로). 사본은 판서 층·묻기 막대·코드 복사 단추를 떼고, id 를 지우며, 칸에 aria-hidden·inert 를
+//                       늦게 따라오지 않는다 — 단계만 바뀌면 그대로). 사본은 판서 층·섹션 묻기 단추·코드 복사 단추를 떼고, id 를 지우며, 칸에 aria-hidden·inert 를
 //                       달고 그 안의 포커스 가능한 것을 포커스 차례에서 뺀다(tabindex -1). 차트 재생 클래스를 떼고 움직임을 끈다(present.css .pr-thumb).
 //                       판서는 넣지 않는다. 노트 칸 너비가 바뀌면 칸 너비에 맞춰 다시 줄인다(relayout). 그림·표 번호(CSS 카운터 fig·tbl)는 상자에 독립
 //                       범위를 두고 덱에서 다음 장 앞까지의 캡션 수로 시작해 덱의 번호와 같게 한다(NEXT_COUNTERS — 덱·원문 카운터는 건드리지 않는다).
@@ -84,10 +84,6 @@
 //   물려받지 않는다(start 의 o 가 정한다). P.nextPreview·P.clock 으로 읽는다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
-// 묻기 넘침 안내 상자(.itda-asknote — ask.js NOTE)는 겹침 층이고, 그 안에 포커스가 있으면 Esc 밖의 키를 양보한다(askNoteKey — 가린 동안은 아니다).
-// 슬라이드 묻기 막대(.itda-askbar — ask.js armSlides)는 미리보기 장의 자식이라 덱 사본에 함께 온다. 마우스를 올린 장에서만 보이고
-// (present.css), 누르기는 넘김·판서가 아니다(onMouse·ink.js BLOCKED). 한눈에 보기 사본(.pr-static)에는 보이지 않는다(호스트 창 틀 CSS).
-//
 // 조작: → Space PageDown 클릭 = 다음(차례로 나타낼 것이 남았으면 그것부터), ← PageUp Backspace = 이전(이전 슬라이드는 다 나타난 모습),
 //       숫자 + Enter = 그 슬라이드, Home·End = 처음·끝, G = 한눈에 보기, B·. = 검은 화면, N = 발표자 노트, Esc = 끝,
 //       노트를 편 동안 + = 노트 글자 크게, − = 작게(머리의 A−/A+ 와 같다), D = 노트 붙이기·띄우기(머리 단추와 같다),
@@ -330,7 +326,7 @@
     nextEl = nextBox = clockEl = null;
     lb = lbEl = null;
     tocItems = [];
-    // 덱 사본의 단추·입력·링크(묻기 막대·코드 복사 단추 등)는 청중 화면에서 입력이 아니다: 덱을 inert 로 두고(지원하는 웹뷰), 지원하지 않아도
+    // 덱 사본의 단추·입력·링크(섹션 묻기 단추·코드 복사 단추 등)는 청중 화면에서 입력이 아니다: 덱을 inert 로 두고(지원하는 웹뷰), 지원하지 않아도
     // 포커스 차례에서 빼며(tabindex -1), 누르기·키보드 활성화의 click 은 eatClick 이 붙잡기 단계에서 먹는다(문서의 위임 처리기 — ask.js handler — 까지 가지 않는다)
     deck.setAttribute("inert", "");
     deck.inert = true;
@@ -582,8 +578,8 @@
 
   // ---- 다음 장 미리보기(머리 주석 「발표자 보조」). 칸은 노트 칸 안(머리 아래)에 늘 만들고, 보이기는 pr-next-on(present.css)이다.
   // 상자는 한눈에 보기 썸네일(.pr-thumb)과 같은 규칙으로 사본을 그린다 — 덱 밖이라 쪽 크기 변수를 상자에 건다(한눈에 보기 칸과 같다).
-  // 사본에서 떼는 것: 판서 층(발표자의 판서를 미리보기에 넣지 않는다)·묻기 막대·코드 복사 단추(입력 부품)
-  const NEXT_DROP = ".ink-hl, .ink-pen, .ink-live, .ink-laser-page, .ink-preview, .itda-askbar, .itda-codecopy";
+  // 사본에서 떼는 것: 판서 층(발표자의 판서를 미리보기에 넣지 않는다)·섹션 묻기 단추·코드 복사 단추(입력 부품)
+  const NEXT_DROP = ".ink-hl, .ink-pen, .ink-live, .ink-laser-page, .ink-preview, .itda-section-ask, .itda-codecopy";
   // 장을 넘어 이어지는 CSS 카운터 — 이름과 그 카운터를 올리는 요소의 선택자. base.css 의 증가 규칙과 정확히 같은 선택자다:
   //   fig ← `.page-body figcaption::before { counter-increment: fig }`(base.css 388 부근), tbl ← `.page-body caption::before { counter-increment: tbl }`(678 부근).
   //   둘의 시작은 `.pages { counter-reset: fig tbl }`(384 부근 — 덱 .pr-deck.pages 가 이것을 받는다). base.css 의 다른 카운터(list-item)는 목록마다 새로
@@ -1131,7 +1127,7 @@
     if (!P.on) return;
     const t = e.target;
     if (inOverlay(t)) return;
-    // 청중 열기: 덮개 안의 click·auxclick 은 모두 먹는다 — 덱 사본의 단추(묻기 막대 등)·링크가 아무것도 하지 않게(키보드 활성화도 click 으로 온다)
+    // 청중 열기: 덮개 안의 click·auxclick 은 모두 먹는다 — 덱 사본의 단추(섹션 묻기 단추 등)·링크가 아무것도 하지 않게(키보드 활성화도 click 으로 온다)
     if (P.audience) { if (root && root.contains(t)) { e.preventDefault(); e.stopPropagation(); } return; }
     // 크게 보기 부품이 없으면 lbEl 이 없다 — 판서가 건 lbEat·덱 안 링크는 그대로 먹는다
     if (lbEat || (lbEl && t && lbEl.contains(t))) {
@@ -1166,9 +1162,7 @@
       return;
     }
     if (P.lightbox) { lbEat = true; closeLightbox(); return; } // 라이트박스가 창을 덮으므로 밖에서 오는 누르기는 드물다(방어)
-    // 코드 복사 단추(.itda-codecopy — 묻기 단추 .itda-codeask 도 이 클래스)·파일명 띠 단추(.itda-codetitle)·슬라이드 묻기 막대(.itda-askbar —
-    // ask.js)도 누르기로 치지 않는다 — 눌렀는데 슬라이드가 넘어가지 않게. 목차 칸·경계도 — 항목 누르기는 그 슬라이드로 가는 것이지 다음 슬라이드가 아니다
-    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .itda-codecopy, .itda-codetitle, .itda-askbar")) return;
+    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .itda-codecopy, .itda-codetitle")) return;
     // 판서가 링크보다 먼저다 — 펜·형광펜·지우개의 왼쪽 누르기는 링크 위에서도 그리기다: 뒤따르는 click 을 먹어 링크가 열리지 않는다.
     // 레이저는 떼는 때 ink.js 가 클릭인지 판단한다(inkClick). 보드 발표에는 판서가 없다(ink 없음)
     const inking = ink ? ink.takes(e) : "";
@@ -1204,21 +1198,9 @@
   // onKey 는 발표 키를 전부 삼킨다(capture — Tab 도). 발표 중 코드 복사 단추·파일명 띠 단추는 마우스로만 누른다: 발표 키는 단추에 포커스가
   // 있어도 발표가 갖고, 누른 뒤 포커스를 단추에 남기지 않는 건 복사 단추 쪽이 한다.
   // 호스트가 ownsKey 로 가져간 키는 맨 앞에서 놓아준다(머리 주석 「호스트 계약」 — 겹침 층을 가린 동안에도 묻는다).
-  // askNoteKey 는 묻기 넘침 안내 상자(ask.js NOTE — body 의 자식 .itda-asknote[data-pr-overlay]) 안에 포커스가 있는 키인가다 — 그러면 발표는 그 키를
-  // 양보한다(넘김·판서·preventDefault 모두 하지 않는다 — ⌘C·Ctrl+C 로 질문 글을 복사하고 Tab·Enter·Space 로 단추를 누른다).
-  // Esc 는 양보하지 않는다(발표 끝내기 그대로). 발표가 층을 가린 동안(pr-overlay-hidden)은 양보하지 않는다 — 보이지 않는 상자가 키를 먹지 않게.
-  // 창·공유·묶음 호스트가 같은 규칙을 갖도록 호스트 훅(ownsKey)이 아니라 여기 둔다. 양보한 키는 문서로 올라가므로 호스트 앱의 단축키 처리기도
-  // ItdaPresent.yieldsKey 로 같은 판정을 묻고 손을 뗀다(⌘W 같은 앱 명령이 되지 않게 — 문서 창 app.js onKey, 공유·묶음 share.js keyHandler, A9).
-  function askNoteKey(e) {
-    if (e.key === "Escape" || document.body.classList.contains(OVERLAY_HIDDEN)) return false;
-    const t = e.target && e.target.closest ? e.target : document.activeElement;
-    return !!(t && t.closest && t.closest(".itda-asknote"));
-  }
-
   function onKey(e) {
     if (!P.on) return;
     if (hostCall("ownsKey", e)) return;
-    if (askNoteKey(e)) return;
     e.preventDefault();
     e.stopPropagation();
     const k = e.key;
@@ -1299,8 +1281,6 @@
   window.ItdaPresent = { setShareSummary, setPenOnly, setNextPreview, setClock, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
     // inkView 는 청중 화면이 발표자 판서를 받아 그리는 view(ink.js view)다 — 머리 주석 「두 화면 발표」 판서 받기. ink.js 가 없으면 null
     inkView: inkViewOf,
-    // yieldsKey 는 발표 중이고 이 키를 안내 상자에 양보했는가다(askNoteKey) — 호스트 앱의 키 처리기가 앱 명령을 하지 않을 때다
-    yieldsKey: e => P.on && askNoteKey(e),
     // inkHeld 는 판서 입력이 진행 중인가다(머리 주석 「펜만 판서」) — 호스트가 손가락 밀기를 버릴지 정할 때 묻는다
     inkHeld: () => !!(P.on && ink && ink.held()) };
 })();

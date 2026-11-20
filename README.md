@@ -33,6 +33,10 @@
 | `cmd/itda-doc/` | 명령줄 도구 |
 | `cmd/itda-doc-wasm/` | 브라우저용 렌더 입구(WebAssembly) — 전역 `itdaDoc.render`·`themes`·`themeCSS`. 수식은 페이지가 올린 `temml.min.js` 로 그린다. `just wasm` 이 `build/web/` 에 만든다 |
 
+## 게시 강의의 섹션 묻기
+
+호스트가 `page.AskView`에 `services`, 강의 MCP의 HTTPS 주소(`mcp`), 번들 문서 식별자(`doc_id`)를 주면 공유 보기에서 본문 직계 제목 중 id가 있는 곳에 서비스별 묻기 단추가 생긴다. 단추는 새 대화에 해당 섹션과 하위를 읽어 달라는 지침을 채운다. 같은 id가 반복되면 문서 순번(`nth`)으로 구별한다. `guide`를 주면 커넥터가 연결되지 않았을 때 보여 줄 안내 주소도 넣는다. 인쇄·발표에서는 단추를 숨긴다.
+
 ## 빌드·시험
 
 Go 1.27 과 node 가 필요하다(node 는 `web/` 의 쪽 나눔 시험). `just test` 와 CI 는 `ITDA_DOC_STRICT=1` 로 돈다 — node 나 CommonMark 예제(`spec.json`)가 없으면 건너뛰지 않고 실패한다. 값 없이 `go test ./...` 하면 그 시험만 건너뛴다.

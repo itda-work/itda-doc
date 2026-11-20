@@ -1,5 +1,5 @@
 // Package web 은 쪽 모델 자원이다 — 문서 기본 모양(base.css)·쪽 나눔(pager.js)·슬라이드(slides.js)·보드(dashboard.js)·보기 전용 공유 화면(share.*)·글꼴(fonts/),
-// 그리고 슬라이드 발표 화면(present.js·present.css)과 판서(ink.js·inkshape.js), 「Claude에게 묻기」 질문 글·슬라이드 단추(ask.js — itda-hyve#896). 발표는 창 틀(전체 화면 등)을 호스트 훅 window.ItdaPresentHost
+// 그리고 슬라이드 발표 화면(present.js·present.css)과 판서(ink.js·inkshape.js), 강의 MCP 섹션 묻기 단추(ask.js). 발표는 창 틀(전체 화면 등)을 호스트 훅 window.ItdaPresentHost
 // 로만 만난다 — 계약은 present.js 머리 주석.
 package web
 
