@@ -11,10 +11,8 @@ import (
 	"testing"
 )
 
-// 묻기 단추(itda-hyve#896, ask.js): 켬 설정 정리·OS 두 출처·질문 글 두 틀·화면 글자(노트 칸·단추 제외)·노트는 실은 렌더일 때만·공개 묶음의
-// 슬라이드 주소·주소 넘침 문턱(24,000자 경계)·넘침의 클립보드 길·슬라이드 막대(멱등·끄기·장 수 그대로·글자 없음)·위임 클릭을 가짜 DOM 위에서
-// node 로 돌린다(testdata/ask.cjs). 코드 블록 단추(조각 모으기)는 호스트 앱의 codecopy.js 시험이, 실제 화면은 호스트 앱 selftest 가 본다.
-const askCases = 64
+// 원문 제목의 섹션 식별자와 서비스별 새 대화 주소를 확인한다.
+const askCases = 49
 
 func TestAsk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -24,21 +22,21 @@ func TestAsk(t *testing.T) {
 		}
 		t.Skip("node 가 없어 실행 검사를 건너뜀")
 	}
-	src := askSource(t)
+	src := askSource(t, "ask.js")
 	runner, _ := filepath.Abs(filepath.Join("testdata", "ask.cjs"))
-	out, err := exec.Command(node, runner, src).CombinedOutput()
+	out, err := exec.Command(node, runner, src, askSource(t, "slides.js")).CombinedOutput()
 	if err != nil {
 		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
 	}
-	if !strings.HasSuffix(strings.TrimSpace(string(out)), fmt.Sprintf("R896 ASK DONE cases=%d failed=0", askCases)) {
+	if !strings.HasSuffix(strings.TrimSpace(string(out)), fmt.Sprintf("R965 ASK DONE cases=%d failed=0", askCases)) {
 		t.Fatalf("사례 %d 개를 모두 마치지 않았다\n%s", askCases, out)
 	}
 }
 
-// askSource 는 node 가 읽을 ask.js 경로다 — ITDA_DOC_TEST_OVERLAY 의 Replace 에 ask.js 가 있으면 그 파일(뮤테이션 시험, presentSources 와 같은 약속).
-func askSource(t *testing.T) string {
+// askSource 는 node에서 읽을 스크립트 경로다. 뮤테이션 시험에서는 overlay의 사본을 읽는다.
+func askSource(t *testing.T, name string) string {
 	t.Helper()
-	src, _ := filepath.Abs("ask.js")
+	src, _ := filepath.Abs(name)
 	p := os.Getenv("ITDA_DOC_TEST_OVERLAY")
 	if p == "" {
 		return src
@@ -56,21 +54,20 @@ func askSource(t *testing.T) string {
 	if r, ok := ov.Replace[src]; ok {
 		return r
 	}
-	if r, ok := ov.Replace["ask.js"]; ok {
+	if r, ok := ov.Replace[name]; ok {
 		return r
 	}
 	return src
 }
 
-// ask.js 는 FS 에 있고 share.html 이 codecopy.js(코드 블록 단추를 다는 호스트 부품)보다 먼저 싣는다. 새 탭은 noopener 로만 연다 —
-// 인라인 스타일 속성·eval 류를 쓰지 않는다(공유·묶음 화면의 CSP 를 넓히지 않는다).
+// 공유 화면의 스크립트·스타일과 CSP에 필요한 제한을 확인한다.
 func TestAskFS(t *testing.T) {
 	b, err := fs.ReadFile(FS, "ask.js")
 	if err != nil {
 		t.Fatalf("FS 에 ask.js 가 없다: %v", err)
 	}
 	s := string(b)
-	for _, bad := range []string{".style.", "setAttribute(\"style\"", "eval(", "new Function", "window.go", "window.runtime"} {
+	for _, bad := range []string{"clipboard", "armSlides", "codeButtons", "itda-asknote", "slideText", ".style.", "setAttribute(\"style\"", "eval(", "new Function", "window.go", "window.runtime"} {
 		if strings.Contains(s, bad) {
 			t.Errorf("ask.js 에 %q", bad)
 		}
@@ -79,8 +76,12 @@ func TestAskFS(t *testing.T) {
 		t.Error("ask.js 의 기본 새 탭이 noopener 가 아니다")
 	}
 	h, _ := fs.ReadFile(FS, "share.html")
-	ai, ci := strings.Index(string(h), "/_/ask.js"), strings.Index(string(h), "/_/codecopy.js")
-	if ai < 0 || ci < 0 || ai > ci {
-		t.Errorf("share.html 이 ask.js 를 codecopy.js 앞에 싣지 않는다(ask %d, codecopy %d)", ai, ci)
+	if !strings.Contains(string(h), "/_/ask.js") {
+		t.Error("공유 화면에서 ask.js를 싣지 않는다")
+	}
+	css, _ := fs.ReadFile(FS, "base.css")
+	if !strings.Contains(string(css), ".itda-section-ask::after { content: attr(data-label); }") ||
+		!strings.Contains(string(css), "@media print {\n  .itda-section-ask { display: none !important; }") {
+		t.Error("섹션 단추의 화면 이름 또는 인쇄 숨김 규칙이 없다")
 	}
 }

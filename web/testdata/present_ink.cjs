@@ -80,13 +80,14 @@ function ctx2d() {
 function world() {
   const doc = new El("html"), win = new El("window"), body = new El("body");
   doc.body = body;
+  win.document = doc;
   doc.createElement = t => new El(t.toLowerCase());
   doc.createElementNS = (ns, t) => new El(t);
   const raf = [];
   Object.assign(win, { devicePixelRatio: 2, navigator: { platform: "MacIntel" }, matchMedia: () => ({ matches: false }), requestAnimationFrame: f => { const g = () => f(); g.id = ++world.seq; raf.push(g); return g.id; }, cancelAnimationFrame: id => { const i = raf.findIndex(g => g.id === id); if (i >= 0) raf.splice(i, 1); },
     ItdaSlides: { SIZE: { "16:9": [1280, 720], "4:3": [960, 720] } }, getComputedStyle: () => ({ backgroundColor: "rgb(255, 255, 255)", width: "0px", height: "0px" }) });
   win.Path2D = class { constructor(d) { this.d = d; } };
-  const ctx = vm.createContext({ window: win, document: doc, performance: { now: () => world.clock }, setTimeout: (f, ms) => { const id = ++world.seq; world.timers.set(id, f); return id; }, clearTimeout: id => world.timers.delete(id), setInterval: () => 0, clearInterval() {}, requestAnimationFrame: win.requestAnimationFrame, console, Math, parseFloat, Number, String, Map, WeakMap, Set, Infinity });
+  const ctx = vm.createContext({ window: win, document: doc, URL, performance: { now: () => world.clock }, setTimeout: (f, ms) => { const id = ++world.seq; world.timers.set(id, f); return id; }, clearTimeout: id => world.timers.delete(id), setInterval: () => 0, clearInterval() {}, requestAnimationFrame: win.requestAnimationFrame, console, Math, parseFloat, Number, String, Map, WeakMap, Set, Infinity });
   // ask.js 는 묻기 단추의 위임 처리기(handler)를 청중 덱에서 시험하려고 싣는다(8절) — 켜기(set) 전에는 아무것도 하지 않는다
   for (const f of ["inkshape.js", "ink.js", "present.js", "ask.js"]) vm.runInContext(fs.readFileSync(path.join(webDir, f), "utf8"), ctx);
   return { win, doc, body, H: win.ItdaPresent, I: win.ItdaInk, P: win.ItdaPresent.state, raf };
@@ -412,57 +413,6 @@ const hidden = w => w.body.classList.contains("pr-overlay-hidden");
   ok("보드 끝: 검은 화면에서 끝내도 겹침 층 요소는 남고 가림 클래스는 떨어진다", !P.on && w.body.kids.includes(ov) && !hidden(w));
 }
 
-// ---- 5. 슬라이드 묻기 막대(itda-hyve#896 — ask.js armSlides 가 장의 마지막 자식으로 단다): 덱 사본에 함께 오고, 그 위 누르기는 넘김이 아니며
-// 펜·레이저 판서도 받지 않는다(present.js onMouse·ink.js BLOCKED). 보이기(마우스 올림)는 present.css — 호스트 앱 selftest 가 본다.
-{
-  const w = world(), { P } = w;
-  const withBar = body => { const p = slide(body); const bar = p.appendChild(new El("div")); bar.className = "itda-askbar"; const b = bar.appendChild(new El("button")); b.className = "itda-ask"; b.attrs["data-ask"] = "claude"; return p; };
-  w.H.start({ pages: [withBar([]), withBar([]), withBar([])], notes: [], index: 0, ratio: "16:9", onExit() {} });
-  const btnOf = i => P.slides[i].querySelector("button.itda-ask");
-  ok("묻기 막대: 덱 사본에 함께 온다", !!btnOf(0) && !!btnOf(1), P.slides.length);
-  tap(w, btnOf(0));
-  ok("묻기 막대: 단추 누르기는 다음 장이 아니다", P.idx === 0, P.idx);
-  fire(btnOf(0), "mousedown", { button: 2, buttons: 2 });
-  ok("묻기 막대: 오른쪽 누르기도 이전 장이 아니다", P.idx === 0, P.idx);
-  tap(w, P.slides[0]);
-  ok("묻기 막대: 막대 밖 누르기는 지금처럼 다음 장", P.idx === 1, P.idx);
-  key(w, "p", "KeyP");
-  const before = page(w, 1).length;
-  drag(w, btnOf(1), line(100, 100, 5));
-  ok("묻기 막대: 펜이 켜져도 단추 위에서는 그리지 않는다(ink BLOCKED)", page(w, 1).length === before && P.idx === 1, { strokes: page(w, 1).length, idx: P.idx });
-  key(w, "p", "KeyP");
-  key(w, "l", "KeyL");
-  tap(w, btnOf(1));
-  ok("묻기 막대: 레이저가 켜져도 단추 누르기는 넘김이 아니다", P.idx === 1, P.idx);
-  key(w, "l", "KeyL");
-  w.H.stop();
-}
-
-// ---- 6. 묻기 넘침 안내 상자(itda-hyve#896 A6 — ask.js NOTE, body 의 자식 .itda-asknote[data-pr-overlay]): 그 안에 포커스가 있으면 발표는 Esc 밖의 키를
-// 양보한다(넘김·판서·preventDefault 없음). 상자 밖은 지금처럼, 가린 동안(검은 화면)은 양보하지 않는다.
-{
-  const w = world(), { P, H } = w;
-  w.H.start({ pages: [slide([]), slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {} });
-  const box = overlayOf(w);
-  box.className = "itda-asknote";
-  const ta = box.appendChild(new El("textarea")), btn = box.appendChild(new El("button"));
-  const yielded = (k, code, mods) => { const e = key(w, k, code, mods); return !e.dp && !e.sp; };
-  ok("안내 상자: 글 칸 포커스의 ⌘C·Ctrl+C 는 발표가 먹지 않는다(기본 복사)", yielded("c", "KeyC", { metaKey: true, target: ta }) && yielded("c", "KeyC", { ctrlKey: true, target: ta }) && P.idx === 0, P.idx);
-  ok("안내 상자: 단추 포커스의 Tab·Enter·Space 는 넘김이 아니다", yielded("Tab", "Tab", { target: btn }) && yielded("Enter", "Enter", { target: btn }) && yielded(" ", "Space", { target: btn }) && P.idx === 0, P.idx);
-  ok("안내 상자: 판서 키(L)도 받지 않는다", yielded("l", "KeyL", { target: ta }) && !toolOf(w), toolOf(w));
-  w.doc.activeElement = btn;
-  ok("안내 상자: 이벤트 대상이 없으면 document.activeElement 로 본다", yielded("Enter", "Enter") && P.idx === 0, P.idx);
-  w.doc.activeElement = null;
-  let e = key(w, "ArrowRight", "ArrowRight", { target: w.body });
-  ok("안내 상자: 상자 밖 포커스는 지금처럼 넘기고 키를 삼킨다", P.idx === 1 && e.dp && e.sp, { idx: P.idx, dp: e.dp });
-  H.setBlack(true);
-  e = key(w, "Enter", "Enter", { target: btn });
-  ok("안내 상자: 가린 동안(검은 화면)은 양보하지 않는다", e.dp && e.sp, { dp: e.dp });
-  H.setBlack(false);
-  e = key(w, "Escape", "Escape", { target: ta });
-  ok("안내 상자: Esc 는 양보하지 않는다(발표 끝내기)", !P.on && e.dp, { on: P.on });
-}
-
 // ---- 7. 두 화면 발표(itda-doc#95 — present.js 머리 주석 「두 화면 발표」): onState·audience 열기·show 덮어쓰기
 const chartFig = n => { const f = new El("figure"); f.className = "chart"; if (n) f.dataset.step = String(n); return f; };
 // snap 은 덮개 아래 모든 요소의 클래스·데이터를 한 글로 적는다 — 같은 show 를 두 번 불러 DOM 이 바뀌지 않았는지 본다.
@@ -582,10 +532,15 @@ for (const via of ["onExit", "onSlide"]) {
 // (ask.js handler)까지 가지 않는다. 실제 WebKit 의 inert·Tab 순서는 미검증(가짜 DOM 은 inert 속성을 다는지만 본다).
 {
   const w = world(), { P, H } = w, A = w.win.ItdaAsk, opened = [];
-  A.set({ services: ["claude"], course: "과정", doc: "교안" });
+  A.set({ services: ["claude"], mcp: "https://docs.example/mcp", doc_id: "01" });
   w.doc.addEventListener("click", A.handler({ open: u => opened.push(u) })); // 호스트가 문서에 한 번 거는 위임 처리기(거품 단계)
-  const asked = () => { const p = slide([]); p.className = "page slide"; const bar = p.appendChild(new El("div")); bar.className = "itda-askbar";
-    const b = bar.appendChild(new El("button")); b.className = "itda-ask"; b.setAttribute("data-ask", "claude"); const a = p.appendChild(new El("a")); a.setAttribute("href", "https://example.com/"); return p; };
+  const asked = () => {
+    const p = slide([]), title = p.appendChild(new El("h2"));
+    title.id = "intro";
+    A.armSections(p);
+    p.appendChild(new El("a")).setAttribute("href", "https://example.com/");
+    return p;
+  };
   // dispatch 는 click 하나를 창 붙잡기 단계 → 문서 거품 단계 차례로 보낸다(앞에서 stopPropagation 하면 멈춘다). detail 0 은 키보드 활성화(Enter·Space)다.
   const dispatch = (t, detail) => { const e = { type: "click", target: t, button: 0, detail, dp: false, sp: false, preventDefault() { this.dp = true; }, stopPropagation() { this.sp = true; } };
     for (const f of [...(w.win.on.click || [])]) { f(e); if (e.sp) return e; }
@@ -593,22 +548,22 @@ for (const via of ["onExit", "onSlide"]) {
     return e; };
   const src = [asked(), asked()];
   H.start({ pages: src, notes: [], index: 0, ratio: "16:9", onExit() {} });
-  dispatch(P.slides[0].querySelector("button.itda-ask"), 1);
-  ok("묻기 위임(대조): 보통 발표의 덱 단추는 지금처럼 ask 로 간다", opened.length === 1, opened.length);
+  dispatch(P.slides[0].querySelector("button.itda-section-ask"), 1);
+  ok("묻기 위임(대조): 발표 사본에서는 새 대화를 열지 않는다", opened.length === 0, opened.length);
   H.stop();
   H.start({ pages: src, notes: [], index: 0, ratio: "16:9", onExit() {}, audience: true });
-  const deck = rootOf(w).querySelector(".pr-deck"), btn = P.slides[0].querySelector("button.itda-ask"), link = P.slides[0].querySelector("a");
+  const deck = rootOf(w).querySelector(".pr-deck"), btn = P.slides[0].querySelector("button.itda-section-ask"), link = P.slides[0].querySelector("a");
   ok("audience: 덱에 inert 를 단다", "inert" in deck.attrs && deck.inert === true, deck.attrs);
-  ok("audience: 덱 사본의 단추·링크는 포커스 차례에서 빠지고 원본은 그대로다", btn.getAttribute("tabindex") === "-1" && link.getAttribute("tabindex") === "-1" && src[0].querySelector("button.itda-ask").getAttribute("tabindex") === undefined);
+  ok("audience: 덱 사본의 단추·링크는 포커스 차례에서 빠지고 원본은 그대로다", btn.getAttribute("tabindex") === "-1" && link.getAttribute("tabindex") === "-1" && src[0].querySelector("button.itda-section-ask").getAttribute("tabindex") === undefined);
   let e = dispatch(btn, 1);
-  ok("audience: 복제 묻기 단추의 위임 클릭은 ask 로 가지 않는다(붙잡기 단계에서 먹는다)", opened.length === 1 && e.dp && e.sp, { n: opened.length, dp: e.dp });
+  ok("audience: 복제 묻기 단추의 위임 클릭은 ask 로 가지 않는다(붙잡기 단계에서 먹는다)", opened.length === 0 && e.dp && e.sp, { n: opened.length, dp: e.dp });
   e = dispatch(btn, 0);
-  ok("audience: 키보드 활성화(detail 0 click)도 ask 로 가지 않는다", opened.length === 1 && e.dp && e.sp && P.idx === 0, opened.length);
+  ok("audience: 키보드 활성화(detail 0 click)도 ask 로 가지 않는다", opened.length === 0 && e.dp && e.sp && P.idx === 0, opened.length);
   e = dispatch(P.slides[0], 1);
   ok("audience: 덱의 여느 누르기도 넘김이 아니고 먹는다", P.idx === 0 && e.dp, P.idx);
   H.stop();
-  dispatch(src[0].querySelector("button.itda-ask"), 1);
-  ok("audience 끝: 발표 밖(원본 단추)의 위임 클릭은 지금처럼 ask 로 간다", opened.length === 2, opened.length);
+  dispatch(src[0].querySelector("button.itda-section-ask"), 1);
+  ok("audience 끝: 발표 밖(원본 단추)의 위임 클릭은 지금처럼 ask 로 간다", opened.length === 1, opened.length);
 }
 
 // ---- 10. 펜만 판서(itda-doc#100 — present.js 머리 주석 「펜만 판서」): penOnly 면 판서는 pointerType "pen" 만 받는다. 판서 도구가 켜진 동안 펜이 아닌
@@ -1345,19 +1300,19 @@ const nextShown = w => { const b = nextBoxOf(w), c = b && b.firstElementChild; r
   H.stop();
 }
 {
-  // 사본 정리: 덱 장(P.slides)에 발표 중 붙은 판서 층·묻기 막대·코드 복사 단추·id·차트 재생·단계 표식이 사본에 남지 않고, 덱 장은 그대로다
+  // 사본 정리: 덱 장(P.slides)에 발표 중 붙은 판서 층·섹션 묻기 단추·코드 복사 단추·id·차트 재생·단계 표식이 사본에 남지 않고, 덱 장은 그대로다
   const w = world(), { P, H } = w;
   const btn = new El("button"), a = new El("a"); a.setAttribute("href", "https://example.com/");
   H.start({ pages: [marked(0), marked(1, [stepped(1), chartFig(), btn, a], 1), marked(2)], notes: [], index: 2, ratio: "16:9", onExit() {}, nextPreview: true });
   const s1 = P.slides[1];
   const layer = c => { const e = new El("svg"); e.className = c; return e; };
-  for (const c of ["ink-hl", "ink-pen", "ink-live", "ink-laser-page", "itda-askbar", "itda-codecopy"]) s1.appendChild(layer(c));
+  for (const c of ["ink-hl", "ink-pen", "ink-live", "ink-laser-page", "itda-section-ask", "itda-codecopy"]) s1.appendChild(layer(c));
   const body = s1.querySelector(".page-body"), tagged = body.appendChild(new El("div")); tagged.setAttribute("id", "dup");
   body.querySelector("figure").classList.add("chart-play");
   body.querySelector("p").classList.add("pr-pending");
   H.jump(0);
   const c = nextBoxOf(w).firstElementChild;
-  const left = [".ink-hl", ".ink-pen", ".ink-live", ".ink-laser-page", ".itda-askbar", ".itda-codecopy", "[id]", ".chart-play", ".pr-pending", ".pr-shown"].filter(s => c.querySelector(s));
+  const left = [".ink-hl", ".ink-pen", ".ink-live", ".ink-laser-page", ".itda-section-ask", ".itda-codecopy", "[id]", ".chart-play", ".pr-pending", ".pr-shown"].filter(s => c.querySelector(s));
   ok("보조 사본: 판서 층·입력 부품·id·차트 재생·단계 표식이 없다(다 나타난 모습)", nextShown(w) === "장1" && left.length === 0 && c.classList.contains("pr-static") && !c.classList.contains("pr-cur"), left);
   ok("보조 사본: 단추·링크는 포커스 차례에서 빠진다", c.querySelector("button").attrs.tabindex === "-1" && c.querySelector("a").attrs.tabindex === "-1");
   ok("보조 사본: 덱의 장은 건드리지 않는다", !!s1.querySelector(".ink-pen") && !!s1.querySelector("[id]") && !s1.querySelector("button").attrs.tabindex, Object.keys(s1.querySelector("button").attrs));

@@ -76,20 +76,19 @@ type View struct {
 	Logo string `json:"logo"`
 	// Info 는 제목 슬라이드에 쓸 문서 정보다(글자 값 — 화면은 textContent 로만 넣는다). 테마의 defaults 를 따른다.
 	Info map[string]string `json:"info"`
-	// Ask 는 코드 블록·슬라이드의 「Claude에게 묻기」「ChatGPT에게 묻기」 단추 설정이다(itda-hyve#896 — web/ask.js). 렌더는 채우지 않는다 — 호스트가
-	// 강의 목록 파일(lecture.yml 의 ask:)을 보고 채운다. 없으면(nil) 화면에 단추가 없다.
+	// Ask 는 호스트가 게시 강의의 섹션 묻기 단추를 켤 때 채운다(web/ask.js).
 	Ask   *AskView `json:"ask,omitempty"`
 	Error string   `json:"error,omitempty"`
 }
 
-// AskView 는 묻기 단추 설정이다(itda-hyve#896). Services 는 단추를 달 서비스("claude"·"chatgpt" — 그 차례), Course 는 과정 제목, Doc 은 교안 제목
-// (비면 화면이 문서 제목을 쓴다), Notes 는 노트를 실은 렌더인가(질문 글에 노트를 넣는다), Public 은 공개 묶음인가(질문 글에 슬라이드 주소를 붙인다)다.
+// AskView 는 강의 MCP로 읽을 문서와 새 대화를 열 서비스를 지정한다.
 type AskView struct {
 	Services []string `json:"services"`
 	Course   string   `json:"course"`
 	Doc      string   `json:"doc"`
-	Notes    bool     `json:"notes"`
-	Public   bool     `json:"public,omitempty"`
+	MCP      string   `json:"mcp"`             // 강의 MCP의 HTTPS 주소
+	DocID    string   `json:"doc_id"`          // list_documents의 doc
+	Guide    string   `json:"guide,omitempty"` // 커넥터 연결 안내 주소
 }
 
 // EditorCodeBlocks 는 렌더가 낸 편집기 코드 블록 토큰이다 — json 에 실리지 않는 값이라 앱이 필요할 때 EditorTokens 로 옮긴다.

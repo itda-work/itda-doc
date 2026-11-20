@@ -198,7 +198,7 @@
   function headClone(h, cont) {
     const t = document.createElement("div");
     t.className = "slide-title";
-    t.innerHTML = h.innerHTML;
+    for (const n of h.childNodes) t.appendChild(n.cloneNode(true));
     const first = !cont || cont.k === 1;
     if (h.id && first) t.id = h.id;
     if (h.dataset.line) t.dataset.line = h.dataset.line;
@@ -499,6 +499,8 @@
       pgs.forEach((pg, i) => {
         if (g.title && g.kind !== "section") {
           const hd = headBox(el("div", "slide-head"), g, pgs.length > 1 && { k: i + 1, n: pgs.length });
+          // 높이는 단추와 장 번호를 함께 재고, 이어지는 장의 제목 사본에서는 단추를 뗀다.
+          if (i > 0) for (const b of hd.querySelectorAll("button.itda-section-ask")) b.remove();
           pg.insertBefore(hd, pg.firstChild);
         }
         if (g.panel) pg.appendChild(slotBox(g.panel, i > 0));

@@ -236,6 +236,23 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
   .page-body a:where([href]:not(nav.toc a, .footnote-ref)):hover { color: var(--link-hover-ink); background-color: var(--link-hover-bg);
     box-shadow: 0 0 0 0.12em var(--link-hover-bg); text-decoration-color: var(--link-hover-line); text-decoration-thickness: 0.12em; }
 } }
+/* 섹션 묻기 이름은 복사·검색에 쓰는 제목 글자와 분리한다. */
+.itda-section-ask {
+  margin-inline-start: .5em;
+  padding: .15em .5em;
+  border: 1px solid currentColor;
+  border-radius: .35em;
+  color: inherit;
+  background: transparent;
+  font: 500 .75rem/1.4 sans-serif;
+  vertical-align: middle;
+  cursor: pointer;
+}
+.itda-section-ask::after { content: attr(data-label); }
+@media print {
+  .itda-section-ask { display: none !important; }
+}
+
 /* 제목 안 링크(itda-work/itda-hyve#621): 글자색은 제목 색이다(--link 가 아니다) — 링크 안 인라인 코드도 따라 제목 색이다(인라인 코드는
    제 글자색이 없다). 링크임은 옅은 밑줄로만 알리고 밑줄 색도 글자색(currentColor)을 옅게 섞는다. 슬라이드 제목 띠(.slide-title —
    slides.js headClone 이 제목 안 HTML 을 .page-body 밖에 옮긴다)도 같다 — 그 밖이라 위 링크 규칙이 닿지 않는다.
