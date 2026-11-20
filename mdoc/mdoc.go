@@ -49,8 +49,9 @@ type Options struct {
 	NoMath bool
 	// RequireFigureDesc 가 참이면 게시용 검사를 한다 — 그린 그림 가운데 글 설명이 없는 것마다 경고 figure-no-desc 를 하나 낸다:
 	// accDescr 가 없는 ```mermaid 그림(여는 펜스 줄 — title·accTitle 은 설명으로 치지 않는다, diagram.go state.diagram)과
-	// 캡션이 없는 :::chart(여는 줄, chart.go placeChart). 그리지 못한 블록(diagram·chart 경고가 나는 것)은 보지 않는다.
-	// 렌더 결과(HTML)는 바꾸지 않고 경고만 더한다. DropNotes 와 함께 켜면 뺀 노트 안의 그림은 보지 않는다.
+	// 캡션이 없는 :::chart(여는 줄, chart.go placeChart), 대체 글(alt)이 비었거나 공백뿐이거나 Deckset 지시 낱말뿐이라
+	// 렌더가 alt 를 비우는 이미지(이미지 줄, transform.go state.image — itda-work/itda-docs#5). 그리지 못한 블록(diagram·chart
+	// 경고가 나는 것)은 보지 않는다. 렌더 결과(HTML)는 바꾸지 않고 경고만 더한다. DropNotes 와 함께 켜면 뺀 노트 안의 그림·이미지는 보지 않는다.
 	// 게시 묶음을 만드는 호출자가 켠다(itda-work/itda-hyve#845). 기본은 거짓 — 이 경고를 내지 않는다.
 	RequireFigureDesc bool
 	// ReadInclude 는 코드 블록 src="상대 경로" 의 파일을 읽는다(itda-hyve#880, codesrc.go). rel 은 문서 폴더 기준의 정리된 상대 경로(슬래시 —
@@ -123,7 +124,7 @@ const (
 	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)
 	WarnTodosBody             = "todos-body"              // :::todos 안에 글이 있어 모음 대신 보통 상자로 그림(todos.go todosContainers, itda-doc#74)
 	WarnNoteRefScope          = "note-ref-scope"          // 노트 밖 참조가 발표자 노트 안의 참조 정의에만 맞아 정의 없는 글자로 둠 — 노트 안 정의는 그 노트 안에서만(refscope.go, itda-doc#89)
-	WarnFigureNoDesc          = "figure-no-desc"          // 그린 그림에 글 설명이 없음 — accDescr 없는 mermaid·캡션 없는 차트. Options.RequireFigureDesc 를 켠 렌더에서만, 렌더는 그대로(itda-work/itda-hyve#845)
+	WarnFigureNoDesc          = "figure-no-desc"          // 그린 그림에 글 설명이 없음 — accDescr 없는 mermaid·캡션 없는 차트·대체 글 없는 이미지. Options.RequireFigureDesc 를 켠 렌더에서만, 렌더는 그대로(itda-work/itda-hyve#845)
 	// 코드 블록 src=(itda-hyve#880, codesrc.go) — 불러오지 못한 블록은 그 자리에 오류 칸, 경고 줄은 여는 펜스 줄
 	WarnCodeSrcUnchecked   = "code-src-unchecked"   // 문서 경로 없이 렌더해(Options.ReadInclude 가 nil) src 를 확인하지 못함 — 오류 칸
 	WarnCodeSrcMissing     = "code-src-missing"     // src 파일이 없음·경로가 비었음·읽지 못함·보통 파일이 아님 — 오류 칸

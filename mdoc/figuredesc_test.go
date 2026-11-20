@@ -163,3 +163,99 @@ func TestFigureNoDescCacheIndependent(t *testing.T) {
 		t.Fatalf("경고: 켬 %v / 끔 %v", on1.Warnings, off.Warnings)
 	}
 }
+
+func TestFigureNoDescImage(t *testing.T) {
+	// 대체 글(alt)이 렌더에 남지 않는 이미지 — 빈 alt·공백 alt·Deckset 지시 낱말뿐인 alt — 에 figure-no-desc(이미지 줄, itda-work/itda-docs#5)
+	cases := []struct {
+		name, img string
+		warn      bool
+	}{
+		{"빈 alt", "![](a.png)", true},
+		{"공백 alt", "![   ](a.png)", true},
+		{"캡션만", `![](a.png "캡션")`, true},
+		{"Deckset fit", "![fit](a.png)", true},
+		{"Deckset left fit", "![left fit](a.png)", true},
+		{"모르는 Deckset 지시", "![filtered](a.png)", true},
+		{"설명", "![두 단계 흐름](a.png)", false},
+		{"설명 + 배치 속성", "![두 단계 흐름](a.png){.fit}", false},
+		{"글 속 이미지 설명", "앞 글 ![배지](b.png) 뒤 글", false},
+		{"글 속 빈 alt", "앞 글 ![](b.png) 뒤 글", true},
+		{"링크 안 빈 alt", "[![](b.png)](https://example.com)", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			// 문서: 1 머리 문단, 2 빈 줄, 3 이미지
+			src := "머리\n\n" + c.img + "\n"
+			ws := figureDescWarns(t, src, Options{RequireFigureDesc: true})
+			if c.warn && (len(ws) != 1 || ws[0].Line != 3) {
+				t.Fatalf("경고 = %v, 3번째 줄에 하나여야 함", ws)
+			}
+			if !c.warn && len(ws) != 0 {
+				t.Fatalf("설명 있는 이미지에 경고: %v", ws)
+			}
+			if ws := figureDescWarns(t, src, Options{}); len(ws) != 0 {
+				t.Fatalf("옵션을 끄면 경고가 없어야 함: %v", ws)
+			}
+		})
+	}
+}
+
+func TestFigureNoDescImageHTMLSame(t *testing.T) {
+	// 옵션은 HTML 을 바꾸지 않는다 — 경고만 더한다
+	src := []byte("![](a.png)\n\n![fit](b.png)\n\n앞 ![](c.png) 뒤\n")
+	on, err := Render(src, Options{RequireFigureDesc: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	off, err := Render(src, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if on.HTML != off.HTML {
+		t.Fatal("옵션이 HTML 을 바꿈")
+	}
+	if len(on.Warnings)-3 != len(off.Warnings) {
+		t.Fatalf("경고: 켬 %v / 끔 %v", on.Warnings, off.Warnings)
+	}
+}
+
+func TestFigureNoDescImageNotes(t *testing.T) {
+	// 노트 안 이미지는 mermaid·차트와 같다 — DropNotes 면 보지 않고, 아니면 본다
+	src := "본문\n\n:::notes\n\n![](a.png)\n\n:::\n"
+	if ws := figureDescWarns(t, src, Options{RequireFigureDesc: true, DropNotes: true}); len(ws) != 0 {
+		t.Fatalf("DropNotes 면 노트 안 이미지에 경고가 없어야 함: %v", ws)
+	}
+	if ws := figureDescWarns(t, src, Options{RequireFigureDesc: true}); len(ws) != 1 || ws[0].Line != 5 {
+		t.Fatalf("DropNotes 없이는 노트 안 이미지에 경고 하나(5번째 줄)여야 함: %v", ws)
+	}
+}
+
+func TestFigureNoDescNestedImage(t *testing.T) {
+	// 다른 이미지의 alt 안에 든 이미지는 렌더되지 않으므로 보지 않는다 — 렌더되는 바깥 이미지만 본다(HTML 은 옵션과 무관)
+	cases := []struct {
+		name, src string
+		n         int
+	}{
+		{"바깥 설명 있음", "![바깥 설명 ![](b.png)](a.png)\n", 0},
+		{"바깥 설명도 없음", "![![](b.png)](a.png)\n", 1},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ws := figureDescWarns(t, c.src, Options{RequireFigureDesc: true})
+			if len(ws) != c.n || (c.n == 1 && ws[0].Line != 1) {
+				t.Fatalf("경고 = %v, %d 개여야 함", ws, c.n)
+			}
+			on, err := Render([]byte(c.src), Options{RequireFigureDesc: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			off, err := Render([]byte(c.src), Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if on.HTML != off.HTML || strings.Contains(on.HTML, "b.png") {
+				t.Fatalf("HTML: %s / %s", on.HTML, off.HTML)
+			}
+		})
+	}
+}
