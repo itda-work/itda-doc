@@ -580,7 +580,8 @@ func (st *state) image(img *ast.Image) {
 		}()
 	}
 	// Deckset 호환(itda-hyve#550): alt 가 지시 낱말로만 이루어졌으면 배치 지시다. 아래 {…} 의 배치 클래스가 있으면 그쪽이 이긴다.
-	if alt := plainText(img, st.src); alt != "" {
+	alt := plainText(img, st.src)
+	if alt != "" {
 		if place, fill, known, ok := decksetAlt(alt); ok {
 			info.noAlt = true
 			if known {
@@ -589,6 +590,12 @@ func (st *state) image(img *ast.Image) {
 				st.warn(line, WarnBadAttribute, fmt.Sprintf("Deckset 그림 지시 %q 는 받지 않아 보통 그림으로 둠(받는 것: left·right·left fit·right fit·fit·inline)", alt))
 			}
 		}
+	}
+	if st.opts.RequireFigureDesc && (strings.TrimSpace(alt) == "" || info.noAlt) && !inImage(img) {
+		// 게시용 검사(Options.RequireFigureDesc, itda-work/itda-docs#5) — 렌더가 alt 로 내는 글이 없는 그림: alt 가 비었거나 공백뿐,
+		// 또는 Deckset 지시 낱말뿐이라 alt 를 비우는 것(noAlt — 위 decksetAlt). 렌더는 그대로다. 다른 이미지의 alt 안에 든 이미지
+		// (![바깥 ![](b.png)](a.png) 의 b.png)는 렌더되지 않으므로(render.go 가 바깥 이미지의 자식을 걷지 않는다) 보지 않는다
+		st.warn(line, WarnFigureNoDesc, "그림에 설명이 없음 — ![설명](경로) 의 대괄호 안에 설명을 적는다(Deckset 배치는 {.fit} 같은 속성으로)")
 	}
 
 	// 바로 뒤의 {…} (Pandoc link_attributes). 글자 노드가 쪼개져 있을 수 있어 이어 붙여 본다.
@@ -651,6 +658,17 @@ func (st *state) image(img *ast.Image) {
 		st.warn(line, WarnBadAttribute, "이미지 속성은 width·split(YouTube 그림은 poster 도)과 클래스 .fit·.fill·.left·.right·.full 만 받아 나머지는 버림")
 	}
 	cutFront(img.Parent(), t, start+end+1)
+}
+
+// inImage 는 그림이 다른 이미지의 alt 안에 있는지다 — 그런 그림은 HTML 에 나가지 않는다(렌더는 바깥 이미지의 자식을 걷지 않고,
+// 바깥 이미지의 alt 를 만들 때도 건너뛴다 — headings.go inlineText).
+func inImage(n ast.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		if _, ok := p.(*ast.Image); ok {
+			return true
+		}
+	}
+	return false
 }
 
 // inLink 는 그림이 링크 안에 있는지다 — 링크 안의 YouTube 주소 그림은 사용자 링크가 이기므로 YouTube 블록으로 만들지 않는다.
