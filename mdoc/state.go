@@ -55,7 +55,7 @@ type state struct {
 	// 글 안 수식 탐색 예산의 남은 양(문단마다) — math.go
 	mathBudget    map[ast.Node]int
 	textPctWarned map[int]bool     // 경고한 \text{…} 속 주석 % 의 원문 자리(textPctLoss — 같은 % 를 여러 시도가 지나도 한 번, itda-hyve#591)
-	delims        map[ast.Node]int // 블록마다 읽은 강조·취소선 구분자 수 — cjk.go 의 상한
+	delims        map[ast.Node]int // 블록마다 읽은 강조·취소선·형광펜 구분자 수 — cjk.go 의 상한
 	closers       map[ast.Node]int // 블록마다 링크로 닫아 본 ] 의 수 — linkclose.go
 	// 블록 중첩 상한 — nesting.go. nestingLimit 은 시험만 바꾼다(상한 없는 파서로 실제 깊이를 잴 때)
 	nestingLimit int
@@ -118,6 +118,7 @@ func newState(src []byte, meta Meta, opts Options) *state {
 				util.Prioritized(&linkCloserGuard{st: st}, 199), // 링크(200)보다 앞 — linkclose.go
 				util.Prioritized(cjkEmphasisParser{st}, 499),
 				util.Prioritized(cjkStrikeParser{st}, 499),
+				util.Prioritized(cjkMarkParser{st}, 499), // 형광펜 ==글== (cjk.go, itda-hyve#992)
 				// GFM 자동 링크. extension.Linkify 와 같은 파서·우선순위를 이차 시간을 막는 덮개로 감싼다(linkify.go)
 				util.Prioritized(newLinkifyGuard(), 999),
 				// 수식은 코드(`)·링크보다 뒤에 돈다 — 먼저 시작한 것이 이긴다. 강조 구분자보다 앞이라 수식 안의 _·* 는 TeX 다

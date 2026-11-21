@@ -40,6 +40,7 @@
   --link-hover-ink: color-mix(in srgb, var(--accent) 75%, black);
   --link-hover-bg: var(--accent-soft);
   --link-hover-line: var(--accent);
+  --mark-bg: #fff1a8;
 
   --page-margin-top: 25mm;
   --page-margin-right: 20mm;
@@ -287,9 +288,10 @@ body.paper-a4-landscape { --page-w: 297mm; --page-h: 210mm; }
 .page-body a code { color: var(--ink); }
 .page-body :where(h1, h2, h3, h4, h5, h6) a code { color: inherit; }
 .page-body strong { font-weight: 700; }
-/* mark 글자색·kbd 테두리·del 글자색(아래)·각주 번호 위치는 --mark-ink·--kbd-line·--del-ink·--footnote-align 을 먼저 본다. 평소엔 값이 없어 뒤의 기본값이고,
+/* 형광펜(==글==·<mark>) 바탕은 테마 토큰 --mark-bg(:root 기본 노랑)다.
+   mark 글자색·kbd 테두리·del 글자색(아래)·각주 번호 위치는 --mark-ink·--kbd-line·--del-ink·--footnote-align 을 먼저 본다. 평소엔 값이 없어 뒤의 기본값이고,
    값을 주는 곳은 강조색 면 표 머리뿐이다(아래 회의록·절차 어휘 블록의 .actions th). 까닭은 그 블록의 주석 */
-.page-body mark { background: #fff1a8; color: var(--mark-ink, inherit); padding: 0 1pt; }
+.page-body mark { background: var(--mark-bg, #fff1a8); color: var(--mark-ink, inherit); padding: 0 1pt; }
 .page-body kbd { font-family: var(--font-mono); font-size: 0.85em; border: 0.75pt solid var(--kbd-line, var(--rule)); border-bottom-width: 1.5pt; border-radius: 2pt; padding: 0 3pt; }
 .page-body hr { border: 0; border-top: 0.75pt solid var(--rule); margin: 10pt 0; }
 .page-body img { max-width: 100%; max-height: var(--img-max-h, 200mm); }
@@ -999,7 +1001,7 @@ nav.toc .toc-section-number { margin-right: 3pt; }
    - 링크·각주·가리킴: currentColor — --table-head-ink 나 --accent-ink 를 박지 않아 compact 처럼 color 를 직접 정한 테마, 어두운 --accent-ink 의
      kakao, 그리고 mark·kbd 안(그 안 글자색)까지 한 값으로 맞는다. 가리킴은 면을 깔지 않고 밑줄(--link-hover-line)만 굵어진다
    - code: 투명 바탕 + 글자색 안쪽 테두리. 다른 머리처럼 글자색 16% 를 깔면 빠듯한 면에서 대비가 깨진다(swiss 흰 / #e72e39 4.33:1, 면 그대로면 4.88:1)
-   - mark: 노랑 바탕 고정이라 글자는 먹색, del: --muted 대신 머리 글자색, kbd: 테두리를 글자색으로
+   - mark: 바탕이 머리색이 아닌 형광 면(--mark-bg, 기본 노랑)이라 글자는 먹색, del: --muted 대신 머리 글자색, kbd: 테두리를 글자색으로
    값만 토큰으로 주고 그 토큰을 기존 규칙(.page-body mark 등)이 읽는다. 어휘 규칙은 특이도 0 이라 color·background 를 직접 정하면
    .page-body mark (0,1,1)·.page-body th code (0,1,2)를 이기지 못하고, 그 규칙들을 .actions 로 올리면 같은 특이도의 회사 테마 규칙을 이기게 된다.
    회사 테마는 .page-body mark 같은 제 규칙이나 .actions th 의 같은 토큰으로 덮는다. 단 .actions 에 --link 를 두면 이 규칙이 th 에서 다시 정해 닿지 않는다.

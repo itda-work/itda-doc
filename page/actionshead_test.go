@@ -39,7 +39,7 @@ func TestActionsHeadInlineBaseCSS(t *testing.T) {
 		}
 	}
 	for _, want := range []string{
-		`.page-body mark { background: #fff1a8; color: var(--mark-ink, inherit);`,
+		`.page-body mark { background: var(--mark-bg, #fff1a8); color: var(--mark-ink, inherit);`,
 		`border: 0.75pt solid var(--kbd-line, var(--rule));`,
 		`.page-body del { color: var(--del-ink, var(--muted)); }`,
 		`.page-body th code { color: inherit; background: var(--head-code-bg, transparent); }`,

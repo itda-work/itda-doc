@@ -12,6 +12,7 @@ import (
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer"
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/testutil"
 	"github.com/yuin/goldmark/util"
@@ -30,15 +31,25 @@ func plainGoldmark(t *testing.T, src string) string {
 	return strings.TrimSuffix(strings.TrimPrefix(buf.String(), "<p>"), "</p>\n")
 }
 
+// cjkFriendlyGoldmark 은 이 패키지의 강조·취소선·형광펜 파서를 얹은 goldmark 다. 형광펜(==)도 넣어 CommonMark 예제·취소선 시험이
+// 형광펜 파서까지 함께 묶는다(itda-hyve#992 — = 가 든 예제가 달라지면 TestCommonMarkSpecUnchanged 가 실패한다).
 func cjkFriendlyGoldmark(exts ...goldmark.Extender) goldmark.Markdown {
 	return goldmark.New(
 		goldmark.WithExtensions(exts...),
-		goldmark.WithRendererOptions(html.WithUnsafe()),
+		goldmark.WithRendererOptions(html.WithUnsafe(), renderer.WithNodeRenderers(util.Prioritized(markOnlyRenderer{}, 100))),
 		goldmark.WithParserOptions(parser.WithInlineParsers(
 			util.Prioritized(cjkEmphasisParser{}, 499),
 			util.Prioritized(cjkStrikeParser{}, 499),
+			util.Prioritized(cjkMarkParser{}, 499),
 		)),
 	)
+}
+
+// markOnlyRenderer 는 Mark 노드만 그린다(패키지 렌더러는 state 가 있어야 해서 시험에서 따로 둔다).
+type markOnlyRenderer struct{}
+
+func (markOnlyRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
+	reg.Register(KindMark, (&htmlRenderer{}).mark)
 }
 
 type specExample struct {

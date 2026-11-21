@@ -137,6 +137,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--link-hover-ink` | 화면에서 링크를 가리킬 때 글자색(hover 는 color-mix 를 아는 엔진에서만. 평소 밑줄은 링크 색을 옅게, PDF 에도) | `color-mix(in srgb, var(--accent) 75%, black)` |
 | `--link-hover-bg` | 가리킬 때 링크 뒤 면 | `var(--accent-soft)` |
 | `--link-hover-line` | 가리킬 때 밑줄 색 | `var(--accent)` |
+| `--mark-bg` | 형광펜(`==글==`·`<mark>`) 바탕(`web/base.css` 의 `.page-body mark`). 색은 문서마다 고르지 않고 테마가 한 가지로 정한다 — 내장 `graphite` 는 회색 면 `#e3e3e3`. 형광펜 글자색은 아래 `--mark-ink` | `#fff1a8` |
 | `--page-margin-top` | 쪽 위 여백(`margin.top` 과 같다) | `25mm` |
 | `--page-margin-right` | 쪽 오른쪽 여백 | `20mm` |
 | `--page-margin-bottom` | 쪽 아래 여백 | `22mm` |
@@ -273,6 +274,8 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--page-w` | 쪽 너비 — 앱이 용지(`papersize`)로 정한다, 테마가 줄 수 없음 | `210mm` |
 | `--page-h` | 쪽 높이 — 앱이 정한다, 테마가 줄 수 없음 | `297mm` |
 <!-- tokens:end -->
+
+형광펜 글자색 `--mark-ink` 는 표에 없는 지역 토큰이다 — `:root` 기본값이 없고, 값이 없으면 `.page-body mark` 가 둘레 글자색을 물려받는다(`var(--mark-ink, inherit)`). base 는 할 일 표 머리 안에서만 `--ink` 로 정한다(5장). 테마는 `.actions th` 같은 자리에서 `--mark-ink` 를 정하거나, `--mark-bg` 를 어둡게 바꿀 때 글자가 읽히도록 `--mark-ink` 를 함께 정한다(`theme.json` `tokens` 에 두면 `:root` 값이 되어 본문 형광펜 전체에 걸린다 — 할 일 표 머리 규칙은 그 안에서 다시 `--ink` 로 정한다). 바탕과 글자의 대비는 테마의 몫이다(base 는 계산하지 않는다 — 내장 테마는 `page/styletheme_test.go` 의 쌍이 본다).
 
 테마는 자기 토큰을 더 만들어 `theme.css` 에서 써도 된다(내장 `classic` 의 `--accent-2`·`--accent-3`, `spine` 의 `--highlight`).
 창 틀이 쓰는 이름(`--ui-…`·`--wails-…`·`--editor-w` 등 호스트 앱 창 틀 CSS 의 변수)과 `--page-w`·`--page-h`·`--img-max-h` 는 줄 수 없다.
