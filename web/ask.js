@@ -1,6 +1,8 @@
 // 호스트가 set(cfg, host)로 강의 MCP와 번들 문서를 지정하면 armSections(flow)가 원문 직계 제목에
 // 서비스별 단추를 단다. 쪽·장으로 나누기 전에 같은 id의 순번을 매긴다. 누르면 섹션 참조와 설명 요청을
-// 담은 새 대화를 연다. 제목의 표시 이름은 CSS가 그리고, 읽는 이름과 기록 안내는 단추 속성에 둔다.
+// 담은 새 대화를 연다. 단추는 제목의 첫 자식으로 넣어 CSS(base.css .itda-section-ask)가 제목 오른쪽 끝에 띄운다.
+// 아이콘은 CSS가 그리고, 읽는 이름은 aria-label, 툴팁은 브라우저 기본 툴팁(title — 첫 줄 이름, 둘째 줄 기록 안내)이다.
+// 단추 안에 글자 노드가 없어 제목 글자의 복사·검색에 섞이지 않는다.
 (function (root) {
   "use strict";
 
@@ -52,20 +54,20 @@
       if (!current || !str(h.id) || h.closest(".notes")) continue;
       const nth = (counts.get(h.id) || 0) + 1;
       counts.set(h.id, nth);
-      const title = headingName(h);
+      const title = headingName(h), at = h.firstChild;
       for (const service of current.services) {
         const b = root.document.createElement("button");
         b.type = "button";
         b.className = "itda-section-ask";
-        const label = services[service].name + "에게 묻기";
+        const label = services[service].name + "에 묻기";
         b.dataset.label = label;
         b.setAttribute("aria-label", label);
-        b.title = notice;
+        b.title = label + "\n" + notice;
         b.dataset.service = service;
         b.dataset.section = h.id;
         b.dataset.nth = String(nth);
         b.dataset.title = title;
-        h.appendChild(b);
+        if (at) h.insertBefore(b, at); else h.appendChild(b);
       }
     }
   }
