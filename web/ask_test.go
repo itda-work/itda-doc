@@ -12,7 +12,7 @@ import (
 )
 
 // 원문 제목의 섹션 식별자와 서비스별 새 대화 주소를 확인한다.
-const askCases = 49
+const askCases = 54
 
 func TestAsk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -67,7 +67,8 @@ func TestAskFS(t *testing.T) {
 		t.Fatalf("FS 에 ask.js 가 없다: %v", err)
 	}
 	s := string(b)
-	for _, bad := range []string{"clipboard", "armSlides", "codeButtons", "itda-asknote", "slideText", ".style.", "setAttribute(\"style\"", "eval(", "new Function", "window.go", "window.runtime"} {
+	// 툴팁은 브라우저 기본 title 이다 — 자리를 재는 문서 리스너·aria-description 은 두지 않는다(itda-hyve#988 접근 방식 변경).
+	for _, bad := range []string{"clipboard", "armSlides", "codeButtons", "itda-asknote", "slideText", ".style.", "setAttribute(\"style\"", "eval(", "new Function", "window.go", "window.runtime", "aria-description", "pointerover", "focusin", "data-tip"} {
 		if strings.Contains(s, bad) {
 			t.Errorf("ask.js 에 %q", bad)
 		}
@@ -80,8 +81,25 @@ func TestAskFS(t *testing.T) {
 		t.Error("공유 화면에서 ask.js를 싣지 않는다")
 	}
 	css, _ := fs.ReadFile(FS, "base.css")
-	if !strings.Contains(string(css), ".itda-section-ask::after { content: attr(data-label); }") ||
-		!strings.Contains(string(css), "@media print {\n  .itda-section-ask { display: none !important; }") {
-		t.Error("섹션 단추의 화면 이름 또는 인쇄 숨김 규칙이 없다")
+	// 아이콘(::before 의 mask-image)·자리(float)·인쇄 숨김. 툴팁은 CSS 로 그리지 않는다(::after·data-tip 규칙 없음).
+	for _, bad := range []string{".itda-section-ask::after", ".itda-section-ask[data-tip", "attr(aria-description)"} {
+		if strings.Contains(string(css), bad) {
+			t.Errorf("base.css 에 CSS 툴팁 규칙 %q 이 남았다", bad)
+		}
+	}
+	for _, want := range []string{
+		".itda-section-ask {\n  float: right;",
+		".itda-section-ask[data-service=\"claude\"]::before { mask-image: url(\"data:image/svg+xml,",
+		".itda-section-ask[data-service=\"chatgpt\"]::before { mask-image: url(\"data:image/svg+xml,",
+		"@media print {\n  .itda-section-ask { display: none !important; }",
+	} {
+		if !strings.Contains(string(css), want) {
+			t.Errorf("섹션 단추의 아이콘·자리·인쇄 숨김 규칙이 없다: %q", want)
+		}
+	}
+	// 상표 아이콘의 출처·표기 파일이 묶음에 든다.
+	lic, err := fs.ReadFile(FS, "LICENSE-ask-icons.txt")
+	if err != nil || !strings.Contains(string(lic), "상표") {
+		t.Errorf("FS 에 아이콘 출처·상표 표기(LICENSE-ask-icons.txt)가 없다: %v", err)
 	}
 }
