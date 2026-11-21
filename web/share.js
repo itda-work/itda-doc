@@ -1007,6 +1007,81 @@
     return { hidden: !has, open, drawer: !panel.wide, back: open && !panel.wide };
   }
 
+  // ---- 목차 따라 굴리기(itda-hyve#991). 지금 항목이 바뀌면 그 항목이 목차를 굴리는 상자(tocScroller) 안에 보이게 그 상자의 scrollTop 만
+  // 바꾼다 — scrollIntoView 는 조상(창·본문 보기 영역)까지 굴릴 수 있어 쓰지 않는다. 문서 창 app.js tocReveal 과 규칙이 같고, 다른 것은
+  // 상자 안에 sticky 로 붙은 것(묶은 교안의 저작권 줄 .pack-side-foot — #979)이 가린 곳을 보이는 영역에서 뺀다는 것뿐이다(문서 창에는 없다).
+  const TOC_REVEAL_PAD = 24;
+  // tocCover 는 상자 rect(box — top·bottom)에서 sticky 로 붙은 것들(rects — 그 사각형들)이 가린 위·아래 높이다 — { top, bottom }.
+  // 가운데가 상자 아래쪽 반에 있으면 아래를, 위쪽 반이면 위를 가린 것으로 본다. 상자 밖이거나 높이가 없는 것은 세지 않는다.
+  function tocCover(box, rects) {
+    const c = { top: 0, bottom: 0 }, mid = (box.top + box.bottom) / 2;
+    for (const r of rects || []) {
+      if (!r || !(r.bottom > r.top) || r.bottom <= box.top || r.top >= box.bottom) continue;
+      if ((r.top + r.bottom) / 2 >= mid) c.bottom = Math.max(c.bottom, box.bottom - Math.max(r.top, box.top));
+      else c.top = Math.max(c.top, Math.min(r.bottom, box.bottom) - box.top);
+    }
+    return c;
+  }
+  // tocRevealTop 은 항목 rect(item)가 상자 rect(box) 안 보이는 영역 — 가린 높이(cover — tocCover)를 뺀 곳 — 에 여유 pad(기본 24px)를 두고
+  // 들게 하는 상자의 새 scrollTop 이다. 이미 들면 st 그대로. 위로 넘치면 위에, 아래로 넘치면 아래에 맞추되 항목이 영역보다 높으면 위에 맞춘다.
+  // 0 아래로는 내리지 않는다(위 끝은 브라우저가 scrollHeight 로 자른다).
+  function tocRevealTop(item, box, cover, st, pad) {
+    const p = pad === undefined ? TOC_REVEAL_PAD : pad, c = cover || { top: 0, bottom: 0 };
+    const top = box.top + c.top + p, bottom = box.bottom - c.bottom - p;
+    let d = 0;
+    if (item.top < top) d = item.top - top;
+    else if (item.bottom > bottom) d = Math.min(item.bottom - bottom, item.top - top);
+    return d ? Math.max(0, st + d) : st;
+  }
+  // tocScroller 는 목차(nav — #side-toc)를 굴리는 상자다: 목차 자신이 굴러가는 꼴(묶은 교안의 「첨부」 가 있는 사이드바 — #987, #side-toc 이
+  // overflow auto)이면 목차, 아니면 사이드바(side — #sidebar). style(el) 은 계산된 스타일(getComputedStyle)이다.
+  function tocScroller(nav, side, style) {
+    const o = nav && style ? style(nav).overflowY : "";
+    return o === "auto" || o === "scroll" ? nav : side;
+  }
+  // tocReveal 은 nav 의 강조 항목(접힌 가지 안이면 보이는 조상 a.on-within, 아니면 a.on)이 보이게 굴리는 상자(tocScroller)만 굴린다.
+  // 사이드바가 숨었거나(hidden·서랍이 닫힘 — no-toc 로 display none) 항목이 보이지 않으면(getClientRects 가 빔) 아무것도 하지 않는다.
+  // 가림은 상자의 자식 가운데 position sticky 인 것만 잰다. win 은 getComputedStyle 을 가진 창이다. 굴렸으면 참.
+  function tocReveal(nav, side, win) {
+    const on = nav && (nav.querySelector("a.on-within") || nav.querySelector("a.on"));
+    if (!on || !side || side.hidden || nav.hidden || !on.getClientRects().length) return false;
+    const style = el => win.getComputedStyle(el), box = tocScroller(nav, side, style);
+    const sticky = [];
+    for (const el of box.children) if (el !== on && style(el).position === "sticky") sticky.push(el.getBoundingClientRect());
+    const b = box.getBoundingClientRect(), st = box.scrollTop;
+    const next = tocRevealTop(on.getBoundingClientRect(), b, tocCover(b, sticky), st);
+    if (next === st) return false;
+    box.scrollTop = next;
+    return true;
+  }
+  // tocRevealer 는 언제 굴릴지(tocReveal 을 언제 부를지)를 쥔다. raf(fn)·caf(id) 는 requestAnimationFrame·cancelAnimationFrame 이고,
+  // run() 은 굴리기 하나다. 예약은 늘 하나이고 다음 그림 차례에 한 번 돈다 — 본문 scroll·그리기 도중에 다른 상자를 굴리지 않게.
+  //  - see(cur): 지금 항목. 앞 항목과 다르고 비지 않았을 때만 예약한다 — 사람이 목차를 굴려 보는 동안 본문이 조금 움직였다고 되돌리지 않는다.
+  //  - doc(key): 그리는 문서의 열쇠. 앞 문서와 다르면 앞 항목을 잊는다 — 새 문서의 첫 see 가 같은 id 여도 그 문서 목차로 맞춘다.
+  //    같은 문서를 다시 그리면(같은 열쇠) 그대로다.
+  //  - open(): 목차를 열었다 — 닫힌 동안 굴리지 못한 것을 한 번 맞춘다.
+  //  - cancel(): 사람이 목차 상자를 만졌다(휠·터치·누름·키) — 남은 예약을 버린다. 그 뒤 지금 항목이 다시 바뀌면 또 예약한다.
+  function tocRevealer(raf, caf, run) {
+    const r = { cur: "", key: undefined, frame: 0 };
+    const fire = () => { r.frame = 0; run(); };
+    const schedule = () => { if (!r.frame) r.frame = raf(fire) || -1; };
+    r.see = cur => { if (cur && cur !== r.cur) schedule(); r.cur = cur; };
+    r.doc = key => { if (key !== r.key) { r.key = key; r.cur = ""; } };
+    r.open = schedule;
+    r.cancel = () => { if (r.frame) { if (r.frame !== -1) caf(r.frame); r.frame = 0; } };
+    r.pending = () => r.frame !== 0;
+    return r;
+  }
+  // tocDocKey 는 tocRevealer.doc 에 넘기는, 그리는 문서의 열쇠다: 원천의 foldKey(v)(공유·게시 화면 — 주소 경로 + 폴더 공유의 문서)가 있으면 그것,
+  // 없으면 원천의 current()(웹 뷰어 — 문서를 열 때마다 새 객체, 같은 문서를 다시 그리면 같은 객체), 그것도 없으면 v.doc.
+  function tocDocKey(source, v) {
+    if (source && typeof source.foldKey === "function") return String(source.foldKey(v) || "");
+    if (source && typeof source.current === "function") return source.current();
+    return v && v.doc !== undefined ? v.doc : undefined;
+  }
+  // TOC_TOUCH 는 목차 상자에서 사람이 굴리거나 만졌다고 보는 이벤트다(scroll 은 넣지 않는다 — tocReveal 이 바꾼 scrollTop 도 scroll 을 낸다).
+  const TOC_TOUCH = ["wheel", "touchstart", "pointerdown", "keydown"];
+
   // slideZoom 은 보는 화면 슬라이드 보기의 배율이다(⑥): 보기 영역(viewerW×viewerH)에서 여백(gutter — 가로, gutterV — 세로, 없으면 gutter)을
   // 뺀 자리에 슬라이드(slideW×slideH) 한 장이 들도록 너비·높이 가운데 작은 쪽에 맞춘다. 상한 1.6·하한 0.2 — 하한에 걸리는 아주 작은 보기 영역에서는
   // 일부가 잘린다(쪽 보기는 너비만 — applyZoom).
@@ -1437,7 +1512,7 @@
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
-    tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
+    tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
@@ -1878,6 +1953,8 @@
 
   const toc = tocPanel();
   let tocIds = [], tocFrame = 0, tocKeep = -1;
+  // 목차 따라 굴리기(itda-hyve#991 — tocRevealer): 굴리는 것은 tocReveal(사이드바나 목차 상자만), 공유가 끝났으면 굴리지 않는다
+  const revealer = tocRevealer(f => requestAnimationFrame(f), id => cancelAnimationFrame(id), () => { if (!state.ended) tocReveal($("side-toc"), $("sidebar"), window); });
   const findHeading = headingFinder($("pages")); // 제목은 그린 본문(#pages) 안에서만 찾는다
   // 목차 접기(itda-hyve#985): 문서마다 기억(foldPrefs — 이 브라우저의 localStorage, 열쇠는 원천의 foldKey(v) — 없거나 "" 면 기억 없이 이 화면 메모리만)하고,
   // 열쇠가 바뀌면(폴더 공유의 다른 문서) 새 상태를 만든다.
@@ -1890,6 +1967,7 @@
   // paintTOC 는 view 의 목차를 사이드바에 그린다(오류 view·제목 없는 문서면 비움 — 단추·사이드바를 숨긴다).
   function paintTOC(v) {
     const has = v && !v.error && Array.isArray(v.toc) && v.toc.length > 0;
+    revealer.doc(tocDocKey(source, v)); // 다른 문서면 앞 지금 항목을 잊는다 — 첫 paintTocOn 이 새 목차로 맞춘다(같은 문서 다시 그리기는 그대로)
     if (has) {
       const key = typeof source.foldKey === "function" ? String(source.foldKey(v) || "") : "";
       if (key !== foldKey) { foldKey = key; fold = key ? tocFold(foldPrefs.load(key), m => foldPrefs.save(key, m)) : tocFold(null, null); }
@@ -1953,6 +2031,8 @@
         a.classList.toggle("on", a.dataset.id === cur);
         a.classList.toggle("on-within", shown !== cur && a.dataset.id === shown);
       }
+      // 지금 항목이 바뀌었을 때만 굴린다 — 사람이 목차를 굴려 보는 동안 본문이 조금 움직였다고 되돌리지 않는다(itda-hyve#991)
+      revealer.see(cur);
     }
     hook("tick");
   }
@@ -2269,11 +2349,14 @@
   $("btn-toc").addEventListener("click", () => {
     const v = $("viewer");
     tocKeep = toc.wide && v.scrollHeight > 0 ? v.scrollTop / v.scrollHeight : -1;
-    toc.toggle();
+    // 닫혀 있는 동안 바뀐 지금 항목은 굴리지 못했다 — 열 때 한 번 맞춘다(사람이 연 것이라 목차를 굴려 보던 중이 아니다)
+    if (toc.toggle()) revealer.open();
     paintTocPanel();
   });
   $("toc-back").addEventListener("click", () => closeTocDrawer());
   // 접기 단추는 접거나 펼 뿐이다 — 옮기지 않고, 서랍을 닫지 않고, 따라가기를 풀지 않는다(itda-hyve#985)
+  // 사람이 목차 상자(사이드바 — 목차 상자 #side-toc 은 그 안이라 이벤트가 올라온다)를 굴리거나 만지면 남은 굴림 예약을 버린다(tocRevealer.cancel)
+  for (const t of TOC_TOUCH) $("sidebar").addEventListener(t, () => revealer.cancel(), { passive: true, capture: true });
   $("side-toc").addEventListener("click", e => {
     const b = e.target.closest && e.target.closest("button.toc-tg");
     if (!b) return;
