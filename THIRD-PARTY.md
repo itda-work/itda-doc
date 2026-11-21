@@ -35,3 +35,4 @@
 | Pretendard(regular·semibold·bold woff2) | `web/fonts/` | SIL Open Font License 1.1 — `web/fonts/OFL-Pretendard.txt` |
 | Noto Serif KR(Bold, 한글·라틴 subset woff2 — editorial 테마) | `themes/editorial/assets/` | SIL Open Font License 1.1 — `themes/editorial/assets/OFL-NotoSerifKR.md` |
 | Lucide 아이콘 모양(공유 화면 `share.html` 의 심볼) | `web/share.html` | ISC(일부 MIT — Feather) — `web/LICENSE-Lucide.txt` |
+| Claude·OpenAI 서비스 아이콘(섹션 묻기 단추) | `web/base.css` `.itda-section-ask` | 각 회사의 상표 — 출처(Simple Icons 묶음 CC0-1.0·OpenAI 공식 로고 묶음)·상표 지침·표기는 `web/LICENSE-ask-icons.txt`. 묶음의 CC0 는 로고 사용 허락이 아니다 |

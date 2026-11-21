@@ -131,7 +131,9 @@ class El {
   blur() { this.blurred = true; }
 }
 const h = (tag, attrs, ...kids) => { const e = new El(tag); for (const k in attrs || {}) e.setAttribute(k, attrs[k]); e.append(...kids); return e; };
-const doc = { documentElement: { lang: "ko" }, createElement: tag => new El(tag) }, opened = [];
+// docOn 은 문서에 걸린 리스너 목록이다 — 묻기 단추는 문서 리스너를 걸지 않는다(아래 「문서 리스너 없음」).
+const docOn = {};
+const doc = { documentElement: { lang: "ko" }, createElement: tag => new El(tag), addEventListener: (t, f) => (docOn[t] = docOn[t] || []).push(f) }, opened = [];
 const win = { document: doc, open: (...args) => opened.push(args) };
 vm.runInNewContext(fs.readFileSync(askPath, "utf8"), { window: win, URL });
 const A = win.ItdaAsk;
@@ -151,13 +153,18 @@ A.set(cfg);
 A.armSections(box);
 A.armSections(box);
 eq("두 제목에 서비스마다 한 번", box.querySelectorAll("button").map(b => b.parentElement.textContent), ["시작", "시작", "복습", "복습"]);
+// 단추는 제목 글자 앞(첫 자식들)에 서비스 차례대로 든다 — CSS가 float으로 제목 오른쪽 끝에 띄운다. 단추 안에는 글자 노드가 없다.
+eq("단추는 제목 글자 앞에 서비스 차례로·글자 없음", [first, second].map(t => t.childNodes.map(n => n.nodeType === 1 ? n.dataset.service + ":" + n.childNodes.length : n.data)),
+  [["claude:0", "chatgpt:0", "시작"], ["claude:0", "chatgpt:0", "복습"]]);
 const click = b => A.handler()({ target: b, preventDefault() {}, stopPropagation() {} });
 for (const [index, title] of [first, second].entries()) {
   const prompts = [];
   for (const [i, b] of title.children.entries()) {
-    const name = ["Claude", "ChatGPT"][i] + "에게 묻기";
+    const name = ["Claude", "ChatGPT"][i] + "에 묻기";
     eq("읽는 이름", b.getAttribute("aria-label"), name);
-    ok("화면 이름과 기록 안내", b.dataset.label && b.title === "질문은 강의 커넥터로 처리되고 기록될 수 있습니다. 기록 여부는 커넥터 안내를 확인하세요.");
+    // 툴팁은 브라우저 기본 title 두 줄(이름 + 기록 안내 원문)이다. aria-description 은 title 과 겹쳐 읽히지 않게 두지 않는다.
+    ok("화면 이름과 기록 안내", b.dataset.label === name && !b.hasAttribute("aria-description") &&
+      b.title === name + "\n질문은 강의 커넥터로 처리되고 기록될 수 있습니다. 기록 여부는 커넥터 안내를 확인하세요.");
     click(b);
     const [url, target, features] = opened.at(-1);
     const q = new URL(url).searchParams.get("q");
@@ -212,6 +219,27 @@ ok("안내 주소 생략·교안 제목 대체", fallback.includes("연결 방�
   const fallback = new URL(opened.at(-1)[0]).searchParams.get("q");
   ok("상한과 같은 과정은 보존하고 호스트 대체 제목에도 상한 적용", fallback.startsWith("「" + "가".repeat(80) + " · " + "교".repeat(79) + "…」"));
 }
+// 단추 자리(itda-hyve#988 리뷰 [3]): 유효 id의 빈 제목은 끝에 붙이고(append 길), 첫 자식이 요소(번호 span·링크·노트)인 제목은
+// 그 요소 앞에 서비스 차례로 넣는다. 다시 불러도 단추 수·차례·data-title·제목 글자가 그대로다.
+{
+  const empty = h("h2", { id: "empty" });
+  const num = h("h2", { id: "num" }, h("span", { class: "header-section-number" }, "1.2"), " 제목 ", h("a", { href: "#x" }, "링크"));
+  const link = h("h3", { id: "link" }, h("a", { href: "#y" }, "링크로 시작"), " 뒤");
+  const noted = h("h3", { id: "noted" }, h("span", { class: "notes" }, "비공개"), "보이는 제목");
+  const flow = h("div", {}, empty, num, link, noted);
+  const shape = () => [empty, num, link, noted].map(t => t.childNodes.map(n => n.nodeType !== 1 ? n.data : n.tag === "button" ? n.dataset.service + "|" + n.dataset.title : n.tag));
+  const want = [["claude|", "chatgpt|"], ["claude|1.2 제목 링크", "chatgpt|1.2 제목 링크", "span", " 제목 ", "a"],
+    ["claude|링크로 시작 뒤", "chatgpt|링크로 시작 뒤", "a", " 뒤"], ["claude|보이는 제목", "chatgpt|보이는 제목", "span", "보이는 제목"]];
+  A.set({ ...cfg, services: ["claude", "chatgpt"] });
+  A.armSections(flow);
+  eq("빈 제목은 끝에, 요소로 시작하는 제목은 첫 요소 앞에 서비스 차례로", shape(), want);
+  A.armSections(flow);
+  A.armSections(flow);
+  eq("다시 불러도 단추 수·차례·data-title 보존", shape(), want);
+  eq("제목 글자 보존", [empty, num, link, noted].map(t => t.textContent), ["", "1.2 제목 링크", "링크로 시작 뒤", "비공개보이는 제목"]);
+}
+// 툴팁은 브라우저 기본 title 이라 set·armSections 는 문서에 리스너를 걸지 않는다(itda-hyve#988 접근 방식 변경).
+eq("문서 리스너 없음", Object.keys(docOn), []);
 // 실제 slides.build가 구역·내용 제목을 복제하고, 더 낮은 제목은 본문으로 옮긴다.
 // 쪽 나눔 대역은 내용 묶음만 두 장으로 나눠 이어지는 머리의 단추 중복을 검사한다.
 vm.runInNewContext(fs.readFileSync(slidesPath, "utf8"), { window: win, document: doc, performance });
