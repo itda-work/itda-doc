@@ -16,6 +16,10 @@
 // hashJump → followLink)로 가 따라가기 중이면 이 화면만 풀린다. 제목은 그린 본문(#pages) 안에서만 찾는다(headingFinder — UI 와 같은
 // id 의 제목). 보기 영역을 굴리면 맨 위에서 120px 안쪽에 든 마지막 제목의 항목을 강조한다(currentHeading — #제목으로 옮긴 제목은
 // 보기 영역 안에 있는 동안 그것). 제목이 없는 문서·공유가 끝난 화면이면 목차 단추·사이드바를 숨긴다.
+// 목차 접기(itda-hyve#985): 하위가 있는 항목마다 ▸/▾ 단추(button.toc-tg — 접고 펼 뿐 옮기지 않는다), 「목차」 머리 옆에 「모두 접기·모두 펼치기」(tocBulkHead).
+// 처음에는 모두 접고 강조 항목의 조상만 펼치며, 강조 항목이 바뀌면 그 조상을 더 펼친다(앞서 펼친 것은 접지 않는다 — tocFold). 사람이 단추로 고른 것만
+// 문서마다 이 브라우저의 localStorage 에 기억하고(tocFoldPrefs — 열쇠는 원천의 foldKey, 문서 200개까지 — 뷰어는 기억하지 않는다) 자동 규칙보다 앞선다. 강조 항목이 접힌 가지 안이면
+// 보이는 가장 가까운 조상에 .on-within 을 단다.
 // ⑧ 내용 위치 따라가기(⑤의 쪽 따라가기를 대체): pos 이벤트(hello 에도 pos·pos_frac·pos_total)로 호스트가 발표가 아닌 보기로 보고 있는
 // 내용 위치 — 최상위 블록 번호 n(pager.js numberBlocks 의 data-n — 호스트와 같은 규칙)과 그 블록 안 비율 f — 를 받는다. follower 는 위치
 // 하나를 따라간다 — 발표 중(slide ≥ 0)이면 슬라이드(보기 꼴을 슬라이드로 바꾼다), 아니고 pos ≥ 0 이면 내용 위치(보기 꼴은 바꾸지 않는다 —
@@ -732,16 +736,227 @@
 
   // tocHTML 은 view.toc(mdoc.TOCItem{Level, ID, Number, Text, Children} 의 트리)를 목차 목록 HTML 로 만든다 — 문서 창 tocList 와 같은
   // 꼴(ul > li > a[href="#id"][data-id] > span.num·span, 하위는 li 안의 ul). 제목이 없으면 "".
-  function tocHTML(items) {
+  // open(id → 참·거짓)을 주면 접기 꼴(itda-hyve#985)이다: li 안에 div.toc-row(접기 단추 button.toc-tg 또는 빈 자리 span.toc-tg-pad + a)를
+  // 두고, 하위가 있고 id 가 있는 항목만 단추를 단다 — 접힌 하위 ul 은 hidden. 단추는 이동하지 않는다(누르기는 화면이 받는다). open 이 없으면 옛 꼴.
+  function tocHTML(items, open) {
     if (!Array.isArray(items) || !items.length) return "";
     let h = "<ul>";
     for (const it of items) {
       const id = String(it.ID || "");
-      h += '<li><a href="#' + esc(encodeURIComponent(id)) + '" data-id="' + esc(id) + '">';
-      if (it.Number) h += '<span class="num">' + esc(it.Number) + "</span>";
-      h += "<span>" + esc(it.Text) + "</span></a>" + tocHTML(it.Children) + "</li>";
+      let a = '<a href="#' + esc(encodeURIComponent(id)) + '" data-id="' + esc(id) + '">';
+      if (it.Number) a += '<span class="num">' + esc(it.Number) + "</span>";
+      a += "<span>" + esc(it.Text) + "</span></a>";
+      if (typeof open !== "function") { h += "<li>" + a + tocHTML(it.Children) + "</li>"; continue; }
+      const kids = Array.isArray(it.Children) && it.Children.length > 0, fold = kids && id !== "", o = !fold || !!open(id);
+      const sub = kids ? tocHTML(it.Children, open) : "";
+      h += '<li><div class="toc-row">' + (fold ? tocToggleHTML(id, o) : '<span class="toc-tg-pad"></span>') + a + "</div>" +
+        (o ? sub : sub.replace(/^<ul>/, "<ul hidden>")) + "</li>";
     }
     return h + "</ul>";
+  }
+  // tocToggleHTML 은 접기 단추 하나다 — 펼쳐 있으면 ▾(누르면 접기), 접혀 있으면 ▸(누르면 펼치기). 문서 창 tocList 와 같은 꼴·이름.
+  function tocToggleHTML(id, open) {
+    const label = open ? "하위 항목 접기" : "하위 항목 펼치기";
+    return '<button type="button" class="toc-tg" data-fold="' + esc(id) + '" aria-expanded="' + open + '" aria-label="' + label + '" title="' + label + '">' + (open ? "▾" : "▸") + "</button>";
+  }
+
+  // ---- 목차 접기(itda-hyve#985). 아래 순수 함수와 tocFold 는 문서 창 app.js 의 같은 이름 함수와 규칙이 같다(hyve 시험 toc_fold.cjs 가 둘을 같은
+  // 사례로 돌린다). 기억 맵(memo)은 {id: "open"|"closed"} — 사람이 단추로 고른 것만 담는다. 자동으로 펼친 것(auto, Set)은 담지 않는다.
+
+  // tocTree 는 목차 트리의 부모 표(parent: id → 가장 가까운 id 있는 조상, 최상위는 "")와 하위가 있는 항목(branch — Set, order — 문서 차례)이다.
+  // id 가 빈 항목은 건너뛴다(그 하위는 그 위 조상에 붙는다). 같은 id 가 다시 나오면 앞의 것만 센다.
+  function tocTree(items) {
+    const parent = new Map(), order = [];
+    const walk = (list, up) => {
+      if (!Array.isArray(list)) return;
+      for (const it of list) {
+        if (!it) continue;
+        const id = String(it.ID || ""), kids = Array.isArray(it.Children) && it.Children.length > 0;
+        if (id && !parent.has(id)) { parent.set(id, up); if (kids) order.push(id); }
+        walk(it.Children, id || up);
+      }
+    };
+    walk(items, "");
+    return { parent, branch: new Set(order), order };
+  }
+  // tocAncestors 는 id 의 조상 id 들이다(가까운 것부터). 목차에 없는 id 면 [].
+  function tocAncestors(id, tree) {
+    const up = [], seen = new Set([id]);
+    let p = tree.parent.get(id);
+    while (p && !seen.has(p)) { seen.add(p); up.push(p); p = tree.parent.get(p); }
+    return up;
+  }
+  // tocFoldIsOpen 은 항목이 펼쳐 있는가다 — 기억(memo)이 자동(auto)보다 앞선다.
+  function tocFoldIsOpen(id, memo, auto) {
+    const m = Object.prototype.hasOwnProperty.call(memo, id) ? memo[id] : "";
+    return m === "open" || (m !== "closed" && auto.has(id));
+  }
+  // tocFoldFollow 는 지금 항목 cur 의 조상 가운데 사람이 접지 않은 것(memo 가 "closed" 가 아님)을 auto 에 더한다. 앞서 펼친 것은 빼지 않는다.
+  function tocFoldFollow(cur, tree, memo, auto) {
+    for (const a of tocAncestors(cur, tree)) if (!Object.prototype.hasOwnProperty.call(memo, a) || memo[a] !== "closed") auto.add(a);
+    return auto;
+  }
+  // tocFoldShown 은 cur 를 강조할 때 화면에 보이는 항목이다 — 맨 위 조상부터 내려가며 처음 만나는 접힌 조상, 접힌 조상이 없으면 cur 그대로.
+  function tocFoldShown(cur, tree, memo, auto) {
+    const up = tocAncestors(cur, tree);
+    for (let i = up.length - 1; i >= 0; i--) if (!tocFoldIsOpen(up[i], memo, auto)) return up[i];
+    return cur;
+  }
+  // tocFoldBulk 은 「모두 접기·모두 펼치기」 단추가 다음에 할 일이다 — 하위가 있는 항목이 모두 펼쳐 있으면 "collapse", 아니면 "expand",
+  // 하위가 있는 항목이 없으면 ""(단추를 숨긴다).
+  function tocFoldBulk(tree, memo, auto) {
+    if (!tree.order.length) return "";
+    return tree.order.every(id => tocFoldIsOpen(id, memo, auto)) ? "collapse" : "expand";
+  }
+  // TOC_FOLD_DOCS 는 기억하는 문서 수 상한(가장 최근에 쓴 것부터 남긴다), TOC_FOLD_IDS 는 문서 하나의 항목 수 상한, TOC_FOLD_KEY_MAX 는
+  // 문서 열쇠 길이 상한이다. 문서 창(prefs.go tocFoldDocs·tocFoldIDs)과 같다.
+  const TOC_FOLD_DOCS = 200, TOC_FOLD_IDS = 1000, TOC_FOLD_KEY_MAX = 2048;
+  // tocFoldClean 은 기억 맵을 고른다 — 값이 "open"·"closed" 인 것만, tree 를 주면 그 목차의 하위 있는 항목만(지금 목차에 없는 id 는 버린다),
+  // 앞에서부터 TOC_FOLD_IDS 개까지. 원형 없는 객체(__proto__ 같은 id 도 그냥 열쇠)를 돌려준다.
+  function tocFoldClean(m, tree) {
+    const out = Object.create(null);
+    if (!m || typeof m !== "object" || Array.isArray(m)) return out;
+    let n = 0;
+    for (const id of Object.keys(m)) {
+      if (n >= TOC_FOLD_IDS) break;
+      const v = m[id];
+      if ((v === "open" || v === "closed") && (!tree || tree.branch.has(id))) { out[id] = v; n++; }
+    }
+    return out;
+  }
+  // tocFoldList 는 저장 글(JSON [[열쇠, 맵], …] — 오래 전에 쓴 것부터)을 읽는다. 깨졌으면 [], 틀린 항목은 버리고 같은 열쇠는 뒤의 것만 둔다.
+  function tocFoldList(raw) {
+    let a = null;
+    try { a = JSON.parse(raw); } catch (e) { a = null; }
+    if (!Array.isArray(a)) return [];
+    const m = new Map();
+    for (const e of a) {
+      if (!Array.isArray(e) || typeof e[0] !== "string" || !e[0] || e[0].length > TOC_FOLD_KEY_MAX) continue;
+      const memo = tocFoldClean(e[1]);
+      m.delete(e[0]);
+      if (Object.keys(memo).length) m.set(e[0], memo);
+    }
+    return [...m].slice(-TOC_FOLD_DOCS);
+  }
+  // tocFoldGet 은 저장 글에서 열쇠 key 문서의 기억 맵이다(없으면 빈 맵).
+  function tocFoldGet(raw, key) {
+    const e = tocFoldList(raw).find(x => x[0] === key);
+    return e ? e[1] : Object.create(null);
+  }
+  // tocFoldPut 은 key 문서의 맵을 memo 로 바꾼 저장 글이다 — 그 문서를 맨 뒤(가장 최근)로 옮기고, 빈 맵이면 지운다. cap(기본 TOC_FOLD_DOCS)을
+  // 넘으면 오래 전에 쓴 것부터 버린다. 열쇠가 비었거나 너무 길면 그대로 둔다.
+  function tocFoldPut(raw, key, memo, cap) {
+    const list = tocFoldList(raw);
+    if (typeof key !== "string" || !key || key.length > TOC_FOLD_KEY_MAX) return JSON.stringify(list);
+    const out = list.filter(e => e[0] !== key), m = tocFoldClean(memo);
+    if (Object.keys(m).length) out.push([key, m]);
+    return JSON.stringify(out.slice(-(cap > 0 ? cap : TOC_FOLD_DOCS)));
+  }
+  // tocFoldKey 는 보는 화면의 문서 열쇠다: 주소의 경로(공유 화면은 /s/<토큰>/ — 같은 주소 공유면 다음 공유에도 같다, 묶은 교안은
+  // <판>/<문서 id>/ — index.html 은 뗀다) + 폴더 공유의 문서(view.doc — ?doc= 와 같은 꼴). 쿼리·#제목은 넣지 않는다.
+  function tocFoldKey(pathname, doc) {
+    const p = String(pathname || "/").replace(/index\.html$/, "");
+    return doc ? p + "?doc=" + doc : p;
+  }
+  // TOC_FOLD_STORE 는 공유·게시 화면의 기억 자리(localStorage 열쇠 하나 — 문서마다 [열쇠, 맵])다.
+  const TOC_FOLD_STORE = "hs-toc-fold";
+  // tocFoldPrefs 는 이 브라우저의 목차 접기 기억이다(localStorage — 읽기·쓰기가 던지면 이 화면의 메모리만, notePrefs 와 같다). 서버에 보내지 않는다.
+  // load(key) 는 그 문서의 맵, save(key, memo) 는 지금 저장 글을 다시 읽어(다른 탭이 쓴 것을 지우지 않게) 그 문서만 바꿔 쓴다.
+  function tocFoldPrefs(storage) {
+    let mem = null; // 쓰기가 막혔을 때의 저장 글
+    const get = () => {
+      if (mem !== null) return mem;
+      try { return storage().getItem(TOC_FOLD_STORE); } catch (e) { return null; }
+    };
+    return {
+      load: key => tocFoldGet(get(), key),
+      save: (key, memo) => {
+        const raw = tocFoldPut(get(), key, memo);
+        try { storage().setItem(TOC_FOLD_STORE, raw); mem = null; } catch (e) { mem = raw; }
+      },
+    };
+  }
+  // tocFold 는 문서 하나의 목차 접기 상태다(문서 창 app.js tocFold 와 같다). memo 는 처음 기억 맵, save(memo) 는 사람이 고를 때마다 부른다
+  // (지금 목차의 하위 있는 항목만 고른 맵을 넘긴다).
+  //  - setTree(items): 새 목차(다시 그림). 기억·자동 펼침은 그대로 둔다 — 없는 id 는 쓰이지 않는다.
+  //  - open(id): 펼쳐 있는가. follow(cur): 지금 항목이 바뀌었으면 그 조상을 자동으로 펼친다 — 펼침이 바뀌었으면 참.
+  //  - shown(cur): 강조가 보일 항목(tocFoldShown). toggle(id): 단추 하나 — 그 항목을 지금과 반대로 기억. all(open): 모든 하위 있는 항목을 그 값으로.
+  //  - bulk(): 일괄 단추가 다음에 할 일(tocFoldBulk).
+  function tocFold(memo, save) {
+    const f = { tree: tocTree([]), memo: tocFoldClean(memo), auto: new Set(), cur: "" };
+    const store = () => { if (typeof save === "function") save(tocFoldClean(f.memo, f.tree)); };
+    // 목차가 바뀌면(편집·저장 내용 갱신) 다음 follow 는 같은 id 라도 새 조상을 다시 본다(리뷰 r1 [2] — 부모가 바뀐 지금 항목이 숨지 않게). 사람이 접은 것은 그대로 앞선다
+    f.setTree = items => { f.tree = tocTree(items); f.cur = null; };
+    f.open = id => tocFoldIsOpen(id, f.memo, f.auto);
+    f.follow = cur => {
+      if (cur === f.cur) return false;
+      f.cur = cur;
+      const before = f.auto.size;
+      tocFoldFollow(cur, f.tree, f.memo, f.auto);
+      return f.auto.size !== before;
+    };
+    f.shown = cur => tocFoldShown(cur, f.tree, f.memo, f.auto);
+    f.toggle = id => {
+      if (!f.tree.branch.has(id)) return false;
+      const m = tocFoldClean(f.memo);
+      m[id] = f.open(id) ? "closed" : "open";
+      f.memo = m;
+      store();
+      return true;
+    };
+    f.all = open => {
+      const m = Object.create(null);
+      for (const id of f.tree.order) m[id] = open ? "open" : "closed";
+      f.memo = m;
+      store();
+    };
+    f.bulk = () => tocFoldBulk(f.tree, f.memo, f.auto);
+    return f;
+  }
+  // paintTocFold 는 그린 목차(nav)의 접기 단추·하위 ul 을 f 대로 고친다(다시 그리지 않는다 — 누른 단추의 포커스가 남는다).
+  function paintTocFold(nav, f) {
+    for (const b of nav.querySelectorAll("button.toc-tg")) {
+      const o = f.open(b.dataset.fold), label = o ? "하위 항목 접기" : "하위 항목 펼치기";
+      b.setAttribute("aria-expanded", String(o));
+      b.setAttribute("aria-label", label);
+      b.title = label;
+      b.textContent = o ? "▾" : "▸";
+      const ul = b.parentNode && b.parentNode.nextElementSibling;
+      if (ul && ul.tagName === "UL") ul.hidden = !o;
+    }
+  }
+  // TOC_BULK_ICON 은 일괄 단추의 그림이다(Lucide chevrons-down-up·chevrons-up-down — ISC). 글자가 없어 머리 글(side-title)의 textContent 에 섞이지 않는다.
+  const TOC_BULK_ICON = {
+    collapse: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 20 5-5 5 5M7 4l5 5 5-5"/></svg>',
+    expand: '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></svg>',
+  };
+  // tocBulkHead 는 목차 머리(title — .side-title)를 div.toc-head 로 싸고 그 끝에 일괄 단추(button.toc-fold-all)를 단다(이미 쌌으면 그 단추).
+  // 머리 글은 그대로 title 에 있다 — 글을 바꾸는 곳(문서 창 썸네일 제목)이 단추를 지우지 않는다. 문서 창 app.js 와 같다.
+  function tocBulkHead(doc, title) {
+    if (!title || !title.parentNode) return null;
+    const had = title.parentNode.classList && title.parentNode.classList.contains("toc-head") ? title.parentNode.querySelector(".toc-fold-all") : null;
+    if (had) return had;
+    const head = doc.createElement("div"), b = doc.createElement("button");
+    head.className = "toc-head";
+    b.type = "button";
+    b.className = "toc-fold-all";
+    b.hidden = true;
+    title.parentNode.insertBefore(head, title);
+    head.appendChild(title);
+    head.appendChild(b);
+    return b;
+  }
+  // paintTocBulk 은 일괄 단추를 f.bulk() 대로 둔다 — "" 면 숨기고, 이름(title·aria-label)은 다음에 할 일.
+  function paintTocBulk(b, f, hide) {
+    if (!b) return;
+    const next = hide ? "" : f.bulk();
+    b.hidden = !next;
+    if (!next || b.dataset.next === next) return;
+    const label = next === "collapse" ? "모두 접기" : "모두 펼치기";
+    b.dataset.next = next;
+    b.title = label;
+    b.setAttribute("aria-label", label);
+    b.innerHTML = TOC_BULK_ICON[next];
   }
 
   // tocIDs 는 목차 트리의 id 를 문서 차례(앞 순회)로 늘어놓는다.
@@ -1082,6 +1297,8 @@
   // 원천의 꼴(뷰어의 원천도 같다): { base, linkMsg?, attach(api) → { applyTheme(v), start(), stop() } }.
   //  - base: 확장(ItdaShareExt)에 넘기는 base. linkMsg: 문서 안 파일 링크를 눌렀을 때의 안내(없으면 공유 화면의 글).
   //    tabTitle: 있으면 탭 제목을 늘 이 글로 둔다(docTitle — 뷰어). 공유 화면(hostSource)은 두지 않는다 — 문서 제목 그대로.
+  //    foldKey(v): 있으면 view v 의 목차 접기 기억 열쇠(itda-hyve#985 — 문서마다 다른 글, ""·없음이면 기억하지 않고 이 화면 메모리만). hostSource 는
+  //    주소 경로 + 폴더 공유의 문서(tocFoldKey), 묶은 교안(hyve packview.js)은 문서 주소. 뷰어는 두지 않는다(파일마다 주소가 같다).
   //  - attach(api) 는 화면이 시작할 때 한 번(첫 그리기 전) 부른다. api 는 화면 부품이다: $(id), ended()(공유가 끝남), current()(지금
   //    view 또는 null), show(v)(view 를 바꾸고 그린다 — Promise), redraw()(끝나지 않았고 view 가 있으면 다시 그림), look(name)(보기 꼴을
   //    골라 다시 그림 — Promise), failed(msg)(안내 줄), themeFailed()(「테마를 불러오지 못했습니다」), end(reason)(끝난 화면),
@@ -1093,6 +1310,7 @@
   function hostSource(base, w) {
     return {
       base,
+      foldKey: v => tocFoldKey(w.location.pathname, v && v.doc),
       attach(api) {
         const gate = reloadGate(base, {
           storage: () => w.sessionStorage,
@@ -1218,7 +1436,8 @@
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, slideFit, SHORT_VIEW_H, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
-    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
+    hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
+    tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
@@ -1660,20 +1879,41 @@
   const toc = tocPanel();
   let tocIds = [], tocFrame = 0, tocKeep = -1;
   const findHeading = headingFinder($("pages")); // 제목은 그린 본문(#pages) 안에서만 찾는다
+  // 목차 접기(itda-hyve#985): 문서마다 기억(foldPrefs — 이 브라우저의 localStorage, 열쇠는 원천의 foldKey(v) — 없거나 "" 면 기억 없이 이 화면 메모리만)하고,
+  // 열쇠가 바뀌면(폴더 공유의 다른 문서) 새 상태를 만든다.
+  // 일괄 단추는 「목차」 머리(.side-title) 옆에 단다(tocBulkHead — 머리를 div.toc-head 로 싼다). 머리가 없는 화면이면 단추도 없다.
+  const foldPrefs = tocFoldPrefs(() => window.localStorage);
+  let fold = tocFold(null, null), foldKey = null;
+  const tocTitle = $("sidebar").querySelector(":scope > .side-title");
+  const tocBulk = tocBulkHead(document, tocTitle);
 
   // paintTOC 는 view 의 목차를 사이드바에 그린다(오류 view·제목 없는 문서면 비움 — 단추·사이드바를 숨긴다).
   function paintTOC(v) {
-    const html = v && !v.error ? tocHTML(v.toc) : "";
+    const has = v && !v.error && Array.isArray(v.toc) && v.toc.length > 0;
+    if (has) {
+      const key = typeof source.foldKey === "function" ? String(source.foldKey(v) || "") : "";
+      if (key !== foldKey) { foldKey = key; fold = key ? tocFold(foldPrefs.load(key), m => foldPrefs.save(key, m)) : tocFold(null, null); }
+      fold.setTree(v.toc);
+    }
+    const html = has ? tocHTML(v.toc, id => fold.open(id)) : "";
     $("side-toc").innerHTML = html; // 글자는 tocHTML 이 이스케이프한다
     tocIds = html ? tocIDs(v.toc) : [];
     if (!tocIds.includes(jumper.pin)) jumper.clear();
+    paintTocBulk(tocBulk, fold, !html);
     paintFiles();
+  }
+  // foldTo 는 접기 상태가 바뀐 뒤 목차를 고친다 — 단추·하위 ul·일괄 단추, 그리고 강조(접힌 가지 안이면 보이는 조상에 — paintTocOn).
+  function foldTo() {
+    paintTocFold($("side-toc"), fold);
+    paintTocBulk(tocBulk, fold, !tocIds.length);
+    paintTocOn();
   }
 
   // paintFiles 는 폴더의 파일 목록을 그린다(폴더 공유가 아니면 아무것도 만들지 않는다). 제목이 없는 문서면 「목차」 머리만 숨긴다.
   function paintFiles() {
     mountFiles(document, $("sidebar"), state.files, state.view && state.view.doc);
-    if (state.files) $("sidebar").querySelector(":scope > .side-title").hidden = !tocIds.length;
+    const head = tocBulk ? tocBulk.parentNode : tocTitle;
+    if (state.files && head) head.hidden = !tocIds.length;
     paintTocPanel();
   }
 
@@ -1700,13 +1940,19 @@
     }
     return currentHeading(positions, st, jumper.pin, viewer.clientHeight);
   }
-  // paintTocOn 은 지금 제목(headingNow)의 항목에 .on 을 달고 확장의 tick 을 부른다.
+  // paintTocOn 은 지금 제목(headingNow)의 항목에 .on 을 달고 확장의 tick 을 부른다. 지금 제목이 바뀌면 그 조상을 펼친다(사람이 접은 것은
+  // 그대로 — fold.follow). 그 항목이 접힌 가지 안이라 보이지 않으면 보이는 가장 가까운 조상에 .on-within 을 단다(.on 은 그대로 하나 — 확장·시험이 본다).
   // 공유가 끝났으면 아무것도 하지 않는다(끝나기 직전에 예약된 프레임 포함).
   function paintTocOn() {
     if (state.ended) return;
     if (tocIds.length) {
       const cur = headingNow();
-      for (const a of $("side-toc").querySelectorAll("a")) a.classList.toggle("on", a.dataset.id === cur);
+      if (fold.follow(cur)) { paintTocFold($("side-toc"), fold); paintTocBulk(tocBulk, fold, false); }
+      const shown = cur ? fold.shown(cur) : "";
+      for (const a of $("side-toc").querySelectorAll("a")) {
+        a.classList.toggle("on", a.dataset.id === cur);
+        a.classList.toggle("on-within", shown !== cur && a.dataset.id === shown);
+      }
     }
     hook("tick");
   }
@@ -1844,6 +2090,7 @@
     tocIds = [];
     jumper.clear();
     $("side-toc").textContent = "";
+    paintTocBulk(tocBulk, fold, true);
     state.files = null;
     mountFiles(document, $("sidebar"), null);
     paintTocPanel();
@@ -2026,6 +2273,19 @@
     paintTocPanel();
   });
   $("toc-back").addEventListener("click", () => closeTocDrawer());
+  // 접기 단추는 접거나 펼 뿐이다 — 옮기지 않고, 서랍을 닫지 않고, 따라가기를 풀지 않는다(itda-hyve#985)
+  $("side-toc").addEventListener("click", e => {
+    const b = e.target.closest && e.target.closest("button.toc-tg");
+    if (!b) return;
+    e.preventDefault();
+    if (fold.toggle(b.dataset.fold)) foldTo();
+  });
+  if (tocBulk) tocBulk.addEventListener("click", () => {
+    const next = fold.bulk();
+    if (!next) return;
+    fold.all(next === "expand");
+    foldTo();
+  });
   $("viewer").addEventListener("scroll", scheduleTocOn, { passive: true });
   // 목차의 펼침 기본값은 화면(본문) 폭으로 고른다 — 경계(1024px)를 넘나들 때만 기본값으로 되돌린다(tocPanel)
   toc.width(document.body.clientWidth);

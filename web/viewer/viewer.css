@@ -78,7 +78,25 @@ body.no-toc .sidebar { display: none; }
 #side-toc a:hover { background: var(--ui-hover); }
 #side-toc a.on { background: var(--ui-active); color: var(--ui-accent); }
 #side-toc .num { color: var(--ui-muted); font-variant-numeric: tabular-nums; flex: none; }
-#side-toc > ul > li > a { font-weight: 600; }
+#side-toc > ul > li > a, #side-toc > ul > li > .toc-row > a { font-weight: 600; }
+/* 목차 접기(itda-hyve#985 — share.js tocHTML 접기 꼴): 모양은 문서 창 app.css 의 같은 규칙과 같다(색만 이 파일의 토큰 — 뷰어는 강조 글자에 --ui-accent).
+   li > div.toc-row(button.toc-tg 또는 같은 너비의 span.toc-tg-pad + a) + 하위 ul(접히면 hidden). 뷰어는 기억하지 않는다(원천에 foldKey 없음) */
+#side-toc a.on-within { background: var(--ui-active); color: var(--ui-accent); box-shadow: inset 2px 0 0 var(--ui-accent); }
+#side-toc .toc-row { display: flex; align-items: flex-start; }
+#side-toc .toc-row > a { flex: 1; min-width: 0; padding-left: 4px; }
+#side-toc .toc-tg, #side-toc .toc-tg-pad { flex: none; width: 18px; height: 27px; }
+#side-toc .toc-tg { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; border: 0; border-radius: 5px; background: transparent;
+  color: var(--ui-muted); font-family: inherit; font-size: 12px; line-height: 1; cursor: pointer; }
+#side-toc .toc-tg:hover { background: var(--ui-hover); color: var(--ui-text); }
+#side-toc .toc-tg:focus-visible, .toc-fold-all:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: -1px; }
+.toc-head { display: flex; align-items: flex-start; }
+.toc-head[hidden] { display: none; }
+.toc-head > .side-title { flex: 1; min-width: 0; }
+.toc-fold-all { flex: none; display: flex; align-items: center; justify-content: center; width: 24px; height: 20px; margin: -4px 4px 0 0; padding: 0;
+  border: 0; border-radius: 5px; background: transparent; color: var(--ui-muted); cursor: pointer; }
+.toc-fold-all:hover { background: var(--ui-hover); color: var(--ui-text); }
+.toc-fold-all[hidden] { display: none; }
+.toc-fold-all svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .viewer { flex: 1; min-width: 0; overflow: auto; position: relative; isolation: isolate; }
 @media screen { .viewer { clip-path: inset(0); } }
 .pages { padding: 28px 0 60px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
