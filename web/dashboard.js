@@ -178,6 +178,8 @@
     pg.style.setProperty("--board-rows", String(rows));
     pg.appendChild(el("div", "board-deco"));
     const head = pg.appendChild(el("header", "board-head"));
+    // 원본 표지의 id 를 머리가 갖는다(itda-hyve#979 — slides.js titleSlide 와 같다). 원본 표지는 보드로 옮기지 않아 흐름과 함께 버려진다.
+    if (g.head && g.head.id) head.id = g.head.id;
     if (o.logo) { const im = head.appendChild(el("img", "bh-logo")); im.src = o.logo; im.alt = ""; }
     const title = head.appendChild(el("div", "bh-title", headSec ? null : docTitle));
     if (headSec) title.appendChild(headSec.title);

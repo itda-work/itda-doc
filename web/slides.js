@@ -265,9 +265,13 @@
 
   // titleSlide 는 표지·제목 블록에서 조직·제목·부제·날짜·작성자를 골라 제목 슬라이드를 만든다(구조는 앱이 정한 한 가지).
   // 값은 Go 가 준 문서 정보(o.info — frontmatter 와 테마 defaults)이고, 없으면 표지·제목 블록에서 고른다. 글자로만 넣는다.
+  // 원본 표지에 id 가 있으면 새 표지 상자가 그 id 를 갖는다(itda-hyve#979) — 그 id 로 가는 #링크·목차 항목이 표지에 닿는다.
+  // 원본 표지는 상자에 옮기지 않으므로 흐름과 함께 버려진다(share.js render 의 flow.remove) — id 는 하나만 남는다.
+  // 상자는 쪽(.page)의 자손이라 발표 사본(present.js 의 querySelectorAll("[id]") 지우기)에서는 빠진다.
   function titleSlide(page, src, o) {
     const body = page.querySelector(".page-body");
     const box = el("div", "slide-cover");
+    if (src.id) box.id = src.id;
     const info = o.info || {};
     const pick = (sel, key) => { if (info[key]) return info[key]; const x = src.querySelector(sel); return x ? x.textContent.trim() : ""; };
     const org = pick(".cover-org, .title-org", "organization");

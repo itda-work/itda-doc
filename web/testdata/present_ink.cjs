@@ -1388,6 +1388,34 @@ const nextShown = w => { const b = nextBoxOf(w), c = b && b.firstElementChild; r
   ok("보조: 보드 발표에는 없고 set* 은 false", !rootOf(w).querySelector(".pr-next") && !rootOf(w).querySelector(".pr-clock") && H.setNextPreview(true) === false && H.setClock(true) === false && !P.nextPreview);
   H.stop();
 }
+// ---- 14. 표지 id(itda-hyve#979): slides.js titleSlide 는 원본 표지 id 를 쪽의 자손 div.slide-cover 에, dashboard.js 는 header.board-head 에 단다
+// (cover_id.cjs 가 실제 build 로 본다). 그 꼴의 장을 실제 발표에 넘겨 덱 사본·다음 장 미리보기·한눈에 보기 썸네일·보드 사본에 그 id 가 남지 않고
+// 원본 장에는 남는지 본다. 장은 그 꼴을 손으로 만든다 — 이 가짜 DOM 은 cover_id.cjs 의 것과 달라 slides.js 출력을 그대로 넘기지 않는다.
+{
+  const hasCoverID = n => [n, ...n.querySelectorAll("[id]")].some(e => e.attrs.id === "hyve-cover");
+  const coverPage = () => {
+    const p = slide([]); p.classList.add("k-title"); p.dataset.n = "1";
+    const box = p.querySelector(".page-body").appendChild(new El("div")); box.className = "slide-cover"; box.setAttribute("id", "hyve-cover");
+    return p;
+  };
+  const w = world(), { P, H } = w;
+  const pages = [marked(0), coverPage(), marked(2)];
+  H.start({ pages, notes: [], index: 0, ratio: "16:9", onExit() {}, nextPreview: true });
+  const root = rootOf(w);
+  ok("표지 id: 다음 장 미리보기가 표지 장을 담는다", nextShown(w) === "장1", nextShown(w));
+  ok("표지 id: 덱 사본·미리보기에 원본 표지 id 가 남지 않는다", !hasCoverID(root), P.slides.map(hasCoverID));
+  H.toggleGrid(true);
+  ok("표지 id: 한눈에 보기 썸네일에도 남지 않는다", root.querySelectorAll(".pr-thumb").filter(t => !t.classList.contains("pr-next-box")).length === 3 && !hasCoverID(root));
+  H.toggleGrid(false);
+  ok("표지 id: 원본 장(보기 화면)에는 그대로", hasCoverID(pages[1]));
+  H.stop();
+  const board = new El("div"); board.className = "page board";
+  const bh = board.appendChild(new El("header")); bh.className = "board-head"; bh.setAttribute("id", "hyve-cover");
+  board.appendChild(new El("div")).className = "page-body board-grid";
+  H.startBoard({ page: board, ratio: "16:9", onExit() {} });
+  ok("표지 id: 보드 발표 사본에 머리 id 가 남지 않고 원본 보드에는 그대로", !!rootOf(w).querySelector(".board-head") && !hasCoverID(rootOf(w)) && hasCoverID(board));
+  H.stop();
+}
 // 발표자 화면과 청중 화면의 끝난 획 SVG 경로가 같다 — 같은 relay 연산에서 같은 path d(펜·형광펜·필압·지우개·되돌리기·다시 실행·전부 지우기).
 // relay 는 앞 묶음의 Promise 가 풀린 뒤 다음을 보내므로 마이크로태스크를 돌린다(pump).
 async function mirrorCases() {
