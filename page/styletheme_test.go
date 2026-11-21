@@ -14,7 +14,7 @@ import (
 // 그 바탕 4.5:1(contrast 는 7:1 — 무드의 목표. 보장은 아래 쌍에 적은 조합까지), 차트 계열은 흰 바탕 3:1 이다. 조합은 테마마다 실제로 쓰는 것만 적는다(theme.css 와 base.css 의 어휘 규칙).
 // contrast 의 차트 6~8번(Okabe-Ito 주황·하늘·노랑)은 3:1 에 못 미쳐 이 기준에서 빼고, 대신 그 면을 두르는 테두리 색(--ink)이 3:1 인지 본다 —
 // 테두리가 실제로 그려지는지는 배치와 같이 PNG 로 확인한다.
-// 쌍의 바탕에는 토큰 말고 base.css 의 고정 색도 쓴다(@base-mark — `.page-body mark` 의 노랑 바탕, base.css 에서 읽는다).
+// 형광펜 바탕 --mark-bg 는 테마가 주지 않으면 base.css :root 의 기본 노랑이다(baseMarkBg 가 base.css 에서 읽는다 — `.page-body mark` 가 그 토큰을 읽는지도 본다).
 // 할 일 표 머리(강조색 면) 안 인라인 요소는 base 가 머리 글자색·투명 바탕으로 맞춘다(web/base.css 의 .actions th). 그래서 code·del·kbd 의 쌍은
 // --accent-ink / --accent 하나이고, mark 안은 먹색 / 노랑이다. 그 규칙이 실제로 그 요소에 걸리는지는 이 시험이 묶지 못하고 브라우저 계산값·PNG 로 확인한다.
 // 바닥글·글자가 어느 면 위에 놓이는지(예: slate 구역 장의 남색 면이 바닥글 위에서 끝나는지, swiss 맨 구역 장의 빨강 면 위 바닥글)는
@@ -50,7 +50,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--alert-warning", "--paper"}, {"--alert-caution", "--paper"}, {"--alert-todo", "--paper"}, // 알림 바탕은 투명(--alert-bg-alpha 0%)
 			{"--ink", "--table-head-bg"}, {"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, // 표 머리, decisions 면과 ✔
 			{"--accent-ink", "--accent"}, // 남색 면(actions 머리·steps 번호 원) 위 흰 글자·링크, 머리 안 code·del·kbd(base)
-			{"--ink", "@base-mark"},      // 머리 안 mark: 노랑 바탕 위 먹 글자·링크(base 의 --mark-ink)
+			{"--ink", "--mark-bg"},       // 머리 안 mark: 노랑 바탕(base 의 --mark-bg) 위 먹 글자·링크(base 의 --mark-ink)
 			{"--ink", "--code-bg"}, {"--code-kw", "--code-bg"}, {"--code-str", "--code-bg"}, {"--code-com", "--code-bg"},
 			{"--code-num", "--code-bg"}, {"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"},
 			{"--code-title-fg", "--paper"},
@@ -69,7 +69,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"}, {"--ink", "--box-bg"},
 			{"--accent-ink", "--accent"},    // 숲색 면(표 머리·steps 번호 원·맨 구역 장 제목과 그 바닥글) 위 흰 글자·링크·각주, 면 안 del
 			{"--accent-ink", "--highlight"}, // 잎색 꼬리표 위 흰 글자(theme.css)
-			{"--ink", "@base-mark"},         // 숲색 면 안 mark: 노랑 바탕 위 먹 글자·링크(base·spine·verdant)
+			{"--ink", "--mark-bg"},          // 숲색 면 안 mark: 노랑 바탕 위 먹 글자·링크(base·spine·verdant)
 			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
 			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
 		}},
@@ -83,7 +83,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--ink", "--accent-soft"}, {"--accent", "--accent-soft"}, {"--muted", "--accent-soft"}, // decisions 면과 ✔, 구역 장 면 위 바닥글
 			{"--ink", "--table-stripe"}, {"--ink", "--code-bg"},
 			{"--accent-ink", "--accent"}, // 빨강 면(할 일 표 머리·steps 번호 원) 위 흰 글자·링크·각주, 면 안 code·del·kbd(base)
-			{"--ink", "@base-mark"},      // 빨강 면 안 mark: 노랑 바탕 위 먹 글자·링크(base)
+			{"--ink", "--mark-bg"},       // 빨강 면 안 mark: 노랑 바탕 위 먹 글자·링크(base)
 			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"},
 			{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
 		}},
@@ -98,7 +98,7 @@ func TestStyleThemeContrast(t *testing.T) {
 			{"--code-num", "--code-bg"}, {"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"},
 			{"--code-title-fg", "--code-bg"}, {"--ink", "--code-hl-bg"},
 			{"--accent-ink", "--accent"},                               // 먹 면(할 일 표 머리·단계 번호 원) 위 흰 글자·링크·각주, 머리 안 code·del·kbd(base)
-			{"--ink", "--mark-bg"},                                     // mark: 노랑 대신 회색 면(theme.css) 위 먹 글자 — 할 일 표 머리 안도 base 가 먹 글자로 둔다
+			{"--ink", "--mark-bg"},                                     // mark: 노랑 대신 회색 면(theme.json 의 --mark-bg) 위 먹 글자 — 할 일 표 머리 안도 base 가 먹 글자로 둔다
 			{"--ink", "--code-diff-add"}, {"--ink", "--code-diff-del"}, // diff 코드 줄 면(회색 둘)
 			{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"},
 			{"--diagram-text", "--diagram-bar-done"}, {"--chart-on", "--diagram-bar-active"}, {"--chart-on", "--diagram-bar-crit"},
@@ -110,7 +110,7 @@ func TestStyleThemeContrast(t *testing.T) {
 		if !ok {
 			t.Fatalf("%s 가 없음", name)
 		}
-		vals := map[string]string{"--paper": "#ffffff", "--accent-ink": "#ffffff", "--chart-on": "#ffffff", "@base-mark": baseMarkBg(t)} // base.css 기본값(테마가 주지 않으면)
+		vals := map[string]string{"--paper": "#ffffff", "--accent-ink": "#ffffff", "--chart-on": "#ffffff", "--mark-bg": baseMarkBg(t)} // base.css 기본값(테마가 주지 않으면)
 		for _, kv := range th.Tokens {
 			vals[kv[0]] = kv[1]
 		}
@@ -143,17 +143,49 @@ func TestStyleThemeContrast(t *testing.T) {
 	}
 }
 
-// baseMarkBg 는 base.css 의 `.page-body mark` 바탕색이다.
+// 형광펜 바탕은 테마 토큰 --mark-bg 하나가 정한다(itda-hyve#992) — 내장 테마의 theme.css 는 mark 의 바탕을 따로 정하지 않고,
+// 토큰으로 정한 값은 토큰 도입 전의 화면 색과 같다(graphite 회색 면, 나머지는 base 의 노랑).
+func TestMarkBgToken(t *testing.T) {
+	want := map[string]string{"graphite": "#e3e3e3"}
+	base := baseMarkBg(t)
+	ts := builtin(t)
+	bgRule := regexp.MustCompile(`(?s)[^{}]*\bmark\b[^{}]*\{[^}]*\bbackground(-color)?\s*:`)
+	for _, info := range ts.List() {
+		th, _ := ts.Get(info.Name)
+		got := base
+		for _, kv := range th.Tokens {
+			if kv[0] == "--mark-bg" {
+				got = strings.ToLower(kv[1])
+			}
+		}
+		exp := base
+		if w, ok := want[info.Name]; ok {
+			exp = w
+		}
+		if got != exp {
+			t.Errorf("%s: 형광펜 바탕 %s, 기대 %s", info.Name, got, exp)
+		}
+		if m := bgRule.FindString(regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(th.CSS, "")); m != "" {
+			t.Errorf("%s: theme.css 가 mark 바탕을 따로 정함 — --mark-bg 토큰으로: %s", info.Name, strings.TrimSpace(m))
+		}
+	}
+}
+
+// baseMarkBg 는 base.css 의 형광펜 바탕 기본값(:root 의 --mark-bg)이다. `.page-body mark` 가 그 토큰을 같은 대체값으로 읽어야 한다.
 func baseMarkBg(t *testing.T) string {
 	b, err := os.ReadFile(filepath.Join("..", "web", "base.css"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	m := regexp.MustCompile(`\.page-body mark \{ background: (#[0-9a-fA-F]{6});`).FindSubmatch(b)
-	if m == nil {
-		t.Fatal("base.css 에서 .page-body mark 바탕색을 찾지 못함")
+	root := regexp.MustCompile(`\n  --mark-bg: (#[0-9a-fA-F]{6});`).FindSubmatch(b)
+	if root == nil {
+		t.Fatal("base.css :root 에서 --mark-bg 를 찾지 못함")
 	}
-	return strings.ToLower(string(m[1]))
+	rule := regexp.MustCompile(`\.page-body mark \{ background: var\(--mark-bg, (#[0-9a-fA-F]{6})\);`).FindSubmatch(b)
+	if rule == nil || !strings.EqualFold(string(rule[1]), string(root[1])) {
+		t.Fatalf("base.css 의 .page-body mark 바탕이 var(--mark-bg, %s) 가 아님", root[1])
+	}
+	return strings.ToLower(string(root[1]))
 }
 
 // contrastRatio 는 WCAG 2.x 대비비다(#rrggbb 둘).

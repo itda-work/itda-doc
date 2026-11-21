@@ -44,9 +44,6 @@ nav.toc > ul > li > a { color: var(--ink); }
 .eyebrow > p { margin: 0; }
 .eyebrow strong { color: var(--accent); font-weight: 800; letter-spacing: 0.06em; margin-right: 0.45em; }
 .page-body .eyebrow + :is(h1, h2) { border-top: none; padding-top: 2pt; margin-top: 0; }
-/* 본문 형광펜(mark)은 노랑 대신 회색 면(--mark-bg) — 글자는 먹(14.71:1) */
-.page-body mark { background: var(--mark-bg); }
-
 /* ---- 표: 위 2pt 먹(--table-top-rule) · 머리 아래 1pt 먹 · 맨 아래 1pt 먹, 가운데 가로줄은 회색, 세로줄 없음. 머리 칸 왼쪽 정렬(열 정렬 지정은 [align] 이 이긴다).
    머리 칸 위·마지막 줄 아래의 칸 선은 없앤다 — 화면 배율 1 에서 칸 선과 표 선이 같은 1px 로 반올림되면 겹친 선 다툼(border-collapse)에서 칸의 회색이 이긴다(slate·swiss 와 같다) */
 .page-body th, .page-body td { border-left: none; border-right: none; }

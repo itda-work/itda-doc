@@ -206,9 +206,63 @@ func (p cjkStrikeParser) Parse(parent ast.Node, block text.Reader, pc parser.Con
 	return d
 }
 
+// ---- == 형광펜 (Pandoc mark 확장의 부분집합, itda-hyve#992). 짝 맞추기는 취소선과 같은 CJK-friendly 판정이다.
+// 좁힌 것: = 는 정확히 둘만 구분자다. 여는 == 바로 앞이나 닫는 == 바로 뒤가 ASCII 영문자·숫자면 열지·닫지 못한다
+// (x==1 이고 y==2 · a==b==c 같은 비교식이 칠해지지 않게. 영문 낱말 안 일부는 raw <mark> 로 쓴다).
+
+type markProcessor struct{}
+
+func (markProcessor) IsDelimiter(b byte) bool { return b == '=' }
+func (markProcessor) CanOpenCloser(opener, closer *parser.Delimiter) bool {
+	return opener.Char == closer.Char
+}
+func (markProcessor) OnMatch(consumes int) ast.Node { return &Mark{} }
+
+type cjkMarkParser struct{ st *state }
+
+func (cjkMarkParser) Trigger() []byte { return []byte{'='} }
+
+func isASCIIAlnum(r rune) bool {
+	return r >= '0' && r <= '9' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+}
+
+func (p cjkMarkParser) Parse(parent ast.Node, block text.Reader, pc parser.Context) ast.Node {
+	before := block.PrecendingCharacter()
+	if before == '=' {
+		// 묶음의 둘째 = 부터(또는 \= 바로 뒤)는 보지 않는다. 묶음 머리에서 이미 판정했다 — 다시 읽지 않아 긴 묶음도 선형이다
+		return nil
+	}
+	line, segment := block.PeekLine()
+	d := scanDelimiter(block, markProcessor{})
+	if d == nil {
+		return nil
+	}
+	// 형광펜이 될 수 없는 = 묶음(하나·셋 이상, 열지도 닫지도 못하는 ==)은 nil 로 글자에 둔다. 취소선처럼 글자 노드를 돌려주면
+	// goldmark 가 그 뒤를 낱말 머리로 보고 자동 링크를 건다(`{poster=https://…}` 의 주소가 링크가 된다)
+	if d.OriginalLength != 2 {
+		return nil
+	}
+	if isASCIIAlnum(before) {
+		d.CanOpen = false
+	}
+	if d.OriginalLength < len(line) && isASCIIAlnum(rune(line[d.OriginalLength])) {
+		d.CanClose = false
+	}
+	if !d.CanOpen && !d.CanClose {
+		return nil // 구분자로 쌓지 않는다(상한에도 세지 않는다)
+	}
+	if t := p.st.tooManyDelims(parent, block, segment, d.OriginalLength); t != nil {
+		return t
+	}
+	d.Segment = segment.WithStop(segment.Start + d.OriginalLength)
+	block.Advance(d.OriginalLength)
+	pc.PushDelimiter(d)
+	return d
+}
+
 // ---- 구분자 수 상한
 
-// MaxDelimitersPerBlock 은 문단(블록) 하나에서 강조·취소선 구분자로 읽는 *·_·~ 의 묶음 수 상한이다. 넘는 것은 글자로 둔다(경고 한 번).
+// MaxDelimitersPerBlock 은 문단(블록) 하나에서 강조·취소선·형광펜 구분자로 읽는 *·_·~·= 의 묶음 수 상한이다. 넘는 것은 글자로 둔다(경고 한 번).
 // goldmark 의 구분자 처리(ProcessDelimiters)는 서로 짝이 될 수 없는 구분자가 번갈아 쌓이면(`_a*_a*…`) 구분자 수의 제곱에 비례한다 —
 // 128KB 문단 하나가 9초였다(수식 속성 시험이 찾은 기존 결함, 순수 goldmark 에서도 같다). 사람이 쓰는 문단은 구분자가 수십 개다.
 const MaxDelimitersPerBlock = 1000
@@ -224,7 +278,7 @@ func (st *state) tooManyDelims(parent ast.Node, block text.Reader, segment text.
 	}
 	if st.delims[parent] == MaxDelimitersPerBlock+1 {
 		st.warn(st.lines.line(segment.Start), WarnTooComplex,
-			fmt.Sprintf("강조 표시(* _ ~)가 %d 개를 넘어 이 문단의 뒤의 것은 글자로 둠", MaxDelimitersPerBlock))
+			fmt.Sprintf("강조 표시(* _ ~ =)가 %d 개를 넘어 이 문단의 뒤의 것은 글자로 둠", MaxDelimitersPerBlock))
 	}
 	block.Advance(n)
 	return ast.NewTextSegment(segment.WithStop(segment.Start + n))

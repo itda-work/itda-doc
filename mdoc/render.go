@@ -44,6 +44,7 @@ func (r *htmlRenderer) RegisterFuncs(reg renderer.NodeRendererFuncRegisterer) {
 	reg.Register(KindTableCaption, r.tableCaption)
 	reg.Register(KindChart, r.chart)
 	reg.Register(KindPause, r.pause)
+	reg.Register(KindMark, r.mark)
 	reg.Register(KindMathInline, r.mathInline)
 	reg.Register(KindMathBlock, r.mathBlock)
 	reg.Register(KindKPIList, r.kpiList)
@@ -578,6 +579,16 @@ func (r *htmlRenderer) pause(w util.BufWriter, src []byte, node ast.Node, enteri
 		_, _ = w.WriteString("></div>\n")
 	}
 	return ast.WalkSkipChildren, nil
+}
+
+// mark 는 형광펜 ==글== 이다 — raw <mark> 를 남긴 것과 같은 태그다(속성 없음).
+func (r *htmlRenderer) mark(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if entering {
+		_, _ = w.WriteString("<mark>")
+	} else {
+		_, _ = w.WriteString("</mark>")
+	}
+	return ast.WalkContinue, nil
 }
 
 func (r *htmlRenderer) tocNav(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {

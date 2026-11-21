@@ -109,3 +109,12 @@ var KindPause = ast.NewNodeKind("Pause")
 
 func (n *Pause) Kind() ast.NodeKind         { return KindPause }
 func (n *Pause) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
+
+// Mark 는 형광펜 ==글== 이다(itda-hyve#992, cjk.go cjkMarkParser). raw <mark>글</mark> 과 같은 <mark>…</mark> 로 그린다.
+// 자식은 감싼 인라인이다. raw <mark> 는 이 노드가 아니라 짝 맞춘 RawHTML 둘로 남는다(Doc.RawTag).
+type Mark struct{ ast.BaseInline }
+
+var KindMark = ast.NewNodeKind("Mark")
+
+func (n *Mark) Kind() ast.NodeKind         { return KindMark }
+func (n *Mark) Dump(src []byte, level int) { ast.DumpHelper(n, src, level, nil, nil) }
