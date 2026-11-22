@@ -1507,13 +1507,214 @@
     return s && typeof s.attach === "function" ? s : null;
   }
 
+  // ---- 그림 설명·크게 보기(itda-doc#121) — 쪽·이어보기·슬라이드 보기(보드·전체 화면 발표·청중은 아니다)의 본문(#pages .page-body) 그림.
+  // 대상은 렌더된 img 그대로다(배치 낱말 판정을 다시 하지 않는다 — mdoc 이 배치 낱말뿐인 alt 를 빈 alt 로 낸다). 로고(.sc-logo·.sf-logo)·숨은 단계(.pr-pending)는
+  // 빼고, 측정 무대(#stage)·노트 칸(#notes)은 범위(#pages) 밖이라 빠진다. 그림의 DOM(부모·형제·class·크기)은 바꾸지 않는다 — 본문을 다 그린 뒤
+  // tabindex 와 data-fig 만 단다(figTips arm).
+  //  - 설명 툴팁: alt 가 비지 않은(공백뿐 아님) 그림에 마우스·펜을 올리거나(터치는 아니다 — 탭은 크게 보기) 키보드 포커스가 닿으면(링크 그림은 그 링크의 포커스)
+  //    body 직계의 .fig-tip(aria-hidden — alt 를 다시 낭독하지 않게, textContent 로만)에 보인다. 쪽 배율(transform)과 상관없는 글자 크기, 자리는 그림 아래 →
+  //    위 → 겹침(figTipPlace). 포인터·포커스가 떠나거나 Esc·굴림·창 크기 바뀜·다시 그리기에 닫는다. Esc 로 닫은 그림은 떠났다 올 때까지 다시 열지 않는다.
+  //  - 크게 보기: 링크(a) 안이 아닌 그림을 누르면(클릭·탭) 또는 포커스한 그림에서 Enter·Space 면 호스트의 크게 보기 부품(window.ItdaLightbox — 없으면
+  //    크게 보기 없이 툴팁만, 누르기는 지금처럼 아무 일도 없다)이 body 에 열고 설명을 아래 캡션으로 보인다. 같은 img 의 얕은 복제(같은 src)다.
+  //    닫기는 Esc·바탕 누르기·닫기 단추(.fig-lb-close), 닫으면 원래 그림으로 포커스를 돌린다. 열린 동안 키는 창(window) 붙잡기 단계에서 이것이 먼저
+  //    받는다 — 쪽 넘김(Space 등)·목차 서랍 Esc·발표 시작 키로 새지 않는다. 링크·YouTube 대표 그림의 누르기는 지금처럼 링크 동작이다.
+  // 인쇄에는 툴팁·크게 보기가 찍히지 않는다(share.css·호스트 app.css 의 @media print).
+
+  const FIG_SKIP = ".sc-logo, .sf-logo, .pr-pending";
+  // figTarget 은 t 가 scope 안 본문(.page-body)의 대상 그림이면 그 img, 아니면 null 이다.
+  function figTarget(t, scope) {
+    if (!t || !scope || typeof t.closest !== "function" || String(t.tagName).toLowerCase() !== "img") return null;
+    if (!scope.contains(t) || !t.closest(".page-body") || t.closest(FIG_SKIP)) return null;
+    return t;
+  }
+  // figText 는 그림의 설명(렌더된 alt 앞뒤 공백을 뺀 것 — 공백뿐이면 "")이다.
+  function figText(img) { return String((img && img.getAttribute && img.getAttribute("alt")) || "").trim(); }
+  // figLinked 는 그림이 링크(a — YouTube 대표 그림 포함) 안인가다 — 누르기는 링크의 것이다.
+  function figLinked(img) { return !!(img && img.closest && img.closest("a")); }
+  // figFocus 는 포커스를 받은 t 의 설명 그림이다 — 대상 그림 자신, 또는 링크면 그 안 첫 설명 그림. 없으면 null.
+  function figFocus(t, scope) {
+    if (!t || typeof t.closest !== "function") return null;
+    const img = figTarget(t, scope);
+    if (img) return figText(img) ? img : null;
+    if (String(t.tagName).toLowerCase() !== "a" || !scope || !scope.contains(t)) return null;
+    for (const x of t.querySelectorAll("img")) if (figTarget(x, scope) && figText(x)) return x;
+    return null;
+  }
+  // figTipPlace 는 툴팁(w×h)을 그림 상자 r(화면 좌표 — getBoundingClientRect, 쪽 배율이 이미 든 값)에 맞춰 놓을 자리다(창 vw×vh, 가장자리 여백 pad).
+  // 가로는 그림 가운데(창 안으로 당김), 세로는 아래에 들면 아래, 아니면 위, 둘 다 안 되면 그림 아래쪽 안에 겹친다(창 안으로 당김).
+  function figTipPlace(r, w, h, vw, vh, gap, pad) {
+    gap = gap === undefined ? 8 : gap;
+    pad = pad === undefined ? 8 : pad;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const left = clamp(r.left + r.width / 2 - w / 2, pad, Math.max(pad, vw - w - pad));
+    let top;
+    if (r.bottom + gap + h <= vh - pad) top = r.bottom + gap;
+    else if (r.top - gap - h >= pad) top = r.top - gap - h;
+    else top = clamp(Math.min(r.bottom, vh) - h - gap, pad, Math.max(pad, vh - h - pad));
+    return { left: Math.round(left), top: Math.round(top) };
+  }
+
+  // figTips 는 위 두 기능의 화면 쪽이다. d = { doc, win, scope(#pages), viewer(굴림 상자 — 굴리면 툴팁을 닫는다), active()(지금 보기 꼴이 대상인가),
+  // lightbox()(크게 보기 부품 — 없으면 null), scale()(쪽 배율) }. 듣기는 처음 한 번 위임으로만 단다(본문을 바꿔도 다시 달지 않는다).
+  // 돌려주는 것: arm()(본문을 바꾼 뒤 — 열린 툴팁·크게 보기를 닫고 새 그림에 tabindex·data-fig 를 단다, 몇 번 불러도 같다)·reset()(본문을 비우거나 끝난 화면)·
+  // tipOn()·lbOn()·tip()(시험용 — 툴팁 요소).
+  function figTips(d) {
+    const doc = d.doc, scope = d.scope;
+    // quiet 은 다시 열지 않을 그림이다 — 연 길(hover·focus)마다 따로: Esc 로 닫으면 그 길의 그림, 크게 보기를 닫고 포커스를 돌려주면 focus 의 그림.
+    // hover 는 그 그림에서 포인터가 떠날 때, focus 는 포커스가 떠날 때 푼다(포커스가 남아 있어도 마우스를 다시 올리면 연다)
+    let tip = null, cur = null, how = "";
+    const quiet = { hover: null, focus: null };
+    let lb = null, lbBtn = null, lbFrom = null;
+    const lbOn = () => !!(lb && lb.kind());
+
+    function tipEl() {
+      if (tip) return tip;
+      tip = doc.createElement("div");
+      tip.className = "fig-tip";
+      tip.setAttribute("aria-hidden", "true");
+      tip.hidden = true;
+      doc.body.appendChild(tip);
+      return tip;
+    }
+    function show(img, src) {
+      if (!img || img === quiet[src] || lbOn() || !d.active()) return;
+      const text = figText(img);
+      if (!text) return;
+      const t = tipEl();
+      t.textContent = text;
+      t.style.left = "0px";
+      t.style.top = "0px";
+      t.hidden = false;
+      cur = img;
+      how = src;
+      const p = figTipPlace(img.getBoundingClientRect(), t.offsetWidth, t.offsetHeight, d.win.innerWidth, d.win.innerHeight);
+      t.style.left = p.left + "px";
+      t.style.top = p.top + "px";
+    }
+    function hide() {
+      if (tip) { tip.hidden = true; tip.textContent = ""; }
+      cur = null;
+      how = "";
+    }
+
+    function lbMake() {
+      if (lb !== null) return lb;
+      const L = d.lightbox();
+      if (!L || typeof L.create !== "function") return null; // 부품이 나중에 오면 다음에 다시 본다
+      lb = L.create(doc.body, { scale: d.scale, card: h => h.closest(".page"), caption: figText, cls: "fig-lb" });
+      // aria-modal 은 달지 않는다 — 닫기 단추가 대화상자(.lb — 열 때마다 내용을 비운다) 밖 body 직계라, 달면 보조기술이 단추를 닫힌 바깥으로 본다.
+      // 열린 동안 Tab 은 닫기 단추에 머문다(아래 창 keydown)
+      lb.el.setAttribute("role", "dialog");
+      lb.el.setAttribute("aria-label", "그림 크게 보기");
+      lb.el.tabIndex = -1;
+      lb.el.addEventListener("click", e => { if (e.target === lb.el && !lb.onScrollbar(e)) lbClose(true); });
+      lbBtn = doc.createElement("button");
+      lbBtn.type = "button";
+      lbBtn.className = "lb-close fig-lb-close";
+      lbBtn.title = "닫기(Esc)";
+      lbBtn.setAttribute("aria-label", "크게 보기 닫기");
+      lbBtn.textContent = "✕";
+      lbBtn.hidden = true;
+      lbBtn.addEventListener("click", () => lbClose(true));
+      doc.body.appendChild(lbBtn);
+      return lb;
+    }
+    function lbOpen(img) {
+      const L = lbMake();
+      if (!L) return false;
+      hide();
+      lbFrom = img;
+      L.open(img);
+      lbBtn.hidden = false;
+      if (L.el.focus) L.el.focus({ preventScroll: true });
+      return true;
+    }
+    // lbClose 는 크게 보기를 닫는다. back 이면 연 그림으로 포커스를 돌린다(그 포커스로 툴팁이 다시 열리지 않게 quiet.focus). 열려 있지 않으면 거짓.
+    function lbClose(back) {
+      if (!lbOn()) return false;
+      lb.close();
+      lbBtn.hidden = true;
+      const f = lbFrom;
+      lbFrom = null;
+      if (back && f && f.isConnected && f.focus) { quiet.focus = f; f.focus({ preventScroll: true }); }
+      return true;
+    }
+
+    scope.addEventListener("pointerover", e => {
+      if (e.pointerType === "touch") return;
+      const img = figTarget(e.target, scope);
+      if (img && img !== cur) show(img, "hover");
+    });
+    scope.addEventListener("pointerout", e => {
+      const img = figTarget(e.target, scope);
+      if (!img) return;
+      if (img === quiet.hover) quiet.hover = null;
+      if (img === cur && how === "hover") hide();
+    });
+    scope.addEventListener("focusin", e => { const img = figFocus(e.target, scope); if (img) show(img, "focus"); });
+    scope.addEventListener("focusout", e => {
+      const img = figFocus(e.target, scope) || figTarget(e.target, scope);
+      if (img && img === quiet.focus) quiet.focus = null;
+      if (how === "focus") hide();
+    });
+    scope.addEventListener("click", e => {
+      if (e.button !== 0 || e.defaultPrevented || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      const img = figTarget(e.target, scope);
+      if (!img || figLinked(img) || !d.active()) return;
+      if (lbOpen(img)) e.preventDefault();
+    });
+    scope.addEventListener("keydown", e => {
+      if ((e.key !== "Enter" && e.key !== " ") || e.isComposing || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      const img = figTarget(e.target, scope);
+      if (!img || img !== e.target || figLinked(img) || !d.active() || !d.lightbox()) return;
+      e.preventDefault();
+      e.stopPropagation(); // 쪽 넘김 키(Space)가 아니다
+      lbOpen(img);
+    });
+    // 크게 보기가 열린 동안의 키는 이것이 먼저다(창 붙잡기 — 문서의 keydown 들보다 앞). Esc 는 닫기, Tab 은 닫기 단추로, 닫기 단추 위 Enter·Space 는 단추 그대로,
+    // 그 밖은 뒤 화면으로 보내지 않는다(⌘·Ctrl 조합은 브라우저 몫으로 둔다). 닫혀 있으면 Esc 는 툴팁만 닫는다(목차 서랍 닫기 등 다른 Esc 도 그대로 간다).
+    d.win.addEventListener("keydown", e => {
+      if (lbOn()) {
+        e.stopPropagation();
+        if (e.key === "Escape") { e.preventDefault(); lbClose(true); return; }
+        if (e.key === "Tab") { e.preventDefault(); lbBtn.focus(); return; }
+        if ((e.key === "Enter" || e.key === " ") && e.target === lbBtn) return;
+        if (!e.metaKey && !e.ctrlKey) e.preventDefault();
+        return;
+      }
+      if (e.key === "Escape" && cur) { quiet[how] = cur; hide(); }
+    }, true);
+    if (d.viewer) d.viewer.addEventListener("scroll", hide, { passive: true });
+    d.win.addEventListener("resize", () => { hide(); if (lbOn()) lb.relayout(); });
+
+    function reset() {
+      hide();
+      quiet.hover = quiet.focus = null;
+      lbClose(false);
+    }
+    function arm() {
+      reset();
+      if (!d.active()) return;
+      const zoom = !!d.lightbox();
+      for (const img of scope.querySelectorAll(".page-body img")) {
+        if (!figTarget(img, scope) || img.hasAttribute("data-fig")) continue;
+        const linked = figLinked(img), kind = !linked && zoom ? "zoom" : figText(img) ? "tip" : "";
+        if (!kind) continue;
+        // 링크 그림은 링크가 포커스를 받는다 — 표지만(크게 보기 커서 없음). 링크 밖 그림은 Tab 으로 닿게(이미 tabindex 가 있으면 둔다)
+        img.setAttribute("data-fig", kind);
+        if (!linked && !img.hasAttribute("tabindex")) img.tabIndex = 0;
+      }
+    }
+    return { arm, reset, tipOn: () => !!cur, lbOn, tip: () => tip, close: () => lbClose(true) };
+  }
+
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, slideFit, SHORT_VIEW_H, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
     tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
-    hostSource, pickSource };
+    hostSource, pickSource, figTarget, figText, figLinked, figFocus, figTipPlace, figTips };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
   if (!source) return;
@@ -1726,6 +1927,12 @@
     now: () => Date.now(), onClose: () => { ctxTables = null; } });
   function closeTableMenu() { tmenu.close(); ctxTables = null; }
 
+  // 그림 설명·크게 보기(itda-doc#121 — figTips). 크게 보기 부품은 호스트의 ItdaLightbox(공유 화면·묶은 교안이 싣는다 — 뷰어에는 없다)
+  const figs = figTips({ doc: document, win: window, scope: $("pages"), viewer: $("viewer"),
+    active: () => !!state.view && !state.ended && (state.look === "doc" || state.look === "flow" || state.look === "slides"),
+    lightbox: () => { const L = hostPart("Lightbox"); return L && typeof L.create === "function" ? L : null; },
+    scale: () => parseFloat($("pages").style.getPropertyValue("--nz")) || 1 });
+
   // 보드 크게 보기(itda-work/itda-hyve#362 — dashboard.js zoomer). 발표를 따라가는 동안(fol.holdsLook — 발표가 꼴을 붙듦, 잠시 풀린 동안 포함)은
   // 열지 않고, 열려 있으면 다음 이벤트·발표 메시지(slide·hello)에서 닫는다. 보드를 그릴 수 없는 화면(웹 뷰어 — ItdaBoard 없음)에는 없다.
   const boardZoom = window.ItdaBoard && window.ItdaBoard.zoomer ? window.ItdaBoard.zoomer($("pages"), { blocked: () => fol.holdsLook(), scroller: $("viewer") }) : null;
@@ -1748,7 +1955,7 @@
     paintTOC(v);
     if (v.error) state.tableSort = null; // 본문을 비운다 — 아래 줄(시험이 글로 보는 자리)
     if (v.error) hook("tick"); // 확장: 오류 view 는 본문을 다시 만들지 않는다 — 지난 본문 기준 그대로
-    if (v.error) { closeTableMenu(); $("pages").textContent = $("notes").textContent = ""; findHeading.refresh(); return; }
+    if (v.error) { closeTableMenu(); figs.reset(); $("pages").textContent = $("notes").textContent = ""; findHeading.refresh(); return; }
     state.landscape = v.paper === "a4-landscape";
     document.body.classList.toggle("paper-a4-landscape", state.landscape);
     document.body.classList.toggle("paper-a4", !state.landscape);
@@ -1829,6 +2036,8 @@
     placeSlideNotes(pagesEl); // 노트 칸(슬라이드 보기 밖이면 지우기만)은 쪽을 바꿔 끼운 뒤에 — 칸은 #notes 에 있어 쪽과 함께 갈리지 않는다
     // 코드 블록 복사 단추(itda-hyve#413 — codecopy.js): 쪽 나눔이 끝난 뒤에 붙인다(나누기 전에 붙으면 splitPre 가 단추를 줄로 센다).
     if (CodeCopy) { CodeCopy.arm(pagesEl); CodeCopy.arm($("notes")); }
+    figs.arm(); // 그림 설명·크게 보기(itda-doc#121): 쪽 나눔이 끝난 새 본문에 — 열린 툴팁·크게 보기는 옛 그림과 함께 닫는다
+
     if (boardZoom && state.look === "dashboard") boardZoom.arm(); // 크게 보기 단추 — 새 보드의 타일마다(옛 보드는 떨어져 열린 상태도 버려진다)
     state.tableSort = sorted;
     findHeading.refresh(); // 본문이 바뀌었다 — 강조가 쓰는 id Map 을 새 본문으로(⑦)
@@ -2158,6 +2367,7 @@
       $("ended-msg").textContent = "공유한 사람이 이 화면의 연결을 끊었습니다.";
     }
     closeTableMenu();
+    figs.reset();
     $("pages").textContent = $("notes").textContent = "";
     findHeading.refresh();
     $("stage").textContent = "";
