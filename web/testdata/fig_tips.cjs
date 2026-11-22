@@ -52,6 +52,7 @@ class El {
     this.hidden = false;
     this.text = "";
     this.rect = { left: 100, top: 100, width: 200, height: 100, right: 300, bottom: 200 };
+    this.scrollTop = 0;
     for (const k of kids || []) this.appendChild(k);
   }
   cls() { return (this.attrs.class || "").split(/\s+/).filter(Boolean); }
@@ -80,6 +81,11 @@ class El {
   getBoundingClientRect() { return this.rect; }
   get offsetWidth() { return 120; }
   get offsetHeight() { return 30; }
+  get classList() { return { contains: c => this.cls().includes(c) }; }
+  querySelector(sel) { return this.querySelectorAll(sel)[0] || null; }
+  // 굴림 높이: _sh·_ch 로 정할 수 있다. 툴팁(.fig-tip)은 글자당 2px 높이, 보이는 높이는 style.maxHeight 까지(share.css overflow:hidden 흉내)
+  get scrollHeight() { if (this._sh !== undefined) return this._sh; return this.cls().includes("fig-tip") ? this.text.length * 2 : 0; }
+  get clientHeight() { if (this._ch !== undefined) return this._ch; const m = parseFloat(this.style.maxHeight); return Math.min(this.scrollHeight, isNaN(m) ? Infinity : m); }
   get isConnected() { let e = this; while (e.parentElement) e = e.parentElement; return e === doc; }
   focus() { const was = doc.activeElement; if (was === this) return; doc.activeElement = this; if (was && was.isEl) fire(was, "focusout"); fire(this, "focusin"); }
   blur() { if (doc.activeElement === this) { doc.activeElement = doc.body; fire(this, "focusout"); } }
@@ -110,6 +116,7 @@ function fakeLightbox() {
     let kind = "";
     const el = root.appendChild(new El("div", { class: "lb " + (opts.cls || "") }));
     const inner = el.appendChild(new El("div", { class: "lb-fig" }));
+    L.cap = inner.appendChild(new El("div", { class: "lb-cap" })); // 굴림 높이는 시험이 _sh·_ch 로 정한다(기본 0 — 넘치지 않음)
     L.inst = { el, inner, open(h) { kind = "img"; L.opened.push(h); L.caps.push(opts.caption ? opts.caption(h) : ""); }, close() { if (!kind) return false; kind = ""; L.closed++; return true; },
       relayout() {}, onScrollbar: () => false, kind: () => kind };
     return L.inst;
@@ -388,6 +395,113 @@ eq("자리: 아래로 넘치는 그림도 위에 자리가 있으면 위", S.fig
   ok("부품 없음: 포커스 툴팁은 된다", s.F.tipOn());
   e = fire(s.imgs.desc, "keydown", { key: " " });
   ok("부품 없음: Space 는 쪽 넘김으로 간다", !e.defaultPrevented && s.seen.key.includes(" "));
+}
+
+// 12. 슬라이드 분할 패널(리뷰 1회차 P1-1) — slides.js 출력 구조: 쪽(.page.slide)의 직접 자식 .slide-panel(본문 .page-body 의 형제)에 그림 블록,
+// 넘쳐 생긴 장에는 그 블록의 사본(slotBox — id 없이), 배경은 .slide-bg. 본문 안 사용자 컨테이너(:::slide-panel)는 본문이다.
+function slidePages() {
+  const fig = new El("figure", {}, [new El("img", { src: "p.png", alt: "구성도 설명", class: "img-left" })]);
+  const p1 = new El("div", { class: "page slide panel-left" }, [new El("div", { class: "slide-head" }),
+    new El("div", { class: "page-body" }, [new El("p"), new El("div", { class: "slide-panel" }, [new El("img", { src: "u.png", alt: "본문 안 컨테이너" })])]),
+    new El("div", { class: "slide-panel" }, [fig])]);
+  const copyFig = new El("figure", {}, [new El("img", { src: "p.png", alt: "구성도 설명", class: "img-left" })]);
+  const p2 = new El("div", { class: "page slide panel-left" }, [new El("div", { class: "slide-head" }), new El("div", { class: "page-body" }, [new El("p")]),
+    new El("div", { class: "slide-panel" }, [copyFig])]);
+  const linkImg = new El("img", { src: "l.png", alt: "링크 패널", class: "img-right" });
+  const bgImg = new El("img", { src: "b.png", alt: "배경 그림", class: "img-fill" });
+  const p3 = new El("div", { class: "page slide panel-right has-bg" }, [new El("div", { class: "slide-bg" }, [new El("figure", {}, [bgImg])]),
+    new El("div", { class: "page-body" }, [new El("p")]),
+    new El("div", { class: "slide-panel" }, [new El("p", {}, [new El("a", { href: "https://example.com/" }, [linkImg])])])]);
+  return { nodes: [p1, p2, p3], panel: fig.children[0], copy: copyFig.children[0], user: p1.children[1].children[1].children[0], link: linkImg, bg: bgImg };
+}
+{
+  const s = setup();
+  const sp = slidePages();
+  s.scope.replaceChildren(...sp.nodes);
+  s.F.arm();
+  eq("패널: 표지(첫 장·사본·본문 안 컨테이너는 zoom, 링크 패널은 tip, 배경은 없음)", [sp.panel, sp.copy, sp.user, sp.link, sp.bg].map(x => x.getAttribute("data-fig")), ["zoom", "zoom", "zoom", "tip", null]);
+  eq("패널: tabindex(링크 패널·배경은 없음)", [sp.panel, sp.copy, sp.link, sp.bg].map(x => x.getAttribute("tabindex")), ["0", "0", null, null]);
+  ok("figArea: 쪽 직속 패널·본문", S.figArea(sp.panel) === sp.panel.parentElement.parentElement && S.figArea(sp.user).cls().includes("page-body"));
+  const stray = new El("div", { class: "slide-panel" }, [new El("img", { alt: "x" })]);
+  s.scope.appendChild(new El("div", {}, [stray]));
+  ok("figArea: 쪽 직속이 아닌 .slide-panel(본문 밖)은 아니다", S.figArea(stray.children[0]) === null && S.figTarget(stray.children[0], s.scope) === null);
+  fire(sp.panel, "pointerover", { pointerType: "mouse" });
+  ok("패널 그림 올림: 툴팁", s.F.tipOn() && s.F.tip().textContent === "구성도 설명");
+  fire(sp.panel, "pointerout", { pointerType: "mouse" });
+  sp.copy.focus();
+  ok("패널 사본 포커스(Tab): 툴팁", s.F.tipOn() && s.F.tip().textContent === "구성도 설명");
+  sp.copy.blur();
+  let e = fire(sp.panel, "click");
+  ok("패널 그림 누르기: 크게 보기(같은 img·캡션)", s.F.lbOn() && s.L.opened[s.L.opened.length - 1] === sp.panel && s.L.caps[s.L.caps.length - 1] === "구성도 설명" && e.defaultPrevented);
+  fire(doc.activeElement, "keydown", { key: "Escape" });
+  sp.copy.focus();
+  e = fire(sp.copy, "keydown", { key: "Enter" });
+  ok("패널 사본 Enter: 크게 보기", s.F.lbOn() && s.L.opened[s.L.opened.length - 1] === sp.copy && e.defaultPrevented);
+  fire(doc.activeElement, "keydown", { key: "Escape" });
+  e = fire(sp.copy, "keydown", { key: " " });
+  ok("패널 사본 Space: 크게 보기·쪽 넘김으로 가지 않음", s.F.lbOn() && e.defaultPrevented && !s.seen.key.includes(" "));
+  fire(doc.activeElement, "keydown", { key: "Escape" });
+  const n = s.L.opened.length;
+  e = fire(sp.link, "click");
+  ok("링크 패널 누르기: 크게 보기 없음·막지 않음(링크 이동)", !s.F.lbOn() && s.L.opened.length === n && !e.defaultPrevented && s.seen.click.includes(sp.link));
+  fire(sp.link, "pointerover", { pointerType: "mouse" });
+  ok("링크 패널 올림: 툴팁", s.F.tipOn() && s.F.tip().textContent === "링크 패널");
+  fire(sp.link, "pointerout", { pointerType: "mouse" });
+  fire(sp.bg, "pointerover", { pointerType: "mouse" });
+  e = fire(sp.bg, "click");
+  ok("배경 그림: 툴팁·크게 보기 없음", !s.F.tipOn() && !s.F.lbOn() && !e.defaultPrevented);
+}
+
+// 13. 긴 툴팁(리뷰 1회차 P2-2) — 높이 상한(창 높이 - 16, 250px)에 넘치면 끝을 「…」 로 줄이고, 자리는 창 안
+eq("figClip: 들면 그대로", S.figClip("가나다", s => s.length <= 5), "가나다");
+eq("figClip: 넘치면 끝을 줄이고 …", S.figClip("가나다라마바사", s => s.length <= 5), "가나다라…");
+eq("figClip: 서로게이트 쌍을 가르지 않는다", S.figClip("😀😀😀😀😀😀", s => Array.from(s).length <= 3), "😀😀…");
+eq("figClip: 끝 공백은 떼고 …", S.figClip("가나 다라마바", s => s.length <= 4), "가나…");
+eq("figClip: 아무것도 안 들면 …", S.figClip("가나다", () => false), "…");
+eq("자리: 창보다 높은 툴팁은 창 위 여백에", S.figTipPlace({ left: 100, top: 200, width: 200, height: 100, bottom: 300 }, 120, 900, 1000, 600), { left: 140, top: 8 });
+{
+  const s = setup();
+  const long = "아주 긴 설명 ".repeat(100).trim(); // 699 자 — 글자당 2px 흉내로 1398px
+  const im = new El("img", { src: "z.png", alt: long });
+  s.scope.children[0].children[0].appendChild(im);
+  s.F.arm();
+  fire(im, "pointerover", { pointerType: "mouse" });
+  const t = s.F.tip(), txt = t.textContent;
+  ok("긴 툴팁: 높이 상한 250px", t.style.maxHeight === "250px", t.style);
+  ok("긴 툴팁: 끝을 …로 줄여 상한 안에 든다", txt.endsWith("…") && txt.length <= 125 && long.startsWith(txt.slice(0, -1).trimEnd()) && t.scrollHeight <= t.clientHeight, { len: txt.length });
+  fire(im, "pointerout", { pointerType: "mouse" });
+  win.innerHeight = 100;
+  fire(im, "pointerover", { pointerType: "mouse" });
+  ok("낮은 창: 상한은 창 높이 - 16(84px), 글도 그만큼 줄인다", t.style.maxHeight === "84px" && t.textContent.length <= 42 && t.textContent.endsWith("…"), { mh: t.style.maxHeight, len: t.textContent.length });
+  fire(im, "pointerout", { pointerType: "mouse" });
+  win.innerHeight = 800;
+  fire(s.imgs.desc, "pointerover", { pointerType: "mouse" });
+  ok("짧은 설명은 줄이지 않는다", t.textContent === "고정 IP 생성 및 연결 — 이름 eta-mini-ip");
+}
+
+// 14. 넘치는 캡션 굴림(리뷰 1회차 P2-1) — 크게 보기가 열린 동안 굴림 키는 뒤 화면이 아니라 캡션을 굴린다. 넘치지 않으면 아무것도 굴리지 않는다
+{
+  const s = setup();
+  fire(s.imgs.desc, "click");
+  s.L.cap._sh = 1000; s.L.cap._ch = 200;
+  const k = key => fire(doc.activeElement, "keydown", { key });
+  let e = k("ArrowDown");
+  ok("↓: 캡션 40 굴림·막음·뒤 화면으로 안 감", s.L.cap.scrollTop === 40 && e.defaultPrevented && !s.seen.key.includes("ArrowDown"));
+  k("PageDown");
+  ok("PageDown: 캡션 높이 - 24 만큼", s.L.cap.scrollTop === 40 + 176);
+  k("End");
+  ok("End: 끝", s.L.cap.scrollTop === 1000);
+  k("ArrowUp");
+  ok("↑: 40 위로", s.L.cap.scrollTop === 960);
+  k("Home");
+  ok("Home: 처음", s.L.cap.scrollTop === 0);
+  e = fire(doc.activeElement, "keydown", { key: " " });
+  ok("Space: 캡션 굴림·쪽 넘김으로 안 감", s.L.cap.scrollTop === 176 && !s.seen.key.includes(" ") && s.F.lbOn());
+  e = fire(doc.activeElement, "keydown", { key: "ArrowDown", metaKey: true });
+  ok("⌘↓ 는 굴리지 않는다(브라우저 몫)", s.L.cap.scrollTop === 176 && !e.defaultPrevented);
+  s.L.cap._sh = 100; s.L.cap.scrollTop = 0;
+  k("ArrowDown");
+  ok("넘치지 않는 캡션은 굴리지 않는다", s.L.cap.scrollTop === 0 && s.F.lbOn());
 }
 
 console.log(`FIGTIP DONE cases=${cases} failed=${failed}`);

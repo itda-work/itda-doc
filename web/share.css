@@ -99,12 +99,13 @@ body.toc-drawer .toc-fold-all { width: 34px; height: 30px; }
 .fig-tip { position: fixed; z-index: 44; left: 0; top: 0; box-sizing: border-box; max-width: min(28rem, calc(100vw - 16px)); padding: 6px 10px; border-radius: 6px;
   background: #1f2329; color: #f2f4f7; border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
   font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
-  white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none; }
+  white-space: pre-wrap; overflow-wrap: anywhere; pointer-events: none;
+  max-height: min(calc(100vh - 16px), 250px); overflow: hidden; } /* 높이 상한 — 넘치는 글은 share.js figClip 이 「…」 로 줄인다(FIG_TIP_MAX_H 와 같다) */
 .fig-tip[hidden] { display: none; }
-/* 크게 볼 수 있는 그림은 돋보기 커서, 키보드 포커스는 테두리(쪽 안이라 배율을 따른다) */
-#pages .page-body img[data-fig="zoom"] { cursor: zoom-in; }
-#pages .page-body img[data-fig]:focus { outline: none; }
-#pages .page-body img[data-fig]:focus-visible { outline: 2px solid #2f6fdf; outline-offset: 2px; }
+/* 크게 볼 수 있는 그림은 돋보기 커서, 키보드 포커스는 테두리(쪽 안이라 배율을 따른다). data-fig 는 share.js figTips 가 대상(본문·분할 패널)에만 단다 */
+#pages img[data-fig="zoom"] { cursor: zoom-in; }
+#pages img[data-fig]:focus { outline: none; }
+#pages img[data-fig]:focus-visible { outline: 2px solid #2f6fdf; outline-offset: -2px; }
 /* 크게 보기 닫기 단추(share.js figTips — 호스트 app.css .lb-close 꼴): 아이콘 대신 글자 */
 .fig-lb-close { font: 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 @media print { .fig-tip, .fig-lb-close, body > .fig-lb { display: none !important; } }

@@ -1507,13 +1507,16 @@
     return s && typeof s.attach === "function" ? s : null;
   }
 
-  // ---- 그림 설명·크게 보기(itda-doc#121) — 쪽·이어보기·슬라이드 보기(보드·전체 화면 발표·청중은 아니다)의 본문(#pages .page-body) 그림.
+  // ---- 그림 설명·크게 보기(itda-doc#121) — 쪽·이어보기·슬라이드 보기(보드·전체 화면 발표·청중은 아니다)의 쪽 콘텐츠 영역(#pages 안 .page-body 와
+  // 슬라이드 분할 패널 .page > .slide-panel — 넘쳐 생긴 장의 패널 사본 포함, figArea) 그림. 배경(.slide-bg)은 아니다.
   // 대상은 렌더된 img 그대로다(배치 낱말 판정을 다시 하지 않는다 — mdoc 이 배치 낱말뿐인 alt 를 빈 alt 로 낸다). 로고(.sc-logo·.sf-logo)·숨은 단계(.pr-pending)는
   // 빼고, 측정 무대(#stage)·노트 칸(#notes)은 범위(#pages) 밖이라 빠진다. 그림의 DOM(부모·형제·class·크기)은 바꾸지 않는다 — 본문을 다 그린 뒤
   // tabindex 와 data-fig 만 단다(figTips arm).
   //  - 설명 툴팁: alt 가 비지 않은(공백뿐 아님) 그림에 마우스·펜을 올리거나(터치는 아니다 — 탭은 크게 보기) 키보드 포커스가 닿으면(링크 그림은 그 링크의 포커스)
   //    body 직계의 .fig-tip(aria-hidden — alt 를 다시 낭독하지 않게, textContent 로만)에 보인다. 쪽 배율(transform)과 상관없는 글자 크기, 자리는 그림 아래 →
-  //    위 → 겹침(figTipPlace). 포인터·포커스가 떠나거나 Esc·굴림·창 크기 바뀜·다시 그리기에 닫는다. Esc 로 닫은 그림은 떠났다 올 때까지 다시 열지 않는다.
+  //    위 → 겹침(figTipPlace — 늘 창 안). 높이는 창 높이 - 16px 와 FIG_TIP_MAX_H(약 12줄) 중 작은 쪽까지이고, 넘치면 끝을 「…」 로 줄인다(figClip).
+  //    전체 설명은 링크 밖 그림이면 크게 보기 캡션으로 읽는다(링크 그림의 긴 설명 전체를 화면에 보이는 길은 없다 — alt 는 화면 읽기 프로그램에 그대로 간다).
+  //    포인터·포커스가 떠나거나 Esc·굴림·창 크기 바뀜·다시 그리기에 닫는다. Esc 로 닫은 그림은 떠났다 올 때까지 다시 열지 않는다.
   //  - 크게 보기: 링크(a) 안이 아닌 그림을 누르면(클릭·탭) 또는 포커스한 그림에서 Enter·Space 면 호스트의 크게 보기 부품(window.ItdaLightbox — 없으면
   //    크게 보기 없이 툴팁만, 누르기는 지금처럼 아무 일도 없다)이 body 에 열고 설명을 아래 캡션으로 보인다. 같은 img 의 얕은 복제(같은 src)다.
   //    닫기는 Esc·바탕 누르기·닫기 단추(.fig-lb-close), 닫으면 원래 그림으로 포커스를 돌린다. 열린 동안 키는 창(window) 붙잡기 단계에서 이것이 먼저
@@ -1521,11 +1524,33 @@
   // 인쇄에는 툴팁·크게 보기가 찍히지 않는다(share.css·호스트 app.css 의 @media print).
 
   const FIG_SKIP = ".sc-logo, .sf-logo, .pr-pending";
-  // figTarget 은 t 가 scope 안 본문(.page-body)의 대상 그림이면 그 img, 아니면 null 이다.
+  const FIG_TIP_MAX_H = 250; // 툴팁 높이 상한(px) — 13px·줄 높이 1.5 로 약 12줄 + 안쪽 여백(share.css .fig-tip)
+  // figArea 는 t 가 든 쪽 콘텐츠 영역이다 — 본문(.page-body) 또는 쪽의 직접 자식인 분할 패널(.page > .slide-panel). 본문 안 사용자 컨테이너(:::slide-panel)는
+  // 본문으로 본다. 없으면 null.
+  function figArea(t) {
+    const pb = t.closest(".page-body");
+    if (pb) return pb;
+    const sp = t.closest(".slide-panel"), pg = sp && sp.parentElement;
+    return pg && pg.classList && pg.classList.contains("page") ? sp : null;
+  }
+  // figTarget 은 t 가 scope 안 쪽 콘텐츠 영역(figArea)의 대상 그림이면 그 img, 아니면 null 이다.
   function figTarget(t, scope) {
     if (!t || !scope || typeof t.closest !== "function" || String(t.tagName).toLowerCase() !== "img") return null;
-    if (!scope.contains(t) || !t.closest(".page-body") || t.closest(FIG_SKIP)) return null;
+    if (!scope.contains(t) || !figArea(t) || t.closest(FIG_SKIP)) return null;
     return t;
+  }
+  // figClip 은 글 text 가 fits(글) 에 들면 그대로, 아니면 끝을 줄이고 「…」 를 단 가장 긴 글이다(글자 단위 — 서로게이트 쌍을 가르지 않는다).
+  // 「…」 하나도 들지 않으면 「…」.
+  function figClip(text, fits) {
+    if (fits(text)) return text;
+    const cs = Array.from(text);
+    const cut = n => cs.slice(0, n).join("").replace(/\s+$/, "") + "…";
+    let lo = 0, hi = cs.length - 1;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (fits(cut(mid))) lo = mid; else hi = mid - 1;
+    }
+    return cut(lo);
   }
   // figText 는 그림의 설명(렌더된 alt 앞뒤 공백을 뺀 것 — 공백뿐이면 "")이다.
   function figText(img) { return String((img && img.getAttribute && img.getAttribute("alt")) || "").trim(); }
@@ -1581,10 +1606,12 @@
       const text = figText(img);
       if (!text) return;
       const t = tipEl();
-      t.textContent = text;
       t.style.left = "0px";
       t.style.top = "0px";
+      t.style.maxHeight = Math.max(20, Math.min(d.win.innerHeight - 16, FIG_TIP_MAX_H)) + "px";
       t.hidden = false;
+      // 높이 상한에 넘치면 끝을 줄인다(share.css .fig-tip overflow:hidden — scrollHeight 가 내용 전체 높이)
+      t.textContent = figClip(text, s => { t.textContent = s; return t.scrollHeight <= t.clientHeight + 1; });
       cur = img;
       how = src;
       const p = figTipPlace(img.getBoundingClientRect(), t.offsetWidth, t.offsetHeight, d.win.innerWidth, d.win.innerHeight);
@@ -1671,6 +1698,18 @@
       e.stopPropagation(); // 쪽 넘김 키(Space)가 아니다
       lbOpen(img);
     });
+    // capScroll 은 크게 보기가 열린 동안의 굴림 키(↑↓·PageUp/PageDown·Space/Shift+Space·Home/End)로 넘치는 설명 캡션(.lb-cap — lightbox.js 가 높이 상한을 건다)을
+    // 굴린다. 캡션이 없거나 넘치지 않으면 아무것도 하지 않는다(뒤 화면도 굴리지 않는다). ⌘·Ctrl 조합은 아니다.
+    function capScroll(e) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const c = lb && lb.el.querySelector && lb.el.querySelector(".lb-cap");
+      if (!c || c.scrollHeight <= c.clientHeight) return;
+      const page = Math.max(20, c.clientHeight - 24);
+      const by = { ArrowDown: 40, ArrowUp: -40, PageDown: page, PageUp: -page, " ": e.shiftKey ? -page : page }[e.key];
+      if (by) c.scrollTop += by;
+      else if (e.key === "Home") c.scrollTop = 0;
+      else if (e.key === "End") c.scrollTop = c.scrollHeight;
+    }
     // 크게 보기가 열린 동안의 키는 이것이 먼저다(창 붙잡기 — 문서의 keydown 들보다 앞). Esc 는 닫기, Tab 은 닫기 단추로, 닫기 단추 위 Enter·Space 는 단추 그대로,
     // 그 밖은 뒤 화면으로 보내지 않는다(⌘·Ctrl 조합은 브라우저 몫으로 둔다). 닫혀 있으면 Esc 는 툴팁만 닫는다(목차 서랍 닫기 등 다른 Esc 도 그대로 간다).
     d.win.addEventListener("keydown", e => {
@@ -1680,6 +1719,7 @@
         if (e.key === "Tab") { e.preventDefault(); lbBtn.focus(); return; }
         if ((e.key === "Enter" || e.key === " ") && e.target === lbBtn) return;
         if (!e.metaKey && !e.ctrlKey) e.preventDefault();
+        capScroll(e); // 넘치는 설명 캡션은 굴림 키로 굴린다(캡션은 포커스를 받지 않는다 — aria-hidden)
         return;
       }
       if (e.key === "Escape" && cur) { quiet[how] = cur; hide(); }
@@ -1696,7 +1736,7 @@
       reset();
       if (!d.active()) return;
       const zoom = !!d.lightbox();
-      for (const img of scope.querySelectorAll(".page-body img")) {
+      for (const img of scope.querySelectorAll("img")) { // 대상(본문·분할 패널 — 사본 포함)은 figTarget 이 가른다
         if (!figTarget(img, scope) || img.hasAttribute("data-fig")) continue;
         const linked = figLinked(img), kind = !linked && zoom ? "zoom" : figText(img) ? "tip" : "";
         if (!kind) continue;
@@ -1714,7 +1754,7 @@
     lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
     tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
-    hostSource, pickSource, figTarget, figText, figLinked, figFocus, figTipPlace, figTips };
+    hostSource, pickSource, figArea, figTarget, figClip, figText, figLinked, figFocus, figTipPlace, figTips };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
   if (!source) return;
