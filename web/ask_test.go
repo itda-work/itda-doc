@@ -12,7 +12,7 @@ import (
 )
 
 // 원문 제목의 섹션 식별자와 서비스별 새 대화 주소를 확인한다.
-const askCases = 54
+const askCases = 58
 
 func TestAsk(t *testing.T) {
 	node, err := exec.LookPath("node")

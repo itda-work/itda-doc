@@ -1,7 +1,7 @@
 // 호스트가 set(cfg, host)로 강의 MCP와 번들 문서를 지정하면 armSections(flow)가 원문 직계 제목에
 // 서비스별 단추를 단다. 쪽·장으로 나누기 전에 같은 id의 순번을 매긴다. 누르면 섹션 참조와 설명 요청을
 // 담은 새 대화를 연다. 단추는 제목의 첫 자식으로 넣어 CSS(base.css .itda-section-ask)가 제목 오른쪽 끝에 띄운다.
-// 아이콘은 CSS가 그리고, 읽는 이름은 aria-label, 툴팁은 브라우저 기본 툴팁(title — 첫 줄 이름, 둘째 줄 기록 안내)이다.
+// 아이콘은 CSS가 그리고, 읽는 이름은 aria-label, 툴팁은 브라우저 기본 툴팁(title — 첫 줄 이름, 둘째 줄 안내)이다.
 // 단추 안에 글자 노드가 없어 제목 글자의 복사·검색에 섞이지 않는다.
 (function (root) {
   "use strict";
@@ -10,7 +10,7 @@
     claude: { name: "Claude", url: "https://claude.ai/new?q=" },
     chatgpt: { name: "ChatGPT", url: "https://chatgpt.com/?q=" },
   };
-  const notice = "질문은 강의 커넥터로 처리되고 기록될 수 있습니다. 기록 여부는 커넥터 안내를 확인하세요.";
+  const notice = "질문은 AI 앱의 새 대화로 열립니다.";
   const selector = "button.itda-section-ask";
   const str = v => typeof v === "string" ? v.trim() : "";
   const displayLimit = 80;
@@ -79,7 +79,6 @@
       "read_section(doc=" + JSON.stringify(cfg.doc_id) + ", section=" + JSON.stringify(ref.section) + ", nth=" + ref.nth + ", subtree=true)로 읽고, 여러 조각이면 끝까지 읽어 주세요.",
       "내 생각을 먼저 물어보고, 교안을 그대로 옮기지 말고 처음 배우는 사람에게 설명해 주세요.",
       cfg.guide ? "커넥터가 연결돼 있지 않으면 이 안내를 보여 주세요. " + cfg.guide : "커넥터가 연결돼 있지 않으면 연결 방법을 알려 주세요.",
-      "대화를 마치면 record_qa로 질문과 답 요약을 보내 주세요.",
     ].join("\n");
   }
 

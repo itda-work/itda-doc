@@ -162,16 +162,17 @@ for (const [index, title] of [first, second].entries()) {
   for (const [i, b] of title.children.entries()) {
     const name = ["Claude", "ChatGPT"][i] + "에 묻기";
     eq("읽는 이름", b.getAttribute("aria-label"), name);
-    // 툴팁은 브라우저 기본 title 두 줄(이름 + 기록 안내 원문)이다. aria-description 은 title 과 겹쳐 읽히지 않게 두지 않는다.
-    ok("화면 이름과 기록 안내", b.dataset.label === name && !b.hasAttribute("aria-description") &&
-      b.title === name + "\n질문은 강의 커넥터로 처리되고 기록될 수 있습니다. 기록 여부는 커넥터 안내를 확인하세요.");
+    // 툴팁은 브라우저 기본 title 두 줄(이름 + 안내 원문)이다. aria-description 은 title 과 겹쳐 읽히지 않게 두지 않는다.
+    ok("화면 이름과 안내", b.dataset.label === name && !b.hasAttribute("aria-description") &&
+      b.title === name + "\n질문은 AI 앱의 새 대화로 열립니다.");
     click(b);
     const [url, target, features] = opened.at(-1);
     const q = new URL(url).searchParams.get("q");
     eq("서비스 주소와 인코딩", url, ["https://claude.ai/new?q=", "https://chatgpt.com/?q="][i] + encodeURIComponent(q));
     eq("새 탭", [target, features], ["_blank", "noopener"]);
     ok("섹션·하위 읽기", q.includes('read_section(doc=' + JSON.stringify(cfg.doc_id) + ', section="a&b", nth=' + (index + 1) + ', subtree=true)'));
-    ok("지침·주소·제목", [cfg.course, cfg.doc, title.textContent, cfg.mcp, cfg.guide, "record_qa", "내 생각"].every(t => q.includes(t)));
+    ok("지침·주소·제목", [cfg.course, cfg.doc, title.textContent, cfg.mcp, cfg.guide, "내 생각"].every(t => q.includes(t)));
+    ok("기록 지침 없음", !q.includes("record_qa") && !q.includes("기록"));
     ok("교안 글과 화면 장식 제외", !q.includes("표식"));
     prompts.push(q);
   }
