@@ -10,6 +10,7 @@
 //     드러나는 겹침은 뒤 타일을 자동 배치로 돌린다(pack 의 moved)
 //   - 적지 않은 타일은 읽는 차례대로 행 우선으로 놓는다 — 남은 칸에 안 들어가면 다음 줄(빈 칸은 그대로, 당겨 채우지 않는다), 찬 칸은 건너뛴다.
 //     같은 입력이면 같은 배치다(pack — testdata/board_pack.cjs 가 node 로 돈다, board_test.go)
+//   - 타일마다 놓인 자리를 data-board-seg·data-board-at·data-board-span·data-board-fixed 로, 격자에 열 수를 data-board-cols 로 남긴다(slots — 호스트의 끌기가 읽는다)
 //   - 타일 행 높이는 일정하다 — rows·ratio 의 상자(16:9 면 1280×720)에 머리와 rows 줄이 꼭 차는 높이(base.css --board-row-h)
 // 타일 안이 넘치면 「(계속)」 으로 잇지 않는다(보드는 한눈에 보는 것): 표는 들어가는 행까지만 보이고 「… n행 더」, 그림·차트는 칸에 맞춰 줄이고,
 // KPI 값은 --kpi-min-size 까지 줄인 뒤 공백에서 줄을 바꾸고, 그래도 한 낱말이 칸보다 넓으면(또는 아래로 넘치면) 보조 글을 숨기고
@@ -140,6 +141,20 @@
     return bottom;
   }
 
+  // slots 는 pack 결과를 타일마다 구역 안 자리로 옮긴다 — 호스트(문서 창 끌기, itda-work/itda-hyve#1038 2단계)가 읽는 값이다.
+  // 돌려주는 out[i] 는 타일이면 { seg(구역 번호 — 0부터, 줄 나눔·구역 줄마다 하나씩 는다), c·r(구역 안 열·행 — 1부터, at 과 같은 셈), w·h(놓인 너비·높이),
+  // fixed(적은 at 대로 놓였는가) }, 타일이 아니면 null 이다. 빈 구역(줄 머리의 줄 나눔)도 번호를 하나 쓴다.
+  function slots(items, place, moved) {
+    const mv = new Set(moved || []);
+    let seg = 0, base = 0;
+    return items.map((it, i) => {
+      const p = place[i];
+      if (it.brk) { seg++; base = p.r; return null; }
+      if (it.sec) { seg++; base = p.r + 1; return null; }
+      return { seg, c: p.c + 1, r: p.r - base + 1, w: p.w, h: p.h || 1, fixed: !!it.at && !mv.has(i) };
+    });
+  }
+
   // cssPx 는 box 안에서 토큰 값(글자 크기)을 px 로 잰다.
   function cssPx(box, token) {
     const p = box.appendChild(el("span"));
@@ -236,8 +251,10 @@
     const before = firstTile < 0 ? items : items.slice(0, firstTile);
     const headSec = docTitle ? null : before.find(it => it.kind === "section") || null;
     if (headSec) items = items.filter(it => it !== headSec);
-    const { place, rows: used, sections, moved } = pack(items.map(it => (it.kind === "break" ? { brk: true } : it.kind === "section" ? { sec: true }
-      : Object.assign({ w: tileWidth(it.blocks) }, tileAttrs(it.title)))), cols);
+    const packed = items.map(it => (it.kind === "break" ? { brk: true } : it.kind === "section" ? { sec: true }
+      : Object.assign({ w: tileWidth(it.blocks) }, tileAttrs(it.title))));
+    const { place, rows: used, sections, moved } = pack(packed, cols);
+    const slot = slots(packed, place, moved);
     const meta = [headText(g.head, o, ".cover-org, .title-org", "organization"), headText(g.head, o, '.meta-row[data-key="date"] dd', "date")].filter(Boolean).join(" · ");
     const pg = el("div", "page board");
     pg.dataset.kind = "board";
@@ -254,6 +271,7 @@
     if (meta) head.appendChild(el("div", "bh-meta", meta));
     const grid = pg.appendChild(el("div", "page-body board-grid"));
     grid.style.gridTemplateColumns = "repeat(" + cols + ", minmax(0, 1fr))";
+    grid.dataset.boardCols = String(cols); // 호스트 끌기가 읽는 열 수(slots 와 함께 — itda-work/itda-hyve#1038 2단계)
     // 행 높이를 줄마다 적는다 — 타일 줄은 고정, 구역 제목 줄은 자기 높이. 크게 보기가 타일을 띄워도 줄이 그대로 남는다
     const isSec = new Set(sections);
     grid.style.gridTemplateRows = Array.from({ length: used }, (_, r) => (isSec.has(r) ? "auto" : "var(--board-row-h)")).join(" ");
@@ -272,6 +290,12 @@
       const tile = el("section", "tile" + (p.w > 1 ? " w2" : ""));
       tile.style.gridColumn = (p.c + 1) + " / span " + p.w;
       tile.style.gridRow = p.h > 1 ? (p.r + 1) + " / span " + p.h : String(p.r + 1);
+      // 놓인 자리(slots): 구역 번호·구역 안 열,행·너비x높이·적은 자리대로인가. 화면 부품(호스트)이 읽기만 한다 — 배치·테마는 이 값을 쓰지 않는다
+      const sl = slot[i];
+      tile.dataset.boardSeg = String(sl.seg);
+      tile.dataset.boardAt = sl.c + "," + sl.r;
+      tile.dataset.boardSpan = sl.w + "x" + sl.h;
+      if (sl.fixed) tile.dataset.boardFixed = "";
       if (it.title) tile.appendChild(el("header", "tile-head")).appendChild(it.title);
       const body = tile.appendChild(el("div", "tile-body"));
       for (const b of it.blocks) body.appendChild(b);
@@ -507,5 +531,5 @@
   }
 
   // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
-  window.ItdaBoard = { build, groups, pack, tileWidth, tileAttrs, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
+  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
 })();

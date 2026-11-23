@@ -124,6 +124,22 @@ eq("속성: 제목 없음", B.tileAttrs(null), {});
   eq("zoomBox: 이상한 비율은 1", B.zoomBox(view, page, grid, 0, 0).width, 600);
 }
 
+// slots: pack 결과를 구역 안 자리(1부터)로 — 호스트 끌기가 읽는 값(itda-work/itda-hyve#1038 2단계)
+{
+  const items = [{ w: 1, at: [2, 1] }, T(2), BRK, { w: 1, span: [2, 2] }, { w: 1, at: [4, 1] }, SEC, T(1), { w: 2, at: [9, 1] }];
+  const r = B.pack(items, 4);
+  const s = B.slots(items, r.place, r.moved);
+  eq("slots: 첫 구역 고정·자동", [s[0], s[1]], [{ seg: 0, c: 2, r: 1, w: 1, h: 1, fixed: true }, { seg: 0, c: 3, r: 1, w: 2, h: 1, fixed: false }]);
+  eq("slots: 줄 나눔·구역 줄은 null", [s[2], s[5]], [null, null]);
+  // 줄 나눔 뒤 구역은 그 줄부터 1행 — 격자 행 1·2 이지만 구역 안에서는 1
+  eq("slots: 줄 나눔 뒤 구역 상대 행·높이", [s[3], s[4]], [{ seg: 1, c: 1, r: 1, w: 2, h: 2, fixed: false }, { seg: 1, c: 4, r: 1, w: 1, h: 1, fixed: true }]);
+  // 구역 줄 뒤도 1행부터, 격자 밖 at(9열)은 자리를 못 지켜 fixed 가 아니다
+  eq("slots: 구역 줄 뒤·못 지킨 고정", [s[6], s[7]], [{ seg: 2, c: 1, r: 1, w: 1, h: 1, fixed: false }, { seg: 2, c: 2, r: 1, w: 2, h: 1, fixed: false }]);
+  // 이미 줄 머리의 줄 나눔(연속)도 구역 번호를 하나 쓴다
+  const it2 = [BRK, BRK, T(1)], r2 = B.pack(it2, 4);
+  eq("slots: 연속 줄 나눔", B.slots(it2, r2.place, r2.moved)[2], { seg: 2, c: 1, r: 1, w: 1, h: 1, fixed: false });
+}
+
 // tileWidth: 내용 종류만 본다
 // blk 는 선택자 하나(또는 그 목록 — 요소가 맞는 선택자들)에 맞는 가짜 블록이다. 구조 게이트를 지난 KPI 는 .kpi·.kpi-tiles 둘 다 맞는다.
 const blk = (sel, items = 0) => ({ matches: s => s.split(",").map(x => x.trim()).some(x => [].concat(sel).includes(x)), querySelectorAll: () => ({ length: items }) });

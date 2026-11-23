@@ -8,7 +8,8 @@ import (
 )
 
 // attrs 는 Pandoc 속성 {#id .class key=value} 하나다(1.3·1.5·1.7).
-// key=value 는 어디서든 data-key 로만 나간다 — style·onclick 같은 실제 속성이 될 수 없다.
+// key=value 는 어디서든 data-key 로만 나간다 — style·onclick 같은 실제 속성이 될 수 없다. 다만 line 은 HTML 로 나가지
+// 않는다 — data-line 은 렌더러의 원문 줄 자리다(render.go userData). 파싱한 값은 남아 차트 같은 쓰임이 읽는다.
 type attrs struct {
 	ID         string
 	Classes    []string
