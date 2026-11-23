@@ -6,7 +6,7 @@
 //   ItdaPresentHost.fullscreen(on)  발표를 열 때 true, 끝낼 때 false 로 부른다 — 창 자체를 전체 화면으로 바꾸는 일(웹뷰 안 JS 전체 화면 API 는
 //                                   믿을 수 없는 웹뷰가 있다). state.fsCalls 는 발표를 열 때(start·startBoard)의 전체 화면 진입
 //                                   요청 횟수다 — 훅이 없어도 오르고, 끝낼 때의 false 요청은 세지 않는다.
-//   ItdaPresentHost.ownLink(href)   참이면 그 href 는 호스트 전용 앵커라 발표가 링크로 다루지 않는다(누르기는 넘김·크게 보기 그대로).
+//   ItdaPresentHost.ownLink(href)   참이면 그 href 는 호스트 전용 앵커라 발표가 링크로 다루지 않는다(누르기는 가장자리 넘김·크게 보기 그대로).
 //   ItdaPresentHost.ownsKey(e)      발표의 keydown(capture — onKey) 맨 앞에서 부른다. 참이면 발표는 그 키에 아무것도 하지 않는다(넘김·판서 키·
 //                                   preventDefault·stopPropagation 모두 — 키는 호스트 몫이다). 겹침 층을 가린 동안(아래)에도 늘 먼저 부른다.
 //                                   가려진 층의 키를 양보할지는 호스트 몫이다 — 호스트는 훅 안에서 body 의 pr-overlay-hidden 을 읽어 정할 수 있다.
@@ -57,7 +57,7 @@
 //   · 판서(펜·형광펜·지우개·레이저)는 pointerType "pen" 입력만 받는다(ink.js notPen) — 손가락·마우스는 획·지우개·레이저를 만들지 않는다.
 //   · 판서 도구가 켜진 동안 펜이 아닌 누르기(손가락·마우스, 그 호환 mousedown·click)는 장을 넘기지 않고 먹는다 — 링크·크게 보기도 아니다(펜·형광펜·
 //     지우개가 켜진 동안의 기존 누르기와 같다). 호환 mousedown 에는 pointerType 이 없어 출처를 가리지 않는다 — 도구가 켜져 있으면 먹는다(ink.js takes).
-//     그래서 손바닥이 닿거나 펜을 먼저 떼도 획이 끊기거나 장이 넘어가지 않는다. 도구를 끄면 지금처럼 누르기 = 다음이다. 쉬는 화면(검은 화면)의 누르기는 지금처럼 다음이다.
+//     그래서 손바닥이 닿거나 펜을 먼저 떼도 획이 끊기거나 장이 넘어가지 않는다. 도구를 끄면 누르기는 아래 「조작」 의 누르기 규칙(가장자리 넘김·크게 보기)이다. 쉬는 화면(검은 화면)의 누르기는 어디든 다음이다.
 //     도구가 켜진 동안의 장 넘김은 키·호스트의 밀기·단추 몫이다.
 //   · 덮개에 pr-pen-only 클래스를 단다(호스트 CSS 가 쓸 수 있다 — present.css 에는 이 클래스의 규칙이 없다).
 //   · 손가락 밀기(좌우로 넘기기)는 발표가 판정하지 않는다 — 옵션이 없을 때와 같이 호스트 몫이다. 호스트는 ItdaPresent.inkHeld() 가 참인 동안
@@ -84,12 +84,16 @@
 //   물려받지 않는다(start 의 o 가 정한다). P.nextPreview·P.clock 으로 읽는다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
 // window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
-// 조작: → Space PageDown 클릭 = 다음(차례로 나타낼 것이 남았으면 그것부터), ← PageUp Backspace = 이전(이전 슬라이드는 다 나타난 모습),
+// 조작: → Space PageDown = 다음(차례로 나타낼 것이 남았으면 그것부터), ← PageUp Backspace = 이전(이전 슬라이드는 다 나타난 모습),
 //       숫자 + Enter = 그 슬라이드, Home·End = 처음·끝, G = 한눈에 보기, B·. = 검은 화면, N = 발표자 노트, Esc = 끝,
 //       노트를 편 동안 + = 노트 글자 크게, − = 작게(머리의 A−/A+ 와 같다), D = 노트 붙이기·띄우기(머리 단추와 같다),
 //       T = 목차 칸, 목차를 편 동안 Shift+D = 목차 붙이기·띄우기(머리 단추와 같다),
-//       슬라이드 안 이미지·표·그림(차트·다이어그램 SVG) 클릭 = 크게 보기(라이트박스 — 열린 동안 클릭·Esc·Space·Enter 는 닫기만, 다른 키는 삼킨다),
-//       지금 슬라이드의 외부 링크·# 링크 왼쪽 클릭 = 링크 동작(넘김·크게 보기보다 먼저다, 동작은 부른 쪽 onLink)
+//       누르기(슬라이드 발표. 보드 발표는 아래 「보드 발표」):
+//         왼쪽 단추 누르기·탭이 무대(.pr-stage — 붙인 노트·목차 칸을 뺀 슬라이드 자리) 왼쪽 가장자리면 이전, 오른쪽 가장자리면 다음이다(edgeAt —
+//         폭은 무대 너비의 EDGE_FRAC 를 EDGE_MIN~EDGE_MAX px 로 묶는다). 가장자리 판정이 링크·크게 보기보다 먼저다(어디가 넘김인지 늘 같게).
+//         가운데 왼쪽 누르기: 지금 슬라이드의 외부 링크·# 링크 = 링크 동작(동작은 부른 쪽 onLink), 이미지·표·그림(차트·다이어그램 SVG)·분할 그림 =
+//         크게 보기(라이트박스 — 열린 동안 클릭·Esc·Space·Enter 는 닫기만, 다른 키는 삼킨다), 배경 그림 슬라이드면 그 밖의 곳 = 배경 그림 크게 보기
+//         (zoomTarget), 나머지 빈 곳 = 아무것도 하지 않는다(넘기지 않는다). 오른쪽 단추 = 어디서나 이전. 검은 화면에서는 왼쪽 누르기가 어디든 다음이다.
 // 노트는 기본으로 슬라이드 위에 떠 있는 카드다(청중과 함께 보므로 슬라이드는 제자리·제 크기, fit 결과가 노트 켜기 전과 같다).
 // 카드 머리(단추 밖)를 끌면 카드가 옮겨진다(화면 안, 아래 줄 위까지 가둔다 — 위치는 이 발표 동안만). 머리의 「붙이기」 단추나 D 키(노트를 편
 // 동안)로 오른쪽에 붙인 칸(도킹 — 슬라이드가 남은 자리로 줄어든다)으로, 「띄우기」·D 로 다시 카드로 바꾼다.
@@ -129,7 +133,10 @@
   const CARD_M = 24; // 떠 있는 카드의 기본 자리 — 창 위·오른쪽에서 띄우는 px(present.css 의 max-height 여백과 같다)
   const HUD_H = 40;  // 아래 줄(.pr-hud — 진행 막대·번호·시간) 높이(present.css) — 카드는 그 위까지만 옮긴다
   // 라이트박스(그리기·크기 규칙은 호스트의 크게 보기 부품 ItdaLightbox): 크게 볼 수 있는 것은 슬라이드 본문(.page-body)의 ItdaLightbox.SEL
-  // (이미지·표·차트·다이어그램 SVG). 머리·꼬리의 로고(.sc-logo·.sf-logo, slides.js)는 아니다. 호스트의 cursor: zoom-in 규칙과 같은 대상이다
+  // (이미지·표·차트·다이어그램 SVG)과 분할 그림·배경 그림(slides.js slotBox — 쪽의 직접 자식 .slide-panel·.slide-bg 안 img, zoomTarget).
+  // 머리·꼬리의 로고(.sc-logo·.sf-logo, slides.js)는 아니다. 호스트의 cursor: zoom-in 규칙과 같은 대상이다
+  // 가장자리 넘김(머리 주석 「조작」 누르기): 폭 = 무대 너비 × EDGE_FRAC 를 EDGE_MIN~EDGE_MAX px 로 묶는다. present.css 의 .pr-edge 폭(clamp)과 같은 값이다
+  const EDGE_FRAC = 0.07, EDGE_MIN = 48, EDGE_MAX = 96; // 본문 왼쪽 여백(기본 테마 슬라이드 너비의 약 7.7%)에 들지 않게
   const OVERLAY = "[data-pr-overlay]", OVERLAY_HIDDEN = "pr-overlay-hidden"; // 겹침 층 표지·가림 클래스(머리 주석 「호스트 계약」)
   const inOverlay = t => !!(t && t.closest && t.closest(OVERLAY));
   // 포커스를 받을 수 있는 것 — 청중 열기에서 덱 사본의 이것들을 포커스 차례에서 뺀다(startAudience)
@@ -243,6 +250,8 @@
     }
     root.appendChild(el("div", "pr-black"));
     if (P.audience) { startAudience(w, h); return; }
+    // 가장자리 넘김의 표시(‹ ›·화살표 커서 — present.css .pr-edge). 넘김 판정은 표시가 아니라 누른 자리(edgeAt)로 한다 — 표시는 모양뿐이다
+    for (const [cls, txt] of [["pr-edge pr-edge-prev", "‹"], ["pr-edge pr-edge-next", "›"]]) stage.appendChild(el("div", cls, txt)).setAttribute("aria-hidden", "true");
     const notes = notesEl = root.appendChild(el("div", "pr-notes"));
     const head = notes.appendChild(el("div", "pr-notes-head"));
     head.appendChild(el("span", "pr-notes-title", "발표자 노트"));
@@ -1081,18 +1090,31 @@
   function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); relayout(); }
 
   // ---- 라이트박스: 슬라이드 안 이미지·표·그림을 눌러 크게 본다. 발표자 화면에만 있다 — 공유 따라가기(onSlide)로 보내지 않는다.
-  // zoomTarget 은 누른 자리 t 에서 크게 볼 대상을 찾는다: 지금 슬라이드의 본문(.page-body) 안 ItdaLightbox.SEL, 로고가 아니고, 차례로 나타내기로
-  // 아직 숨은(흐린 목록 항목 포함 — .pr-pending) 요소 안이 아닐 때만. 없으면 null(지금처럼 다음).
+  // zoomTarget 은 누른 자리 t 에서 크게 볼 대상을 찾는다(지금 슬라이드 cur 안만, 없으면 null — 가운데 빈 곳이라 아무것도 하지 않는다):
+  //   1) cur 의 본문(.page-body) 안 ItdaLightbox.SEL, 또는 cur 의 직접 자식 .slide-panel(분할 그림) 안 img — 로고가 아니고, 차례로 나타내기로
+  //      아직 숨은(흐린 목록 항목 포함 — .pr-pending) 요소 안이 아닐 때만.
+  //   2) 1) 이 아니고 cur 에 직접 자식 .slide-bg(배경 그림)가 있으면 그 안 img — 누른 자리가 링크(a[href] — 파일 링크 포함) 안·로고(.sc-logo·.sf-logo) 위가
+  //      아니고, 배경 img 가 링크(그림 하나를 감싼 링크 문단·YouTube 블록) 안이 아닐 때만. 배경은 본문 밑에 깔려(base.css z-index 0) 그 위 글자·빈 곳을
+  //      눌러도 배경을 본다. 아직 숨은 단계 요소(.pr-pending — 보이지 않는다) 위는 배경이다.
+  //   링크 판정(linkAt)은 부르는 쪽이 이보다 먼저 한다 — 링크로 감싼 분할 그림은 링크다.
+  const directChild = (pg, cls) => { for (const k of pg.children) if (k.classList && k.classList.contains(cls)) return k; return null; };
   function zoomTarget(t) {
     if (!t || !t.closest || !deck || !deck.contains(t)) return null;
-    if (!window.ItdaLightbox) return null; // 크게 보기 부품이 없는 호스트 — 누르기는 지금처럼 다음
-    const hit = t.closest(window.ItdaLightbox.SEL), cur = P.slides[P.idx];
-    if (!hit || !cur || !cur.contains(hit) || !hit.closest(".page-body")) return null;
-    if (hit.closest(".sc-logo, .sf-logo, .pr-pending")) return null;
-    return hit;
+    if (!window.ItdaLightbox) return null; // 크게 보기 부품이 없는 호스트 — 가운데 누르기는 아무것도 하지 않는다
+    const cur = P.slides[P.idx];
+    if (!cur || !cur.contains(t)) return null;
+    const hit = t.closest(window.ItdaLightbox.SEL);
+    if (hit && cur.contains(hit) && !hit.closest(".sc-logo, .sf-logo, .pr-pending")) {
+      if (hit.closest(".page-body")) return hit;
+      const panel = hit.closest(".slide-panel");
+      if (panel && panel.parentNode === cur && String(hit.tagName).toLowerCase() === "img") return hit;
+    }
+    const bg = directChild(cur, "slide-bg"), im = bg && bg.querySelector("img");
+    if (!im || im.closest("a") || t.closest("a[href], .sc-logo, .sf-logo")) return null;
+    return im;
   }
   // linkAt 은 누른 자리 t 에서 열 링크를 찾는다: 덱의 지금 슬라이드 안 a[href] 로, 아직 숨은 단계(.pr-pending) 안이 아니고 href 가
-  // #·http·https·mailto·tel 일 때만(호스트의 링크 처리와 같은 판정 — 호스트 전용 앵커 ItdaPresentHost.ownLink 는 아니다). 없으면 null(파일 링크도 — 지금처럼 다음).
+  // #·http·https·mailto·tel 일 때만(호스트의 링크 처리와 같은 판정 — 호스트 전용 앵커 ItdaPresentHost.ownLink 는 아니다). 없으면 null(파일 링크도 — 크게 보기·빈 곳 규칙).
   function linkAt(t) {
     if (!t || !t.closest || !deck || !deck.contains(t)) return null;
     const a = t.closest("a[href]"), cur = P.slides[P.idx];
@@ -1167,16 +1189,35 @@
     // 레이저는 떼는 때 ink.js 가 클릭인지 판단한다(inkClick). 보드 발표에는 판서가 없다(ink 없음)
     const inking = ink ? ink.takes(e) : "";
     if (inking) { if (inking === "draw") lbEat = true; return; }
-    // 링크 위 왼쪽 클릭은 넘김·크게 보기가 아니라 링크 동작이다 — 여는 것은 뒤따르는 click(eatClick). 검은 화면에서는 아니다(지금처럼 다음)
-    if (e.button === 0 && !P.black) { const a = linkAt(e.target); if (a) { linkDown = a; return; } }
+    // 가장자리 왼쪽 누르기는 넘김이다 — 링크·크게 보기보다 먼저(머리 주석 「조작」 누르기). 보드 발표·검은 화면에는 가장자리가 없다
+    const side = e.button === 0 && !P.black && !P.board ? edgeAt(e.clientX) : 0;
+    // 링크 위 왼쪽 클릭은 크게 보기가 아니라 링크 동작이다 — 여는 것은 뒤따르는 click(eatClick). 검은 화면에서는 아니다(어디든 다음)
+    if (!side && e.button === 0 && !P.black) { const a = linkAt(e.target); if (a) { linkDown = a; return; } }
     // 보드 발표: 그림·표는 라이트박스, 그 밖의 누르기는 아무것도 하지 않는다(다음 장이 없다)
     if (P.board) { if (e.button === 0 && !P.black) { const hit = zoomTarget(e.target); if (hit) { lbEat = true; openLightbox(hit); } } return; }
-    pressAt(e.target, e.button);
+    pressAt(e.target, e.button, side);
   }
-  // pressAt 은 슬라이드 위 누르기 하나다. 이미지·표·그림 위 왼쪽 클릭은 다음이 아니라 크게 보기. 검은 화면에서는 아니다(지금처럼 다음 — 화면이 가려져 있다)
-  function pressAt(target, button) {
-    if (button === 0 && !P.black) { const hit = zoomTarget(target); if (hit) { lbEat = true; openLightbox(hit); return; } }
-    if (button === 0) next(); else if (button === 2) prev();
+  // edgeAt 은 창 x 좌표가 무대(.pr-stage) 왼쪽 가장자리면 -1, 오른쪽 가장자리면 1, 아니면 0 이다(폭 EDGE_FRAC·EDGE_MIN·EDGE_MAX).
+  // 무대는 붙인 노트·목차 칸을 뺀 슬라이드 자리다 — 칸을 붙이면 가장자리도 칸 안쪽으로 온다(칸 위 누르기는 onMouse 가 먼저 뺀다)
+  function edgeAt(x) {
+    const st = root && root.querySelector(".pr-stage");
+    if (!st || typeof x !== "number") return 0;
+    const r = st.getBoundingClientRect(), w = r.width || 0;
+    if (!w) return 0;
+    const ew = Math.min(EDGE_MAX, Math.max(EDGE_MIN, w * EDGE_FRAC)), dx = x - r.left;
+    if (dx < 0 || dx > w) return 0;
+    return dx < ew ? -1 : dx > w - ew ? 1 : 0;
+  }
+  // pressAt 은 슬라이드 위 누르기 하나다(링크는 부른 쪽이 먼저 갈랐다). side 는 edgeAt 의 값이다(왼쪽 단추일 때만 잰다).
+  // 오른쪽 단추 = 이전. 왼쪽 단추: 검은 화면이면 어디든 다음(화면이 가려져 있다), 가장자리면 이전·다음, 그 밖은 크게 볼 대상(zoomTarget)이면
+  // 크게 보기, 아니면 아무것도 하지 않는다(가운데 빈 곳은 넘기지 않는다)
+  function pressAt(target, button, side) {
+    if (button === 2) { prev(); return; }
+    if (button !== 0) return;
+    if (P.black) { next(); return; }
+    if (side) { if (side < 0) prev(); else next(); return; }
+    const hit = zoomTarget(target);
+    if (hit) { lbEat = true; openLightbox(hit); }
   }
   // attachInk 는 판서를 붙인다. 판서는 탭에 딸린다(opts.inkKey — ink.js bookFor) — 같은 탭에서 다시 발표해도 남는다.
   function attachInk(w, h) {
@@ -1186,11 +1227,12 @@
       slides: () => P.slides, idx: () => P.idx, scale: () => P.scale, paused: () => !!(P.grid || P.lightbox || P.black),
       click: inkClick, eatClick: () => { lbEat = true; }, wake, settleTransition });
   }
-  // inkClick 은 움직이지 않은 레이저 클릭이다 — 도구가 꺼진 클릭과 같다: 링크가 넘김·크게 보기보다 먼저다. 다만 여는 것은 뒤따르는 click(eatClick)이 아니라
-  // 여기다: 레이저는 포인터를 잡고 있어 click 이 링크가 아니라 root 로 올 수 있다. 그 click 은 깃발로 먹는다
-  function inkClick(target, button) {
-    const a = button === 0 ? linkAt(target) : null; // 쉬는 화면의 누르기는 여기 오지 않는다(ink.js onUp)
-    if (!a) { pressAt(target, button); return; }
+  // inkClick 은 움직이지 않은 레이저 클릭이다 — 도구가 꺼진 클릭과 같다: 가장자리 넘김이 먼저, 그다음 링크가 크게 보기보다 먼저다(x 는 누른 자리의 창 x 좌표).
+  // 다만 링크를 여는 것은 뒤따르는 click(eatClick)이 아니라 여기다: 레이저는 포인터를 잡고 있어 click 이 링크가 아니라 root 로 올 수 있다. 그 click 은 깃발로 먹는다
+  function inkClick(target, button, x) {
+    const side = button === 0 ? edgeAt(x) : 0; // 쉬는 화면(검은 화면)의 누르기는 여기 오지 않는다(ink.js onUp)
+    const a = button === 0 && !side ? linkAt(target) : null;
+    if (!a) { pressAt(target, button, side); return; }
     lbEat = true;
     if (opts.onLink) opts.onLink(a.getAttribute("href"));
   }

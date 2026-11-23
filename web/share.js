@@ -1543,7 +1543,9 @@
   }
 
   // ---- 그림 설명·크게 보기(itda-doc#121) — 쪽·이어보기·슬라이드 보기(보드·전체 화면 발표·청중은 아니다)의 쪽 콘텐츠 영역(#pages 안 .page-body 와
-  // 슬라이드 분할 패널 .page > .slide-panel — 넘쳐 생긴 장의 패널 사본 포함, figArea) 그림. 배경(.slide-bg)은 아니다.
+  // 슬라이드 분할 패널 .page > .slide-panel·배경 .page > .slide-bg — 넘쳐 생긴 장의 사본 포함, figArea) 그림.
+  // 배경 그림은 머리·본문 밑(base.css z-index 0)이라 누르기는 그 위를 덮는 블록이 없는 자리에서만 그림에 닿는다 — 본문 글자·빈 본문 자리를 눌러도 열리지 않는다.
+  // 키보드로는 다른 그림과 같이 Tab(tabindex 0)으로 닿아 Enter·Space 로 연다.
   // 대상은 렌더된 img 그대로다(배치 낱말 판정을 다시 하지 않는다 — mdoc 이 배치 낱말뿐인 alt 를 빈 alt 로 낸다). 로고(.sc-logo·.sf-logo)·숨은 단계(.pr-pending)는
   // 빼고, 측정 무대(#stage)·노트 칸(#notes)은 범위(#pages) 밖이라 빠진다. 그림의 DOM(부모·형제·class·크기)은 바꾸지 않는다 — 본문을 다 그린 뒤
   // tabindex 와 data-fig 만 단다(figTips arm).
@@ -1560,12 +1562,12 @@
 
   const FIG_SKIP = ".sc-logo, .sf-logo, .pr-pending";
   const FIG_TIP_MAX_H = 250; // 툴팁 높이 상한(px) — 13px·줄 높이 1.5 로 약 12줄 + 안쪽 여백(share.css .fig-tip)
-  // figArea 는 t 가 든 쪽 콘텐츠 영역이다 — 본문(.page-body) 또는 쪽의 직접 자식인 분할 패널(.page > .slide-panel). 본문 안 사용자 컨테이너(:::slide-panel)는
-  // 본문으로 본다. 없으면 null.
+  // figArea 는 t 가 든 쪽 콘텐츠 영역이다 — 본문(.page-body) 또는 쪽의 직접 자식인 분할 패널(.page > .slide-panel)·배경(.page > .slide-bg).
+  // 본문 안 사용자 컨테이너(:::slide-panel 등)는 본문으로 본다. 없으면 null.
   function figArea(t) {
     const pb = t.closest(".page-body");
     if (pb) return pb;
-    const sp = t.closest(".slide-panel"), pg = sp && sp.parentElement;
+    const sp = t.closest(".slide-panel, .slide-bg"), pg = sp && sp.parentElement;
     return pg && pg.classList && pg.classList.contains("page") ? sp : null;
   }
   // figTarget 은 t 가 scope 안 쪽 콘텐츠 영역(figArea)의 대상 그림이면 그 img, 아니면 null 이다.
@@ -1771,7 +1773,7 @@
       reset();
       if (!d.active()) return;
       const zoom = !!d.lightbox();
-      for (const img of scope.querySelectorAll("img")) { // 대상(본문·분할 패널 — 사본 포함)은 figTarget 이 가른다
+      for (const img of scope.querySelectorAll("img")) { // 대상(본문·분할 패널·배경 — 사본 포함)은 figTarget 이 가른다
         if (!figTarget(img, scope) || img.hasAttribute("data-fig")) continue;
         const linked = figLinked(img), kind = !linked && zoom ? "zoom" : figText(img) ? "tip" : "";
         if (!kind) continue;

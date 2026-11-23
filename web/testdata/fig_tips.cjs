@@ -398,7 +398,7 @@ eq("자리: 아래로 넘치는 그림도 위에 자리가 있으면 위", S.fig
 }
 
 // 12. 슬라이드 분할 패널(리뷰 1회차 P1-1) — slides.js 출력 구조: 쪽(.page.slide)의 직접 자식 .slide-panel(본문 .page-body 의 형제)에 그림 블록,
-// 넘쳐 생긴 장에는 그 블록의 사본(slotBox — id 없이), 배경은 .slide-bg. 본문 안 사용자 컨테이너(:::slide-panel)는 본문이다.
+// 넘쳐 생긴 장에는 그 블록의 사본(slotBox — id 없이), 배경은 쪽의 직접 자식 .slide-bg(배경 그림도 대상). 본문 안 사용자 컨테이너(:::slide-panel)는 본문이다.
 function slidePages() {
   const fig = new El("figure", {}, [new El("img", { src: "p.png", alt: "구성도 설명", class: "img-left" })]);
   const p1 = new El("div", { class: "page slide panel-left" }, [new El("div", { class: "slide-head" }),
@@ -414,17 +414,22 @@ function slidePages() {
     new El("div", { class: "slide-panel" }, [new El("p", {}, [new El("a", { href: "https://example.com/" }, [linkImg])])])]);
   return { nodes: [p1, p2, p3], panel: fig.children[0], copy: copyFig.children[0], user: p1.children[1].children[1].children[0], link: linkImg, bg: bgImg };
 }
+const p3body = sp => sp.nodes[2].children[1].children[0]; // 배경 장 본문의 문단
 {
   const s = setup();
   const sp = slidePages();
   s.scope.replaceChildren(...sp.nodes);
   s.F.arm();
-  eq("패널: 표지(첫 장·사본·본문 안 컨테이너는 zoom, 링크 패널은 tip, 배경은 없음)", [sp.panel, sp.copy, sp.user, sp.link, sp.bg].map(x => x.getAttribute("data-fig")), ["zoom", "zoom", "zoom", "tip", null]);
-  eq("패널: tabindex(링크 패널·배경은 없음)", [sp.panel, sp.copy, sp.link, sp.bg].map(x => x.getAttribute("tabindex")), ["0", "0", null, null]);
+  eq("패널: 표지(첫 장·사본·본문 안 컨테이너·배경은 zoom, 링크 패널은 tip)", [sp.panel, sp.copy, sp.user, sp.link, sp.bg].map(x => x.getAttribute("data-fig")), ["zoom", "zoom", "zoom", "tip", "zoom"]);
+  eq("패널: tabindex(링크 패널은 없음, 배경은 Tab 으로 닿는다)", [sp.panel, sp.copy, sp.link, sp.bg].map(x => x.getAttribute("tabindex")), ["0", "0", null, "0"]);
   ok("figArea: 쪽 직속 패널·본문", S.figArea(sp.panel) === sp.panel.parentElement.parentElement && S.figArea(sp.user).cls().includes("page-body"));
   const stray = new El("div", { class: "slide-panel" }, [new El("img", { alt: "x" })]);
   s.scope.appendChild(new El("div", {}, [stray]));
   ok("figArea: 쪽 직속이 아닌 .slide-panel(본문 밖)은 아니다", S.figArea(stray.children[0]) === null && S.figTarget(stray.children[0], s.scope) === null);
+  ok("figArea: 쪽 직속 배경(.slide-bg)", S.figArea(sp.bg) === sp.bg.parentElement.parentElement && S.figTarget(sp.bg, s.scope) === sp.bg);
+  const strayBg = new El("div", { class: "slide-bg" }, [new El("img", { alt: "y" })]);
+  s.scope.appendChild(new El("div", {}, [strayBg]));
+  ok("figArea: 쪽 직속이 아닌 .slide-bg 는 아니다", S.figArea(strayBg.children[0]) === null && S.figTarget(strayBg.children[0], s.scope) === null);
   fire(sp.panel, "pointerover", { pointerType: "mouse" });
   ok("패널 그림 올림: 툴팁", s.F.tipOn() && s.F.tip().textContent === "구성도 설명");
   fire(sp.panel, "pointerout", { pointerType: "mouse" });
@@ -448,8 +453,19 @@ function slidePages() {
   ok("링크 패널 올림: 툴팁", s.F.tipOn() && s.F.tip().textContent === "링크 패널");
   fire(sp.link, "pointerout", { pointerType: "mouse" });
   fire(sp.bg, "pointerover", { pointerType: "mouse" });
+  ok("배경 그림 올림: 툴팁", s.F.tipOn() && s.F.tip().textContent === "배경 그림");
+  fire(sp.bg, "pointerout", { pointerType: "mouse" });
   e = fire(sp.bg, "click");
-  ok("배경 그림: 툴팁·크게 보기 없음", !s.F.tipOn() && !s.F.lbOn() && !e.defaultPrevented);
+  ok("배경 그림 누르기: 크게 보기(같은 img·캡션)", s.F.lbOn() && s.L.opened[s.L.opened.length - 1] === sp.bg && s.L.caps[s.L.caps.length - 1] === "배경 그림" && e.defaultPrevented);
+  fire(doc.activeElement, "keydown", { key: "Escape" });
+  ok("배경 그림: Esc 로 닫는다", !s.F.lbOn());
+  sp.bg.focus();
+  e = fire(sp.bg, "keydown", { key: "Enter" });
+  ok("배경 그림 Enter(Tab 으로 닿은 포커스): 크게 보기", s.F.lbOn() && s.L.opened[s.L.opened.length - 1] === sp.bg && e.defaultPrevented);
+  fire(doc.activeElement, "keydown", { key: "Escape" });
+  const nb = s.L.opened.length;
+  e = fire(p3body(sp), "click");
+  ok("배경 장 본문 누르기: 크게 보기 없음(배경 그림 자체를 누를 때만)", !s.F.lbOn() && s.L.opened.length === nb && !e.defaultPrevented);
 }
 
 // 13. 긴 툴팁(리뷰 1회차 P2-2) — 높이 상한(창 높이 - 16, 250px)에 넘치면 끝을 「…」 로 줄이고, 자리는 창 안
