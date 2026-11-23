@@ -69,7 +69,7 @@ func TestBoardView(t *testing.T) {
 		t.Errorf("둘 다 Present 여야 함: %+v %+v", v.Slides, v.Board)
 	}
 	// Check 의 meta.dashboard(앱의 검사 도구·itda-doc check 가 같은 값을 낸다)
-	res, err := Check([]byte("---\ndashboard: {cols: 9}\n---\n\n## 타일\n\n:::kpi\n글\n:::\n"), "", ts)
+	res, err := Check([]byte("---\ndashboard: {cols: 25}\n---\n\n## 타일\n\n:::kpi\n글\n:::\n"), "", ts)
 	if err != nil || !res.Meta.Dashboard || res.Meta.Slides {
 		t.Fatalf("check %+v %v", res, err)
 	}

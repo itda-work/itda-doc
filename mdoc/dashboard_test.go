@@ -20,7 +20,7 @@ func TestDashboardMeta(t *testing.T) {
 		{"dashboard: false", nil, nil},
 		{"dashboard:\n  cols: 3\n  rows: 2\n  ratio: \"4:3\"\n  level: 3", &DashboardMeta{Cols: 3, Rows: 2, Ratio: "4:3", Level: 3}, nil},
 		{"dashboard: {cols: 4, rows: 3, aspect: 16/9}", &DashboardMeta{Cols: 4, Rows: 3, Ratio: "16:9"}, nil},
-		{"dashboard:\n  cols: 7\n  rows: 1\n  ratio: \"21:9\"\n  level: 0\n  size: big", &DashboardMeta{},
+		{"dashboard:\n  cols: 25\n  rows: 1\n  ratio: \"21:9\"\n  level: 0\n  size: big", &DashboardMeta{},
 			[]string{WarnFrontmatterValue, WarnFrontmatterValue, WarnFrontmatterValue, WarnFrontmatterValue, WarnFrontmatterValue}},
 		// 실시간 소스는 ② — 키가 둘이어도 경고 한 줄, 나머지 설정은 쓴다
 		{"dashboard:\n  cols: 2\n  refresh: 30s\n  sources:\n    매출: { file: ./sales.csv }", &DashboardMeta{Cols: 2}, []string{WarnDashboardSources}},
@@ -33,6 +33,11 @@ func TestDashboardMeta(t *testing.T) {
 		{"dashboard: {cols: 3.0, rows: 2.5, level: \"2\"}", &DashboardMeta{},
 			[]string{WarnFrontmatterValue, WarnFrontmatterValue, WarnFrontmatterValue}},
 		{"dashboard: {cols: 6, rows: 4, level: 6}", &DashboardMeta{Cols: 6, Rows: 4, Level: 6}, nil},
+		// 촘촘한 격자(itda-work/itda-hyve#1038): cols 2~24·rows 2~12 — 범위 끝과 그 바로 밖
+		{"dashboard: {cols: 12, rows: 6}", &DashboardMeta{Cols: 12, Rows: 6}, nil},
+		{"dashboard: {cols: 24, rows: 12}", &DashboardMeta{Cols: 24, Rows: 12}, nil},
+		{"dashboard: {cols: 25, rows: 13}", &DashboardMeta{}, []string{WarnFrontmatterValue, WarnFrontmatterValue}},
+		{"dashboard: {cols: 1}", &DashboardMeta{}, []string{WarnFrontmatterValue}},
 	}
 	for _, c := range cases {
 		src := "---\ntitle: t\n" + c.fm + "\n---\n\n본문\n"
@@ -114,14 +119,14 @@ func TestDashboardFromFolder(t *testing.T) {
 		}
 		return strings.Join(out, ",")
 	}
-	// 문서에 dashboard 가 없다 — 보드가 아니고 안내 하나(틀린 폴더 값 rows: 9 는 쓰지 않으니 값 경고도 없다)
-	r := render(t, "---\ntitle: t\n---\n\n본문\n", fold("dashboard: {cols: 3, rows: 9}\norganization: 잇다\n"))
+	// 문서에 dashboard 가 없다 — 보드가 아니고 안내 하나(틀린 폴더 값 rows: 13 은 쓰지 않으니 값 경고도 없다)
+	r := render(t, "---\ntitle: t\n---\n\n본문\n", fold("dashboard: {cols: 3, rows: 13}\norganization: 잇다\n"))
 	if r.Meta.Dashboard != nil || r.Meta.Organization != "잇다" || codes(r.Warnings) != WarnFolderDashboardUnused+"@0" ||
 		!strings.HasPrefix(r.Warnings[0].Message, "_metadata.yml: ") || !strings.Contains(r.Warnings[0].Message, "보드로 열리지 않음") {
 		t.Errorf("문서에 dashboard 없음: %+v %+v", r.Meta.Dashboard, r.Warnings)
 	}
 	// 문서 true — 폴더 맵이 채운다, 틀린 폴더 값은 폴더 파일 경로·줄로
-	r = render(t, "---\ndashboard: true\n---\n\n본문\n", fold("dashboard: {cols: 3, rows: 9}\n"))
+	r = render(t, "---\ndashboard: true\n---\n\n본문\n", fold("dashboard: {cols: 3, rows: 13}\n"))
 	if r.Meta.Dashboard == nil || *r.Meta.Dashboard != (DashboardMeta{Cols: 3}) || codes(r.Warnings) != WarnFrontmatterValue+"@0" ||
 		!strings.HasPrefix(r.Warnings[0].Message, "_metadata.yml 1줄: frontmatter dashboard.rows") {
 		t.Errorf("문서 true + 폴더 맵: %+v %+v", r.Meta.Dashboard, r.Warnings)
@@ -143,7 +148,7 @@ func TestDashboardFromFolder(t *testing.T) {
 		t.Errorf("문서 false: %+v %+v", r.Meta.Dashboard, r.Warnings)
 	}
 	// 문서의 틀린 값은 폴더가 있어도 문서 줄로
-	r = render(t, "---\ndashboard: {cols: 9}\n---\n\n본문\n", fold("dashboard: {rows: 3}\n"))
+	r = render(t, "---\ndashboard: {cols: 25}\n---\n\n본문\n", fold("dashboard: {rows: 3}\n"))
 	if codes(r.Warnings) != WarnFrontmatterValue+"@2" || r.Meta.Dashboard == nil || r.Meta.Dashboard.Rows != 3 {
 		t.Errorf("문서의 틀린 값: %+v %+v", r.Meta.Dashboard, r.Warnings)
 	}

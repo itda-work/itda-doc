@@ -126,6 +126,7 @@ func (st *state) transform(doc *ast.Document) {
 	st.collectTodos(doc, todoIDs) // 알림 판정 뒤, 제목 id 앞 — 할 일 id 를 먼저 정해 제목 id 가 비킨다(todos.go)
 	st.processHeadings(headings, doc)
 	st.slideSplits(doc) // 제목·그림 판정 뒤 — 슬라이드 경계와 분할 그림이 정해졌다(itda-hyve#550)
+	st.boardPlace(doc)  // 제목 속성을 뗀 뒤 — 보드 타일의 at·span 을 검사한다(itda-work/itda-hyve#1038)
 	for _, l := range links {
 		st.link(l)
 	}

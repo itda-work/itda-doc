@@ -9,7 +9,8 @@ import (
 )
 
 // 보드 배치(itda-work/itda-hyve#362): dashboard.js 의 pack·tileWidth 를 node 로 돌린다(testdata/board_pack.cjs) — 같은 입력에 같은 배치,
-// 읽는 차례 보존(빈 칸 남김)·2×1 이 줄 끝에서 다음 줄로·판 없음(줄만 는다)·cols=2·줄 나눔·구역 줄·구조 없는 kpi 는 글 타일·크게 보기 자리(zoomBox). 타일 안 넘침(「… n행 더」·
+// 읽는 차례 보존(빈 칸 남김)·2×1 이 줄 끝에서 다음 줄로·판 없음(줄만 는다)·cols=2·줄 나눔·구역 줄·구조 없는 kpi 는 글 타일·크게 보기 자리(zoomBox),
+// 자리·크기 속성(itda-work/itda-hyve#1038 — at·span 의 고정·자동 섞임, 구역 상대 행, 높이 2 이상, 찬 칸 건너뛰기, 겹침, 격자 밖, tileAttrs). 타일 안 넘침(「… n행 더」·
 // KPI 하한·「…」)은 화면 실측이다(명세 dashboard.md 8장 「미검증」).
 func TestBoardPack(t *testing.T) { runBoardNode(t, "board_pack.cjs", "BOARD") }
 

@@ -63,8 +63,8 @@ type SlidesMeta struct {
 // DashboardMeta 는 보드 설정이다(itda-work/itda-hyve#362). 모두 선택이고, 0 값은 "정하지 않음" 이다(화면이 기본을 쓴다 — page.BoardView).
 // 실시간 소스(sources·refresh)는 이 판이 해석하지 않는다 — 경고(WarnDashboardSources) 한 줄로만 알린다.
 type DashboardMeta struct {
-	Cols  int    `json:"cols"`  // 격자 열 수 2~6(기본 4)
-	Rows  int    `json:"rows"`  // 기준 상자(ratio)에 들어가는 타일 행 수 2~4(기본 3) — 타일 높이를 정한다
+	Cols  int    `json:"cols"`  // 격자 열 수 2~24(기본 4)
+	Rows  int    `json:"rows"`  // 기준 상자(ratio)에 들어가는 타일 행 수 2~12(기본 3) — 타일 높이를 정한다
 	Ratio string `json:"ratio"` // 보드 폭·기준 상자 비율 "16:9"(기본) · "4:3" — slides.ratio 와 같은 값·별칭
 	Level int    `json:"level"` // 타일을 여는 제목 단계(1~6). 0 이면 문서에서 정한다(Result.SlideLevel — 슬라이드와 같은 규칙)
 }
@@ -747,9 +747,9 @@ func parseDashboard(v *yaml.Node, srcs metaSrc) (*DashboardMeta, []Warning) {
 		kk, vv := v.Content[i], v.Content[i+1]
 		switch kk.Value {
 		case "cols":
-			intIn(kk, vv, 2, 6, &dm.Cols)
+			intIn(kk, vv, 2, 24, &dm.Cols)
 		case "rows":
-			intIn(kk, vv, 2, 4, &dm.Rows)
+			intIn(kk, vv, 2, 12, &dm.Rows)
 		case "ratio", "aspect", "aspectratio":
 			s, _ := scalar(vv)
 			if r, ok := parseRatio(strings.ToLower(strings.TrimSpace(s))); ok {

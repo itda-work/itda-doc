@@ -3,9 +3,12 @@
 //   - 타일 단계(level — dashboard.level, 없으면 슬라이드 단계)의 제목 → 새 타일(그 제목이 타일 머리)
 //   - 그보다 높은 제목 → 격자 전체 폭의 구역 제목 줄(.board-section). 가로줄(---)·쪽 나눔 → 다음 줄부터 시작(이미 줄 머리면 무시)
 //   - 표지·제목 블록은 머리의 제목·조직·날짜가 된다(제목이 없으면 타일 앞의 첫 높은 제목). 목차·각주·발표자 노트·멈춤(. . .)은 보드에 넣지 않는다
-//   - 타일 크기는 내용 종류가 정한다(크기를 적는 문법은 없다): 본문이 그림·차트·흐름도(figure)나 표 하나면 2×1,
+//   - 타일 크기는 적지 않으면 내용 종류가 정한다: 본문이 그림·차트·흐름도(figure)나 표 하나면 2×1,
 //     :::kpi 하나면 항목이 셋 이상일 때 2×1 아니면 1×1, 그 밖(글·목록·알림·상자·여럿)은 1×1
-//   - 읽는 차례대로 행 우선으로 놓는다 — 남은 칸에 안 들어가면 다음 줄(빈 칸은 그대로, 당겨 채우지 않는다).
+//   - 타일 제목 속성 at=열,행·span=너비x높이(itda-work/itda-hyve#1038)가 자리·크기를 정한다 — 행은 구역(구역 제목 줄·가로줄·쪽 나눔 사이) 안에서 센다.
+//     틀린 값·격자 밖·겹침은 mdoc(boardplace.go)이 경고하고 속성을 떼어 보낸다. 여기서는 받은 값을 다시 확인하고(tileAttrs·pack), 내용 너비 때문에야
+//     드러나는 겹침은 뒤 타일을 자동 배치로 돌린다(pack 의 moved)
+//   - 적지 않은 타일은 읽는 차례대로 행 우선으로 놓는다 — 남은 칸에 안 들어가면 다음 줄(빈 칸은 그대로, 당겨 채우지 않는다), 찬 칸은 건너뛴다.
 //     같은 입력이면 같은 배치다(pack — testdata/board_pack.cjs 가 node 로 돈다, board_test.go)
 //   - 타일 행 높이는 일정하다 — rows·ratio 의 상자(16:9 면 1280×720)에 머리와 rows 줄이 꼭 차는 높이(base.css --board-row-h)
 // 타일 안이 넘치면 「(계속)」 으로 잇지 않는다(보드는 한눈에 보는 것): 표는 들어가는 행까지만 보이고 「… n행 더」, 그림·차트는 칸에 맞춰 줄이고,
@@ -49,28 +52,92 @@
     return b.matches("figure, table") ? 2 : 1;
   }
 
-  // pack 은 차례대로 놓는다. items = [{brk: true} | {sec: true} | {w}], 돌려주는 place[i] 는 타일이면 {r, c, w}, 구역 제목 줄이면 {r, sec: true}(한 줄을 다
-  // 쓴다), 줄 나눔이면 {r}(놓이는 것 없음). 줄 나눔·구역 줄은 지금 줄에 타일이 있을 때만 다음 줄로 간다. 타일 너비는 cols 를 넘지 않는다.
-  // rows 는 쓴 줄 수, sections 는 구역 제목 줄의 번호들이다(격자 행 높이를 정한다).
+  // MAX_ROW 는 구역 안 행 번호(at 의 행 + 높이 − 1)의 상한이다 — mdoc boardplace.go boardMaxRow 와 같다(격자가 끝없이 늘지 않게).
+  const MAX_ROW = 99;
+
+  // tileAttrs 는 타일 제목의 data-at·data-span(mdoc 이 제목 속성 at=·span= 을 옮긴 것)을 읽는다. at = [열, 행](1부터), span = [너비, 높이].
+  // 꼴이 틀리면 그 값은 없다(mdoc 이 이미 경고하고 뗀다 — 여기는 손으로 만든 HTML 에 대한 방어다).
+  function tileAttrs(title) {
+    const out = {};
+    const d = title && title.dataset ? title.dataset : null;
+    if (!d) return out;
+    const a = /^\s*(\d{1,3})\s*,\s*(\d{1,3})\s*$/.exec(d.at || "");
+    if (a && +a[1] >= 1 && +a[2] >= 1) out.at = [+a[1], +a[2]];
+    const s = /^\s*(\d{1,3})x(\d{1,3})\s*$/.exec(d.span || "");
+    if (s && +s[1] >= 1 && +s[2] >= 1) out.span = [+s[1], +s[2]];
+    return out;
+  }
+
+  // pack 은 차례대로 놓는다. items = [{brk: true} | {sec: true} | {w, at?, span?}], 돌려주는 place[i] 는 타일이면 {r, c, w}(높이가 2 이상이면 h 도),
+  // 구역 제목 줄이면 {r, sec: true}(한 줄을 다 쓴다), 줄 나눔이면 {r}(놓이는 것 없음). rows 는 쓴 줄 수, sections 는 구역 제목 줄의 번호들이다(격자 행 높이를 정한다).
+  // 구역(줄 나눔·구역 줄 사이)마다 따로 놓고 위에서 아래로 쌓는다 — 한 구역의 높이는 그 안 타일이 쓴 마지막 행까지다(packSeg).
+  // 자리를 지키지 못한 고정 타일(격자 밖·겹침)의 번호는 moved 에 싣는다 — 없으면 moved 키가 없다(속성 없는 문서의 결과는 예전과 같다).
   function pack(items, cols) {
     cols = Math.max(1, cols | 0);
-    let r = 0, c = 0;
-    const place = [], sections = [];
-    for (const it of items) {
-      if (it.brk || it.sec) {
-        if (c > 0) { r++; c = 0; }
-        if (it.brk) { place.push({ r }); continue; }
-        place.push({ r, sec: true });
-        sections.push(r);
-        r++;
-        continue;
-      }
-      const w = Math.min(Math.max(1, it.w | 0), cols);
-      if (c + w > cols) { r++; c = 0; }
-      place.push({ r, c, w });
-      c += w;
+    let r = 0;
+    const place = [], sections = [], moved = [];
+    for (let i = 0; i < items.length;) {
+      const it = items[i];
+      if (it.brk) { place[i++] = { r }; continue; }
+      if (it.sec) { place[i++] = { r, sec: true }; sections.push(r); r++; continue; }
+      let j = i;
+      while (j < items.length && !items[j].brk && !items[j].sec) j++;
+      r += packSeg(items, i, j, cols, r, place, moved);
+      i = j;
     }
-    return { place, rows: c > 0 ? r + 1 : r, sections };
+    const out = { place, rows: r, sections };
+    if (moved.length) out.moved = moved;
+    return out;
+  }
+
+  // packSeg 는 한 구역(items[a..b))의 타일을 base 줄부터 놓고 쓴 줄 수를 돌려준다.
+  //   1) at 이 있는 타일을 읽는 차례로 먼저 놓는다. 크기는 span, 없으면 내용 너비 × 1(그 열에서 격자 끝까지로 줄인다). 격자 밖이거나 앞선 고정 타일과
+  //      겹치면 자동 배치로 돌린다(moved).
+  //   2) 나머지는 읽는 차례대로 커서(행 우선)로 놓는다: 지금 줄 남은 칸에 너비가 안 들어가면 다음 줄 머리로, 들어가도 찬 칸과 겹치면 한 칸 오른쪽으로.
+  //      커서는 뒤로 가지 않는다(앞의 빈 칸을 당겨 채우지 않는다).
+  function packSeg(items, a, b, cols, base, place, moved) {
+    const used = new Set();
+    const free = (r, c, w, h) => {
+      for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) if (used.has(y * cols + x)) return false;
+      return true;
+    };
+    const take = (k, r, c, w, h) => {
+      for (let y = r; y < r + h; y++) for (let x = c; x < c + w; x++) used.add(y * cols + x);
+      const p = { r: base + r, c, w };
+      if (h > 1) p.h = h;
+      place[k] = p;
+      bottom = Math.max(bottom, r + h);
+    };
+    const size = it => {
+      const s = it.span;
+      if (s && s[0] >= 1 && s[0] <= cols && s[1] >= 1 && s[1] <= MAX_ROW) return [s[0], s[1], true];
+      return [Math.min(Math.max(1, it.w | 0), cols), 1, false];
+    };
+    let bottom = 0;
+    const fixed = new Set();
+    for (let k = a; k < b; k++) {
+      const at = items[k].at;
+      if (!at) continue;
+      const [C, R] = at;
+      let [w, h, given] = size(items[k]);
+      if (!given && C >= 1 && C <= cols) w = Math.min(w, cols - C + 1);
+      if (!(C >= 1 && R >= 1 && C - 1 + w <= cols && R - 1 + h <= MAX_ROW) || !free(R - 1, C - 1, w, h)) { moved.push(k); continue; }
+      take(k, R - 1, C - 1, w, h);
+      fixed.add(k);
+    }
+    let cr = 0, cc = 0;
+    for (let k = a; k < b; k++) {
+      if (fixed.has(k)) continue;
+      const [w, h] = size(items[k]);
+      for (;;) {
+        if (cc + w > cols) { cr++; cc = 0; continue; }
+        if (free(cr, cc, w, h)) break;
+        cc++;
+      }
+      take(k, cr, cc, w, h);
+      cc += w;
+    }
+    return bottom;
   }
 
   // cssPx 는 box 안에서 토큰 값(글자 크기)을 px 로 잰다.
@@ -152,7 +219,7 @@
   }
 
   // build 는 flow(문서 흐름 HTML 이 든 요소)를 target 안의 보드 한 장(.page.board)으로 놓는다. target 은 무대(잴 수 있는 자리)에 있어야 한다.
-  // o = { ratio, cols, rows, level, info, logo }. 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms }
+  // o = { ratio, cols, rows, level, info, logo }. 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms, moved(자리를 지키지 못한 고정 타일 수 — 있을 때만) }
   function build(flow, target, o) {
     const t0 = performance.now();
     const SIZE = window.ItdaSlides.SIZE;
@@ -169,7 +236,8 @@
     const before = firstTile < 0 ? items : items.slice(0, firstTile);
     const headSec = docTitle ? null : before.find(it => it.kind === "section") || null;
     if (headSec) items = items.filter(it => it !== headSec);
-    const { place, rows: used, sections } = pack(items.map(it => (it.kind === "break" ? { brk: true } : it.kind === "section" ? { sec: true } : { w: tileWidth(it.blocks) })), cols);
+    const { place, rows: used, sections, moved } = pack(items.map(it => (it.kind === "break" ? { brk: true } : it.kind === "section" ? { sec: true }
+      : Object.assign({ w: tileWidth(it.blocks) }, tileAttrs(it.title)))), cols);
     const meta = [headText(g.head, o, ".cover-org, .title-org", "organization"), headText(g.head, o, '.meta-row[data-key="date"] dd', "date")].filter(Boolean).join(" · ");
     const pg = el("div", "page board");
     pg.dataset.kind = "board";
@@ -203,7 +271,7 @@
       }
       const tile = el("section", "tile" + (p.w > 1 ? " w2" : ""));
       tile.style.gridColumn = (p.c + 1) + " / span " + p.w;
-      tile.style.gridRow = String(p.r + 1);
+      tile.style.gridRow = p.h > 1 ? (p.r + 1) + " / span " + p.h : String(p.r + 1);
       if (it.title) tile.appendChild(el("header", "tile-head")).appendChild(it.title);
       const body = tile.appendChild(el("div", "tile-body"));
       for (const b of it.blocks) body.appendChild(b);
@@ -213,7 +281,10 @@
     window.ItdaPager.fitMath(pg);
     let overflow = 0;
     for (const t of target.querySelectorAll(".page.board .tile")) if (fitTile(t)) overflow++;
-    return { overflow, ms: Math.round(performance.now() - t0) };
+    // moved: 적은 자리를 지키지 못해 자동 배치로 돌린 타일 수(내용 너비 때문에야 드러난 겹침 — mdoc 경고가 없는 경우). 없으면 키가 없다
+    const out = { overflow, ms: Math.round(performance.now() - t0) };
+    if (moved) out.moved = moved.length;
+    return out;
   }
 
   // ---- 크게 보기(itda-work/itda-hyve#362 — 보는 쪽 화면 동작이며 형식 약속이 아니다, 명세 dashboard.md 「크게 보기」)
@@ -436,5 +507,5 @@
   }
 
   // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
-  window.ItdaBoard = { build, groups, pack, tileWidth, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
+  window.ItdaBoard = { build, groups, pack, tileWidth, tileAttrs, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
 })();
