@@ -38,6 +38,8 @@ type codeInfo struct {
 	src          string
 	hasSrc       bool
 	titleFromSrc bool
+	// noNumber 는 줄 번호 끄기 낱말 nonumber 가 있었는지다(itda-hyve#1024 — codenonumber.go).
+	noNumber bool
 }
 
 // guessLang 은 언어 낱말이 없을 때 짐작한 언어다 — src 파일 이름(itda-hyve#880)을 먼저, 못 하면 머리 띠 파일명으로(guessCodeLang).
@@ -93,6 +95,7 @@ func sanitizeTitle(s string) string {
 //   - title= 낱말은 첫 낱말이든 나머지든 찾는다. 줄임 파일명과 title= 이 둘 다 있으면 줄임이 이긴다.
 //   - 줄 강조 낱말 `{1,3-5}`(itda-hyve#479 — codehl.go cutHLWord)는 먼저 떼어 내고 나머지를 위 규칙으로 가른다.
 //   - src= 낱말(itda-hyve#880 — srcWord)은 언어·파일명 가르기와 따로 찾는다. title 이 없으면 src 의 마지막 이름이 파일명이다.
+//   - nonumber 낱말(itda-hyve#1024 — hasCodeNoNumber)도 따로 찾는다. 첫 낱말이 정확히 nonumber 면 언어가 아니다(언어 없음).
 //
 // 기존 출력 불변: 언어만 적힌 info string(`go`·`math`·`mermaid`)은 lang 이 그 첫 낱말 그대로다. {…} 가 없으면
 // 언어·파일명 결과는 줄 강조 이전과 같다.
@@ -100,6 +103,13 @@ func parseCodeInfo(info []byte) codeInfo {
 	rest, hl, hasHL := cutHLWord(string(info))
 	ci := parseCodeLangTitle(rest)
 	ci.hl, ci.hasHL = hl, hasHL
+	if hasCodeNoNumber(rest) {
+		ci.noNumber = true
+		// ```nonumber 처럼 언어 자리에 적어도 번호 끄기다 — 그 낱말을 언어로 쓰지 않는다(nonumber:a.py 같은 줄임은 낱말이 아니라 그대로)
+		if text, _ := codeInfoText(rest); ci.lang == codeNoNumberWord && codeInfoFirst(text) == codeNoNumberWord {
+			ci.lang = ""
+		}
+	}
 	if v, _, found := srcWord(rest); found {
 		ci.src, ci.hasSrc = v, true
 		// 파일명을 적지 않은 src 블록은 src 의 마지막 이름을 머리 띠에 그린다 — 내려받기 단추가 그 띠에 붙는다(itda-hyve#880)
