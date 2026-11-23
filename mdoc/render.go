@@ -208,6 +208,9 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 			r.st.warn(r.st.lines.line(fc.Pos()), WarnBadAttribute, msg)
 		}
 	}
+	if info.noNumber {
+		attr(w, "data-ln", "off") // 이 블록만 줄 번호 끄기(itda-hyve#1024) — 화면(codelines.js)이 번호 없이 감싼다(codenonumber.go)
+	}
 	if hl := r.codeHL(node, info, nLines); hl != "" {
 		attr(w, "data-hl", hl) // 줄 강조(itda-hyve#479) — 화면(codelines.js)이 줄 span 에 hl 클래스를 단다
 	}
