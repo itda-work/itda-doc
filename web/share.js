@@ -1272,6 +1272,41 @@
     };
   }
 
+  // notesPop 은 머리 막대 「노트」 단추(#notes-btn)와 그 아래 판(#notes-pop — 위치·글자 크기, itda-hyve#1040)의 여닫기다. o = { doc(사건을 받는 문서),
+  // btn, pop } — DOM 은 넘겨받는다(시험이 가짜로 돌린다). { isOpen, set(on, focus) } 를 돌려주고 처음에는 닫는다.
+  //  - 상태는 판의 hidden 과 단추의 aria-expanded 가 늘 같이 말한다(set). 단추의 .on 은 여기서 건드리지 않는다 — 노트가 켜졌음의 표시다(paintNotesSwitch).
+  //  - 단추 누름은 여닫기다. 판 안의 위치·글자 단추를 눌러도 닫지 않는다(여러 번 누르는 컨트롤이다).
+  //  - 열렸을 때만: Esc 는 닫고 단추로 초점을 돌린다(캡처 단계에서 받아 문서로 내려보내지 않는다 — 보기 화면의 Esc 처리까지 가지 않게),
+  //    판·단추 밖 누름(pointerdown — 캡처, 막지 않는다. 호스트의 다른 메뉴도 같은 사건으로 닫힌다)과 초점이 판·단추 밖의 요소로 옮겨감(relatedTarget 이 있을 때 —
+  //    창 밖으로 나가 상대가 없으면 그대로)은 닫는다. 발표로 들어가는 키(F5 · ⌘/Ctrl+Shift+Enter)는 닫기만 하고 막지 않는다.
+  function notesPop(o) {
+    const { doc, btn, pop } = o;
+    let open = false;
+    const inside = t => !!t && (btn.contains(t) || pop.contains(t));
+    function set(on, focus) {
+      open = !!on;
+      pop.hidden = !open;
+      btn.setAttribute("aria-expanded", String(open));
+      if (!open && focus && btn.focus) btn.focus({ preventScroll: true });
+    }
+    set(false);
+    btn.addEventListener("click", () => set(!open));
+    doc.addEventListener("pointerdown", e => { if (open && !inside(e && e.target)) set(false); }, true);
+    doc.addEventListener("keydown", e => {
+      if (!open || !e || e.isComposing) return;
+      // 발표로 들어가는 키(F5 · ⌘/Ctrl+Shift+Enter — 호스트가 그 키로 발표를 연다)면 판을 닫고 키는 그대로 흘려보낸다 — 발표 뒤에 열린 판이 남지 않는다
+      if (e.key === "F5" || (e.key === "Enter" && e.shiftKey && (e.metaKey || e.ctrlKey))) { set(false); return; }
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      e.preventDefault();
+      set(false, true);
+    }, true);
+    const blur = e => { if (open && e && e.relatedTarget && !inside(e.relatedTarget)) set(false); };
+    pop.addEventListener("focusout", blur);
+    btn.addEventListener("focusout", blur);
+    return { isOpen: () => open, set };
+  }
+
   // tableMenu 는 표 복사 메뉴(#table-ctx — itda-hyve#349)의 열고 닫기와 메뉴 안의 키다(itda-hyve#376). deps: menu(메뉴 요소)·active()(document.activeElement)·
   // view()({w, h} 창 크기)·now()(ms)·onClose()(닫힐 때 — 고른 표를 버린다).
   //  - open(x, y, how): (x, y)에 두고(창 밖으로 나가지 않게) 그때의 포커스를 돌아갈 자리로 쥔 뒤 첫 항목에 포커스를 준다(preventScroll —
@@ -1753,7 +1788,7 @@
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
     lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
-    tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, tableMenu, tableCopyClick, appName, docTitle, pick,
+    tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, notesPop, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource, figArea, figTarget, figClip, figText, figLinked, figFocus, figTipPlace, figTips };
   if (typeof document === "undefined" || !document.body) return;
   const source = pickSource(window, document.body);
@@ -1966,6 +2001,9 @@
   const tmenu = tableMenu({ menu: $("table-ctx"), active: () => document.activeElement, view: () => ({ w: window.innerWidth, h: window.innerHeight }),
     now: () => Date.now(), onClose: () => { ctxTables = null; } });
   function closeTableMenu() { tmenu.close(); ctxTables = null; }
+  // 발표자 노트 판(itda-hyve#1040): 「노트」 단추를 누르면 위치·글자 크기 판이 열린다 — 여닫기는 notesPop 이 쥔다. 공유 화면(share.html)과 웹 뷰어
+  // (viewer/index.html)가 같은 단추·판을 둔다. 둘이 없는 화면(옛 html)은 여닫을 것이 없다(빈 짝)
+  const npop = $("notes-btn") && $("notes-pop") ? notesPop({ doc: document, btn: $("notes-btn"), pop: $("notes-pop") }) : { isOpen: () => false, set() {} };
 
   // 그림 설명·크게 보기(itda-doc#121 — figTips). 크게 보기 부품은 호스트의 ItdaLightbox(공유 화면·묶은 교안이 싣는다 — 뷰어에는 없다)
   const figs = figTips({ doc: document, win: window, scope: $("pages"), viewer: $("viewer"),
@@ -2106,10 +2144,13 @@
     if (np.font) r.setProperty("--note-fs", String(np.font)); else r.removeProperty("--note-fs");
     $("note-fs-val").textContent = String(np.font || 14);
   }
-  // paintNotesSwitch 는 노트 컨트롤을 노트가 온 슬라이드 보기에서만 보인다(공유가 끝났으면 숨김). 켜진 표시는 실제 배치에 붙고, 오른쪽이 들어가지
-  // 않는 너비에서는 「오른쪽」 을 비활성(disabled)으로 두고 title 을 이유로 바꾼다(notesSwitchState·paintNotesButtons).
+  // paintNotesSwitch 는 노트 컨트롤을 노트가 온 슬라이드 보기에서만 보인다(공유가 끝났으면 숨김 — 숨길 때 판도 닫는다). 켜진 표시는 실제 배치에 붙고, 오른쪽이 들어가지
+  // 않는 너비에서는 「오른쪽」 을 비활성(disabled)으로 두고 title 을 이유로 바꾼다(notesSwitchState·paintNotesButtons). 막대의 「노트」 단추(#notes-btn)는
+  // 고른 값이 끔이 아니면 .on 이다(실제 배치가 아니라 고른 값 — 좁아 아래로 그려도 켜져 있다).
   function paintNotesSwitch() {
     $("notes-switch").hidden = state.ended || state.look !== "slides" || !state.hasNotes;
+    if ($("notes-switch").hidden) npop.set(false);
+    if ($("notes-btn")) $("notes-btn").classList.toggle("on", np.mode !== "off");
     paintNotesButtons(document.querySelectorAll("[data-notes]"), notesSwitchState(np.mode, state.notesLayout, state.notesRightFits));
     for (const b of document.querySelectorAll("[data-note-font]")) b.disabled = np.mode === "off";
   }
@@ -2414,6 +2455,7 @@
     $("pages-box").style.width = $("pages-box").style.height = "";
     $("look-switch").hidden = true;
     $("notes-switch").hidden = true;
+    npop.set(false);
     $("follow-back").hidden = true;
     // 목차: 예약된 강조 프레임을 거두고 링크·id·pin 을 비운 뒤 숨긴다 — 끝난 뒤 목차 콜백이 DOM 을 쓰지 않게
     if (tocFrame) { cancelAnimationFrame(tocFrame); tocFrame = 0; }
