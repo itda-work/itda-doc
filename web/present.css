@@ -80,6 +80,16 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-deck li[data-step].pr-pending { visibility: inherit; opacity: 0.3; }
 .pr-black { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 5; }
 #present.pr-black-on .pr-black { opacity: 1; }
+/* 가장자리 넘김(present.js edgeAt·머리 주석 「조작」 누르기): 무대 왼쪽·오른쪽 가장자리의 흐린 ‹ ›·화살표 커서. 폭은 present.js
+   EDGE_FRAC·EDGE_MIN·EDGE_MAX 와 같다(무대 너비의 7%, 48~96px). 넘김 판정은 누른 자리(edgeAt)로 하고 이 상자는 모양뿐이다. 덱 위·검은 화면(5) 아래다.
+   마우스가 그 가장자리에 있을 때만 보이고, 커서를 숨긴 동안(pr-idle)·판서 도구가 켜진 동안·검은 화면·크게 보기·한눈에 보기에서는 없다 */
+.pr-edge { position: absolute; top: 0; bottom: 0; width: clamp(48px, 7%, 96px); z-index: 3; display: flex; align-items: center; justify-content: center;
+  cursor: default; font: 200 64px/1 var(--ui-font); color: #fff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.2s; }
+.pr-edge-prev { left: 0; }
+.pr-edge-next { right: 0; }
+.pr-edge:hover { opacity: 0.4; }
+#present.pr-idle .pr-edge { opacity: 0; cursor: none; }
+#present:is(.pr-ink-on, .pr-black-on, .lb-on, .pr-grid-on) .pr-edge { display: none; }
 /* 아래: 진행 막대·번호·경과 시간·조작 안내. 마우스를 가만히 두면 숨는다. */
 .pr-hud { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 18px 4px;
   font: 12px/1 var(--ui-font); color: rgba(255, 255, 255, 0.78); z-index: 6; transition: opacity 0.3s;

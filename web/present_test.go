@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -17,7 +19,7 @@ import (
 // 두 화면 발표(itda-doc#95 — onState·audience 열기·show 덮어쓰기)를, 펜만 판서(itda-doc#100 — penOnly 입력 나눔·inkHeld·발표 중 setPenOnly)를,
 // 판서 받아 그리기(itda-doc#108 — ink.js view 연산·멱등·reset·레이저, 청중 열기의 붙이기, 발표자·청중의 같은 경로)를
 // 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 595 // itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
+const presentInkCases = 627 // 누르기 규칙(가장자리 넘김·분할·배경 그림 크게 보기) 32, itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -266,5 +268,30 @@ func TestPresentOverlayCSS(t *testing.T) {
 	}
 	if strings.Contains(css, "body.presenting > :not(#present) {") {
 		t.Error("present.css 의 발표 숨김이 겹침 층까지 가린다")
+	}
+}
+
+// 가장자리 넘김의 표시(present.css .pr-edge)는 present.js 의 판정 폭(EDGE_FRAC·EDGE_MIN·EDGE_MAX — edgeAt)과 같은 폭이고, 판서 도구·검은 화면·
+// 크게 보기·한눈에 보기에서는 없고, 커서를 숨긴 동안(pr-idle)은 커서도 숨는다. 실제 그리기는 호스트 앱의 시험이 본다.
+func TestPresentEdgeCSS(t *testing.T) {
+	js, _ := fs.ReadFile(FS, "present.js")
+	css, _ := fs.ReadFile(FS, "present.css")
+	m := regexp.MustCompile(`const EDGE_FRAC = ([0-9.]+), EDGE_MIN = (\d+), EDGE_MAX = (\d+);`).FindStringSubmatch(string(js))
+	if m == nil {
+		t.Fatal("present.js 에 EDGE_FRAC·EDGE_MIN·EDGE_MAX 상수가 없다")
+	}
+	var frac float64
+	fmt.Sscan(m[1], &frac)
+	want := fmt.Sprintf("width: clamp(%spx, %s%%, %spx)", m[2], strconv.FormatFloat(math.Round(frac*10000)/100, 'f', -1, 64), m[3])
+	for _, w := range []string{
+		want,
+		".pr-edge-prev { left: 0; }",
+		".pr-edge-next { right: 0; }",
+		"#present.pr-idle .pr-edge { opacity: 0; cursor: none; }",
+		"#present:is(.pr-ink-on, .pr-black-on, .lb-on, .pr-grid-on) .pr-edge { display: none; }",
+	} {
+		if !strings.Contains(string(css), w) {
+			t.Errorf("present.css 에 %q 가 없다", w)
+		}
 	}
 }
