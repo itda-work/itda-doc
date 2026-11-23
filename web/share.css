@@ -35,9 +35,24 @@
 /* 비활성 단추(좁아 오른쪽이 들어가지 않는 「오른쪽」·노트 끔일 때의 글자 단추 — share.js paintNotesSwitch): 호스트 창 틀 CSS 에 기대지 않고 흐리게, hover 색 없이 */
 .share-view .notes-switch .gbtn:disabled { opacity: .45; cursor: default; }
 .share-view .notes-switch .gbtn:disabled:hover { background: var(--ui-panel); }
-.share-view .notes-k { font-size: 12px; color: var(--ui-muted); padding: 0 4px 0 6px; align-self: center; }
+/* 막대의 「노트」 단추 하나(#notes-btn)와 그 아래 뜨는 판(#notes-pop — 위치·글자 크기, itda-hyve#1040). 단추의 켜진 표시(.on)는 노트가 켜져 있음(고른 값이 끔이
+   아님 — share.js paintNotesSwitch)이고, 판이 열렸는지는 aria-expanded 가 말한다. 판의 꼴은 호스트의 「강의·계정」 메뉴(.pack-menu)와 같은 둥근 모서리·그림자다 */
+.share-view .notes-switch { position: relative; }
+.share-view .notes-switch > .notes-btn { border-radius: 8px; gap: 5px; padding: 0 8px 0 9px; }
+.share-view .notes-switch > .notes-btn[aria-expanded="true"]:not(.on) { background: var(--ui-hover); }
+.share-view .notes-chev { width: 12px; height: 12px; margin-left: -1px; color: var(--ui-muted); }
+.share-view .notes-btn.on .notes-chev { color: inherit; }
+.share-view .notes-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: 60; display: flex; flex-direction: column; gap: 8px; padding: 10px 12px;
+  background: var(--ui-panel); border: 1px solid var(--ui-line); border-radius: 10px; box-shadow: var(--ui-shadow); white-space: nowrap; }
+.share-view .notes-row { display: flex; align-items: center; gap: 10px; }
+.share-view .notes-row-k { font-size: 12px; color: var(--ui-muted); min-width: 2.5em; }
+.share-view .notes-pop .note-fs { margin-left: 0; }
+.share-view .notes-pop .note-fs-val { min-width: 2.6em; font-size: 12px; }
+@media (max-width: 900px) { /* 좁은 폭(호스트 막대의 문턱과 같다): 단추는 아이콘만 — 이름은 aria-label 「발표자 노트」 가 남는다 */
+  .share-view .notes-btn .notes-k { display: none; }
+}
 @media (max-width: 600px) {
-  .share-view .notes-switch [data-notes="right"], .share-view .notes-k, .share-view .note-fs-val { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
+  .share-view .notes-switch [data-notes="right"] { display: none; } /* 폰은 늘 아래 — 오른쪽은 넓은 화면만 */
 }
 /* 노트 칸 너비 손잡이(share.js bindNoteGrip): 보이기·모양은 호스트 앱 창 틀 CSS(#pages.notes-right ~ #notes .sn-grip — 오른쪽 배치에서만). 여기서는
    펜·터치로 끌 때 브라우저가 굴리지 않게 하고, 끄는 동안 글이 선택되지 않게 한다. 폰은 늘 아래 배치라 손잡이가 없다 */
