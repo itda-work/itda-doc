@@ -11,7 +11,7 @@ import (
 	"github.com/yuin/goldmark/util"
 )
 
-// 그림 자리 지정(itda-hyve#475): ```mermaid 펜스 줄의 ratio=W:H·width=N%·height=N% 으로 그림이 차지할 상자를 정한다.
+// 그림 자리 지정(itda-hyve#475): ```mermaid 펜스 줄의 ratio=W:H(또는 수 하나 R — itda-hyve#1074)·width=N%·height=N% 으로 그림이 차지할 상자를 정한다.
 // 그림(SVG)은 상자 안에 비율을 지켜 최대한 크게·가운데 그린다(contain) — 배치를 다시 짜지는 않는다.
 // 다른 뷰어(GitHub 등)는 이 속성을 무시하고 그림을 그대로 그리므로 원문 호환은 지켜진다.
 //
@@ -23,7 +23,7 @@ import (
 
 // diagramSize 는 펜스 줄에서 가린 그림 상자 값이다. 0 은 없음.
 type diagramSize struct {
-	ratioW, ratioH int // ratio=W:H — 상자의 가로:세로 비율
+	ratioW, ratioH int // ratio=W:H — 상자의 가로:세로 비율. 100 배 정수(1.91 → 191, 16 → 1600 — 소수 둘째 자리까지라 오차가 없다)
 	width, height  int // width — 그림이 놓인 자리 너비의, height — 본문 높이의 백분율(10~100. 기준은 화면이 정한다)
 }
 
@@ -36,9 +36,37 @@ type diagramSize struct {
 // title= 파일명 띠(codetitle.go)와는 나누기·계약을 섞지 않는다.
 
 var (
-	diagramRatioRe = regexp.MustCompile(`^([1-9][0-9]{0,1}):([1-9][0-9]{0,1})$`) // 1~99 정수 둘
-	diagramPctRe   = regexp.MustCompile(`^(100|[1-9][0-9])%$`)                   // 10~100 정수 + %
+	// ratio 값: W:H 또는 수 하나 R(= R:1, itda-hyve#1074). 각 값은 정수부 0~99(앞자리 0 은 「0」 하나만) , 소수부는 없거나 1~2자리.
+	// 0 초과는 parseDiagramSize 가 본다.
+	diagramRatioRe = regexp.MustCompile(`^((?:0|[1-9][0-9]?)(?:\.[0-9]{1,2})?)(?::((?:0|[1-9][0-9]?)(?:\.[0-9]{1,2})?))?$`)
+	diagramPctRe   = regexp.MustCompile(`^(100|[1-9][0-9])%$`) // 10~100 정수 + %
 )
+
+// diagramRatioWant 는 ratio 값 꼴이 틀렸을 때 경고에 다는 「원하는 꼴」 안내다.
+const diagramRatioWant = "W:H 또는 수 하나 — 따옴표 없이 0 초과 99.99 이하, 소수 둘째 자리까지"
+
+// parseRatioValue 는 diagramRatioRe 를 통과한 값 하나(「1」·「1.5」·「1.91」)를 100 배 정수로 바꾼다(부동소수를 거치지 않는다).
+func parseRatioValue(v string) int {
+	ip, fp, _ := strings.Cut(v, ".")
+	n, _ := strconv.Atoi(ip)
+	f := 0
+	if fp != "" {
+		f, _ = strconv.Atoi(fp)
+		if len(fp) == 1 {
+			f *= 10
+		}
+	}
+	return n*100 + f
+}
+
+// formatRatioValue 는 100 배 정수를 글자로 되돌린다 — 정수는 「16」, 소수는 뒤 0 을 뗀 「1.5」·「1.91」.
+func formatRatioValue(n int) string {
+	s := strconv.Itoa(n / 100)
+	if f := n % 100; f != 0 {
+		s += "." + strings.TrimSuffix(fmt.Sprintf("%02d", f), "0")
+	}
+	return s
+}
 
 // diagramWords 는 info string 에서 그림 자리 속성 후보 낱말(경계에서 ratio=·width=·height= 로 시작하는
 // 낱말 전체)을 차례로 낸다.
@@ -117,16 +145,21 @@ func parseDiagramSize(info string) (diagramSize, []string) {
 	}
 	if w, ok := vals["ratio"]; ok {
 		v := w[len("ratio="):]
-		if m := diagramRatioRe.FindStringSubmatch(v); m == nil {
-			bad("ratio", v, "W:H — 따옴표 없이 정수 1~99")
-		} else {
-			w, _ := strconv.Atoi(m[1])
-			h, _ := strconv.Atoi(m[2])
-			if w*10 >= h && h*10 >= w {
-				sz.ratioW, sz.ratioH = w, h
-			} else {
-				bad("ratio", v, "비율 1/10~10")
+		m := diagramRatioRe.FindStringSubmatch(v)
+		w, h := 0, 100 // 수 하나 R 은 R:1
+		if m != nil {
+			w = parseRatioValue(m[1])
+			if m[2] != "" {
+				h = parseRatioValue(m[2])
 			}
+		}
+		switch {
+		case m == nil || w == 0 || h == 0:
+			bad("ratio", v, diagramRatioWant)
+		case w*10 >= h && h*10 >= w: // 100 배 정수끼리라 비율 경계에 부동소수 오차가 없다
+			sz.ratioW, sz.ratioH = w, h
+		default:
+			bad("ratio", v, "비율 1/10~10")
 		}
 	}
 	for _, name := range []string{"width", "height"} {
@@ -154,10 +187,15 @@ func parseDiagramSize(info string) (diagramSize, []string) {
 	return sz, warns
 }
 
+// ratioText 는 ratio 를 늘 W:H 꼴 글자로 낸다(정수는 「16:9」 그대로, 소수는 뒤 0 을 뗀 꼴, 수 하나 R 은 「R:1」).
+func (sz diagramSize) ratioText() string {
+	return formatRatioValue(sz.ratioW) + ":" + formatRatioValue(sz.ratioH)
+}
+
 // attrs 는 검사한 값을 data-diagram-* 속성으로 쓴다(값이 있는 것만 — 속성이 없으면 출력이 지금과 같다).
 func (sz diagramSize) attrs(w util.BufWriter) {
 	if sz.ratioW != 0 {
-		attr(w, "data-diagram-ratio", strconv.Itoa(sz.ratioW)+":"+strconv.Itoa(sz.ratioH))
+		attr(w, "data-diagram-ratio", sz.ratioText())
 	}
 	if sz.width != 0 {
 		attr(w, "data-diagram-width", strconv.Itoa(sz.width)+"%")

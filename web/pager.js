@@ -111,8 +111,12 @@
   //   width+height          너비 N%, 높이 min(본문높이×N%, cap)(셋 다면 mdoc 이 ratio 를 뗏다 — 여기서도 지킨다)
   // 상자를 정한 그림은 base.css 의 max-height(--img-max-h) 대신 위 cap 을 쓴다(백분율 약속을 세는 본문 높이와
   // 같은 출처여야 한다) — max-height: none 을 건 뒤 min() 안에서 자른다.
-  const diagramRatioRe = /^([1-9][0-9]?):([1-9][0-9]?)$/;
+  // ratio 는 mdoc 이 늘 W:H 로 정규화해 낸다(수 하나 R 은 R:1 — 속성에 수 하나 꼴은 오지 않아 받지 않는다). 각 값은 mdoc 과 같은
+  // 꼴(정수부 0~99, 소수부는 없거나 1~2자리, 0 초과 — itda-hyve#1074)이고, 비율 경계(1/10~10)는 mdoc 처럼 100 배 정수로 재 부동소수 오차가 없다.
+  // 정규화되지 않은 꼴(1.50:1)도 같은 수로 받는다 — mdoc 은 그 꼴을 내지 않는다.
+  const diagramRatioRe = /^((?:0|[1-9][0-9]?)(?:\.[0-9]{1,2})?):((?:0|[1-9][0-9]?)(?:\.[0-9]{1,2})?)$/;
   const diagramPctRe = /^(100|[1-9][0-9])%$/;
+  const ratioCenti = v => { const [i, f = ""] = v.split("."); return +i * 100 + +(f + "00").slice(0, 2); };
   function sizeDiagrams(rootEl) {
     const BODY = "var(--body-h, 200mm)", CAP = "(" + BODY + " - 60px)";
     const hPct = n => "min(calc(" + BODY + " * " + n + " / 100), calc(" + CAP + "))";
@@ -121,7 +125,10 @@
       if (!svg) continue;
       let w = 0, h = 0, rw = 0, rh = 0;
       const r = diagramRatioRe.exec(fig.getAttribute("data-diagram-ratio") || "");
-      if (r && +r[1] * 10 >= +r[2] && +r[2] * 10 >= +r[1]) { rw = +r[1]; rh = +r[2]; }
+      if (r) {
+        const cw = ratioCenti(r[1]), ch = ratioCenti(r[2]);
+        if (cw > 0 && ch > 0 && cw * 10 >= ch && ch * 10 >= cw) { rw = +r[1]; rh = +r[2]; } // CSS 에는 소수 그대로(1.91 / 1)
+      }
       const wp = diagramPctRe.exec(fig.getAttribute("data-diagram-width") || "");
       if (wp) w = +wp[1]; // 그룹은 % 앞까지다(% 는 정규식 바깥)
       const hp = diagramPctRe.exec(fig.getAttribute("data-diagram-height") || "");

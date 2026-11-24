@@ -17,10 +17,10 @@ func TestDiagramSizeParse(t *testing.T) {
 		warns []string // 경고 문구의 앞부분(포함 검사)
 	}{
 		{info: "mermaid", want: diagramSize{}},
-		{info: "mermaid ratio=16:9", want: diagramSize{ratioW: 16, ratioH: 9}},
+		{info: "mermaid ratio=16:9", want: diagramSize{ratioW: 1600, ratioH: 900}},
 		{info: "mermaid width=50%", want: diagramSize{width: 50}},
-		{info: "mermaid ratio=4:3 width=40%", want: diagramSize{ratioW: 4, ratioH: 3, width: 40}},
-		{info: "mermaid ratio=4:3 height=70%", want: diagramSize{ratioW: 4, ratioH: 3, height: 70}},
+		{info: "mermaid ratio=4:3 width=40%", want: diagramSize{ratioW: 400, ratioH: 300, width: 40}},
+		{info: "mermaid ratio=4:3 height=70%", want: diagramSize{ratioW: 400, ratioH: 300, height: 70}},
 		{info: "mermaid width=30% height=90%", want: diagramSize{width: 30, height: 90}},
 		// 셋 다 — ratio 를 뗀다(경고 한 번)
 		{info: "mermaid ratio=16:9 width=50% height=60%", want: diagramSize{width: 50, height: 60},
@@ -33,11 +33,36 @@ func TestDiagramSizeParse(t *testing.T) {
 		{info: "mermaid height=0%", want: diagramSize{}, warns: []string{"height=0%"}},
 		{info: "mermaid width=50", want: diagramSize{}, warns: []string{"% 필수"}}, // % 없음
 		{info: "mermaid width=50.5%", want: diagramSize{}, warns: []string{"width=50.5%"}},
-		// 비율 경계: 1/10~10 까지(W·H 은 1~99)
-		{info: "mermaid ratio=1:10", want: diagramSize{ratioW: 1, ratioH: 10}},
+		// 비율 경계: 1/10~10 까지(W·H 은 0 초과 99.99 이하 — 값은 100 배 정수)
+		{info: "mermaid ratio=1:10", want: diagramSize{ratioW: 100, ratioH: 1000}},
 		{info: "mermaid ratio=1:11", want: diagramSize{}, warns: []string{"ratio=1:11"}},
 		{info: "mermaid ratio=11:1", want: diagramSize{}, warns: []string{"ratio=11:1"}},
-		{info: "mermaid ratio=10:1", want: diagramSize{ratioW: 10, ratioH: 1}},
+		{info: "mermaid ratio=10:1", want: diagramSize{ratioW: 1000, ratioH: 100}},
+		// 소수·수 하나(itda-hyve#1074)
+		{info: "mermaid ratio=1.91:1", want: diagramSize{ratioW: 191, ratioH: 100}},
+		{info: "mermaid ratio=2.35:1", want: diagramSize{ratioW: 235, ratioH: 100}},
+		{info: "mermaid ratio=0.5:1", want: diagramSize{ratioW: 50, ratioH: 100}},
+		{info: "mermaid ratio=2", want: diagramSize{ratioW: 200, ratioH: 100}},
+		{info: "mermaid ratio=1.50:1", want: diagramSize{ratioW: 150, ratioH: 100}},
+		{info: "mermaid ratio=0.1:1", want: diagramSize{ratioW: 10, ratioH: 100}},
+		{info: "mermaid ratio=99.99:10", want: diagramSize{ratioW: 9999, ratioH: 1000}},
+		{info: "mermaid ratio=10.01:1", want: diagramSize{}, warns: []string{"ratio=10.01:1 값이 틀려 무시함(비율 1/10~10)"}},
+		{info: "mermaid ratio=1:10.01", want: diagramSize{}, warns: []string{"비율 1/10~10"}},
+		{info: "mermaid ratio=0.09", want: diagramSize{}, warns: []string{"비율 1/10~10"}},
+		{info: "mermaid ratio=100:1", want: diagramSize{}, warns: []string{"0 초과 99.99 이하"}},
+		{info: "mermaid ratio=1.234:1", want: diagramSize{}, warns: []string{"ratio=1.234:1"}},
+		{info: "mermaid ratio=.5:1", want: diagramSize{}, warns: []string{"ratio=.5:1"}},
+		{info: "mermaid ratio=1.:1", want: diagramSize{}, warns: []string{"ratio=1.:1"}},
+		{info: "mermaid ratio=05:1", want: diagramSize{}, warns: []string{"ratio=05:1"}},
+		{info: "mermaid ratio=0:1", want: diagramSize{}, warns: []string{"0 초과 99.99 이하"}},
+		{info: "mermaid ratio=0", want: diagramSize{}, warns: []string{"ratio=0 "}},
+		{info: "mermaid ratio=0.0", want: diagramSize{}, warns: []string{"ratio=0.0 "}},
+		{info: "mermaid ratio=1:0.00", want: diagramSize{}, warns: []string{"ratio=1:0.00 "}},
+		{info: "mermaid ratio=-1:1", want: diagramSize{}, warns: []string{"ratio=-1:1"}},
+		{info: "mermaid ratio=1e2:1", want: diagramSize{}, warns: []string{"ratio=1e2:1"}},
+		{info: "mermaid ratio=1:", want: diagramSize{}, warns: []string{"ratio=1: "}},
+		{info: `mermaid ratio="1.5:1"`, want: diagramSize{}, warns: []string{`ratio="1.5:1"`}},
+		{info: `mermaid ratio="2"`, want: diagramSize{}, warns: []string{`ratio="2"`}},
 		{info: "mermaid ratio=0:5", want: diagramSize{}, warns: []string{"ratio=0:5"}},
 		{info: "mermaid ratio=100:5", want: diagramSize{}, warns: []string{"ratio=100:5"}},
 		{info: "mermaid ratio=16:9:9", want: diagramSize{}, warns: []string{"ratio=16:9:9"}},
@@ -47,7 +72,7 @@ func TestDiagramSizeParse(t *testing.T) {
 		// 같은 속성이 여럿이면 앞의 것이 이긴다
 		{info: "mermaid width=50% width=70%", want: diagramSize{width: 50}},
 		// title= 과 함께 쓸 수 있다
-		{info: `mermaid title="a.md" ratio=16:9`, want: diagramSize{ratioW: 16, ratioH: 9}},
+		{info: `mermaid title="a.md" ratio=16:9`, want: diagramSize{ratioW: 1600, ratioH: 900}},
 		// 리뷰 1회차 [1] 회귀 — 다른 속성의 따옴표 값 안은 낱말이 아니므로 크기 속성이 아니다
 		{info: `mermaid title="report width=50% draft.md"`, want: diagramSize{}},
 		{info: `mermaid title="report width=50% draft.md" width=70%`, want: diagramSize{width: 70}},
@@ -111,6 +136,17 @@ func TestDiagramSizeFence(t *testing.T) {
 			want: []string{"<svg"}, not: []string{"data-diagram"}, warn: WarnDiagram},
 		{name: "줄임 파일명 표기와 함께", src: "```mermaid:flow.md ratio=16:9\n" + body + "\n```",
 			want: []string{` data-diagram-ratio="16:9"`}},
+		// 출력은 늘 W:H 꼴로 정규화한다(itda-hyve#1074) — 소수는 뒤 0 을 떼고, 수 하나 R 은 R:1
+		{name: "소수 ratio", src: "```mermaid ratio=1.91:1\n" + body + "\n```",
+			want: []string{`<figure class="diagram" data-line="1" data-diagram-ratio="1.91:1">`}},
+		{name: "수 하나 ratio", src: "```mermaid ratio=2\n" + body + "\n```",
+			want: []string{` data-diagram-ratio="2:1"`}},
+		{name: "소수 뒤 0 떼기", src: "```mermaid ratio=1.50:1.0\n" + body + "\n```",
+			want: []string{` data-diagram-ratio="1.5:1"`}},
+		{name: "정수부 0", src: "```mermaid ratio=0.5:1 width=40%\n" + body + "\n```",
+			want: []string{` data-diagram-ratio="0.5:1" data-diagram-width="40%"`}},
+		{name: "소수 비율 밖 — 경고하고 그림", src: "```mermaid ratio=10.01:1\n" + body + "\n```",
+			want: []string{"<svg"}, not: []string{"data-diagram"}, warn: WarnDiagram},
 	}
 	runCases(t, cases)
 
@@ -201,7 +237,7 @@ var backtickRe = regexp.MustCompile("``(.+?)``|`([^`]+)`")
 // attrsHTML 은 diagramSize 가 내야 할 속성(있어야 할 것·없어야 할 것)을 검사 문자열로 준다.
 func (sz diagramSize) attrsHTML() (want, not []string) {
 	if sz.ratioW != 0 {
-		want = append(want, ` data-diagram-ratio="`+strconv.Itoa(sz.ratioW)+":"+strconv.Itoa(sz.ratioH)+`"`)
+		want = append(want, ` data-diagram-ratio="`+sz.ratioText()+`"`)
 	} else {
 		not = append(not, "data-diagram-ratio=")
 	}

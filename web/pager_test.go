@@ -293,3 +293,26 @@ func TestImageBorders(t *testing.T) {
 		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
 	}
 }
+
+// 그림 자리 ratio(itda-hyve#475·#1074): sizeDiagrams 가 mdoc 이 낸 data-diagram-ratio(정수·소수 W:H)를 mdoc 과 같은 규칙으로 다시 검사해
+// svg 의 aspect-ratio·width 계산식에 비율을 그대로 거는지, 규칙 밖 값(수 하나 꼴·0·비율 밖·셋째 자리 소수)은 상자를 걸지 않는지
+// testdata/pager_diagrams.cjs 가 pager.js 를 그대로 돌려 본다(adoptWidths 로 부른다). 값 규칙의 정본 검사는 mdoc TestDiagramSizeParse.
+func TestPagerSizeDiagrams(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		if os.Getenv("ITDA_DOC_STRICT") == "1" {
+			t.Fatal("node 가 없어 실행 검사를 할 수 없다")
+		}
+		t.Skip("node 가 없어 실행 검사를 건너뜀")
+	}
+	js, _ := filepath.Abs("pager.js")
+	runner, _ := filepath.Abs(filepath.Join("testdata", "pager_diagrams.cjs"))
+	out, err := exec.Command(node, runner, js).CombinedOutput()
+	if err != nil {
+		t.Fatalf("실행 검사 실패: %v\n%s", err, out)
+	}
+	m := regexp.MustCompile(`PAGER DONE cases=(\d+) failed=0\s*$`).FindStringSubmatch(string(out))
+	if m == nil || m[1] == "0" {
+		t.Fatalf("실패가 있거나 끝나지 않음\n%s", out)
+	}
+}
