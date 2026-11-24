@@ -59,8 +59,9 @@
 .sc-meta { border-top: 0.75pt solid var(--rule); color: var(--muted); }
 /* 구역 슬라이드 — 띠의 자리·폭은 classic 그대로(본문 left 계산도 classic 의 것) */
 /* 남색 면과 청록 띠는 바닥글 줄 위(--slide-pad-bottom — 본문 아래 끝과 같은 줄)에서 함께 끝난다. 바닥글(조직·로고·쪽 번호)은
-   base 자리 그대로라 바닥글이 세 줄까지 꺾이는 배치에서는 흰 바탕 위다(조직 --muted 4.83:1·쪽 번호 --ink — 면 위면 --muted 3.01:1).
-   더 긴 바닥글은 면에 닿을 수 있다 — 면 끝이 고정 여백이라 바닥글 높이를 따라가지 않는다(itda-doc#33 리뷰). */
+   base 자리(bottom 8pt)에 위 선·padding 7pt 를 더해 로고가 있는 한 줄이면 윗끝이 약 31pt 라, 아래 여백을 34pt 로 잡아(theme.json)
+   한 줄 바닥글까지 흰 바탕 위다(조직 --muted 4.83:1·쪽 번호 --ink — 면 위면 --muted 3.01:1). 두 줄 이상으로 꺾이는 바닥글은 면에 닿는다
+   — 면 끝이 고정 여백이라 바닥글 높이를 따라가지 않는다(itda-doc#33 리뷰, 여백 절반 itda-doc#128). */
 .slide-deco.k-section::before { left: 0; bottom: var(--slide-pad-bottom); background: var(--accent); }
 .slide-deco.k-section::after { content: ""; position: absolute; bottom: var(--slide-pad-bottom); height: auto; background: var(--highlight); }
 .page-body .ss-num { color: var(--highlight); }

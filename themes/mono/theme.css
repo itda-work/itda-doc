@@ -52,6 +52,7 @@
 .slide-deco::before { display: none; }
 .slide-title { color: var(--ink); padding-bottom: 9pt; border-bottom: 3.5pt double var(--ink); }
 .slide-title .header-section-number { color: var(--ink); }
+/* 바닥글은 bottom 14pt + 위 선·padding 7pt 라 로고 있는 줄의 윗끝이 약 37pt — 아래 여백을 40pt 로 잡는다(theme.json, itda-doc#128) */
 .slide-foot { color: var(--ink); border-top: 0.75pt solid var(--ink); padding-top: 7pt; bottom: 14pt; }
 .slide-cover { align-items: center; text-align: center; padding: 64pt 96pt 56pt; }
 .sc-top { justify-content: center; font-size: calc(25pt * var(--slide-scale)); font-weight: 800; color: var(--ink); letter-spacing: 0.35em; text-indent: 0.35em;

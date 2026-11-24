@@ -48,9 +48,9 @@
     "--chart-7": "#3a6fb0",
     "--chart-8": "#8a6a3f",
     "--slide-bg": "#0c1a21",
-    "--slide-pad-x": "70pt",
-    "--slide-pad-top": "46pt",
-    "--slide-pad-bottom": "56pt",
+    "--slide-pad-x": "35pt",
+    "--slide-pad-top": "23pt",
+    "--slide-pad-bottom": "28pt",
     "--slide-scrim": "rgba(6, 16, 22, 0.5)"
   }
 }

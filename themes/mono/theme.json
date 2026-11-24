@@ -61,6 +61,7 @@
     "--chart-7": "#d9d9d9",
     "--chart-8": "#6b6b6b",
     "--chart-grid": "#dddddd",
-    "--chart-axis": "#111111"
+    "--chart-axis": "#111111",
+    "--slide-pad-bottom": "40pt"
   }
 }
