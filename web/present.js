@@ -104,6 +104,9 @@
 // 구역 → 슬라이드 2단(넘쳐 생긴 「(계속)」 장은 한 항목), 누르면 그 슬라이드로 간다. 모드·너비는 부른 쪽이 기억한다(켬은 기억하지 않는다).
 // 노트가 있는 슬라이드는 목차 항목·진행 막대 눈금·한눈에 보기 썸네일에 점이 붙고, 노트 칸 머리에 「노트 k/n」 이 보인다(노트가 하나도
 // 없는 문서면 그리지 않는다).
+// 노트 표지 점(itda-doc#126 — .pr-note-hint, 슬라이드 발표의 발표자 화면에만): 지금 장에 노트가 있고 노트 칸이 닫혀 있으면 우상단에 작은 점을 보인다
+// (paintHint — 한눈에 보기·검은 화면·크게 보기 동안은 숨는다. 아래 줄과 달리 커서를 숨긴 동안에도 보인다). 점을 누르거나 점에 포커스가 있을 때
+// Enter·Space 는 노트를 연다(setNotes(true) — N 과 같다). 점 누르기는 넘김·판서·크게 보기가 아니다.
 // 마우스를 가만히 두면 2초 뒤 숨고, 아래 진행 막대·번호·경과 시간도 함께 숨는다(움직이면 다시 보인다).
 // 판서(ink.js): L 레이저, P 펜, H 형광펜, E 지우개, 다시 누르면 끈다. 켠 동안 X = 이 장 전부 지우기, C·[·] = 색, ⌘Z·⇧⌘Z(Windows 는 Ctrl) = 되돌리기·다시 실행.
 // Esc 는 그리는 중 → 취소, 도구 켜짐 → 도구 끔, 그다음에야 발표 끝. 펜·형광펜·지우개가 켜진 동안 왼쪽 클릭은 넘김·크게 보기가 아니고, 레이저가 켜진 동안
@@ -120,6 +123,7 @@
   let tocEl = null, tocBody = null, tocDockBtn = null, tocItems = [];
   // 발표자 보조(머리 주석) — 다음 장 미리보기 칸·축소 상자·지금 담은 장 번호(-1 끝, -2 비었음)·현재 시각 칸
   let nextEl = null, nextBox = null, nextAt = -2, clockEl = null;
+  let hintEl = null; // 노트 표지 점(머리 주석 — 발표자 화면에만)
   let ink = null; // 판서(ink.js) — 슬라이드 발표에만 붙는다. 보드 발표에는 없다
   // 받아 그리는 판서(ink.js view — itda-doc#108). 청중 열기에만 붙인다(inkMounted). 모델은 발표를 닫아도 남는다 — 청중 화면을 다시 열면 그대로 그린다
   let inkView = null, inkMounted = false;
@@ -294,6 +298,7 @@
     clockEl.title = "현재 시각";
     shareEl = hud.appendChild(el("span", "pr-share", shareSummary));
     hud.appendChild(el("span", "pr-hint", "← → 넘기기 · 번호 Enter 이동 · G 한눈에 · T 목차(⇧D 붙이기/띄우기) · N 노트(+/− 글자 · D 붙이기/띄우기 · 머리 끌어 옮기기) · 그림·표 클릭 크게 · B 검은 화면 · L 레이저 · P 펜 · H 형광펜 · E 지우개(켠 동안 X 전부 지우기 · C 색 · ⌘Z 되돌리기) · Esc 끝"));
+    buildHint();
     gotoEl = root.appendChild(el("div", "pr-goto"));
     gridEl = root.appendChild(el("div", "pr-grid"));
     // 한눈에 보기 칸의 복제 쪽도 덱과 같은 쪽 크기로 놓는다 — 칸은 덱 밖(#present 바로 아래)이라 덱에 건 변수를 받지 못해
@@ -332,7 +337,7 @@
   // 한눈에 보기·크게 보기·판서 입력은 만들지 않고(받은 판서는 inkView 가 그린다) 키·마우스·커서 깨우기 리스너도 걸지 않는다. 지난 발표가 남긴 부품 참조는 비워 go·stop 이 건너뛰게 한다.
   function startAudience(w, h) {
     notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
-    nextEl = nextBox = clockEl = null;
+    nextEl = nextBox = clockEl = hintEl = null;
     lb = lbEl = null;
     tocItems = [];
     // 덱 사본의 단추·입력·링크(섹션 묻기 단추·코드 복사 단추 등)는 청중 화면에서 입력이 아니다: 덱을 inert 로 두고(지원하는 웹뷰), 지원하지 않아도
@@ -376,7 +381,7 @@
     P.audience = false; // 두 화면 발표(onState·audience·show)는 슬라이드 발표에만 있다
     P.penOnly = false; // 보드 발표에는 판서가 없다
     P.nextPreview = P.clock = false; // 발표자 보조도 없다
-    nextEl = nextBox = clockEl = null;
+    nextEl = nextBox = clockEl = hintEl = null; // 노트 표지 점도 없다(노트가 없다)
     onState = null;
     opts = o;
     P.slides = [];
@@ -498,7 +503,7 @@
     sentState = "";
     P.audience = false;
     notesEl = notesBody = dockBtn = fsVal = numEl = timeEl = barEl = gotoEl = gridEl = tocEl = tocBody = tocDockBtn = shareEl = null;
-    nextEl = nextBox = clockEl = null;
+    nextEl = nextBox = clockEl = hintEl = null;
     nextAt = -2;
     P.nextPreview = P.clock = false;
     lb = lbEl = null;
@@ -749,6 +754,7 @@
       if (window.ItdaCodeCopy) window.ItdaCodeCopy.arm(notesBody);
     }
     paintNext(); // 다음 장 미리보기(머리 주석 「발표자 보조」) — 다음 장이 바뀔 때만 사본을 바꾼다
+    paintHint(); // 노트 표지 점 — 새 장의 노트 여부를 따른다
     layoutCard(); // 카드 높이가 노트를 따라 바뀐다(ResizeObserver 가 없는 웹뷰에서도 화면 안에 가둔다)
     // 키 → 화면 전환(DOM·클래스)까지, 그리고 다음 슬라이드가 그려지기까지(다음 그리기 두 번 뒤 — 창이 가려지면 그리기가 미뤄져 재지 않는다)
     P.switchMs.push(Math.round((performance.now() - t0) * 10) / 10);
@@ -793,6 +799,7 @@
     root.classList.toggle("pr-grid-on", P.grid);
     if (P.grid) closeLightbox();
     syncOverlay();
+    paintHint();
     if (P.grid && ink) ink.pause(); // 그리던 획을 확정한 뒤 복제한다
     if (!P.grid) { gridEl.textContent = ""; return; }
     gridSel = P.idx;
@@ -1086,8 +1093,45 @@
     if (P.showToc) markToc();
   }
 
-  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); if (P.black && ink) ink.pause(); if (inkMounted) inkView.wake(); emitState(); }
-  function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); relayout(); }
+  function setBlack(on) { P.black = on === undefined ? !P.black : on; root.classList.toggle("pr-black-on", P.black); syncOverlay(); paintHint(); if (P.black && ink) ink.pause(); if (inkMounted) inkView.wake(); emitState(); }
+  function setNotes(on) { P.showNotes = on === undefined ? !P.showNotes : on; root.classList.toggle("pr-notes-on", P.showNotes); paintHint(); relayout(); }
+
+  // ---- 노트 표지 점(머리 주석 「노트 표지 점」). buildHint 는 발표자 화면(start)에서만 부른다 — 청중 열기·보드 발표에는 점이 없다(hintEl null).
+  // 누르기: pointerdown 은 점에서 멈춰 판서(ink.js — root 의 pointerdown)가 획·레이저 누르기를 시작하지 않게 하고, mousedown 은 onMouse 가
+  // 제외 목록(.pr-note-hint)으로 넘김·크게 보기에서 뺀다. 여는 것은 click 이다(키보드는 onKey — 발표가 keydown 을 모두 삼켜 단추의 기본 활성화가 없다).
+  function buildHint() {
+    hintEl = root.appendChild(el("button", "pr-note-hint"));
+    hintEl.type = "button";
+    hintEl.title = "노트 보기 (N)";
+    hintEl.setAttribute("aria-label", "노트 보기 (N)");
+    hintEl.addEventListener("pointerdown", ev => ev.stopPropagation());
+    // 누르기로 포커스를 받지 않는다(Chromium 계열은 mousedown 으로 단추에 포커스를 준다) — click 없이 끝난 누르기(밖으로 끌어 놓기·오른쪽 단추) 뒤에
+    // 포커스가 점에 남으면 넘기려는 Space·Enter 가 노트 열기로 간다. 거품은 막지 않는다(onMouse 의 깨우기·깃발 내리기는 그대로)
+    hintEl.addEventListener("mousedown", ev => ev.preventDefault());
+    hintEl.addEventListener("click", ev => { ev.stopPropagation(); openFromHint(); });
+    paintHint();
+  }
+  // hintOn 은 점이 보이는가다: 슬라이드 발표의 발표자 화면이고, 지금 장에 노트가 있고, 노트 칸·한눈에 보기·검은 화면·크게 보기가 닫혀 있을 때.
+  function hintOn() { return !!(hintEl && P.on && !P.board && !P.audience && !P.showNotes && !P.grid && !P.black && !P.lightbox && hasNote(P.idx)); }
+  // paintHint 는 점을 지금 상태에 맞춘다 — 보이면 .on, 숨으면 .on 을 떼고 aria-hidden·tabindex -1(읽기·포커스 차례에서 뺀다).
+  // display 는 바꾸지 않는다: 켜질 때 서서히 나타나기는 .on 의 전환이다(present.css).
+  function paintHint() {
+    if (!hintEl) return;
+    const on = hintOn();
+    hintEl.classList.toggle("on", on);
+    if (on) { hintEl.removeAttribute("aria-hidden"); hintEl.removeAttribute("tabindex"); }
+    else {
+      hintEl.setAttribute("aria-hidden", "true");
+      hintEl.setAttribute("tabindex", "-1");
+      if (document.activeElement === hintEl && hintEl.blur) hintEl.blur(); // 숨은 점에 포커스를 남기지 않는다
+    }
+  }
+  // openFromHint 는 점으로 노트를 연다(점이 보일 때만). 포커스를 점에 남기지 않는다 — 숨은 단추에 포커스가 남아 Enter 가 점 몫으로 가지 않게.
+  function openFromHint() {
+    if (!hintOn()) return;
+    setNotes(true);
+    if (hintEl && hintEl.blur) hintEl.blur();
+  }
 
   // ---- 라이트박스: 슬라이드 안 이미지·표·그림을 눌러 크게 본다. 발표자 화면에만 있다 — 공유 따라가기(onSlide)로 보내지 않는다.
   // zoomTarget 은 누른 자리 t 에서 크게 볼 대상을 찾는다(지금 슬라이드 cur 안만, 없으면 null — 가운데 빈 곳이라 아무것도 하지 않는다):
@@ -1131,8 +1175,8 @@
       card: () => P.slides[P.idx],
       scope: () => deck,
       cls: "pr-lightbox", // 옛 표지 — ink.js BLOCKED(라이트박스 위 판서 입력 제외)·호스트의 YouTube 재생이 이 이름을 본다
-      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); syncOverlay(); emitState(); },
-      onClose: () => { P.lightbox = ""; syncOverlay(); emitState(); },
+      onOpen: (kind, k) => { P.lightbox = kind; P.lbZoom = k; digits = ""; root.classList.remove("pr-goto-on"); syncOverlay(); paintHint(); emitState(); },
+      onClose: () => { P.lightbox = ""; syncOverlay(); paintHint(); emitState(); },
     });
     lbEl = lb.el;
   }
@@ -1184,7 +1228,7 @@
       return;
     }
     if (P.lightbox) { lbEat = true; closeLightbox(); return; } // 라이트박스가 창을 덮으므로 밖에서 오는 누르기는 드물다(방어)
-    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .itda-codecopy, .itda-codetitle")) return;
+    if (P.grid || e.target.closest(".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .pr-note-hint, .itda-codecopy, .itda-codetitle")) return;
     // 판서가 링크보다 먼저다 — 펜·형광펜·지우개의 왼쪽 누르기는 링크 위에서도 그리기다: 뒤따르는 click 을 먹어 링크가 열리지 않는다.
     // 레이저는 떼는 때 ink.js 가 클릭인지 판단한다(inkClick). 보드 발표에는 판서가 없다(ink 없음)
     const inking = ink ? ink.takes(e) : "";
@@ -1246,6 +1290,8 @@
     e.preventDefault();
     e.stopPropagation();
     const k = e.key;
+    // 노트 표지 점에 포커스가 있으면 Enter·Space 는 점 누르기다(노트 열기 — 머리 주석 「노트 표지 점」). 점이 숨었으면 아래 보통 키다
+    if (hintEl && e.target === hintEl && (k === "Enter" || k === " ") && !e.isComposing && hintOn()) { openFromHint(); return; }
     // 판서 키는 조합 검사 앞이다 — 한글 입력 상태에서도 e.code 로 받는다. 숨겨진 상태(라이트박스·한눈에 보기·검은 화면)와 번호 지우기 Esc 는 아래가 먼저다
     if (ink && !P.lightbox && !P.grid && !P.black && !(digits && k === "Escape") && ink.key(e)) return;
     if (e.isComposing) return;

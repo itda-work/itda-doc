@@ -1716,4 +1716,168 @@ async function repeatCases(pump) {
   H.stop();
 }
 
+// ---- 16. 노트 표지 점(itda-doc#126 — present.js 머리 주석 「노트 표지 점」·paintHint): 지금 장에 노트가 있고 노트 칸이 닫혀 있을 때만 .on 이다.
+// 노트 없는 장·노트 열림·한눈에 보기·검은 화면·크게 보기에서는 숨고, 장 넘김(next·prev·jump·show·거꾸로 단계)을 따라간다. 점 누르기·Enter·Space 는
+// 노트를 열고(P.showNotes) 장을 넘기지 않으며 판서 획이 되지 않는다. 청중 열기·보드 발표에는 점이 없고, stop 뒤 남지 않는다.
+// 판정은 클래스(.on)·aria-hidden·tabindex·P.showNotes·P.idx 다(CSS 모양·움직임은 TestPresentNoteHintCSS 가 규칙 글로 본다).
+{
+  const w = world(), { P, H } = w;
+  w.win.ItdaLightbox = { SEL: "img", create(root, o) {
+    const el = root.appendChild(new El("div")); el.className = "pr-lightbox";
+    let on = false;
+    return { el, open() { on = true; o.onOpen("img", 1); }, close() { if (on) { on = false; o.onClose(); } }, onScrollbar: () => false, relayout() {} };
+  } };
+  // 0 노트(단계 1) · 1 노트 없음 · 2 노트(그림 — 크게 보기) · 3 노트 없음(빈 글)
+  const pages = [slide([], 1), slide([]), slide([img()]), slide([])];
+  H.start({ pages, notes: ["<p>영</p>", "", "<p>이</p>", ""], index: 0, ratio: "16:9", onExit() {} });
+  const root = rootOf(w), hint = root.querySelector(".pr-note-hint");
+  const lit = () => !!hint && hint.classList.contains("on");
+  const hidden = () => !!hint && !hint.classList.contains("on") && hint.getAttribute("aria-hidden") === "true" && hint.getAttribute("tabindex") === "-1";
+  const shown = () => lit() && hint.getAttribute("aria-hidden") === undefined && hint.getAttribute("tabindex") === undefined;
+  ok("표지 점: 발표자 화면에 단추 하나(type button·aria-label·title 「노트 보기 (N)」)", root.querySelectorAll(".pr-note-hint").length === 1 && hint.tag === "button" && hint.type === "button"
+    && hint.getAttribute("aria-label") === "노트 보기 (N)" && hint.title === "노트 보기 (N)", hint && [hint.tag, hint.type, hint.title]);
+  ok("표지 점: 노트 있는 첫 장에서 켜져 있다(aria-hidden·tabindex 없음)", shown(), hint && hint.className);
+  H.next();
+  ok("표지 점: 같은 장 단계 넘김에도 켜진 채", P.idx === 0 && P.step === 1 && shown(), [P.idx, P.step]);
+  H.next();
+  ok("표지 점: 노트 없는 장으로 넘기면 숨는다(aria-hidden·tabindex -1)", P.idx === 1 && hidden(), hint.className);
+  H.next();
+  ok("표지 점: 다음 노트 있는 장에서 다시 켜진다", P.idx === 2 && shown());
+  H.next();
+  ok("표지 점: 노트가 빈 글인 장은 노트 없음이다", P.idx === 3 && hidden());
+  H.prev(); H.prev();
+  ok("표지 점: 이전으로 노트 없는 장", P.idx === 1 && hidden());
+  H.prev();
+  ok("표지 점: 거꾸로 넘겨 앞 장의 마지막 단계로 와도 켜진다", P.idx === 0 && P.step === 1 && shown(), [P.idx, P.step]);
+  H.jump(3);
+  ok("표지 점: jump 로 노트 없는 장", P.idx === 3 && hidden());
+  H.jump(2);
+  ok("표지 점: jump 로 노트 있는 장", P.idx === 2 && shown());
+  H.show({ i: 1 });
+  ok("표지 점: show 로 노트 없는 장", P.idx === 1 && hidden());
+  H.show({ i: 0 });
+  ok("표지 점: show 로 노트 있는 장", P.idx === 0 && shown());
+  // 노트 칸 열기·닫기(N 키·setNotes)
+  key(w, "n", "KeyN");
+  ok("표지 점: N 으로 노트를 열면 숨는다", P.showNotes && hidden());
+  H.jump(2);
+  ok("표지 점: 노트를 연 채 노트 있는 장으로 가도 숨은 채", P.idx === 2 && P.showNotes && hidden(), P.idx);
+  key(w, "n", "KeyN");
+  ok("표지 점: N 으로 노트를 닫으면 다시 켜진다", !P.showNotes && shown());
+  H.setNotes(true);
+  ok("표지 점: setNotes(true) 면 숨는다", hidden());
+  H.setNotes(false);
+  ok("표지 점: setNotes(false) 면 켜진다", shown());
+  H.setDock(true);
+  ok("표지 점: 붙인 칸(도킹)으로 바꿔도 노트가 닫혀 있으면 켜진 채", P.noteDock && !P.showNotes && shown());
+  H.setDock(false);
+  // 한눈에 보기·검은 화면·크게 보기
+  key(w, "g", "KeyG");
+  ok("표지 점: 한눈에 보기(G) 동안 숨는다", P.grid && hidden());
+  key(w, "Escape", "Escape");
+  ok("표지 점: 한눈에 보기를 닫으면 다시 켜진다", !P.grid && P.on && shown());
+  key(w, "b", "KeyB");
+  ok("표지 점: 검은 화면(B) 동안 숨는다", P.black && hidden());
+  key(w, "b", "KeyB");
+  ok("표지 점: 검은 화면을 걷으면 다시 켜진다", !P.black && shown());
+  H.setBlack(true);
+  ok("표지 점: setBlack(true) 도 숨긴다", hidden());
+  H.setBlack(false);
+  H.jump(2);
+  tap(w, P.slides[2].querySelector("img"), { clientX: 640 });
+  ok("표지 점: 크게 보기 동안 숨는다", P.lightbox === "img" && hidden(), P.lightbox);
+  H.closeLightbox();
+  ok("표지 점: 크게 보기를 닫으면 다시 켜진다", !P.lightbox && shown());
+  tap(w, P.slides[2].querySelector("img"), { clientX: 640 });
+  H.jump(0); H.jump(2);
+  ok("표지 점: 크게 보기 중 장이 바뀌면 크게 보기는 닫히고 점은 새 장을 따른다", P.idx === 2 && !P.lightbox && shown(), P.lightbox);
+  // 점 누르기: 노트가 열리고, 넘기지 않으며(오른쪽 가장자리 x 에서도), 뒤따르는 click 을 창이 먹지 않는다
+  const at = P.idx;
+  const eaten = tap(w, hint, { clientX: 1260, clientY: 20 });
+  fire(hint, "click", { clientX: 1260, clientY: 20 });
+  ok("표지 점 누르기: 노트가 열리고 점이 숨는다", P.showNotes && hidden());
+  ok("표지 점 누르기: 다음 장으로 넘기지 않는다(오른쪽 가장자리 자리여도)", P.idx === at && P.step === 0, [P.idx, P.step]);
+  ok("표지 점 누르기: 뒤따르는 click 을 창 붙잡기 단계가 먹지 않는다", !eaten);
+  H.setNotes(false);
+  const r = fire(hint, "mousedown", { button: 2, buttons: 2, clientX: 1260, clientY: 20 });
+  ok("표지 점 위 오른쪽 단추: 이전으로 넘기지 않는다", P.idx === at && r, P.idx);
+  // 판서 펜이 켜진 동안: 점 위 끌기는 획이 아니고 누르면 노트가 열린다(비교 — 슬라이드 위 끌기는 획이다)
+  key(w, "p", "KeyP");
+  const n0 = page(w, at).length;
+  drag(w, hint, line(1250, 20, 4));
+  fire(hint, "click", { clientX: 1280, clientY: 20 });
+  ok("표지 점 + 펜: 점 위 끌기는 획을 남기지 않고 노트를 연다", page(w, at).length === n0 && P.showNotes && P.idx === at, [page(w, at).length, n0, P.idx]);
+  H.setNotes(false);
+  drag(w, P.slides[at], line(300, 300, 4));
+  ok("표지 점 + 펜(비교): 슬라이드 위 끌기는 획이다", page(w, at).length === n0 + 1, page(w, at).length);
+  key(w, "p", "KeyP");
+  // 키보드: 점에 포커스가 있을 때 Enter·Space 는 노트 열기(넘기지 않는다), 점이 숨었으면 보통 키(다음)
+  for (const [name, k] of [["Enter", "Enter"], ["Space", " "]]) {
+    H.setNotes(false);
+    const e = key(w, k, k === " " ? "Space" : "Enter", { target: hint });
+    ok("표지 점 키보드: " + name + " 은 노트를 열고 넘기지 않는다", P.showNotes && P.idx === at && P.step === 0 && hidden() && e.dp, [P.showNotes, P.idx]);
+  }
+  H.setNotes(false);
+  H.jump(3);
+  key(w, "Enter", "Enter", { target: hint });
+  ok("표지 점 키보드: 점이 숨은 장(노트 없음)에서 Enter 는 보통 키 — 노트를 열지 않는다", !P.showNotes, P.showNotes);
+  H.jump(2);
+  // 리뷰 [1]: 점 누르기는 포커스를 받지 않는다 — mousedown 만 하고 click 없이(밖으로 끌어 놓기) 끝나도 Space 는 넘김이다.
+  // 가짜 DOM 은 포커스를 옮기지 않으므로 브라우저 규칙(mousedown 기본 동작을 막지 않으면 단추가 포커스를 받는다)을 여기서 흉내 낸다
+  w.doc.activeElement = w.body;
+  const md = fire(hint, "mousedown", { button: 0, buttons: 1, clientX: 1260, clientY: 20 });
+  if (!md.defaultPrevented) w.doc.activeElement = hint;
+  ok("표지 점 mousedown: 기본 동작(포커스 받기)을 막는다", md.defaultPrevented && w.doc.activeElement !== hint);
+  const at2 = P.idx;
+  key(w, " ", "Space", { target: w.doc.activeElement });
+  ok("표지 점 mousedown 뒤 click 없이 Space: 노트를 열지 않고 넘긴다", P.idx === at2 + 1 && !P.showNotes, [P.idx, P.showNotes]);
+  // 점이 숨을 때 포커스가 점에 있으면 푼다(리뷰 [1] 나안 일부)
+  H.jump(2);
+  let blurs = 0;
+  hint.blur = () => { blurs++; if (w.doc.activeElement === hint) w.doc.activeElement = w.body; };
+  w.doc.activeElement = hint;
+  H.jump(3);
+  ok("표지 점: 숨을 때 포커스가 점에 있으면 푼다", blurs === 1 && w.doc.activeElement === w.body && hidden(), blurs);
+  H.jump(2);
+  ok("표지 점: 포커스가 점에 없으면 숨어도 blur 를 부르지 않는다", (H.jump(3), blurs === 1), blurs);
+  H.jump(2);
+  // 리뷰 [4]: 레이저를 켠 채 점 위로 움직이면 레이저 커서를 그리지 않는다(ink.js BLOCKED). 비교 — 슬라이드 위에서는 커서(채운 원 둘)를 그린다
+  key(w, "l", "KeyL");
+  const lc = () => rootOf(w).querySelector(".ink-laser").ctx.paints.filter(p => p.op === "fill").length;
+  fire(P.slides[2], "pointermove", { clientX: 300, clientY: 300 });
+  runRaf(w);
+  ok("표지 점 + 레이저(비교): 슬라이드 위에서는 레이저 커서를 그린다", lc() === 2, lc());
+  fire(hint, "pointermove", { clientX: 1260, clientY: 20 });
+  runRaf(w);
+  ok("표지 점 + 레이저: 점 위에서는 레이저 커서를 그리지 않는다", lc() === 0, lc());
+  key(w, "l", "KeyL");
+  // stop 뒤 남지 않는다
+  H.stop();
+  ok("표지 점: stop 뒤 화면에 남지 않는다", !w.body.querySelector(".pr-note-hint") && !rootOf(w));
+  ok("표지 점: stop 뒤 떨어진 점 click 은 아무것도 하지 않는다(던지지 않고 P.showNotes 그대로)", (() => { try { fire(hint, "click", {}); return true; } catch (e) { return false; } })() && !P.showNotes, P.showNotes);
+  // 노트가 하나도 없는 문서: 단추는 있어도 켜지지 않는다
+  H.start({ pages: [slide([]), slide([])], notes: [], index: 0, ratio: "16:9", onExit() {} });
+  const h2 = rootOf(w).querySelector(".pr-note-hint");
+  ok("표지 점: 노트 없는 문서에서는 켜지지 않는다", !!h2 && !h2.classList.contains("on"));
+  H.next();
+  ok("표지 점: 노트 없는 문서에서 넘겨도 켜지지 않는다", !h2.classList.contains("on"));
+  H.stop();
+  // 다시 열면 새 점이고 첫 장 노트를 따른다(지난 발표의 노트 열림을 물려받지 않는다)
+  H.start({ pages: [slide([]), slide([])], notes: ["", "<p>일</p>"], index: 1, ratio: "16:9", onExit() {} });
+  const h3 = rootOf(w).querySelector(".pr-note-hint");
+  ok("표지 점: 다시 열면 시작 장(노트 있음)에서 켜진다", h3 !== hint && h3.classList.contains("on") && !P.showNotes);
+  H.stop();
+  // 청중 열기·보드 발표에는 점이 없다
+  H.start({ pages: [slide([]), slide([])], notes: ["<p>영</p>", "<p>일</p>"], index: 0, ratio: "16:9", onExit() {}, audience: true, onState() {} });
+  ok("표지 점: 청중 열기에는 없다", !rootOf(w).querySelector(".pr-note-hint"));
+  H.show({ i: 1 });
+  ok("표지 점: 청중 열기에서 넘겨도 생기지 않는다", !rootOf(w).querySelector(".pr-note-hint"));
+  H.stop();
+  H.startBoard({ page: slide([]), ratio: "16:9", onExit() {} });
+  ok("표지 점: 보드 발표에는 없다", !rootOf(w).querySelector(".pr-note-hint"));
+  H.setBlack(true); H.setBlack(false);
+  ok("표지 점: 보드 발표의 검은 화면 켜고 끄기에도 생기지 않는다", !rootOf(w).querySelector(".pr-note-hint"));
+  H.stop();
+}
+
 mirrorCases().then(() => console.log("PRESENT INK DONE cases=" + cases + " failed=" + failed), e => { console.log("실패 거울 시험 예외 — " + (e && e.stack)); process.exit(1); });
