@@ -85,6 +85,7 @@ nav.toc > ul > li > a { color: var(--ink); }
 .slide-head > .eyebrow { margin: 0 0 4pt; padding-top: 8pt; font-size: calc(13pt * var(--slide-scale)); }
 .slide-head > .eyebrow + .slide-title { border-top: none; padding-top: 0; }
 .slide-section > .eyebrow { margin: 0; font-size: calc(14pt * var(--slide-scale)); }
+/* 위 선·padding 7pt 로 로고 있는 바닥글 윗끝이 약 31pt(bottom 8pt + 7pt + 로고 15pt) — 아래 여백을 34pt 로 잡는다(theme.json, itda-doc#128) */
 .slide-foot { color: var(--muted); border-top: 0.5pt solid var(--rule); padding-top: 7pt; }
 .sf-num { color: var(--ink); }
 .page-body.k-content h2, .page-body.k-content h3 { color: var(--ink); }

@@ -132,9 +132,9 @@
   --diagram-bar-crit: var(--alert-caution);
   --diagram-bar-crit-border: var(--rule-strong);
 
-  --slide-pad-x: 64pt;
-  --slide-pad-top: 44pt;
-  --slide-pad-bottom: 52pt;
+  --slide-pad-x: 32pt;
+  --slide-pad-top: 22pt;
+  --slide-pad-bottom: 26pt;
   /* 슬라이드 글자 배율(itda-hyve#430) — 아래 --slide-*-size 글자 토큰과 슬라이드의 고정 pt 글자에 쓰는 자리(.page.slide 쪽)에서 곱한다.
      여백(--slide-pad-*)은 곱하지 않는다. frontmatter slides.font-scale 이 있으면 slides.js build 가 슬라이드마다 그 값으로 덮는다 */
   --slide-scale: 0.9;
@@ -956,7 +956,7 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 .slide-title { font-family: var(--font-heading); font-size: calc(var(--slide-title-size) * var(--slide-scale)); font-weight: 700; line-height: 1.25; color: var(--slide-title-color); letter-spacing: -0.01em; }
 .slide-title .header-section-number { color: var(--accent); margin-right: 0.4em; }
 .slide-title :is(.slide-cont, .slide-seq) { font-size: 0.55em; font-weight: 600; color: var(--muted); letter-spacing: 0; white-space: nowrap; } /* 「(계속 k/n)」 표지는 한 덩이로 줄바꿈(itda-hyve#482) */
-.slide-foot { position: absolute; left: var(--slide-pad-x); right: var(--slide-pad-x); bottom: 16pt; display: flex; align-items: center;
+.slide-foot { position: absolute; left: var(--slide-pad-x); right: var(--slide-pad-x); bottom: 8pt; display: flex; align-items: center;
   justify-content: space-between; font-size: 11pt; color: var(--muted); line-height: 1; }
 .sf-left { display: flex; align-items: center; gap: 8pt; min-width: 0; }
 .sf-logo { height: 15pt; max-width: 80pt; object-fit: contain; }
@@ -1128,8 +1128,15 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 .page.slide > .slide-bg > * > a { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .page.slide > .slide-bg img { display: block; flex: 1 1 0; min-height: 0; width: 100% !important; max-width: none; max-height: none; object-fit: contain; }
 .page.slide > .slide-bg img.img-fill { object-fit: cover; }
-.page.slide > .slide-bg figcaption { position: absolute; z-index: 1; right: var(--slide-pad-x); bottom: calc(var(--slide-pad-bottom) - 14pt); max-width: 50%; margin: 0;
+/* 캡션 아래 끝은 아래 여백(바닥글 자리) 위 4pt 다 — 기본 26pt 면 30pt 로, 바닥글(bottom 8pt + 로고 높이 15pt(.sf-logo) = 윗끝 23pt)보다 7pt 위.
+   바닥글을 키우는 테마(위 선·padding — graphite·slate·mono)는 아래 여백을 바닥글 윗끝보다 크게 잡아 캡션이 선에 걸리지 않는다.
+   아래 여백이 큰 테마에서는 캡션이 바닥글에서 그만큼 떨어져 뜬다(예: 52pt 면 56pt — 겹치지는 않는다) */
+.page.slide > .slide-bg figcaption { position: absolute; z-index: 1; right: var(--slide-pad-x); bottom: calc(var(--slide-pad-bottom) + 4pt); max-width: 50%; margin: 0;
   font-size: calc(11pt * var(--slide-scale)); color: var(--muted); text-align: right; line-height: 1.3; }
+/* 캡션이 있는 배경 장(slides.js 가 쪽에 bg-cap)은 본문 아래 끝을 캡션 위로 올린다(itda-doc#128) — 아래 여백(26pt)이 캡션 자리(30pt 위)보다
+   낮아 바닥까지 찬 본문 끝줄이 캡션과 겹쳤다. 캡션 아래 끝(위 식, 여백 + 4pt) + 한 줄 높이(11pt × 0.9 × 1.3 ≈ 13pt) + 간격 5pt. 두 줄로 꺾인
+   캡션은 첫 줄이 본문 끝줄과 같은 높이에 올 수 있다. 쪽 class 라 쪽 나눔이 이 bottom 으로 본문 높이를 잰다(:has() 는 옛 WebKit 이 몰라 쓰지 않는다) */
+.page.slide.bg-cap .page-body { bottom: calc(var(--slide-pad-bottom) + 22pt); }
 .page.slide.bg-fill > .slide-bg::after { content: ""; position: absolute; inset: 0; background: var(--slide-scrim); box-shadow: var(--slide-scrim-shade); pointer-events: none; }
 /* 스크림 위 밝은 글은 바탕 없는 글에만(itda-hyve#569 리뷰 2회차 결정): 쪽 머리 제목과 본문의 맨 위 글 블록(.page-body 의 직접 자식 제목·문단·목록·
    정의 목록·구역 제목)과 그 안의 굵은 글·링크·목록 기호. 인용·알림·상자(.box·.lead)·표·코드처럼 제 바탕이 있는 블록은 고르지 않아 테마 색 그대로다
