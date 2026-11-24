@@ -141,7 +141,9 @@ func TestTildeRuns(t *testing.T) {
 		"글자 사이 긴 묶음":  func(n int) string { return "가" + strings.Repeat("~", n) + "나" },
 		"*·~ 긴 묶음 섞음": func(n int) string { return strings.Repeat("~", n/2) + strings.Repeat("*", n/2) },
 	} {
-		assertLinear(t, name, gen, 100*time.Millisecond)
+		// 상한 300ms(#130): 옛 상한 100ms 는 러너 값 `~~~ 반복` 100.1ms·`~ 붙은 ~~ 반복` 104.8ms(512KB, run 45319496651)에
+		// 붙어 있어 간헐 실패했다. 고치기 전의 이차 시간(128KB 3.9초)은 선형 판정과 이 상한 모두로 잡힌다.
+		assertLinear(t, name, gen, 300*time.Millisecond)
 	}
 	gfm := goldmark.New(goldmark.WithExtensions(extension.GFM))
 	dataLine := regexp.MustCompile(` data-line="\d+"`)
