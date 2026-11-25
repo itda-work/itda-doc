@@ -85,7 +85,8 @@
     "--diagram-text": "var(--ink)",
     "--diagram-bar-done": "#8a8a8a",
     "--diagram-bar-active": "var(--ink)",
-    "--diagram-bar-crit": "var(--ink)"
+    "--diagram-bar-crit": "var(--ink)",
+    "--slide-pad-bottom": "34pt"
   },
   "derived": {
     "--accent-2": "oklch(from var(--accent) calc(l + 0.18) c h)",

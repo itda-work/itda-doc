@@ -80,6 +80,16 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-deck li[data-step].pr-pending { visibility: inherit; opacity: 0.3; }
 .pr-black { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 5; }
 #present.pr-black-on .pr-black { opacity: 1; }
+/* 가장자리 넘김(present.js edgeAt·머리 주석 「조작」 누르기): 무대 왼쪽·오른쪽 가장자리의 흐린 ‹ ›·화살표 커서. 폭은 present.js
+   EDGE_FRAC·EDGE_MIN·EDGE_MAX 와 같다(무대 너비의 7%, 48~96px). 넘김 판정은 누른 자리(edgeAt)로 하고 이 상자는 모양뿐이다. 덱 위·검은 화면(5) 아래다.
+   마우스가 그 가장자리에 있을 때만 보이고, 커서를 숨긴 동안(pr-idle)·판서 도구가 켜진 동안·검은 화면·크게 보기·한눈에 보기에서는 없다 */
+.pr-edge { position: absolute; top: 0; bottom: 0; width: clamp(48px, 7%, 96px); z-index: 3; display: flex; align-items: center; justify-content: center;
+  cursor: default; font: 200 64px/1 var(--ui-font); color: #fff; text-shadow: 0 0 6px rgba(0, 0, 0, 0.6); opacity: 0; transition: opacity 0.2s; }
+.pr-edge-prev { left: 0; }
+.pr-edge-next { right: 0; }
+.pr-edge:hover { opacity: 0.4; }
+#present.pr-idle .pr-edge { opacity: 0; cursor: none; }
+#present:is(.pr-ink-on, .pr-black-on, .lb-on, .pr-grid-on) .pr-edge { display: none; }
 /* 아래: 진행 막대·번호·경과 시간·조작 안내. 마우스를 가만히 두면 숨는다. */
 .pr-hud { position: absolute; left: 0; right: 0; bottom: 0; height: 40px; display: flex; align-items: center; gap: 14px; padding: 0 18px 4px;
   font: 12px/1 var(--ui-font); color: rgba(255, 255, 255, 0.78); z-index: 6; transition: opacity 0.3s;
@@ -248,10 +258,26 @@ body.presenting.pr-overlay-hidden [data-pr-overlay], body.presenting.pr-overlay-
 .pr-ink-bar.has-note .pr-ink-note { display: block; }
 /* 노트 있는 슬라이드 썸네일의 점 */
 .pr-cell-note { position: absolute; right: 7px; bottom: 7px; width: 9px; height: 9px; border-radius: 50%; background: #4b86f5; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55); }
+/* 노트 표지 점(present.js 머리 주석 「노트 표지 점」 — itda-doc#126): 지금 장에 노트가 있고 노트 칸이 닫혀 있으면 .on. 단추(22px — 누르는 자리)는 위·오른쪽
+   12px 에 두고 그 가운데 9px 점(::before — 위·오른쪽 여백 약 18px)을 그린다. 누르기는 이 단추에만 닿는다(꺼지면 pointer-events: none).
+   켜질 때 서서히 나타나고(opacity·scale 전환) 켜진 동안 느리게 숨 쉰다. 꺼질 때는 사라진 뒤 visibility 를 내린다. 커서 숨김(pr-idle)과 무관하게 보인다.
+   판서 도구 막대(.pr-ink-bar — 위 가운데, z 6)보다 앞에 놓여 같은 z 에서 막대가 위다. 동작 줄이기에서는 아래 미디어 규칙(#present *)이 전환·숨쉬기를 끈다 */
+.pr-note-hint { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; padding: 0; margin: 0; border: 0; border-radius: 50%; background: transparent;
+  z-index: 6; cursor: pointer; opacity: 0; transform: scale(0.4); visibility: hidden; pointer-events: none;
+  transition: opacity 0.6s ease-out, transform 0.6s cubic-bezier(0.22, 0.8, 0.26, 1), visibility 0s linear 0.6s; }
+.pr-note-hint::before { content: ""; position: absolute; left: 6.5px; top: 6.5px; width: 9px; height: 9px; border-radius: 50%; background: #4b86f5;
+  box-shadow: 0 0 6px 1px rgba(75, 134, 245, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.pr-note-hint.on { opacity: 1; transform: none; visibility: visible; pointer-events: auto; transition-delay: 0s;
+  animation: pr-hint-breathe 3.2s ease-in-out 0.6s infinite; }
+/* 검은 화면(pr-black-on — 덮개 z 5 가 0.25초에 덮는다)에서는 점(z 6)이 덮개 위에 남지 않게 사라지기 전환 없이 곧바로 숨는다 */
+#present.pr-black-on .pr-note-hint { transition: none; }
+#present.pr-idle .pr-note-hint { cursor: none; } /* 점은 보이지만 커서는 숨긴 그대로다(가장자리 표시와 같다) */
+.pr-note-hint:focus-visible { outline: 2px solid rgba(141, 180, 255, 0.8); outline-offset: 0; }
+@keyframes pr-hint-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 /* 동작 줄이기: 움직임을 끄고, 나가는 장(pr-out)은 곧바로 숨긴다 — 전환 종류와 무관하게 none 과 같은 화면이다. present.js 는 시작할 때만
    설정을 읽어 t-none 으로 여므로, 발표 중에 설정을 켜면 t-cover 등이 남는다. 그때 움직이지 않는 나가는 장이 OUT_MS 동안 남아
    cover 뒤로(z-index 3)처럼 새 장을 가리지 않게 여기서 숨긴다(itda-doc#99 리뷰 1회차) */
 @media (prefers-reduced-motion: reduce) {
-  #present *, #present .page { animation: none !important; transition: none !important; }
+  #present *, #present .page { animation: none !important; transition: none !important; } /* 노트 표지 점(.pr-note-hint)의 숨쉬기·전환도 여기서 꺼져 켜져만 있다 */
   #present .pr-deck .page.pr-out { visibility: hidden !important; }
 }

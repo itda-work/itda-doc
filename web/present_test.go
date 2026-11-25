@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -16,8 +18,9 @@ import (
 // 호스트 훅 계약(present.js 머리 주석 — 전체 화면·호스트 전용 앵커·키 양보 ownsKey·겹침 층, 크게 보기·코드 복사 부품이 없을 때),
 // 두 화면 발표(itda-doc#95 — onState·audience 열기·show 덮어쓰기)를, 펜만 판서(itda-doc#100 — penOnly 입력 나눔·inkHeld·발표 중 setPenOnly)를,
 // 판서 받아 그리기(itda-doc#108 — ink.js view 연산·멱등·reset·레이저, 청중 열기의 붙이기, 발표자·청중의 같은 경로)를
+// 노트 표지 점(itda-doc#126 — 보이는 조건·장 넘김 따라가기·누르기·키보드·판서 펜과의 관계·청중·보드·stop)을
 // 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 595 // itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
+const presentInkCases = 677 // itda-doc#126 노트 표지 점 50(포커스 받지 않기·숨을 때 포커스 풀기·레이저 커서 포함), 누르기 규칙(가장자리 넘김·분할·배경 그림 크게 보기) 32, itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -266,5 +269,75 @@ func TestPresentOverlayCSS(t *testing.T) {
 	}
 	if strings.Contains(css, "body.presenting > :not(#present) {") {
 		t.Error("present.css 의 발표 숨김이 겹침 층까지 가린다")
+	}
+}
+
+// 가장자리 넘김의 표시(present.css .pr-edge)는 present.js 의 판정 폭(EDGE_FRAC·EDGE_MIN·EDGE_MAX — edgeAt)과 같은 폭이고, 판서 도구·검은 화면·
+// 크게 보기·한눈에 보기에서는 없고, 커서를 숨긴 동안(pr-idle)은 커서도 숨는다. 실제 그리기는 호스트 앱의 시험이 본다.
+func TestPresentEdgeCSS(t *testing.T) {
+	js, _ := fs.ReadFile(FS, "present.js")
+	css, _ := fs.ReadFile(FS, "present.css")
+	m := regexp.MustCompile(`const EDGE_FRAC = ([0-9.]+), EDGE_MIN = (\d+), EDGE_MAX = (\d+);`).FindStringSubmatch(string(js))
+	if m == nil {
+		t.Fatal("present.js 에 EDGE_FRAC·EDGE_MIN·EDGE_MAX 상수가 없다")
+	}
+	var frac float64
+	fmt.Sscan(m[1], &frac)
+	want := fmt.Sprintf("width: clamp(%spx, %s%%, %spx)", m[2], strconv.FormatFloat(math.Round(frac*10000)/100, 'f', -1, 64), m[3])
+	for _, w := range []string{
+		want,
+		".pr-edge-prev { left: 0; }",
+		".pr-edge-next { right: 0; }",
+		"#present.pr-idle .pr-edge { opacity: 0; cursor: none; }",
+		"#present:is(.pr-ink-on, .pr-black-on, .lb-on, .pr-grid-on) .pr-edge { display: none; }",
+	} {
+		if !strings.Contains(string(css), w) {
+			t.Errorf("present.css 에 %q 가 없다", w)
+		}
+	}
+}
+
+// 노트 표지 점(present.css .pr-note-hint — itda-doc#126)의 규칙 글: 우상단 자리, 기존 노트 점과 같은 색(#4b86f5)·빛, 꺼지면 누르기를 받지 않고
+// 켜지면(.on) 전환으로 나타나 숨쉬기 animation 이 돈다, 동작 줄이기 규칙(#present *)이 그 animation·transition 을 끈다, 커서 숨김(pr-idle)에서 점을
+// 숨기는 규칙이 없다. 실제 그리기·움직임은 호스트 앱의 화면 시험이 본다(미검증).
+func TestPresentNoteHintCSS(t *testing.T) {
+	b, _ := fs.ReadFile(FS, "present.css")
+	css := string(b)
+	rule := func(sel string) string {
+		i := strings.Index(css, "\n"+sel+" {")
+		if i < 0 {
+			t.Fatalf("present.css 에 %s 규칙이 없다", sel)
+		}
+		j := strings.Index(css[i:], "}")
+		return css[i : i+j]
+	}
+	base, dot, on := rule(".pr-note-hint"), rule(".pr-note-hint::before"), rule(".pr-note-hint.on")
+	for _, w := range []string{"position: absolute;", "top: 12px;", "right: 12px;", "opacity: 0;", "transform: scale(0.4);", "visibility: hidden;", "pointer-events: none;", "transition: opacity"} {
+		if !strings.Contains(base, w) {
+			t.Errorf(".pr-note-hint 에 %q 가 없다", w)
+		}
+	}
+	for _, w := range []string{"width: 9px;", "height: 9px;", "background: #4b86f5;", "box-shadow: 0 0 6px 1px rgba(75, 134, 245"} {
+		if !strings.Contains(dot, w) {
+			t.Errorf(".pr-note-hint::before 에 %q 가 없다", w)
+		}
+	}
+	for _, w := range []string{"opacity: 1;", "visibility: visible;", "pointer-events: auto;", "animation: pr-hint-breathe"} {
+		if !strings.Contains(on, w) {
+			t.Errorf(".pr-note-hint.on 에 %q 가 없다", w)
+		}
+	}
+	// 검은 화면에서는 사라지기 전환 없이 곧바로 숨는다(덮개보다 위층이라 0.6초 동안 검은 화면 위에 남지 않게 — 리뷰 [3])
+	if !strings.Contains(css, "\n#present.pr-black-on .pr-note-hint { transition: none; }") {
+		t.Error("present.css 에 검은 화면의 표지 점 곧바로 숨기 규칙(#present.pr-black-on .pr-note-hint { transition: none; })이 없다")
+	}
+	if !strings.Contains(css, "@keyframes pr-hint-breathe {") {
+		t.Error("present.css 에 숨쉬기 keyframes(pr-hint-breathe)가 없다")
+	}
+	if !regexp.MustCompile(`@media \(prefers-reduced-motion: reduce\) \{\s*#present \*, #present \.page \{ animation: none !important; transition: none !important; \}`).MatchString(css) {
+		t.Error("동작 줄이기 규칙이 #present 안 animation·transition 을 모두 끄지 않는다 — 표지 점의 숨쉬기가 남는다")
+	}
+	if regexp.MustCompile(`(?m)^[^\n{/]*pr-idle[^\n{]*\.pr-note-hint[^\n{]*\{[^}]*(opacity: 0|display: none|visibility: hidden)`).MatchString(css) {
+		t.Error("커서 숨김(pr-idle)에서 표지 점을 숨기는 규칙이 있다 — 점은 늘 보여야 한다")
 	}
 }

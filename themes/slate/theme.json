@@ -43,7 +43,8 @@
     "--chart-7": "#646975",
     "--chart-8": "#395a53",
     "--chart-grid": "#e5e7eb",
-    "--chart-axis": "#6b7280"
+    "--chart-axis": "#6b7280",
+    "--slide-pad-bottom": "34pt"
   },
   "derived": {
     "--accent-2": "oklch(from var(--accent) calc(l + 0.18) c h)",

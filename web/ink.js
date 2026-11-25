@@ -25,8 +25,9 @@
   const RELAY_MS = 33;     // 중계 묶음 간격(ms)
   const SVG_NS = "http://www.w3.org/2000/svg";
   // 판서가 받지 않는 자리 — 노트·목차·막대·코드 단추 등은 present.js onMouse 의 제외 목록과 같고, YouTube 재생(a.yt·.yt-play)은 호스트가 mousedown 을 창 단계에서 가로채므로 여기서 뺀다.
-  // 호스트의 겹침 층([data-pr-overlay] — present.js 머리 주석 「호스트 계약」)도 판서 자리가 아니다
-  const BLOCKED = ".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .pr-lightbox, .itda-codecopy, .itda-codetitle, a.yt, .yt-play, [data-pr-overlay]";
+  // 호스트의 겹침 층([data-pr-overlay] — present.js 머리 주석 「호스트 계약」)도 판서 자리가 아니다. 노트 표지 점(.pr-note-hint — itda-doc#126) 위에서는
+  // 획·레이저 누르기를 시작하지 않고 레이저 커서도 그리거나 보내지 않는다
+  const BLOCKED = ".pr-notes, .pr-hud, .pr-notes-grip, .pr-toc, .pr-toc-grip, .pr-ink-bar, .pr-note-hint, .pr-lightbox, .itda-codecopy, .itda-codetitle, a.yt, .yt-play, [data-pr-overlay]";
   const LIMIT_NOTE = "판서 상한(2천 획·20만 점)에 닿았습니다 — 지우면 다시 그릴 수 있습니다";
   const RELAY_NOTE = "판서가 공유 상한을 넘어 보는 사람에게 보내지 못합니다 — 공유 패널의 「판서 함께 보이기」 를 껐다 켜면 다시 시도합니다";
 
@@ -608,7 +609,7 @@
   }
 
   // ---- 발표에 붙이기. o = { root, deck, size: [w, h](설계 px), book, slides()(복제된 .page 들), idx(), scale(), paused()(라이트박스·한눈에 보기·검은 화면),
-  //   click(target, button)(레이저의 클릭 — 넘김·크게 보기), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단),
+  //   click(target, button, x)(레이저의 클릭 — 가장자리 넘김·링크·크게 보기, x 는 누른 자리의 창 x 좌표), eatClick()(뒤따르는 click 을 먹는다), wake()(도구가 바뀌면 커서 숨김을 다시 판단),
   //   penOnly(참이면 pointerType "pen" 만 판서 — itda-doc#100. 시작 값이고 발표 중에는 돌려준 setPenOnly(b) 로 바꾼다), settleTransition()(진행 중인 장 넘김 전환을 곧바로 끝낸다 — itda-doc#105, 없어도 된다) }
   function attach(o) {
     const { root, deck, book } = o, [W, H] = o.size;
@@ -876,7 +877,7 @@
       if (!p || e.type !== "pointerup" || o.paused()) { settle(); return; }
       press = null;
       settle();
-      if (p.line) o.eatClick(); else o.click(p.target, p.button);
+      if (p.line) o.eatClick(); else o.click(p.target, p.button, p.x); // x 는 누른 자리의 창 x 좌표 — 발표의 가장자리 넘김(present.js edgeAt)
     }
     // settle 은 진행 중인 입력을 끝내는 한 곳이다 — 슬라이드가 바뀌거나 쉬는 화면으로 들어가거나 도구가 바뀌거나 포인터를 잃으면 부른다. 획과 지우개는 그때까지 한
     // 만큼 확정하고(그린 것을 버리지 않는다), 레이저 누르기는 클릭이 되지 않게 거두고 뒤따르는 click 도 먹는다. 포인터를 놓으므로 그 뒤 움직임·떼기는 아무것도 하지 않는다.
@@ -1017,7 +1018,7 @@
     // takes 는 onMouse 가 이 누르기를 넘김·크게 보기로 쓰면 안 되는가다 — "draw"(펜·형광펜·지우개의 왼쪽 단추) · "laser"(떼는 때로 미룬다) · ""(지금처럼).
     // penOnly 면 도구가 켜진 동안 누르기는 출처(손가락·마우스·펜)를 가리지 않고 "draw"(먹는다 — 장이 넘어가지 않고 뒤따르는 click 도 먹는다)다.
     // 누르기(mousedown — MouseEvent)에는 pointerType 이 없어 출처를 알 수 없다 — 시각·자리로 짐작하지 않는다. 펜의 호환 mousedown 도 원래 판서 몫이라
-    // 넘기지 않는다(레이저의 펜 클릭은 onUp 의 o.click 이 넘긴다). 도구가 꺼졌거나 쉬는 화면(검은 화면)이면 지금처럼 ""(누르기 = 다음)다.
+    // 넘기지 않는다(레이저의 펜 클릭은 onUp 의 o.click 이 넘긴다). 도구가 꺼졌거나 쉬는 화면(검은 화면)이면 ""(발표의 보통 누르기 — present.js 머리 주석 「조작」)다.
     function takes(e) {
       if (!tool || o.paused()) return "";
       if (penOnly) return "draw";

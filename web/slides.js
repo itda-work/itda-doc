@@ -452,7 +452,9 @@
       // 걸어야 글 영역 폭으로 잰다(머리 높이 재기 probe 도 같은 class). 패널 자체는 나눈 뒤 장마다 붙인다(넘친 장도 반복).
       const cls = "slide k-" + g.kind + (g.title && g.kind !== "section" ? " has-head" : "") +
         (g.panel ? " has-panel panel-" + g.panel.side + " split-" + g.panel.split.replace(":", "-") : "") +
-        (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") : "");
+        (g.bg ? " has-bg " + (g.bg.fill ? "bg-fill" : "bg-contain") + (g.bg.block.querySelector("figcaption") ? " bg-cap" : "") : "");
+      // bg-cap: 캡션(figcaption)이 있는 배경 장 — base.css 가 본문 아래 끝을 캡션 위로 올린다(itda-doc#128). 쪽 class 라 나누기 전에 걸려
+      // 나눔(pager.js 가 .page-body 높이를 잰다)이 줄어든 본문 높이로 「(계속)」을 정한다
       // 머리(제목) 높이를 재어 본문 위치를 정한다 — 두 줄 제목도 본문을 가리지 않게.
       // 넘쳐 여러 장이 된 묶음의 머리에는(첫 장 포함) 「(계속 k/n)」 표지가 붙어 긴 제목은 한 줄 더 내려갈 수 있다(itda-hyve#482). 묶음의 쪽마다 같은 높이를 써야
       // 나눌 때 잰 본문 높이와 그린 높이가 같으므로, 표지가 실제로 줄을 바꾸는 묶음만 첫 장 포함 전체를 표지 단 높이로 나눈다.
