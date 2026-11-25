@@ -133,8 +133,8 @@ func slideView(r mdoc.Result) SlideView {
 // BoardView 는 화면이 보드(격자 한 장)를 놓을 때 쓰는 값이다(itda-work/itda-hyve#362 — web/dashboard.js).
 type BoardView struct {
 	Present bool   `json:"present"` // frontmatter 에 dashboard: 가 있다 — 보드로 연다(slides: 보다 앞선다)
-	Cols    int    `json:"cols"`    // 격자 열 수(2~6, 기본 4)
-	Rows    int    `json:"rows"`    // 기준 상자에 들어가는 타일 행 수(2~4, 기본 3) — 타일 높이를 정한다
+	Cols    int    `json:"cols"`    // 격자 열 수(2~24, 기본 4)
+	Rows    int    `json:"rows"`    // 기준 상자에 들어가는 타일 행 수(2~12, 기본 3) — 타일 높이를 정한다
 	Ratio   string `json:"ratio"`   // 비율 16:9 · 4:3 — 폭과 기준 상자는 슬라이드와 같다(web/slides.js SIZE)
 	Level   int    `json:"level"`   // 타일을 여는 제목 단계(dashboard.level 또는 문서에서 정한 것 — 슬라이드와 같은 규칙). 제목이 없으면 0
 }

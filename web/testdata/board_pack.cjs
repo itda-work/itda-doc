@@ -1,5 +1,6 @@
 // dashboard.js 의 배치(pack)·타일 크기(tileWidth)를 node 로 돌린다(board_test.go TestBoardPack). 인자: dashboard.js.
-// 배치는 DOM 없이 숫자만 다룬다 — 같은 입력이면 같은 배치, 읽는 차례 보존(빈 칸은 남긴다), 2×1 이 줄 끝에 안 들어가면 다음 줄, 판이 없다(줄만 는다), 줄 나눔·구역 줄.
+// 배치는 DOM 없이 숫자만 다룬다 — 같은 입력이면 같은 배치, 읽는 차례 보존(빈 칸은 남긴다), 2×1 이 줄 끝에 안 들어가면 다음 줄, 판이 없다(줄만 는다), 줄 나눔·구역 줄,
+// 자리·크기(at·span — 고정·자동 섞임, 구역 상대 행, 높이 2 이상, 건너뛰기, 겹침, 격자 밖, tileAttrs).
 // zoomBox(크게 보기 자리)도 숫자만 다룬다.
 "use strict";
 const fs = require("fs"), vm = require("vm");
@@ -58,6 +59,58 @@ const big = Array.from({ length: 40 }, (_, i) => (i % 11 === 3 ? SEC : i % 7 ===
 eq("결정적", B.pack(big, 4), B.pack(big, 4));
 eq("빈 입력", B.pack([], 4), { place: [], rows: 0, sections: [] });
 
+// 9. 자리·크기(itda-work/itda-hyve#1038): at=[열, 행](1부터, 구역 안 행), span=[너비, 높이]
+const F = (w, at, span) => Object.assign({ w }, at ? { at } : {}, span ? { span } : {});
+const ath = (r, c, w, h) => ({ r, c, w, h });
+// 고정·자동 섞임: 고정 타일을 먼저 놓고, 나머지는 읽는 차례로 찬 칸을 건너뛴다(앞의 빈 칸은 당기지 않는다)
+eq("섞임: 고정이 먼저, 자동은 찬 칸을 건너뜀", B.pack([T(1), F(1, [2, 1]), T(1), T(1), T(1)], 4),
+  { place: [at(0, 0, 1), at(0, 1, 1), at(0, 2, 1), at(0, 3, 1), at(1, 0, 1)], rows: 2, sections: [] });
+eq("섞임: 뒤에 적은 고정 타일이 앞 자리를 먼저 갖는다", B.pack([T(1), T(1), F(1, [1, 1])], 4),
+  { place: [at(0, 1, 1), at(0, 2, 1), at(0, 0, 1)], rows: 1, sections: [] });
+// 건너뛰기: 2칸 타일이 고정 칸에 걸리면 한 칸씩 오른쪽으로 — 커서 앞의 빈 칸(0열)은 남는다
+eq("건너뛰기: 2칸이 고정 칸을 넘어 감", B.pack([F(1, [2, 1]), T(2), T(1)], 4),
+  { place: [at(0, 1, 1), at(0, 2, 2), at(1, 0, 1)], rows: 2, sections: [] });
+// 높이 2 이상: 아래 줄의 찬 칸도 건너뛴다
+eq("높이: 2×2 고정 아래 줄을 건너뜀", B.pack([F(1, [1, 1], [2, 2]), T(2), T(1), T(1), T(1)], 4),
+  { place: [ath(0, 0, 2, 2), at(0, 2, 2), at(1, 2, 1), at(1, 3, 1), at(2, 0, 1)], rows: 3, sections: [] });
+eq("높이: span 만 적으면 자리는 자동", B.pack([T(1), F(1, null, [2, 3]), T(1)], 4),
+  { place: [at(0, 0, 1), ath(0, 1, 2, 3), at(0, 3, 1)], rows: 3, sections: [] });
+eq("높이: 자동 2×2 다음 넓은 타일은 비는 줄까지 내려감", B.pack([F(1, null, [2, 2]), T(2), T(4)], 4),
+  { place: [ath(0, 0, 2, 2), at(0, 2, 2), at(2, 0, 4)], rows: 3, sections: [] });
+// 빈 줄: at 의 행이 멀면 그 사이 줄은 빈 채로 남고, 구역 높이는 마지막 행까지
+eq("빈 줄: 3행에 놓으면 구역이 3줄", B.pack([F(1, [4, 3])], 4), { place: [at(2, 3, 1)], rows: 3, sections: [] });
+// 구역 상대 행: 구역 줄·가로줄 뒤의 행 1은 그 구역의 첫 줄이다
+eq("구역 상대 행", B.pack([T(1), SEC, F(1, [2, 2]), T(1), BRK, F(2, [3, 1])], 4),
+  { place: [at(0, 0, 1), { r: 1, sec: true }, at(3, 1, 1), at(2, 0, 1), { r: 4 }, at(4, 2, 2)], rows: 5, sections: [1] });
+eq("구역 상대 행: 앞 구역의 키 큰 타일 아래로 쌓인다", B.pack([F(1, [1, 1], [1, 3]), BRK, F(1, [1, 1])], 4),
+  { place: [ath(0, 0, 1, 3), { r: 3 }, at(3, 0, 1)], rows: 4, sections: [] });
+// 겹침: 뒤에 적은 고정 타일이 자동 배치로(moved 에 번호), 크기(span)는 지킨다
+eq("겹침: 뒤의 것이 자동", B.pack([F(1, [1, 1], [2, 1]), F(1, [2, 1], [2, 2])], 4),
+  { place: [at(0, 0, 2), ath(0, 2, 2, 2)], rows: 2, sections: [], moved: [1] });
+// 내용 너비(span 없음)로만 드러나는 겹침도 같다 — 표(2칸)를 1열에, 다음 타일을 2열에
+eq("겹침: 내용 너비로 겹침", B.pack([F(2, [1, 1]), F(1, [2, 1])], 4),
+  { place: [at(0, 0, 2), at(0, 2, 1)], rows: 1, sections: [], moved: [1] });
+// 격자 밖: span 이 격자를 넘으면 자리를 버리고 자동, span 없는 내용 너비는 그 열에서 격자 끝까지로 줄인다
+eq("격자 밖: span 이 넘침", B.pack([F(1, [4, 1], [2, 1])], 4), { place: [at(0, 0, 2)], rows: 1, sections: [], moved: [0] });
+eq("격자 밖: 열이 넘침", B.pack([F(1, [5, 1])], 4), { place: [at(0, 0, 1)], rows: 1, sections: [], moved: [0] });
+eq("격자 끝: 내용 너비 2 를 4열에 두면 1칸", B.pack([F(2, [4, 1])], 4), { place: [at(0, 3, 1)], rows: 1, sections: [] });
+eq("틀린 span 은 없는 것: 너비가 cols 보다 큼", B.pack([F(1, null, [5, 1])], 4), { place: [at(0, 0, 1)], rows: 1, sections: [] });
+eq("틀린 span 은 없는 것: 높이 0", B.pack([F(2, null, [2, 0])], 4), { place: [at(0, 0, 2)], rows: 1, sections: [] });
+eq("행 상한: 99행을 넘는 자리는 자동", B.pack([F(1, [1, 99], [1, 2])], 4), { place: [ath(0, 0, 1, 2)], rows: 2, sections: [], moved: [0] });
+// 촘촘한 격자(12열): 자리·크기를 섞은 보드 — 마지막 고정 타일은 둘째 타일과 겹쳐 자동(커서가 2행 9열)
+eq("12열 보드", B.pack([F(1, [1, 1], [3, 2]), F(1, [4, 1], [9, 1]), F(1, null, [3, 1]), T(2), F(1, [5, 1], [3, 4])], 12),
+  { place: [ath(0, 0, 3, 2), at(0, 3, 9), at(1, 3, 3), at(1, 6, 2), ath(1, 8, 3, 4)], rows: 5, sections: [], moved: [4] });
+const mix = Array.from({ length: 30 }, (_, i) => (i % 9 === 4 ? SEC : F(1 + (i % 2), i % 3 ? null : [1 + (i % 4), 1 + (i % 2)], i % 5 ? null : [2, 2])));
+eq("결정적: 자리 섞임", B.pack(mix, 4), B.pack(mix, 4));
+
+// tileAttrs: 제목의 data-at·data-span
+const ttl = d => ({ dataset: d });
+eq("속성: 둘 다", B.tileAttrs(ttl({ at: "5,1", span: "3x4" })), { at: [5, 1], span: [3, 4] });
+eq("속성: 공백 허용", B.tileAttrs(ttl({ at: " 2 , 3 " })), { at: [2, 3] });
+eq("속성: 틀린 꼴은 없음", B.tileAttrs(ttl({ at: "0,1", span: "3X4" })), {});
+eq("속성: 음수·글자·빈 값", B.tileAttrs(ttl({ at: "-1,2", span: "ax2" })), {});
+eq("속성: 제목 없음", B.tileAttrs(null), {});
+
 // zoomBox: 격자 좌표(확대 전 px). 굴림 칸 y 100..700, 보드는 위로 굴러 칸을 넘치고 격자는 보드 안 x+30·y+80
 {
   const view = { left: 0, right: 1000, top: 100, bottom: 700 };
@@ -69,6 +122,22 @@ eq("빈 입력", B.pack([], 4), { place: [], rows: 0, sections: [] });
   // 보드가 칸보다 짧으면 보드 끝까지만
   eq("zoomBox: 짧은 보드", B.zoomBox(view, { left: 0, right: 1000, top: 150, bottom: 400 }, { left: 30, right: 970, top: 200, bottom: 380 }, 1, 12), { left: -18, top: -38, width: 976, height: 226 });
   eq("zoomBox: 이상한 비율은 1", B.zoomBox(view, page, grid, 0, 0).width, 600);
+}
+
+// slots: pack 결과를 구역 안 자리(1부터)로 — 호스트 끌기가 읽는 값(itda-work/itda-hyve#1038 2단계)
+{
+  const items = [{ w: 1, at: [2, 1] }, T(2), BRK, { w: 1, span: [2, 2] }, { w: 1, at: [4, 1] }, SEC, T(1), { w: 2, at: [9, 1] }];
+  const r = B.pack(items, 4);
+  const s = B.slots(items, r.place, r.moved);
+  eq("slots: 첫 구역 고정·자동", [s[0], s[1]], [{ seg: 0, c: 2, r: 1, w: 1, h: 1, fixed: true }, { seg: 0, c: 3, r: 1, w: 2, h: 1, fixed: false }]);
+  eq("slots: 줄 나눔·구역 줄은 null", [s[2], s[5]], [null, null]);
+  // 줄 나눔 뒤 구역은 그 줄부터 1행 — 격자 행 1·2 이지만 구역 안에서는 1
+  eq("slots: 줄 나눔 뒤 구역 상대 행·높이", [s[3], s[4]], [{ seg: 1, c: 1, r: 1, w: 2, h: 2, fixed: false }, { seg: 1, c: 4, r: 1, w: 1, h: 1, fixed: true }]);
+  // 구역 줄 뒤도 1행부터, 격자 밖 at(9열)은 자리를 못 지켜 fixed 가 아니다
+  eq("slots: 구역 줄 뒤·못 지킨 고정", [s[6], s[7]], [{ seg: 2, c: 1, r: 1, w: 1, h: 1, fixed: false }, { seg: 2, c: 2, r: 1, w: 2, h: 1, fixed: false }]);
+  // 이미 줄 머리의 줄 나눔(연속)도 구역 번호를 하나 쓴다
+  const it2 = [BRK, BRK, T(1)], r2 = B.pack(it2, 4);
+  eq("slots: 연속 줄 나눔", B.slots(it2, r2.place, r2.moved)[2], { seg: 2, c: 1, r: 1, w: 1, h: 1, fixed: false });
 }
 
 // tileWidth: 내용 종류만 본다

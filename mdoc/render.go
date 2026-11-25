@@ -63,6 +63,19 @@ func dataAttrs(w util.BufWriter, n ast.Node) {
 	html.RenderAttributes(w, n, util.NewBytesFilter())
 }
 
+// userData 는 사용자가 적은 key=value 를 data-key 로 쓴다. line 은 쓰지 않는다 — data-line 은 렌더러가 계산한
+// 원문 줄(dataAttrs)만이다. 사용자 {line=…} 이 그 자리를 가로채면 목차 이동·편집기에서 이 줄로·보드 끌기가 다른 줄을
+// 가리킨다(itda-work/itda-hyve#1038). 원문 줄이 없는 요소(중첩 제목 등)에도 내지 않는다. 키는 parseAttrs 가 소문자로
+// 바꿔 두므로 LINE·Line 도 여기서 걸린다. 파싱한 line 값(차트의 line="계열")은 그대로 남는다.
+func userData(w util.BufWriter, data [][2]string) {
+	for _, kv := range data {
+		if kv[0] == "line" {
+			continue
+		}
+		attr(w, "data-"+kv[0], kv[1])
+	}
+}
+
 func (r *htmlRenderer) heading(w util.BufWriter, src []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
 	n := node.(*ast.Heading)
 	tag := "h" + string(rune('0'+n.Level))
@@ -77,9 +90,7 @@ func (r *htmlRenderer) heading(w util.BufWriter, src []byte, node ast.Node, ente
 		if len(info.classes) > 0 {
 			attr(w, "class", strings.Join(info.classes, " "))
 		}
-		for _, kv := range info.data {
-			attr(w, "data-"+kv[0], kv[1])
-		}
+		userData(w, info.data)
 	}
 	dataAttrs(w, n)
 	_ = w.WriteByte('>')
@@ -452,12 +463,7 @@ func (r *htmlRenderer) container(w util.BufWriter, src []byte, node ast.Node, en
 	if n.Attrs.ID != "" {
 		attr(w, "id", n.Attrs.ID)
 	}
-	for _, kv := range n.Attrs.Data {
-		if kv[0] == "line" {
-			continue // data-line 은 원문 줄(아래 dataAttrs)이다 — 차트의 line="계열" 이 표로 남을 때 겹치지 않게
-		}
-		attr(w, "data-"+kv[0], kv[1])
-	}
+	userData(w, n.Attrs.Data) // 차트의 line="계열" 이 표로 남을 때도 data-line 은 원문 줄 하나다
 	if n.Width != "" {
 		attr(w, "style", "width:"+n.Width)
 	}
