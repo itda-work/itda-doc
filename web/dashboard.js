@@ -271,11 +271,13 @@
   }
 
   // ---- 움직임(3단계 C): 처음 그릴 때 등장, 다시 그릴 때 본문이 바뀐 타일 강조. 움직임은 base.css 의 CSS animation 만이다 —
-  // JS 는 class(tile-enter·tile-changed)와 늦춤(--tile-enter-delay)만 달고, 끝나면(animationend·animationcancel) 뗀다. 그 이벤트가 오지 않을 때의 늦은 끝은 lifeMs(계산된 시간 + 늦춤 + 0.5초, 최소 SETTLE_MS)다 —
-  // 계산 스타일을 읽으므로 enter·build 는 문서에 붙은 타일에 불러야 한다(붙지 않은 요소는 값이 비어 최소값이 된다).
+  // JS 는 class(tile-enter·tile-changed)와 늦춤(--tile-enter-delay)만 달고, 끝나면(animationend) 뗀다. 그 이벤트가 오지 않을 때의 늦은 끝은 lifeMs(계산된 시간 + 늦춤 + 0.5초, 최소 SETTLE_MS)이고,
+  // 늦은 끝에 타일에서 아직 도는 애니메이션이 있으면 그 끝까지 다시 기다린다(rest). 그래서 build 를 문서 밖·animation 을 끈 무대에서 불러 lifeMs 가 최소값을 읽어도,
+  // 무대에서 그린 뒤 타일을 다른 부모로 옮기다 애니메이션이 새 자리에서 다시 시작해도 테마가 늘린 시간이 잘리지 않는다.
   // 끝 모양이 기본 모양이라 애니메이션이 돌지 않아도(인쇄·움직임 줄이기·모르는 엔진) 타일은 다 보인다.
   const ENTER_STEP = 40, ENTER_SPREAD = 300; // 타일 사이 늦춤(ms)·늦춤의 상한 — 등장 시간(base.css --board-enter-time 0.3초)과 합쳐 0.6초 안
   const SETTLE_MS = { "tile-enter": 1200, "tile-changed": 2000 }; // animationend 가 오지 않을 때(돌지 않음·화면 밖) class 를 떼는 늦은 끝의 최소값 — 실제 값은 lifeMs
+  const SETTLE_WAITS = 4; // 늦은 끝에 아직 도는 애니메이션을 다시 기다리는 횟수의 상한 — 호스트가 타일을 거듭 떼었다 붙여 애니메이션이 거듭 다시 시작해도 표지가 끝내 떨어진다
   const memo = new WeakMap(); // 대상(또는 o.motionScope) → 앞 그림의 { doc: 문서 열쇠(o.motionDoc), tiles: 짝 열쇠 → 본문 글 } — 대상이 사라지면 함께 사라진다
 
   // enterDelays 는 타일 n 개의 등장 늦춤(ms)이다 — 읽는 차례로 ENTER_STEP 씩, 마지막이 ENTER_SPREAD 를 넘지 않게 간격을 줄인다.
@@ -298,29 +300,45 @@
   }
 
   // settle 은 움직임 class 를 끝나면 뗀다 — 크게 보기·호스트의 끌기 transform 과 부딪치지 않게, 화면 밖에 있다가 나중에 다시 돌지 않게.
+  // animationcancel 로는 떼지 않는다 — 타일을 떼었다 붙이면 애니메이션이 취소된 뒤 새 자리에서 다시 돌 수 있고, 늦게 온 취소로 떼면 그 등장이 끊긴다.
+  // 취소된 채 끝난 것(도중에 움직임 줄이기로 바뀜 등)은 늦은 끝이 뗀다. 늦은 끝(late)은 아직 도는 애니메이션이 있으면 그 끝 + 0.5초까지 다시 기다린다(SETTLE_WAITS 번까지).
   function settle(tile, cls) {
-    let done = false, timer = 0;
+    let done = false, timer = 0, waits = 0;
     const off = e => {
       if (done || (e && e.target !== tile)) return;
       done = true;
       tile.classList.remove(cls);
       if (cls === "tile-enter") tile.style.removeProperty("--tile-enter-delay");
-      if (tile.removeEventListener) {
-        tile.removeEventListener("animationend", off);
-        tile.removeEventListener("animationcancel", off);
-      }
+      if (tile.removeEventListener) tile.removeEventListener("animationend", off);
       if (timer) clearTimeout(timer);
     };
+    const late = () => {
+      timer = 0;
+      const left = done ? 0 : rest(tile);
+      if (left > 0 && waits++ < SETTLE_WAITS) timer = setTimeout(late, left + 500);
+      else off();
+    };
     // 이벤트·타이머가 없는 자리(화면 없이 HTML 만 만드는 호스트·시험의 가짜 DOM)에서도 build 가 멈추지 않게 있는 것만 쓴다 — class 가 남아도 끝 모양이 기본 모양이다
-    if (tile.addEventListener) {
-      tile.addEventListener("animationend", off);
-      tile.addEventListener("animationcancel", off);
-    }
-    if (typeof setTimeout === "function") timer = setTimeout(off, lifeMs(tile, cls));
+    if (tile.addEventListener) tile.addEventListener("animationend", off);
+    if (typeof setTimeout === "function") timer = setTimeout(late, lifeMs(tile, cls));
   }
-  // lifeMs 는 늦은 끝 타이머의 시간이다 — 테마가 움직임 토큰(--board-enter-time·--board-enter-stagger·--board-flash-time)을 늘려도 도는 애니메이션을
-  // 자르지 않게, 계산된 animation-duration + animation-delay(쉼표 목록이면 가장 긴 것)에 여유 0.5초를 더한다. 그 값이 SETTLE_MS 보다 짧거나
-  // 읽을 수 없으면(움직임 줄이기 — animation 없음, 계산 스타일이 없는 자리) SETTLE_MS 다.
+  // rest 는 타일 자신에 걸려 지금 도는(running·pending) CSS animation 이 끝날 때까지 남은 시간(ms, 가장 긴 것)이다. 없거나 셀 수 없으면 0 —
+  // 끝없는 것(infinite)·멈춘 것(paused)·끝난 것·transition 은 세지 않는다(기다려도 끝나지 않거나 표지와 상관없다). 문서에서 떨어진 타일은 애니메이션이 없어 0 이다.
+  function rest(tile) {
+    if (typeof tile.getAnimations !== "function") return 0;
+    let left = 0;
+    for (const a of tile.getAnimations()) {
+      if (typeof a.animationName !== "string" || (a.playState !== "running" && a.playState !== "pending")) continue;
+      const t = a.effect && typeof a.effect.getComputedTiming === "function" ? a.effect.getComputedTiming() : null;
+      if (!t || !isFinite(t.endTime)) continue;
+      left = Math.max(left, t.endTime - (Number(a.currentTime) || 0));
+    }
+    return left > 0 ? Math.ceil(left) : 0;
+  }
+  // lifeMs 는 늦은 끝 타이머의 처음 시간이다 — 테마가 움직임 토큰(--board-enter-time·--board-enter-stagger·--board-flash-time)을 늘려도 도는 애니메이션을
+  // 자르지 않게, 계산된 animation-duration + animation-delay(쉼표 목록이면 가장 긴 것)에 여유 0.5초를 더한다. 그 값이 SETTLE_MS 보다 짧거나 읽을 수 없으면
+  // (움직임 줄이기 — animation 없음, 문서에서 떨어진 타일 — 계산 스타일이 비어 있다, animation 을 끈 무대) SETTLE_MS 다 — 그때도 늦은 끝의 rest 가 자르지 않게 한다.
+  // visibility: hidden·display: none 인 무대(문서에 붙음)에서는 계산 스타일을 그대로 읽는다(Chrome·WebKit 재현).
   function lifeMs(tile, cls) {
     const cs = typeof getComputedStyle === "function" ? getComputedStyle(tile) : null;
     const ms = v => String(v || "").split(",").map(s => { s = s.trim(); const n = parseFloat(s); return isFinite(n) ? (/ms$/.test(s) ? n : n * 1000) : 0; });

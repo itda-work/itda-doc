@@ -24,7 +24,8 @@ func TestBoardZoom(t *testing.T) { runBoardNode(t, "board_zoom.cjs", "ZOOM") }
 // 타일 상태·움직임(itda-work/itda-hyve#1038 3단계 B·C): 가짜 DOM 위에서 build 를 끝까지 돌린다(testdata/board_motion.cjs) —
 // 상태 class 하나씩·둘 이상이면 무거운 쪽(bad > warn > ok)·구역 줄과 타일 안 낮은 제목은 무시·머리 맨 앞 표식 자리와 읽는 프로그램용 글·slots 그대로,
 // 상태 없는 문서의 보드 마크업이 이 변경 전(main 26d80f8)과 같음, 처음 그림에만 등장(읽는 차례 늦춤)·다시 그림에 등장 없음·본문이 바뀐 타일만 강조(새 타일·
-// 자리만 바뀐 타일·같은 본문 없음, 같은 제목 둘의 차례 짝), motion: false·motionScope, 끝나면(animationend·animationcancel·늦은 끝) 표지를 뗌,
+// 자리만 바뀐 타일·같은 본문 없음, 같은 제목 둘의 차례 짝), motion: false·motionScope, 끝나면(animationend·늦은 끝) 표지를 뗌(animationcancel 로는 떼지 않음 — 무대에서 옮긴 뒤 다시 도는 등장),
+// 늦은 끝에 아직 도는 애니메이션이 있으면 그 끝 + 0.5초를 다시 기다림(끝없는 것·멈춘 것·transition 꼴은 세지 않음, 다시 기다림 4번까지),
 // enter(발표 복제본), 늦춤 상한(타일 100개 — 0.3초 안). 실제 움직임은 CSS 라 TestBoardMotionCSS 가 규칙 꼴을, 화면은 Chrome 캡처가 봤다.
 func TestBoardMotion(t *testing.T) { runBoardNode(t, "board_motion.cjs", "MOTION") }
 

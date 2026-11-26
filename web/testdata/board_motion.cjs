@@ -236,7 +236,7 @@ eq("같은 문서를 다시 그림: 강조 없음", [r3.entered, r3.changed, til
   eq("forget: 버린 것이 있으면 참, 다음 그림은 처음 그림", [Bd.forget(keep), Bd.forget(keep), build(spec2, new El("div"), { motionScope: keep }).entered], [true, false, 6]);
 }
 
-// ---- 표지가 끝난 뒤 떼어짐: animationend(그 타일이 대상일 때만)·animationcancel·늦은 끝(타이머)
+// ---- 표지가 끝난 뒤 떼어짐: animationend(그 타일이 대상일 때만)·늦은 끝(타이머). animationcancel 로는 떼지 않는다
 {
   timers.length = 0;
   const T = new El("div");
@@ -246,11 +246,13 @@ eq("같은 문서를 다시 그림: 강조 없음", [r3.entered, r3.changed, til
   eq("떼기: 자식의 animationend 는 무시", a.cls.has("tile-enter"), true);
   a.fire("animationend");
   b.fire("animationcancel");
-  eq("떼기: animationend·animationcancel 뒤 class·늦춤 변수가 없다", [a, b].map(t => [t.cls.has("tile-enter"), "--tile-enter-delay" in t.style.vars]), [[false, false], [false, false]]);
-  eq("떼기: 끝난 타일의 리스너도 뗀다", [(a.on.animationend || []).length, (a.on.animationcancel || []).length], [0, 0]);
+  eq("떼기: animationend 뒤 class·늦춤 변수가 없다", [a.cls.has("tile-enter"), "--tile-enter-delay" in a.style.vars], [false, false]);
+  eq("떼기: animationcancel 로는 떼지 않는다(옮김으로 취소된 뒤 다시 도는 등장을 자르지 않게)", [b.cls.has("tile-enter"), "--tile-enter-delay" in b.style.vars], [true, true]);
+  eq("떼기: 끝난 타일의 리스너도 뗀다, 취소 리스너는 달지 않는다", [(a.on.animationend || []).length, (b.on.animationcancel || []).length], [0, 0]);
   eq("떼기: 아직 안 끝난 타일은 그대로", c.cls.has("tile-enter"), true);
   runTimers();
-  eq("떼기: 애니메이션이 돌지 않아도 늦은 끝에 모두 뗀다", tiles(T).filter(t => t.cls.has("tile-enter") || "--tile-enter-delay" in t.style.vars).length, 0);
+  eq("떼기: 애니메이션이 돌지 않아도(getAnimations 없음) 늦은 끝에 모두 뗀다", tiles(T).filter(t => t.cls.has("tile-enter") || "--tile-enter-delay" in t.style.vars).length, 0);
+  eq("떼기: 늦은 끝 뒤 남은 타이머 없음", timers.length, 0);
   T.textContent = "";
   build(spec2, T);
   runTimers();
@@ -283,6 +285,66 @@ eq("같은 문서를 다시 그림: 강조 없음", [r3.entered, r3.changed, til
   eq("늦은 끝: 계산 값이 짧으면 최소값", [...new Set(timers.map(t => t.ms))], [1200]);
   animStyle = null;
   timers.length = 0;
+}
+
+// ---- 늦은 끝에 아직 도는 애니메이션이 있으면 그 끝 + 0.5초까지 다시 기다린다(rest) — 무대에서 그린 뒤 옮기는 호스트·문서 밖 build·animation 을 끈 무대
+// 가짜 애니메이션: { animationName, playState, endTime, currentTime } — getAnimations 가 이것을 CSSAnimation 꼴로 돌려준다
+const anim = (o) => Object.assign({ animationName: "itda-tile-enter", playState: "running", currentTime: 0 },
+  o, { effect: { getComputedTiming: () => ({ endTime: o.endTime }) } });
+{
+  // 옮김: 문서 밖(계산 스타일 없음)에서 build — 늦은 끝은 최소값 1.2초. 타일을 붙인 뒤 테마가 늘린 등장(2초 + 늦춤 0.4초)이 다시 시작했고 취소도 늦게 왔다
+  timers.length = 0;
+  const T = new El("div");
+  build(spec1, T);
+  const [a, b] = tiles(T);
+  let now = 0;
+  a.getAnimations = () => (now < 2400 ? [anim({ endTime: 2400, currentTime: now })] : []);
+  b.getAnimations = () => [anim({ animationName: "theme-pulse", endTime: Infinity, currentTime: now }), anim({ animationName: undefined, endTime: 5000 })]; // 끝없는 것·transition 꼴은 세지 않음
+  a.fire("animationcancel"); // 떨어질 때의 취소가 붙인 뒤에 온다
+  eq("옮김: 첫 늦은 끝은 최소값", timers.map(t => t.ms).slice(0, 2), [1200, 1200]);
+  now = 1200;
+  runTimers();
+  eq("옮김: 1.2초에 아직 도는 타일은 표지를 지킨다, 끝없는·셀 수 없는 것만 있는 타일은 뗀다", [a.cls.has("tile-enter"), b.cls.has("tile-enter")], [true, false]);
+  eq("옮김: 남은 시간(2.4 − 1.2초) + 0.5초를 다시 기다린다", timers.map(t => t.ms), [1700]);
+  now = 2900;
+  runTimers();
+  eq("옮김: 다시 기다린 늦은 끝에 애니메이션이 끝났으면 뗀다", [a.cls.has("tile-enter"), "--tile-enter-delay" in a.style.vars, timers.length], [false, false, 0]);
+}
+{
+  // animationend 가 다시 기다리는 동안 오면 그때 떼고 남은 타이머를 지운다
+  timers.length = 0;
+  const T = new El("div");
+  build([["h2", "하나"], ["p", "글"]], T);
+  const [a] = tiles(T);
+  a.getAnimations = () => [anim({ endTime: 3000, currentTime: 1200 })];
+  runTimers();
+  eq("다시 기다림 도중 animationend: 기다림 타이머 하나", timers.map(t => t.ms), [2300]);
+  a.fire("animationend");
+  eq("다시 기다림 도중 animationend: 떼고 타이머를 지운다", [a.cls.has("tile-enter"), timers.filter(t => t.live).length], [false, 0]);
+}
+{
+  // 멈춘(paused)·끝난(finished) 애니메이션은 기다리지 않는다, 강조 표지도 같은 규칙
+  timers.length = 0;
+  const K = new El("div");
+  build(spec1, new El("div"), { motionScope: K });
+  const T = new El("div");
+  build(spec2, T, { motionScope: K });
+  const ch = tiles(T).filter(t => t.cls.has("tile-changed"));
+  ch[0].getAnimations = () => [anim({ animationName: "itda-tile-flash", playState: "paused", endTime: 9000 })];
+  ch[1].getAnimations = () => [anim({ animationName: "itda-tile-flash", playState: "finished", endTime: 1000, currentTime: 1000 })];
+  runTimers();
+  eq("멈춘·끝난 애니메이션: 기다리지 않고 뗀다", [ch.map(t => t.cls.has("tile-changed")), timers.length], [[false, false], 0]);
+}
+{
+  // 끝내 남지 않음: 애니메이션이 거듭 다시 시작해도(호스트가 거듭 떼었다 붙임) SETTLE_WAITS(4)번 다시 기다린 뒤 뗀다
+  timers.length = 0;
+  const T = new El("div");
+  build([["h2", "하나"], ["p", "글"]], T);
+  const [a] = tiles(T);
+  a.getAnimations = () => [anim({ endTime: 300, currentTime: 0 })];
+  const waits = [];
+  for (let i = 0; i < 10 && timers.length; i++) { waits.push(timers.filter(t => t.live).map(t => t.ms)[0]); runTimers(); }
+  eq("거듭 다시 시작: 처음 + 다시 기다림 4번 뒤 뗀다", [waits, a.cls.has("tile-enter"), timers.length], [[1200, 800, 800, 800, 800], false, 0]);
 }
 
 // ---- enter: 발표가 복제한 보드 — 남은 표지를 지우고 다시 건다
