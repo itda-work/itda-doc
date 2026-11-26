@@ -91,7 +91,7 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `formal` | 단정·격식 | 차분하고 격식 있는 — 내장 `slate`·`swiss`·`contrast`·`graphite` |
 | `vivid` | 선명·브랜드 | 브랜드색이 앞에 서는 |
 | `editorial` | 감성·에디토리얼 | 잡지·감성 무드 — 내장 `verdant`·`editorial` |
-| `dark` | 다크 | 어두운 바탕 — 내장 `hyrule`(슬라이드만 어둡고 문서는 양피지) |
+| `dark` | 다크 | 어두운 바탕 — 내장 `hyrule`(슬라이드만 어둡고 문서는 양피지)·`night`(보드·슬라이드가 어둡고 문서는 흰 바탕) |
 <!-- theme-groups:end -->
 
 ## 3. 토큰 — 전체 표
@@ -267,6 +267,13 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
 | `--slide-kpi-size` | 슬라이드의 KPI 값 글자 크기(슬라이드 배율 `--slide-scale` 을 곱한다) | `calc(var(--kpi-size) * 1.6)` |
 | `--kpi-up` | KPI 보조 글 오름(`▲`·`+`) 색 — 기호 글자와 함께 쓴다 | `#1a7f37` |
 | `--kpi-down` | KPI 보조 글 내림(`▼`·`−`·`-`) 색 | `#c62828` |
+| `--status-ok` | 타일 상태 「정상」(타일을 여는 제목의 class `ok` — [대시보드 안내서](dashboard.md) 2장 「타일 상태」)의 왼쪽 띠·표식(✓) 색 — 표식 글자와 함께 쓴다 | `#1a7f37` |
+| `--status-warn` | 타일 상태 「주의」(class `warn`)의 띠·표식(!) 색 | `#9a6700` |
+| `--status-bad` | 타일 상태 「위험」(class `bad`)의 띠·채운 원 표식(✕) 색 — 표식 안 글자는 `--tile-bg` | `#c62828` |
+| `--board-enter-time` | 보드를 처음 그릴 때 타일 하나가 나타나는 시간(`0s` 면 움직임 없이 늦춤만 남는다 — 끄려면 `--board-enter-stagger` 도 0) | `0.3s` |
+| `--board-enter-rise` | 등장할 때 타일이 떠오르는 거리(아래에서 제자리로) | `6px` |
+| `--board-enter-stagger` | 등장 늦춤 배율 — 늦춤은 `web/dashboard.js` 가 읽는 차례로 0\~0.3초를 준다(1 이면 그대로, 0 이면 함께 나타남). 움직임 토큰은 상한이 없다 — 움직임 표지를 떼는 늦은 끝은 계산된 시간·늦춤을 따라간다(`web/dashboard.js` `lifeMs`) | `1` |
+| `--board-flash-time` | 다시 그릴 때 본문이 바뀐 타일의 강조(강조색 테두리·옅은 바탕이 돌아옴) 시간(`0s` 면 없음) | `1s` |
 | `--caption-size` | 그림·표 캡션 크기 | `9pt` |
 | `--caption-color` | 캡션 색 | `var(--muted)` |
 | `--figure-label` | 그림 번호 앞 글자(CSS 글자열) | `"그림"` |
@@ -373,6 +380,12 @@ HTML 구조·스크립트·원격 파일은 담지 못한다.
   ```
 
   크기·여백은 `--board-*`·`--tile-*`·`--kpi-*` 토큰이다. 보드 격자 안(타일·타일 머리·구역 제목 줄·KPI)은 `.page-body.board-grid …` 로, 머리·장식은 `.board-head`·`.bh-*`·`.board-deco` 로 시작한다 — 그러면 base 기본 모양을 이긴다. 쪽 문서용 규칙은 `.page-body` 에 클래스·의사 클래스 하나까지만 더한 꼴이면 보드 구조에 닿지 않고, 그보다 높으면 보드 안에도 닿는다. `web/base.css` 의 격자 규칙은 `:where(.page.board) .page-body.board-grid …` 꼴이라 테마의 같은 선택자와 우선순위가 같고, 같으면 테마가 이긴다(`@scope` 가까움, 가두지 않는 엔진은 나중 순서). 쪽 문서용 일반 규칙이 보드 안에 닿는 것을 막는 약속은 위 문장까지이고, 그보다 높은 회사 테마 규칙은 테마 책임이다(예: `.page-body h3.foo:not(.bar)::before` 는 h3 타일 머리에도 닿는다). 타일 본문(`.tile-body`) 안의 제목·표는 쪽 문서 규칙을 그대로 받는다. 보드 규칙은 모두 판 안에 묶여 문서가 제 클래스로 `{.tile}` 을 달아도 쪽·슬라이드 모양이 바뀌지 않는다. 테마 CSS 는 `@scope (.page)` 안에 들어가 선택자가 쪽 상자의 자손으로 읽히므로 `.page.board .tile` 처럼 `.page` 로 시작하는 선택자는 아무것도 고르지 못한다(`page/builtincheck.go` `pageRootProblems` — 내장 테마는 `TestBuiltinThemesNoPageRoot` 가 본다, 회사 테마에 경고를 내지는 않는다). 이 약속은 꼴 검사(`page/builtincheck_test.go` `TestBaseBoardSelectorShape`·`TestBuiltinThemeBoardSelectorShape`)와 Chrome 계산 스타일 실측까지이고 WebKit 은 미검증이다. KPI(`:::kpi`)는 `.kpi.kpi-tiles > dl > .kpi-item > dt + dd(값) + dd(보조 글 — .kpi-up·.kpi-down)` 이고 문서·슬라이드에서도 같은 마크업이다. `kpi-tiles` 는 정의 목록·3열 표가 있어 KPI 로 그렸다는 표식이다 — 구조 없는 `.kpi`(회사 어휘)에는 붙지 않으니 KPI 모양은 `.kpi-tiles` 로 꾸민다. 내장 다섯 테마의 `theme.css` 끝에 보드 절이 있다(슬라이드 절의 띠·면을 옮긴 것 — `mono` 는 흑백이라 `--kpi-up`·`--kpi-down` 도 `var(--ink)`, `page/guidethemes_test.go`). 회사 테마는 바탕 테마의 보드 절을 물려받는다(`page/usertheme_test.go` `TestSampleCompanyTheme`).
+
+  **타일 상태**: 타일을 여는 제목에 class `ok`·`warn`·`bad` 가 있으면 타일에 `.tile-ok`·`.tile-warn`·`.tile-bad`(둘 이상이면 가장 무거운 하나 — `bad` > `warn` > `ok`), 타일 머리 맨 앞(제목 요소 앞)에 `span.tile-status.tile-status-<상태> > span.tile-status-label`(「정상」·「주의」·「위험」 — 화면에 안 보이는 읽는 프로그램용 글)이 붙는다(`web/dashboard.js` `markStatus`). base 가 모든 테마에 기본 모양을 준다 — 타일 왼쪽 3pt 띠(`.tile::after`, 자리를 차지하지 않는다)와 표식 글자(✓·! 는 테두리 원, ✕ 는 채운 원 — `.tile-status::before`). 색은 `--status-ok`·`--status-warn`·`--status-bad` 이고 규칙 안에서 고른 값은 지역 변수 `--tile-status` 다. 색만으로 뜻을 전하지 않으므로 흑백 테마에서도 표식 글자로 셋이 갈린다. 테마는 토큰만 주거나 `.page-body.board-grid .tile-warn …` 으로 꾸민다. 회사 테마가 제목의 `.ok` 를 자기 어휘로 꾸며 왔다면 이제 base 의 상태 모양이 함께 붙는다.
+
+  **움직임**: 같은 대상에 보드를 처음 그리면 타일에 `.tile-enter`(늦춤은 인라인 `--tile-enter-delay`), 다시 그리면 본문이 바뀐 타일에 `.tile-changed` 가 잠깐 붙는다(`web/dashboard.js` `motion` — 끝나면 뗀다). 움직임은 `web/base.css` 의 `@media screen and (prefers-reduced-motion: no-preference)` 안 규칙과 `@keyframes itda-tile-enter`·`itda-tile-flash` 이고, 테마는 토큰 `--board-enter-time`·`--board-enter-rise`·`--board-enter-stagger`·`--board-flash-time` 으로 줄이거나 끈다(테마 CSS 에는 `@keyframes` 를 둘 수 없다). 등장은 `transform`·`opacity`, 강조는 `outline`·바탕색만 움직이므로, 테마가 타일에 `transform` 이나 `animation` 을 걸면 그 동안 부딪친다 — 걸지 않는다.
+
+  **어두운 보드**(내장 `night`): 쪽 상자(`.page`)는 테마 규칙이 고르지 못하므로 보드·슬라이드 바탕은 `theme.json` 토큰 `--board-bg`·`--slide-bg` 로 어둡게 하고, 글자·면 색은 `theme.css` 에서 `.board-head, .board-deco, .page-body.board-grid` 와 슬라이드 요소(`.slide-deco`·`.slide-head`·`.slide-foot`·`.slide-panel`·`.page-body:is(.k-title, .k-section, .k-content, .k-single)`) 안에서 다시 정한다. 이 요소들은 화면 부품이 쪽의 직접 자식으로 만들고, 문서가 쓴 같은 이름의 컨테이너·class(`:::slide-panel`·`{.board-head}` 등)는 늘 본문(`.page-body`) 안에 있으므로 선택자마다 `:not(:where(.page-body *))` 를 붙여 본문 안의 것을 뺀다(`.page.slide > …` 처럼 쪽으로 시작하는 꼴은 `@scope (.page)` 안에서 쓸 수 없다 — `:where` 라 우선순위는 그대로). 빠뜨리면 쪽·이어보기 문서의 같은 이름 컨테이너가 흰 바탕에 밝은 글자가 된다(`page/styletheme_test.go` `TestNightStructureScoped`). `:root` 의 파생 토큰(`var()` 로 적은 값 — `--link`·`--h1-color`·`--table-head-bg`·`--chart-1`·`--diagram-*` 등)은 `:root` 에서 밝은 값으로 이미 계산돼 내려오므로 그 블록에서 모두 직접 준다(`themes/night/theme.css`, `hyrule` 슬라이드 절과 같은 방식). 바탕은 인쇄에서도 빠지지 않는다(`.page` 의 `print-color-adjust: exact`).
 - **이어보기**: 쪽 나눔 없이 보는 꼴이다. 같은 쪽 상자 하나(`.page.page-flow`)에 문서 흐름이 통째로 들어가고 높이는 내용만큼이다 — 테마에게는 "아주 긴 쪽 하나" 라 같은 선택자가 그대로 맞는다. 머리글·바닥글은 없다. 표지(`cover: true`)는 종이 한 장이 아니라 맨 위의 제목 영역이 되고, 이어보기 전용 모양은 본문 상자의 클래스 **`.page-body.flow-view`** 로 고른다(예: `.page-body.flow-view .cover { … }`). 내장 `classic`·`bold`·`spine` 의 `theme.css` 끝에 그 예가 있다. 회사 테마는 바탕 테마의 것을 물려받는다. 출력(PDF·인쇄)은 이어보기에서도 쪽으로 나오므로 이어보기 모양은 화면에만 쓰인다.
 
 ## 5. 표준 어휘와 자기 어휘
@@ -475,7 +488,7 @@ itda-doc render -page -themes ~/테마 -theme acme 견본.md > acme.html  # 표�
 
 ## 11. 빌드 때 넣기(내장 테마로)
 
-내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`·`graphite`), 그리고 `extends` 없이 선 어두운 슬라이드 테마 `hyrule`(묶음 `dark`)이다. `editorial`·`hyrule` 은 제목 글꼴(Noto Serif KR Bold, OFL — 두 폴더에 같은 바이트)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용과 `hyrule` 의 제목은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
+내장 테마는 렌더러 구현이 바이너리에 넣는다. 이 저장소의 내장 테마는 `themes/` 의 구조 테마 다섯(`classic`·`bold`·`compact`·`mono`·`spine`)과 그 위에 `extends` 로 얹은 중립 스타일 테마(`slate`·`swiss`·`contrast`·`verdant`·`editorial`·`graphite`), 그리고 `extends` 없이 선 어두운 슬라이드 테마 `hyrule`(묶음 `dark`), `classic` 위에 얹은 어두운 보드 테마 `night`(묶음 `dark` — 보드·슬라이드는 어둡고 문서는 흰 바탕)이다. `editorial`·`hyrule` 은 제목 글꼴(Noto Serif KR Bold, OFL — 두 폴더에 같은 바이트)을 9장 방식으로 `assets/` 에 넣는다 — 출처·subset 범위는 그 폴더의 `README.md`. 이 글꼴은 테마 자산을 내주는 호스트(`Themes.Asset`)에서만 걸리도록 묶였다. WebAssembly 판(`GOOS=js`)의 묶음에는 글꼴이 없어(`themes/themes_js.go` — 테마 CSS 는 네이티브와 같고 글꼴 자리는 0 바이트다), 설치 없는 웹 뷰어(`web/viewer`)에서 `editorial` 의 제목·큰 인용과 `hyrule` 의 제목은 세리프가 아니라 `--font-heading` 의 다음 글꼴(Pretendard)로 나온다.
 중립 스타일 테마는 아래 「스타일 테마」 레시피를 브랜드 없이 따른 것이다 — 상표·「비공식」 머리말이 없고, 묶음은 그 무드로 고른다.
 
 ### 스타일 테마 — 남의 디자인 시스템에서 테마 만들기

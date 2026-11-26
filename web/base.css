@@ -172,6 +172,17 @@
   --slide-kpi-size: calc(var(--kpi-size) * 1.6); /* 슬라이드의 KPI 값 — 슬라이드 배율(--slide-scale)을 곱한다 */
   --kpi-up: #1a7f37;
   --kpi-down: #c62828;
+  /* 타일 상태(타일을 여는 제목의 class ok·warn·bad — itda-work/itda-hyve#1038 3단계 B): 타일 왼쪽 띠와 머리 표식 글자(✓·!·✕)의 색.
+     색만으로 뜻을 전하지 않는다 — 표식 글자가 셋을 가르고(흑백 테마에서도), 읽는 프로그램에는 「정상」·「주의」·「위험」 글이 간다(dashboard.js markStatus) */
+  --status-ok: #1a7f37;
+  --status-warn: #9a6700;
+  --status-bad: #c62828;
+  /* 보드 움직임(3단계 C, dashboard.js motion): 처음 그릴 때 타일 등장(시간·떠오르는 거리·늦춤 배율 — 늦춤은 dashboard.js 가 읽는 차례로 0~0.3초를 준다),
+     다시 그릴 때 본문이 바뀐 타일 강조(시간). 늦춤 배율 0 이면 함께 나타난다. 등장을 끄려면 시간 0s·늦춤 배율 0 을 함께, 강조를 끄려면 시간 0s. 인쇄·움직임 줄이기에는 움직임이 없다 */
+  --board-enter-time: 0.3s;
+  --board-enter-rise: 6px;
+  --board-enter-stagger: 1;
+  --board-flash-time: 1s;
 
   --caption-size: 9pt;
   --caption-color: var(--muted);
@@ -1268,6 +1279,34 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 :where(.page.board) .page-body.board-grid .kpi-item { min-width: 0; justify-content: center; border-left: 0; padding: 0 4pt; }
 :where(.page.board) .page-body.board-grid .kpi-item + .kpi-item { border-left: 0.75pt solid var(--rule); padding-left: 10pt; }
 :where(.page.board) .page-body.board-grid .kpi-item > dd:first-of-type { font-size: var(--kpi-fit, calc(var(--kpi-size) * 1.45)); }
+/* 타일 상태(itda-work/itda-hyve#1038 3단계 B — dashboard.js markStatus): tile-ok·tile-warn·tile-bad 타일에 왼쪽 띠(::after — 자리를 차지하지 않아 배치·넘침 측정이
+   그대로다), 머리 맨 앞 표식(span.tile-status::before — ✓·!·✕ 글자라 흑백·PDF 에서도 셋이 갈린다). 표식의 대체 글은 비운다(content … / "") — 읽는 프로그램은
+   안의 숨긴 글(.tile-status-label 「정상」·「주의」·「위험」)을 읽는다. 색은 토큰 --status-ok·--status-warn·--status-bad. 화면·인쇄가 같다 */
+:where(.page.board) .page-body.board-grid .tile-ok { --tile-status: var(--status-ok); }
+:where(.page.board) .page-body.board-grid .tile-warn { --tile-status: var(--status-warn); }
+:where(.page.board) .page-body.board-grid .tile-bad { --tile-status: var(--status-bad); }
+:where(.page.board) .page-body.board-grid .tile:is(.tile-ok, .tile-warn, .tile-bad)::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3pt;
+  background: var(--tile-status); pointer-events: none; }
+:where(.page.board) .page-body.board-grid .tile-status { flex: none; position: relative; align-self: center; display: inline-flex; align-items: center; justify-content: center;
+  width: 1.25em; height: 1.25em; border-radius: 50%; box-sizing: border-box; border: 1.25pt solid var(--tile-status); color: var(--tile-status);
+  font-size: calc(var(--tile-head-size) * 0.8); font-weight: 800; line-height: 1; }
+:where(.page.board) .page-body.board-grid .tile-status-ok::before { content: "✓"; content: "✓" / ""; }
+:where(.page.board) .page-body.board-grid .tile-status-warn::before { content: "!"; content: "!" / ""; }
+:where(.page.board) .page-body.board-grid .tile-status-bad::before { content: "✕"; content: "✕" / ""; }
+:where(.page.board) .page-body.board-grid .tile-status-bad { background: var(--tile-status); color: var(--tile-bg); } /* 가장 무거운 것은 채운 원 — 모양으로도 가른다 */
+:where(.page.board) .page-body.board-grid .tile-status-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* 움직임(3단계 C — dashboard.js motion): 처음 그린 보드의 타일 등장(.tile-enter — 늦춤은 인라인 --tile-enter-delay), 다시 그린 보드의 본문이 바뀐 타일 강조(.tile-changed).
+   화면이고 움직임을 줄이지 않을 때만 돈다 — 인쇄·PDF(@media print)·움직임 줄이기에는 이 규칙이 없다. 끝 모양이 기본 모양이다: keyframes 는 처음 모양(from)만 적고,
+   class 자체는 opacity·transform 을 바꾸지 않는다 — 애니메이션이 돌지 않아도 타일이 다 보인다(늦춤 동안의 처음 모양은 fill backwards). 등장은 transform·opacity 만
+   움직여 배치·fitTile·fitKPI 측정이 등장 전후로 같고, 강조는 outline·바탕색만 움직인다(자리를 차지하지 않는다). class 는 끝나면 dashboard.js 가 뗀다(settle).
+   keyframes(itda-tile-enter·itda-tile-flash)는 아래 「보드 움직임의 keyframes」 절에 있다 */
+@media screen and (prefers-reduced-motion: no-preference) {
+  :where(.page.board) .page-body.board-grid .tile.tile-enter {
+    animation: itda-tile-enter var(--board-enter-time) cubic-bezier(0.2, 0.7, 0.3, 1) calc(var(--tile-enter-delay, 0ms) * var(--board-enter-stagger)) backwards; }
+  :where(.page.board) .page-body.board-grid .tile.tile-changed {
+    outline: 2pt solid transparent; outline-offset: -2pt; animation: itda-tile-flash var(--board-flash-time) ease-out; }
+}
 /* 크게 보기(itda-work/itda-hyve#362 — 보는 쪽 화면 동작, dashboard.js zoomer). 복제하지 않고 그 자리 타일(.tile-zoomed)을 지금 보이는 영역 크기로(--tz-*, zoomBox) 절대 위치에
    띄운다 — 조상이 그대로라 테마 보드 절이 닿고, 보드와 함께 확대·축소된다(position: fixed 를 쓰지 않는다). 다른 타일·구역 줄·머리(.tile-under)는 숨긴다.
    넘침 처리가 남긴 것(숨긴 행·「… n행 더」·「…」·인라인 --img-max-h·--kpi-fit·kpi-noaux)은 DOM 에 두고 여기서만 덮는다 — 닫으면 클래스만 떨어져 타일이 전과 같다.
@@ -1307,4 +1346,13 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 }
 @media print {
   :where(.page.board) .page-body.board-grid .tile-zoom-btn, :where(.page.board) .page-body.board-grid .tile-zoom-close { display: none; }
+}
+
+/* ---- 보드 움직임의 keyframes(itda-work/itda-hyve#1038 3단계 C — 쓰는 규칙은 위 보드 절의 @media screen and (prefers-reduced-motion: no-preference)).
+   처음 모양(from)만 적는다 — 끝 모양은 타일의 기본 모양이다. 등장: 조금 아래·투명에서 제자리·또렷하게. 강조: 강조색 테두리·옅은 강조색 바탕에서 제 모양으로 */
+@keyframes itda-tile-enter {
+  from { opacity: 0; transform: translateY(var(--board-enter-rise)); }
+}
+@keyframes itda-tile-flash {
+  from { outline-color: var(--accent); background-color: color-mix(in srgb, var(--accent) 18%, var(--tile-bg)); }
 }
