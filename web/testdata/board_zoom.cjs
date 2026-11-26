@@ -365,6 +365,23 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   const t2 = new El("div");
   Bd.build(f2, t2, { ratio: "16:9", cols: 4, rows: 3, level: 2, info: { title: "문서 제목" } });
   eq("빌드: 문서 제목이 있으면 머리는 그것, 첫 # 는 구역 줄", [t2.querySelector(".bh-title").textContent, t2.querySelectorAll(".board-section").length], ["문서 제목", 1]);
+
+  // 촘촘한 격자(12열·6행 — 배율 3·2, itda-work/itda-hyve#1038 3단계 A): build 가 autoScale·tileItem 을 지나 pack 에 넘기는지 실제 경로로 본다.
+  // 속성 없는 글은 3×2, 표는 6×2. 같은 보드의 at 만(글·표)·span 만 적은 타일은 배율을 받지 않는다(내용 너비 × 1, 적은 크기)
+  const h2 = (text, d) => { const e = mk("h2", text); Object.assign(e.dataset, d || {}); return e; };
+  const f3 = new El("div");
+  [h2("글"), mk("p", "본문"), h2("표"), new El("table"), h2("at 글", { at: "10,1" }), mk("p", "본문"), h2("at 표", { at: "1,3" }), new El("table"),
+    h2("span 글", { span: "2x1" }), mk("p", "본문")].forEach(e => f3.appendChild(e));
+  const t3 = new El("div");
+  Bd.build(f3, t3, { ratio: "16:9", cols: 12, rows: 6, level: 2 });
+  const placed = t3.querySelectorAll(".tile").map(x => [x.querySelector("h2").textContent, x.style.gridColumn, x.style.gridRow, x.dataset.boardAt, x.dataset.boardSpan, "boardFixed" in x.dataset]);
+  eq("빌드 12열·6행: 속성 없는 글 3×2·표 6×2, at 만·span 만은 배율 없음", placed, [
+    ["글", "1 / span 3", "1 / span 2", "1,1", "3x2", false],
+    ["표", "4 / span 6", "1 / span 2", "4,1", "6x2", false],
+    ["at 글", "10 / span 1", "1", "10,1", "1x1", true],
+    ["at 표", "1 / span 2", "3", "1,3", "2x1", true],
+    ["span 글", "11 / span 2", "1", "11,1", "2x1", false]]);
+  eq("빌드 12열·6행: 격자 열 수·줄 수", [t3.querySelector(".board-grid").dataset.boardCols, t3.querySelector(".board-grid").style.gridTemplateRows.split(" ").length], ["12", 3]);
 }
 
 console.log("ZOOM DONE cases=" + cases + " failed=" + failed);

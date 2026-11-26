@@ -3,8 +3,10 @@
 //   - 타일 단계(level — dashboard.level, 없으면 슬라이드 단계)의 제목 → 새 타일(그 제목이 타일 머리)
 //   - 그보다 높은 제목 → 격자 전체 폭의 구역 제목 줄(.board-section). 가로줄(---)·쪽 나눔 → 다음 줄부터 시작(이미 줄 머리면 무시)
 //   - 표지·제목 블록은 머리의 제목·조직·날짜가 된다(제목이 없으면 타일 앞의 첫 높은 제목). 목차·각주·발표자 노트·멈춤(. . .)은 보드에 넣지 않는다
-//   - 타일 크기는 적지 않으면 내용 종류가 정한다: 본문이 그림·차트·흐름도(figure)나 표 하나면 2×1,
-//     :::kpi 하나면 항목이 셋 이상일 때 2×1 아니면 1×1, 그 밖(글·목록·알림·상자·여럿)은 1×1
+//   - 타일 크기는 적지 않으면 내용 종류가 정한다: 본문이 그림·차트·흐름도(figure)나 표 하나면 너비 2, :::kpi 하나면 항목이 셋 이상일 때 2 아니면 1,
+//     그 밖(글·목록·알림·상자·여럿)은 1(tileWidth). 자리(at)도 크기(span)도 없는 타일은 촘촘한 격자에서 커진다 — 너비 × floor(cols/4)(열 수까지),
+//     높이 floor(rows/3)(배율은 둘 다 최소 1 — autoScale). cols 7 이하·rows 5 이하면 배율 1 이라 내용 너비 × 1 그대로다.
+//     at 만 적은 타일은 배율 없이 내용 너비 × 1 이다(mdoc boardplace.go 가 span 없는 고정 타일을 1×1 로 재는 것과 더 어긋나지 않게)
 //   - 타일 제목 속성 at=열,행·span=너비x높이(itda-work/itda-hyve#1038)가 자리·크기를 정한다 — 행은 구역(구역 제목 줄·가로줄·쪽 나눔 사이) 안에서 센다.
 //     틀린 값·격자 밖·겹침은 mdoc(boardplace.go)이 경고하고 속성을 떼어 보낸다. 여기서는 받은 값을 다시 확인하고(tileAttrs·pack), 내용 너비 때문에야
 //     드러나는 겹침은 뒤 타일을 자동 배치로 돌린다(pack 의 moved)
@@ -53,6 +55,21 @@
     return b.matches("figure, table") ? 2 : 1;
   }
 
+  // autoScale 은 자리도 크기도 적지 않은 타일의 배율 [열 배율, 행 배율] = [max(1, floor(cols/4)), max(1, floor(rows/3))] 이다
+  // (itda-work/itda-hyve#1038 3단계 — 기본 격자 4×3 의 한 칸이 촘촘한 격자에서도 비슷한 넓이가 되게). 이상한 값은 배율 1.
+  function autoScale(cols, rows) {
+    return [Math.max(1, Math.floor((cols | 0) / 4)), Math.max(1, Math.floor((rows | 0) / 3))];
+  }
+
+  // tileItem 은 타일 하나를 pack 의 항목으로 만든다 — w 는 내용 너비(tileWidth), attrs 는 tileAttrs, scale 은 autoScale.
+  // 자리도 크기도 적지 않은 타일만 배율을 받는다({w: w × 열 배율, h: 행 배율} — 행 배율이 1 이면 h 를 싣지 않는다). at·span 이 하나라도 있으면
+  // {w, at?, span?} 그대로다. mdoc 이 틀린 at·span 을 뗀 타일은 HTML 에 속성이 없어 적지 않은 타일과 같다(배율을 받는다).
+  function tileItem(w, attrs, scale) {
+    if (attrs.at || attrs.span) return Object.assign({ w }, attrs);
+    const [sx, sy] = scale || [1, 1];
+    return sy > 1 ? { w: w * sx, h: sy } : { w: w * sx };
+  }
+
   // MAX_ROW 는 구역 안 행 번호(at 의 행 + 높이 − 1)의 상한이다 — mdoc boardplace.go boardMaxRow 와 같다(격자가 끝없이 늘지 않게).
   const MAX_ROW = 99;
 
@@ -69,7 +86,8 @@
     return out;
   }
 
-  // pack 은 차례대로 놓는다. items = [{brk: true} | {sec: true} | {w, at?, span?}], 돌려주는 place[i] 는 타일이면 {r, c, w}(높이가 2 이상이면 h 도),
+  // pack 은 차례대로 놓는다. items = [{brk: true} | {sec: true} | {w, h?, at?, span?}] — w·h 는 span 이 없을 때의 너비·높이다(h 는 at 이 없을 때만 쓰고
+  // 없으면 1 — build 는 자리·크기를 적지 않은 타일에만 autoScale 을 곱해 싣는다). 돌려주는 place[i] 는 타일이면 {r, c, w}(높이가 2 이상이면 h 도),
   // 구역 제목 줄이면 {r, sec: true}(한 줄을 다 쓴다), 줄 나눔이면 {r}(놓이는 것 없음). rows 는 쓴 줄 수, sections 는 구역 제목 줄의 번호들이다(격자 행 높이를 정한다).
   // 구역(줄 나눔·구역 줄 사이)마다 따로 놓고 위에서 아래로 쌓는다 — 한 구역의 높이는 그 안 타일이 쓴 마지막 행까지다(packSeg).
   // 자리를 지키지 못한 고정 타일(격자 밖·겹침)의 번호는 moved 에 싣는다 — 없으면 moved 키가 없다(속성 없는 문서의 결과는 예전과 같다).
@@ -92,7 +110,7 @@
   }
 
   // packSeg 는 한 구역(items[a..b))의 타일을 base 줄부터 놓고 쓴 줄 수를 돌려준다.
-  //   1) at 이 있는 타일을 읽는 차례로 먼저 놓는다. 크기는 span, 없으면 내용 너비 × 1(그 열에서 격자 끝까지로 줄인다). 격자 밖이거나 앞선 고정 타일과
+  //   1) at 이 있는 타일을 읽는 차례로 먼저 놓는다. 크기는 span, 없으면 w × 1(그 열에서 격자 끝까지로 줄인다). 격자 밖이거나 앞선 고정 타일과
   //      겹치면 자동 배치로 돌린다(moved).
   //   2) 나머지는 읽는 차례대로 커서(행 우선)로 놓는다: 지금 줄 남은 칸에 너비가 안 들어가면 다음 줄 머리로, 들어가도 찬 칸과 겹치면 한 칸 오른쪽으로.
   //      커서는 뒤로 가지 않는다(앞의 빈 칸을 당겨 채우지 않는다).
@@ -112,7 +130,9 @@
     const size = it => {
       const s = it.span;
       if (s && s[0] >= 1 && s[0] <= cols && s[1] >= 1 && s[1] <= MAX_ROW) return [s[0], s[1], true];
-      return [Math.min(Math.max(1, it.w | 0), cols), 1, false];
+      // h 는 자동 자리 타일만 쓴다 — at 이 있는 타일(자리를 못 지켜 자동으로 돈 것도)은 높이 1
+      const h = it.at ? 1 : Math.min(Math.max(1, it.h | 0), MAX_ROW);
+      return [Math.min(Math.max(1, it.w | 0), cols), h, false];
     };
     let bottom = 0;
     const fixed = new Set();
@@ -251,8 +271,9 @@
     const before = firstTile < 0 ? items : items.slice(0, firstTile);
     const headSec = docTitle ? null : before.find(it => it.kind === "section") || null;
     if (headSec) items = items.filter(it => it !== headSec);
+    const scale = autoScale(cols, rows);
     const packed = items.map(it => (it.kind === "break" ? { brk: true } : it.kind === "section" ? { sec: true }
-      : Object.assign({ w: tileWidth(it.blocks) }, tileAttrs(it.title))));
+      : tileItem(tileWidth(it.blocks), tileAttrs(it.title), scale)));
     const { place, rows: used, sections, moved } = pack(packed, cols);
     const slot = slots(packed, place, moved);
     const meta = [headText(g.head, o, ".cover-org, .title-org", "organization"), headText(g.head, o, '.meta-row[data-key="date"] dd', "date")].filter(Boolean).join(" · ");
@@ -531,5 +552,5 @@
   }
 
   // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
-  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
+  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, autoScale, tileItem, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
 })();
