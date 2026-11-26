@@ -2078,7 +2078,12 @@
       Ask.armSections(flow);
     }
     if (state.look === "dashboard") {
-      window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info });
+      // 움직임(dashboard.js motion): target 은 그릴 때마다 새것이라 앞 그림의 기억은 늘 남는 #pages 에 묶고(motionScope), 문서 열쇠(tocDocKey — 목차 따라가기와 같은 열쇠)가
+      // 바뀌면 처음 그림으로 다룬다(motionDoc — 다른 문서의 같은 제목 타일을 강조하지 않는다). 같은 문서의 호스트 갱신(version)은 등장 없이 바뀐 타일만 강조하고,
+      // 보기 꼴을 쪽·슬라이드로 바꿨다 돌아와도 같은 문서면 다시 그림이다(그 사이 바뀐 타일만 강조). 발표를 따라가는 동안(fol.holdsLook)은 등장을 끈다 —
+      // 그린 직후 scrollToFollow 가 타일 안 블록의 getBoundingClientRect 로 굴리는데 등장 중 translateY 만큼 어긋난다(강조는 자리를 바꾸지 않아 그대로 둔다)
+      window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info,
+        motionScope: $("pages"), motionDoc: tocDocKey(source, v), enter: !fol.holdsLook() });
     } else if (state.look === "slides") {
       const org = (flow.querySelector(".cover-org, .title-org") || {}).textContent || "";
       const r = window.ItdaSlides.build(flow, target, { ratio: state.ratio, level: sv.level, incremental: sv.incremental, fontScale: sv.font_scale, logo: v.logo, footer: org.trim(), info: v.info });

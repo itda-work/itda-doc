@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -221,6 +222,37 @@ func TestShareFollowerWiring(t *testing.T) {
 	out, err := cmd.CombinedOutput()
 	if err != nil || string(out) != "FOL OK" {
 		t.Fatalf("발표 꼴 따라가기 연결: %v\n%s", err, out)
+	}
+}
+
+// 공유 보는 화면의 보드 움직임 기억(itda-work/itda-hyve#1038 3단계 C): render 는 그릴 때마다 새 target 을 만들므로 build 에 늘 남는 #pages 를
+// motionScope 로, 목차 따라가기와 같은 문서 열쇠(tocDocKey(source, v))를 motionDoc 으로 넘긴다 — 같은 문서의 호스트 갱신은 등장 없이 바뀐 타일만
+// 강조하고, 다른 문서는 처음 그림으로 다룬다(그 판단은 board_motion.cjs 가 node 로 본다). 발표를 따라가는 동안은 등장만 끈다(enter). 여기서는 연결만 글로 본다 —
+// render 안의 보드 build 호출 하나에 세 옵션이 있고, source 가 render 보다 앞에 정해진다. 실제 화면 움직임은 미검증(Chrome 캡처는 dashboard.js 단독 하네스).
+func TestShareBoardMotionScope(t *testing.T) {
+	b, err := FS.ReadFile("share.js") // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := string(b)
+	r := strings.Index(src, "\n  async function render(v, sort) {")
+	end := strings.Index(src, "\n  async function draw(sort) {")
+	if r < 0 || end < r {
+		t.Fatal("share.js 에서 render 를 찾지 못함")
+	}
+	body := src[r:end]
+	calls := regexp.MustCompile(`(?s)window\.ItdaBoard\.build\(flow, target, \{(.*?)\}\);`).FindAllStringSubmatch(body, -1)
+	if len(calls) != 1 {
+		t.Fatalf("render 안의 보드 build 호출이 %d 개 — 하나여야 함", len(calls))
+	}
+	// enter: 발표를 따라가는 동안 등장을 끈다 — scrollToFollow 가 그린 직후 블록 자리를 재므로(등장 중 translateY 만큼 어긋남)
+	for _, want := range []string{`motionScope: $("pages")`, "motionDoc: tocDocKey(source, v)", "enter: !fol.holdsLook()"} {
+		if !strings.Contains(calls[0][1], want) {
+			t.Errorf("share.js render 의 보드 build 에 %s 가 없음", want)
+		}
+	}
+	if s := strings.Index(src, "\n  const source = pickSource("); s < 0 || s > r {
+		t.Error("share.js 의 source 가 render 보다 앞에 정해지지 않음")
 	}
 }
 
@@ -872,7 +904,7 @@ func TestShareFontsBeforeSplit(t *testing.T) {
     const set = r.faces; set.ready = Promise.resolve();
     const el = element();
     r.state = { view: null, look: "", chosen: "", ratio: "16:9", ended: false, rendering: null, again: false, slideNotes: [], hasNotes: false, tableSort: null, fontStale: false };
-    const env = { state: r.state, fontGate: S.fontGate, applyTheme: async () => true, $: () => el, docTitle: () => "", app: "", source: {}, fol: { active: () => false },
+    const env = { state: r.state, fontGate: S.fontGate, applyTheme: async () => true, $: () => el, docTitle: () => "", app: "", source: {}, fol: { active: () => false, holdsLook: () => false },
       findHeading: { refresh: noop }, jumper: { jump: noop }, TableSort: { mark: noop, apply: (f, sort) => { r.sorts.push(sort); return true; } }, CodeLines: null, CodeCopy: null, Ask: null, boardZoom: null, figs: { arm: noop, reset: noop }, hook: name => { if (name === "tick") r.ticks++; }, imagesSettled: () => r.imgs ? r.imgs.done : null,
       lookFor: (v, w, chosen) => v.look || chosen || "slides",
       document: { fonts: set, title: "", body: el, documentElement: el, createElement: () => element(), createDocumentFragment: () => element(), querySelectorAll: () => [] },

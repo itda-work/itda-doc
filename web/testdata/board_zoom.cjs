@@ -352,7 +352,8 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   const flow = new El("div");
   [mk("h1", "첫 구역", "first"), mk("h2", "매출"), mk("p", "글"), new El("hr"), mk("h2", "이익"), mk("h1", "둘째 구역", "second"), mk("h2", "비용"), mk("h2", "인력"), new El("hr"), new El("hr"), mk("h2", "일정")].forEach(e => flow.appendChild(e));
   const t = new El("div");
-  const r = Bd.build(flow, t, { ratio: "16:9", cols: 4, rows: 2, level: 2 });
+  // motion: false — 움직임(등장 표지·돌려주는 entered)은 board_motion.cjs 가 본다(여기서는 움직임 없는 보드의 돌려주는 값·자리만 본다)
+  const r = Bd.build(flow, t, { ratio: "16:9", cols: 4, rows: 2, level: 2, motion: false });
   eq("빌드: 타일을 놓은 보드에 수식 맞춤을 한 번 건다", fitted, [[true, 5]]);
   eq("빌드: 보드는 한 장이고 돌려주는 값에 판 수가 없다", [t.querySelectorAll(".page.board").length, Object.keys(r).sort()], [1, ["ms", "overflow"]]);
   eq("빌드: 판 번호·rows 는 줄 높이 기준으로", [t.querySelectorAll(".bh-num").length, t.querySelector(".page.board").style.vars["--board-rows"]], [0, "2"]);
@@ -363,7 +364,7 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   eq("빌드: 타일 줄은 고정 높이, 구역 줄은 auto", t.querySelector(".board-grid").style.gridTemplateRows, ["var(--board-row-h)", "var(--board-row-h)", "auto", "var(--board-row-h)", "var(--board-row-h)"].join(" "));
   const f2 = new El("div"); [mk("h1", "문서 제목 앞 구역", "a"), mk("h2", "타일")].forEach(e => f2.appendChild(e));
   const t2 = new El("div");
-  Bd.build(f2, t2, { ratio: "16:9", cols: 4, rows: 3, level: 2, info: { title: "문서 제목" } });
+  Bd.build(f2, t2, { ratio: "16:9", cols: 4, rows: 3, level: 2, info: { title: "문서 제목" }, motion: false });
   eq("빌드: 문서 제목이 있으면 머리는 그것, 첫 # 는 구역 줄", [t2.querySelector(".bh-title").textContent, t2.querySelectorAll(".board-section").length], ["문서 제목", 1]);
 
   // 촘촘한 격자(12열·6행 — 배율 3·2, itda-work/itda-hyve#1038 3단계 A): build 가 autoScale·tileItem 을 지나 pack 에 넘기는지 실제 경로로 본다.
@@ -373,7 +374,7 @@ eq("다시 그림: 떨어진 타일은 버림", [z.current(), kr.stopped], [null
   [h2("글"), mk("p", "본문"), h2("표"), new El("table"), h2("at 글", { at: "10,1" }), mk("p", "본문"), h2("at 표", { at: "1,3" }), new El("table"),
     h2("span 글", { span: "2x1" }), mk("p", "본문")].forEach(e => f3.appendChild(e));
   const t3 = new El("div");
-  Bd.build(f3, t3, { ratio: "16:9", cols: 12, rows: 6, level: 2 });
+  Bd.build(f3, t3, { ratio: "16:9", cols: 12, rows: 6, level: 2, motion: false });
   const placed = t3.querySelectorAll(".tile").map(x => [x.querySelector("h2").textContent, x.style.gridColumn, x.style.gridRow, x.dataset.boardAt, x.dataset.boardSpan, "boardFixed" in x.dataset]);
   eq("빌드 12열·6행: 속성 없는 글 3×2·표 6×2, at 만·span 만은 배율 없음", placed, [
     ["글", "1 / span 3", "1 / span 2", "1,1", "3x2", false],

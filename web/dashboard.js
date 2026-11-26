@@ -17,6 +17,8 @@
 // 타일 안이 넘치면 「(계속)」 으로 잇지 않는다(보드는 한눈에 보는 것): 표는 들어가는 행까지만 보이고 「… n행 더」, 그림·차트는 칸에 맞춰 줄이고,
 // KPI 값은 --kpi-min-size 까지 줄인 뒤 공백에서 줄을 바꾸고, 그래도 한 낱말이 칸보다 넓으면(또는 아래로 넘치면) 보조 글을 숨기고
 // 타일 머리에 「…」 를 달고 잘린다. 글은 잘리고 타일 머리에 「…」. 화면·PDF 가 같은 규칙이다(PDF 는 화면의 보드를 찍는다).
+// 타일을 여는 제목의 class ok·warn·bad 는 타일 상태다 — 타일에 tile-ok·tile-warn·tile-bad, 머리에 표식 자리(tileStatus·markStatus, itda-hyve#1038 3단계 B).
+// 같은 대상에 처음 그리면 타일 등장, 다시 그리면 본문이 바뀐 타일 강조(motion — o.motion === false 면 없음, 3단계 C). 움직임은 base.css 의 CSS animation 만이다.
 (function () {
   "use strict";
 
@@ -245,6 +247,127 @@
     return clip(tile);
   }
 
+  // ---- 타일 상태(itda-work/itda-hyve#1038 3단계 B): 타일을 여는 제목의 class ok·warn·bad. 둘 이상이면 가장 무거운 것(bad > warn > ok).
+  // build 가 타일에 tile-ok·tile-warn·tile-bad 를 달고 타일 머리 맨 앞에 표식 자리(span.tile-status)를 넣는다 — 표식 글자는 CSS(::before)가,
+  // 읽는 프로그램이 읽을 글(「정상」·「주의」·「위험」)은 그 안의 숨긴 글(span.tile-status-label)이 맡는다(색만으로 뜻을 전하지 않는다).
+  // 타일을 여는 제목이 아닌 곳(구역 제목 줄·타일 안 낮은 제목·쪽/이어보기/슬라이드)의 같은 class 는 문서의 자유 어휘라 아무것도 하지 않는다.
+  const STATUS = ["bad", "warn", "ok"]; // 무거운 차례
+  const STATUS_LABEL = { ok: "정상", warn: "주의", bad: "위험" };
+
+  // tileStatus 는 타일 제목의 상태("ok"·"warn"·"bad", 없으면 "")다.
+  function tileStatus(title) {
+    const c = title && title.classList;
+    if (!c) return "";
+    return STATUS.find(s => c.contains(s)) || "";
+  }
+
+  // markStatus 는 tile 에 상태를 옮겨 적는다(head 는 타일 머리). 상태가 없으면 아무것도 하지 않는다 — 상태 없는 문서의 마크업은 전과 같다.
+  function markStatus(tile, head, st) {
+    if (!st) return;
+    tile.classList.add("tile-" + st);
+    const s = el("span", "tile-status tile-status-" + st);
+    s.appendChild(el("span", "tile-status-label", STATUS_LABEL[st]));
+    head.insertBefore(s, head.firstChild);
+  }
+
+  // ---- 움직임(3단계 C): 처음 그릴 때 등장, 다시 그릴 때 본문이 바뀐 타일 강조. 움직임은 base.css 의 CSS animation 만이다 —
+  // JS 는 class(tile-enter·tile-changed)와 늦춤(--tile-enter-delay)만 달고, 끝나면(animationend·animationcancel) 뗀다. 그 이벤트가 오지 않을 때의 늦은 끝은 lifeMs(계산된 시간 + 늦춤 + 0.5초, 최소 SETTLE_MS)다 —
+  // 계산 스타일을 읽으므로 enter·build 는 문서에 붙은 타일에 불러야 한다(붙지 않은 요소는 값이 비어 최소값이 된다).
+  // 끝 모양이 기본 모양이라 애니메이션이 돌지 않아도(인쇄·움직임 줄이기·모르는 엔진) 타일은 다 보인다.
+  const ENTER_STEP = 40, ENTER_SPREAD = 300; // 타일 사이 늦춤(ms)·늦춤의 상한 — 등장 시간(base.css --board-enter-time 0.3초)과 합쳐 0.6초 안
+  const SETTLE_MS = { "tile-enter": 1200, "tile-changed": 2000 }; // animationend 가 오지 않을 때(돌지 않음·화면 밖) class 를 떼는 늦은 끝의 최소값 — 실제 값은 lifeMs
+  const memo = new WeakMap(); // 대상(또는 o.motionScope) → 앞 그림의 { doc: 문서 열쇠(o.motionDoc), tiles: 짝 열쇠 → 본문 글 } — 대상이 사라지면 함께 사라진다
+
+  // enterDelays 는 타일 n 개의 등장 늦춤(ms)이다 — 읽는 차례로 ENTER_STEP 씩, 마지막이 ENTER_SPREAD 를 넘지 않게 간격을 줄인다.
+  function enterDelays(n) {
+    const step = n > 1 ? Math.min(ENTER_STEP, ENTER_SPREAD / (n - 1)) : 0;
+    return Array.from({ length: Math.max(0, n) }, (_, i) => Math.round(i * step));
+  }
+
+  // tileKeys 는 타일마다 짝 맞추기 열쇠다: 제목 글(공백을 한 칸으로) + "#" + 같은 제목 글 안의 차례(0부터). 제목 없는 타일은 빈 제목으로 센다.
+  // 자리(at·span·배치)는 열쇠에 넣지 않는다 — 자리만 바뀐 타일은 같은 타일이다.
+  const squash = s => String(s || "").replace(/\s+/g, " ").trim();
+  function tileKeys(titles) {
+    const seen = new Map();
+    return titles.map(t => {
+      const k = squash(t);
+      const n = seen.get(k) || 0;
+      seen.set(k, n + 1);
+      return k + "#" + n;
+    });
+  }
+
+  // settle 은 움직임 class 를 끝나면 뗀다 — 크게 보기·호스트의 끌기 transform 과 부딪치지 않게, 화면 밖에 있다가 나중에 다시 돌지 않게.
+  function settle(tile, cls) {
+    let done = false, timer = 0;
+    const off = e => {
+      if (done || (e && e.target !== tile)) return;
+      done = true;
+      tile.classList.remove(cls);
+      if (cls === "tile-enter") tile.style.removeProperty("--tile-enter-delay");
+      if (tile.removeEventListener) {
+        tile.removeEventListener("animationend", off);
+        tile.removeEventListener("animationcancel", off);
+      }
+      if (timer) clearTimeout(timer);
+    };
+    // 이벤트·타이머가 없는 자리(화면 없이 HTML 만 만드는 호스트·시험의 가짜 DOM)에서도 build 가 멈추지 않게 있는 것만 쓴다 — class 가 남아도 끝 모양이 기본 모양이다
+    if (tile.addEventListener) {
+      tile.addEventListener("animationend", off);
+      tile.addEventListener("animationcancel", off);
+    }
+    if (typeof setTimeout === "function") timer = setTimeout(off, lifeMs(tile, cls));
+  }
+  // lifeMs 는 늦은 끝 타이머의 시간이다 — 테마가 움직임 토큰(--board-enter-time·--board-enter-stagger·--board-flash-time)을 늘려도 도는 애니메이션을
+  // 자르지 않게, 계산된 animation-duration + animation-delay(쉼표 목록이면 가장 긴 것)에 여유 0.5초를 더한다. 그 값이 SETTLE_MS 보다 짧거나
+  // 읽을 수 없으면(움직임 줄이기 — animation 없음, 계산 스타일이 없는 자리) SETTLE_MS 다.
+  function lifeMs(tile, cls) {
+    const cs = typeof getComputedStyle === "function" ? getComputedStyle(tile) : null;
+    const ms = v => String(v || "").split(",").map(s => { s = s.trim(); const n = parseFloat(s); return isFinite(n) ? (/ms$/.test(s) ? n : n * 1000) : 0; });
+    const delay = cs ? ms(cs.animationDelay) : [];
+    const end = cs ? Math.max(0, ...ms(cs.animationDuration).map((d, i) => d + (delay[i] || 0))) : 0;
+    return Math.max(SETTLE_MS[cls], Math.ceil(end) + 500);
+  }
+
+  // enter 는 page(보드 한 장) 의 타일에 등장을 건다 — 읽는 차례로 늦춘다. 남은 움직임 표지는 먼저 지운다(발표가 복제한 보드 — present.js startBoard).
+  // 돌려주는 값은 등장을 건 타일 수다.
+  function enter(page) {
+    const tiles = [...page.querySelectorAll(".page-body.board-grid > .tile")];
+    const delays = enterDelays(tiles.length);
+    tiles.forEach((t, i) => {
+      t.classList.remove("tile-enter", "tile-changed");
+      t.style.setProperty("--tile-enter-delay", delays[i] + "ms");
+      t.classList.add("tile-enter");
+      settle(t, "tile-enter");
+    });
+    return tiles.length;
+  }
+
+  // motion 은 build 의 끝에서 앞 그림과 견준다. scope = 기억을 묶을 요소, tiles = [{tile, title(제목 글), sig(본문 글)}], on = 움직임을 쓰는가.
+  // 처음 그림이면 등장, 다시 그림이면 같은 열쇠인데 본문 글이 달라진 타일만 강조. 기억은 on 이 아니어도 늘 새로 적는다(끈 동안 그린 것도 앞 그림이다).
+  // doc 은 그리는 문서의 열쇠다(o.motionDoc — 없으면 undefined). 앞 그림과 열쇠가 다르면(다른 문서) 앞 그림이 없는 것으로 본다 — 처음 그림처럼 등장하고,
+  // 다른 문서의 같은 제목 타일을 「바뀐 타일」로 강조하지 않는다. 열쇠는 === 로 견준다. ent 가 거짓이면 처음 그림이어도 등장하지 않는다(o.enter === false — 강조는 그대로).
+  function motion(scope, page, tiles, on, doc, ent) {
+    const last = memo.get(scope);
+    const prev = last && last.doc === doc ? last.tiles : null;
+    const keys = tileKeys(tiles.map(t => t.title));
+    const now = new Map(keys.map((k, i) => [k, tiles[i].sig]));
+    memo.set(scope, { doc, tiles: now });
+    const out = { entered: 0, changed: 0 };
+    if (!on) return out;
+    if (!prev) { if (ent) out.entered = enter(page); return out; }
+    tiles.forEach((t, i) => {
+      if (!prev.has(keys[i]) || prev.get(keys[i]) === t.sig) return;
+      t.tile.classList.add("tile-changed");
+      settle(t.tile, "tile-changed");
+      out.changed++;
+    });
+    return out;
+  }
+
+  // forget 은 scope(대상 또는 motionScope)에 묶인 앞 그림의 기억을 버린다 — 다음 build 는 처음 그림이다. 돌려주는 값은 버린 것이 있었는가.
+  function forget(scope) { return memo.delete(scope); }
+
   // headText 는 표지·제목 블록에서 고른 글자다(o.info 가 앞선다 — slides.js titleSlide 와 같다).
   function headText(src, o, sel, key) {
     const info = o.info || {};
@@ -254,7 +377,11 @@
   }
 
   // build 는 flow(문서 흐름 HTML 이 든 요소)를 target 안의 보드 한 장(.page.board)으로 놓는다. target 은 무대(잴 수 있는 자리)에 있어야 한다.
-  // o = { ratio, cols, rows, level, info, logo }. 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms, moved(자리를 지키지 못한 고정 타일 수 — 있을 때만) }
+  // o = { ratio, cols, rows, level, info, logo, motion, enter, motionScope, motionDoc }. motion === false 면 등장·강조가 없다(편집 미리보기처럼 자주 다시 그리는 화면 — 없으면 켜짐).
+  // motionScope 는 앞 그림의 기억을 묶을 요소다(없으면 target — 그릴 때마다 새 target 을 만드는 호스트는 늘 남는 요소를 준다).
+  // motionDoc 은 문서의 열쇠다 — 앞 그림과 다르면(=== 아님) 처음 그림으로 다룬다(한 자리에서 여러 문서를 바꿔 그리는 호스트). 기억을 아예 버리려면 forget(scope).
+  // enter === false 면 등장만 끈다(강조는 그대로 — 그린 직후 타일 안 블록 자리를 재서 굴리는 화면, 예: 공유 보는 화면의 발표 따라가기).
+  // 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms, moved(자리를 지키지 못한 고정 타일 수), entered(등장을 건 타일 수), changed(강조한 타일 수) — 뒤 셋은 있을 때만 }
   function build(flow, target, o) {
     const t0 = performance.now();
     const SIZE = window.ItdaSlides.SIZE;
@@ -297,6 +424,7 @@
     const isSec = new Set(sections);
     grid.style.gridTemplateRows = Array.from({ length: used }, (_, r) => (isSec.has(r) ? "auto" : "var(--board-row-h)")).join(" ");
     target.appendChild(pg);
+    const seen = [];
     items.forEach((it, i) => {
       const p = place[i];
       if (it.kind === "break") return;
@@ -317,18 +445,28 @@
       tile.dataset.boardAt = sl.c + "," + sl.r;
       tile.dataset.boardSpan = sl.w + "x" + sl.h;
       if (sl.fixed) tile.dataset.boardFixed = "";
-      if (it.title) tile.appendChild(el("header", "tile-head")).appendChild(it.title);
+      if (it.title) {
+        const th = tile.appendChild(el("header", "tile-head"));
+        th.appendChild(it.title);
+        markStatus(tile, th, tileStatus(it.title));
+      }
       const body = tile.appendChild(el("div", "tile-body"));
       for (const b of it.blocks) body.appendChild(b);
       grid.appendChild(tile);
+      // 짝 맞추기용 제목 글·본문 글은 넘침 처리(「… n행 더」·숨긴 행) 전에 잰다 — 칸 크기가 바뀌어도 본문이 같으면 같은 글이다
+      seen.push({ tile, title: it.title ? it.title.textContent : "", sig: squash(body.textContent) });
     });
     // 넓은 수식을 타일 너비에 맞춘 뒤에 넘침을 잰다 — 줄어든 높이로 재야 수식이 있는 타일이 필요 없이 잘리지 않는다(보드는 쪽 나눔을 지나지 않는다, itda-hyve#752)
     window.ItdaPager.fitMath(pg);
     let overflow = 0;
     for (const t of target.querySelectorAll(".page.board .tile")) if (fitTile(t)) overflow++;
     // moved: 적은 자리를 지키지 못해 자동 배치로 돌린 타일 수(내용 너비 때문에야 드러난 겹침 — mdoc 경고가 없는 경우). 없으면 키가 없다
+    // 움직임: 이 대상(o.motionScope 가 있으면 그것)에 처음 그리면 등장, 다시 그리면 본문이 바뀐 타일 강조. o.motion === false 면 둘 다 없다
+    const mv = motion(o.motionScope || target, pg, seen, o.motion !== false, o.motionDoc, o.enter !== false);
     const out = { overflow, ms: Math.round(performance.now() - t0) };
     if (moved) out.moved = moved.length;
+    if (mv.entered) out.entered = mv.entered;
+    if (mv.changed) out.changed = mv.changed;
     return out;
   }
 
@@ -552,5 +690,5 @@
   }
 
   // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
-  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, autoScale, tileItem, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
+  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, autoScale, tileItem, tileStatus, tileKeys, enterDelays, enter, forget, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
 })();
