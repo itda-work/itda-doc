@@ -124,3 +124,7 @@ body.toc-drawer .toc-fold-all { width: 34px; height: 30px; }
 /* 크게 보기 닫기 단추(share.js figTips — 호스트 app.css .lb-close 꼴): 아이콘 대신 글자 */
 .fig-lb-close { font: 18px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 @media print { .fig-tip, .fig-lb-close, body > .fig-lb { display: none !important; } }
+/* 꺼진 문서 안 파일 링크(share.js markLinks — itda-hyve#1096): 열지 않는 링크는 href 가 없고 class link-off 다. 링크 색·밑줄 없이 둘레 글자색을 흐리게, 커서는 「안 됨」 —
+   올리면 title 이 까닭을 보인다. 화면·인쇄 모두(인쇄에서도 링크처럼 보이지 않게). 본문 링크 색(base.css .page-body a)보다 앞서도록 #notes 를 낀 :is 로 높인다 */
+body :is(.page-body, #notes) a.link-off, body a.link-off { color: inherit; text-decoration: none; opacity: .6; cursor: not-allowed; background: none; box-shadow: none; }
+body a.link-off:focus-visible { outline: 2px solid color-mix(in srgb, currentColor 50%, transparent); outline-offset: 2px; opacity: .8; }
