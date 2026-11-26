@@ -78,7 +78,21 @@
       (doc ? "「" + doc + "」의 " : "") + "「" + ref.title + "」 섹션과 하위 섹션 전부를 강의 MCP(" + cfg.mcp + ")로 읽어 주세요.",
       "read_section(doc=" + JSON.stringify(cfg.doc_id) + ", section=" + JSON.stringify(ref.section) + ", nth=" + ref.nth + ", subtree=true)로 읽고, 여러 조각이면 끝까지 읽어 주세요.",
       "내 생각을 먼저 물어보고, 교안을 그대로 옮기지 말고 처음 배우는 사람에게 설명해 주세요.",
-      cfg.guide ? "커넥터가 연결돼 있지 않으면 이 안내를 보여 주세요. " + cfg.guide : "커넥터가 연결돼 있지 않으면 연결 방법을 알려 주세요.",
+      connectLine(cfg),
+    ].join("\n");
+  }
+
+  // connectLine 은 커넥터가 없을 때의 연결 안내 줄이다 — 섹션 묻기(question)와 용어 묻기(termQuestion)가 같이 쓴다.
+  function connectLine(cfg) {
+    return cfg.guide ? "커넥터가 연결돼 있지 않으면 이 안내를 보여 주세요. " + cfg.guide : "커넥터가 연결돼 있지 않으면 연결 방법을 알려 주세요.";
+  }
+
+  // termQuestion 은 게시 화면 용어사전(glossary.js — itda-hyve#1084)의 「Claude 로 추가 설명받기」 지침이다. cfg 는 normalize 결과다.
+  // 싣는 것은 강의 이름·용어·강의 MCP 주소·연결 안내뿐이다 — 풀이(def)·교안 본문은 싣지 않는다. 용어 바로 뒤에는 받침에 따라 바뀌는 조사를 두지 않는다(「'<용어>'의 뜻」).
+  function termQuestion(cfg, term) {
+    return [
+      (cfg.course ? "「" + cfg.course + "」 " : "") + "강의 MCP(" + cfg.mcp + ")로 용어 '" + displayName(term) + "'의 뜻을 처음 배우는 사람에게 비유와 함께 설명하고, 이해했는지 질문 하나로 확인해줘.",
+      connectLine(cfg),
     ].join("\n");
   }
 
@@ -93,5 +107,5 @@
     };
   }
 
-  root.ItdaAsk = { normalize, set, armSections, handler };
+  root.ItdaAsk = { normalize, set, armSections, handler, termQuestion };
 })(typeof window !== "undefined" ? window : globalThis);

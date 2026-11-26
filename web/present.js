@@ -145,6 +145,15 @@
   const inOverlay = t => !!(t && t.closest && t.closest(OVERLAY));
   // 포커스를 받을 수 있는 것 — 청중 열기에서 덱 사본의 이것들을 포커스 차례에서 뺀다(startAudience)
   const FOCUSABLE = "a[href], area[href], button, input, select, textarea, summary, iframe, audio, video, [tabindex], [contenteditable]";
+  // 게시 강의 용어사전 밑줄(glossary.js termSpan — itda-doc#135)은 발표에서 누르지 않는다: 덱·보드 사본에서 단추 의미(role·tabindex·aria)·표지·꼴 class 를 벗기고
+  // 글자(span 과 그 속)는 그대로 둔다. 미리보기·한눈에 보기는 덱 사본을 다시 복제하므로 따라 벗겨진다. 사전 없는 화면에는 .itda-term 이 없어 아무 일도 없다.
+  const TERM_ATTRS = ["role", "tabindex", "aria-haspopup", "aria-expanded", "data-term"];
+  function plainTerms(c) {
+    for (const x of c.querySelectorAll(".itda-term")) {
+      for (const a of TERM_ATTRS) x.removeAttribute(a);
+      x.classList.remove("itda-term");
+    }
+  }
   const reduce = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // 장 넘김 전환(present.css .t-*). 모르는 값은 none 이다 — mdoc 이 이미 걸러 주지만 호스트가 다른 값을 넘겨도 클래스가 새지 않게.
   // OUT_MS 는 나가는 장(pr-out)을 보이게 두는 시간 — present.css 의 나가는 움직임(지연 포함)은 이 안에 끝난다(present_test.go 가 묶는다)
@@ -248,6 +257,7 @@
       // 미리보기의 읽기 전용 판서 층(ink.js preview)은 따라오지 않는다: 발표는 같은 판서를 자기 층(attachInk)에 그리므로, 따라오면 두 겹이 되고
       // 지우개·되돌리기·전부 지우기가 복제된 층을 지우지 못한다
       for (const x of c.querySelectorAll(".ink-preview")) x.remove();
+      plainTerms(c);
       c.classList.add("pr-slide");
       deck.appendChild(c);
       P.slides.push(c);
@@ -407,6 +417,7 @@
     const c = o.page.cloneNode(true);
     for (const x of c.querySelectorAll(".src-active, .chart-wait, .chart-play, .toc-focus")) x.classList.remove("src-active", "chart-wait", "chart-play", "toc-focus");
     for (const x of c.querySelectorAll("[id]")) x.removeAttribute("id"); // 미리보기와 id 가 겹치지 않게
+    plainTerms(c);
     c.classList.add("pr-slide", "pr-cur");
     deck.appendChild(c);
     P.slides.push(c);
