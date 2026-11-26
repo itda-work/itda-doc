@@ -31,7 +31,7 @@
 //    localImages·folderImages 가 옮기며, CSP img-src(data:·blob: 만)가 원격·같은 출처 그림 요청을 막는다.
 //  - 문서 안 상대 링크(#조각·http(s)·mailto·tel 이 아닌 href — 다른 md·// 주소 등)는 href 를 data-local-href 로 옮겨(localLinks)
 //    같은 출처로 이동하지 않는다 — 가운데 단추·새 탭으로 열어도 마찬가지다. 누르면 share.js onClick 이 linkMsg 안내를 낸다(폴더로 열어도
-//    다른 문서로 가지 않는다).
+//    다른 문서로 가지 않는다). 그린 뒤 share.js markLinks 가 그 링크에 꺼진 표시(class link-off·aria-disabled·title linkMsg)를 단다(itda-hyve#1096).
 //  - 경고 목록은 View.warnings(줄 번호와 글)에 뷰어의 줄(그리지 않은 그림)을 더한 것이다. 막대의 상태 칸(#open-state)은 폴더 설정
 //    적용 여부를 짧게 보인다.
 //  - 인쇄는 브라우저 인쇄다. 쪽 크기(@page)는 시작할 때 꼴마다 blob: 스타일시트를 media="not all" 로 만들어 두고, 인쇄 직전
