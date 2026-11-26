@@ -1,0 +1,58 @@
+/* 게시 강의 화면의 용어사전(itda-work/itda-hyve#1084, itda-doc#135) — glossary.js 의 밑줄(span.itda-term)과 풀이 팝업(.itda-gloss-pop).
+   밑줄은 text-decoration 만 쓴다 — 글자 자리·줄 높이를 바꾸지 않아 쪽 나눔·진행 위치·판서 자리가 그대로다.
+   발표 덱(#present — 본문 쪽을 복제한다)과 인쇄·PDF 에는 밑줄·팝업이 없다. 색은 화면 틀 변수(--ui-*)를 쓰고 없으면 기본값. */
+.itda-term {
+  text-decoration-line: underline; text-decoration-style: dotted; text-decoration-thickness: 1.5px; text-underline-offset: 0.2em;
+  text-decoration-color: var(--ui-accent, #2f6fed); cursor: help; border-radius: 2px;
+}
+.itda-term:hover, .itda-term[aria-expanded="true"] { background: var(--ui-active, rgba(47, 111, 237, 0.12)); }
+.itda-term:focus-visible { outline: 2px solid var(--ui-accent, #2f6fed); outline-offset: 1px; }
+#present .itda-term { text-decoration: none; cursor: inherit; background: none; outline: none; }
+
+.itda-gloss-pop {
+  position: fixed; z-index: 90; left: 8px; top: 8px; box-sizing: border-box; width: min(360px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto;
+  padding: 14px 16px 12px; border: 1px solid var(--ui-line, #e5e5ea); border-radius: 10px; background: var(--ui-panel, #fff); color: var(--ui-text, #1c1c1e);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18); font: 14px/1.55 "Pretendard", system-ui, sans-serif; text-align: left;
+}
+.itda-gloss-pop[hidden] { display: none; }
+.itda-gloss-pop:focus { outline: none; }
+.itda-gloss-pop p { margin: 0; }
+.itda-gloss-pop .ig-close {
+  position: absolute; top: 6px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--ui-muted, #6e6e73);
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+.itda-gloss-pop .ig-close:hover { background: var(--ui-hover, #f2f2f5); }
+.itda-gloss-pop .ig-term { padding-right: 28px; font-weight: 700; font-size: 16px; }
+.itda-gloss-pop .ig-alias { margin-top: 2px; color: var(--ui-muted, #6e6e73); font-size: 12.5px; }
+.itda-gloss-pop .ig-alias[hidden], .itda-gloss-pop .ig-see[hidden], .itda-gloss-pop .ig-ask[hidden] { display: none; }
+.itda-gloss-pop .ig-def { margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+.itda-gloss-pop .ig-see { margin-top: 8px; font-size: 13px; }
+.itda-gloss-pop .ig-see a { color: var(--ui-accent-ink, #2a64d5); text-decoration: none; }
+.itda-gloss-pop .ig-see a:hover { text-decoration: underline; }
+.itda-gloss-pop .ig-ask { position: relative; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ui-line, #e5e5ea); }
+.itda-gloss-pop .ig-ask-row { display: flex; }
+.itda-gloss-pop .ig-ask-go, .itda-gloss-pop .ig-ask-more {
+  height: 32px; border: 1px solid var(--ui-accent, #2f6fed); background: var(--ui-accent, #2f6fed); color: var(--ui-accent-fg, #fff); font: inherit; font-size: 13px; cursor: pointer;
+}
+.itda-gloss-pop .ig-ask-go { flex: 1; min-width: 0; padding: 0 12px; border-radius: 7px 0 0 7px; font-weight: 600; }
+.itda-gloss-pop .ig-ask-more { width: 34px; border-left-color: rgba(255, 255, 255, 0.45); border-radius: 0 7px 7px 0; }
+.itda-gloss-pop .ig-ask-go:hover, .itda-gloss-pop .ig-ask-more:hover { filter: brightness(1.06); }
+.itda-gloss-pop .ig-ask-go:focus-visible, .itda-gloss-pop .ig-ask-more:focus-visible, .itda-gloss-pop .ig-ask-item:focus-visible { outline: 2px solid var(--ui-text, #1c1c1e); outline-offset: 1px; }
+.itda-gloss-pop .ig-ask-menu {
+  margin-top: 6px; padding: 4px; border: 1px solid var(--ui-line, #e5e5ea); border-radius: 8px; background: var(--ui-panel, #fff);
+}
+.itda-gloss-pop .ig-ask-menu[hidden] { display: none; }
+.itda-gloss-pop .ig-ask-item {
+  display: flex; align-items: center; gap: 8px; box-sizing: border-box; width: 100%; height: 32px; padding: 0 10px; border: 0; border-radius: 6px; background: none;
+  color: var(--ui-text, #1c1c1e); font: inherit; font-size: 13px; text-align: left; text-decoration: none; cursor: pointer;
+}
+.itda-gloss-pop .ig-ask-item:hover { background: var(--ui-hover, #f2f2f5); }
+.itda-gloss-pop .ig-ask-item::before { content: ""; width: 14px; flex: none; text-align: center; color: var(--ui-accent, #2f6fed); }
+.itda-gloss-pop .ig-ask-item[aria-current="true"]::before { content: "✓"; }
+.itda-gloss-pop .ig-ask-note { margin-top: 6px; color: var(--ui-muted, #6e6e73); font-size: 11.5px; }
+.ig-copy-tmp { position: fixed; left: -9999px; top: 0; opacity: 0; }
+
+@media print {
+  .itda-term { text-decoration: none !important; background: none !important; outline: none !important; }
+  .itda-gloss-pop { display: none !important; }
+}

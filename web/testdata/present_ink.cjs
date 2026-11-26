@@ -1418,6 +1418,39 @@ const nextShown = w => { const b = nextBoxOf(w), c = b && b.firstElementChild; r
   ok("표지 id: 보드 발표 사본에 머리 id 가 남지 않고 원본 보드에는 그대로", !!rootOf(w).querySelector(".board-head") && !hasCoverID(rootOf(w)) && hasCoverID(board));
   H.stop();
 }
+// ---- 15. 용어사전 밑줄(itda-hyve#1084, glossary.js termSpan 꼴): 일반 발표·청중 발표의 덱 사본·미리보기·썸네일·보드 사본에서 단추 의미(role·tabindex·aria·data-term)와
+// .itda-term 을 벗기고 글자는 그대로, 원본 장에는 그대로 남는지 본다.
+{
+  const ATTRS = ["role", "tabindex", "aria-haspopup", "aria-expanded", "data-term"];
+  const term = () => { const s = new El("span"); s.setAttribute("class", "itda-term"); s.setAttribute("data-term", "0"); s.setAttribute("role", "button"); s.setAttribute("tabindex", "0"); s.setAttribute("aria-haspopup", "dialog"); s.setAttribute("aria-expanded", "false"); s.textContent = "스킬"; return s; };
+  const termPage = () => slide([term()]);
+  const leftover = n => [n, ...n.querySelectorAll("span")].filter(e => e.classList.contains("itda-term") || ATTRS.some(a => a in e.attrs));
+  const words = n => n.querySelectorAll("span").map(e => e.textContent).join("|");
+  for (const audience of [false, true]) {
+    const name = audience ? "용어(청중)" : "용어(일반)";
+    const w = world(), { P, H } = w;
+    const pages = [termPage(), termPage(), termPage()];
+    H.start({ pages, notes: [], index: 0, ratio: "16:9", onExit() {}, nextPreview: true, audience });
+    const root = rootOf(w);
+    ok(name + ": 덱 사본에 단추 의미·용어 class 가 남지 않는다", P.slides.every(sl => leftover(sl).length === 0), P.slides.map(sl => leftover(sl).map(e => e.attrs)));
+    ok(name + ": 사본의 글자는 그대로", P.slides.every(sl => words(sl) === "스킬"), P.slides.map(words));
+    if (!audience) {
+      ok(name + ": 다음 장 미리보기에도 남지 않는다", leftover(root).length === 0);
+      H.toggleGrid(true);
+      ok(name + ": 한눈에 보기 썸네일에도 남지 않는다", leftover(root).length === 0);
+      H.toggleGrid(false);
+    }
+    ok(name + ": 원본 장(보기 화면)의 밑줄은 그대로", pages.every(pg => leftover(pg).length === 1 && pg.querySelector(".itda-term").attrs.role === "button"));
+    H.stop();
+  }
+  const w = world(), { H } = w;
+  const board = new El("div"); board.className = "page board";
+  board.appendChild(new El("div")).className = "page-body board-grid";
+  board.kids[0].appendChild(term());
+  H.startBoard({ page: board, ratio: "16:9", onExit() {} });
+  ok("용어: 보드 발표 사본에도 남지 않고 원본 보드는 그대로", leftover(rootOf(w)).length === 0 && words(rootOf(w).querySelector(".pr-deck")) === "스킬" && leftover(board).length === 1);
+  H.stop();
+}
 // 발표자 화면과 청중 화면의 끝난 획 SVG 경로가 같다 — 같은 relay 연산에서 같은 path d(펜·형광펜·필압·지우개·되돌리기·다시 실행·전부 지우기).
 // relay 는 앞 묶음의 Promise 가 풀린 뒤 다음을 보내므로 마이크로태스크를 돌린다(pump).
 async function mirrorCases() {
