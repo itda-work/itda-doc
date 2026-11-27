@@ -82,8 +82,13 @@
 //                       #present.pr-clock-on 일 때만 보인다). 경과 시간과 같은 타이머(tick)로 고친다.
 //   setNextPreview·setClock 은 발표를 다시 열지 않고 바꾼다 — 슬라이드 발표 중에만 듣고(발표 밖·보드 발표·청중 열기면 false), 적용하면 true. 다음 발표는
 //   물려받지 않는다(start 의 o 가 정한다). P.nextPreview·P.clock 으로 읽는다.
+// 화이트보드(화이트보드 기획 ④-1a) — ItdaPresent.whiteboard() 가 화이트보드 표면(whiteboard.js — ItdaWhiteboard.open)을 연다. W(수식키 없이)는 그것을 부른다.
+//   호스트가 저장 계약 window.ItdaWhiteboardHost(계약은 whiteboard.js 머리 주석)를 줬고 whiteboard.js 가 실렸을 때만 연다 — 없으면 W 는 지금처럼
+//   아무 일도 하지 않고 whiteboard() 는 false 다. 슬라이드 발표·보드 발표에서 열고, 청중 열기(audience)·한눈에 보기·검은 화면·크게 보기·번호 입력
+//   중에는 열지 않는다(이 조건은 whiteboard() 한 곳에 있다 — 키로 부르든 호스트가 부르든 같다). 여는 순간 그리던 판서는 거기까지 확정하고(ink.js pause), 열린 동안 판서는 쉬는 화면으로 본다(attachInk paused).
+//   열린 동안 키·포인터는 표면이 창 붙잡기 단계에서 먼저 받아 발표에 오지 않는다(onKey 도 열린 동안은 아무것도 하지 않는다). 닫으면 발표는 그대로다.
 // 있으면 쓰고 없으면 건너뛰는 부품(전역): window.ItdaLightbox(크게 보기 — create·SEL), window.ItdaCodeCopy(노트 코드 복사 단추 — arm),
-// window.ItdaInk(판서 — ink.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
+// window.ItdaInk(판서 — ink.js), window.ItdaWhiteboard(화이트보드 — whiteboard.js). 늘 있어야 하는 것: window.ItdaSlides(slides.js — 쪽 크기·노트 글자 단계).
 // 조작: → Space PageDown = 다음(차례로 나타낼 것이 남았으면 그것부터), ← PageUp Backspace = 이전(이전 슬라이드는 다 나타난 모습),
 //       숫자 + Enter = 그 슬라이드, Home·End = 처음·끝, G = 한눈에 보기, B·. = 검은 화면, N = 발표자 노트, Esc = 끝,
 //       노트를 편 동안 + = 노트 글자 크게, − = 작게(머리의 A−/A+ 와 같다), D = 노트 붙이기·띄우기(머리 단추와 같다),
@@ -1287,7 +1292,7 @@
     const I = window.ItdaInk;
     if (!I) return;
     ink = I.attach({ root, deck, size: [w, h], book: I.bookFor(opts.inkKey), penOnly: P.penOnly,
-      slides: () => P.slides, idx: () => P.idx, scale: () => P.scale, paused: () => !!(P.grid || P.lightbox || P.black),
+      slides: () => P.slides, idx: () => P.idx, scale: () => P.scale, paused: () => !!(P.grid || P.lightbox || P.black || wbOn()),
       click: inkClick, eatClick: () => { lbEat = true; }, wake, settleTransition });
   }
   // inkClick 은 움직이지 않은 레이저 클릭이다 — 도구가 꺼진 클릭과 같다: 가장자리 넘김이 먼저, 그다음 링크가 크게 보기보다 먼저다(x 는 누른 자리의 창 x 좌표).
@@ -1304,7 +1309,7 @@
   // 있어도 발표가 갖고, 누른 뒤 포커스를 단추에 남기지 않는 건 복사 단추 쪽이 한다.
   // 호스트가 ownsKey 로 가져간 키는 맨 앞에서 놓아준다(머리 주석 「호스트 계약」 — 겹침 층을 가린 동안에도 묻는다).
   function onKey(e) {
-    if (!P.on) return;
+    if (!P.on || wbOn()) return; // 화이트보드가 열린 동안 키는 표면 몫이다(머리 주석 「화이트보드」 — 보통은 표면이 먼저 받아 여기 오지 않는다)
     if (hostCall("ownsKey", e)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -1313,6 +1318,9 @@
     if (hintEl && e.target === hintEl && (k === "Enter" || k === " ") && !e.isComposing && hintOn()) { openFromHint(); return; }
     // 판서 키는 조합 검사 앞이다 — 한글 입력 상태에서도 e.code 로 받는다. 숨겨진 상태(라이트박스·한눈에 보기·검은 화면)와 번호 지우기 Esc 는 아래가 먼저다
     if (ink && !P.lightbox && !P.grid && !P.black && !(digits && k === "Escape") && ink.key(e)) return;
+    // W 는 화이트보드다 — 판서 키처럼 조합 검사 앞이고 e.code 로도 받는다(한글 입력 상태). 열 수 있는지는 whiteboard() 가 정한다 —
+    // 열지 못하면(계약 없음·가린 화면·번호 입력 중) 아래로 흘러 지금처럼 그 상태의 키로 다룬다
+    if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.code === "KeyW" || k === "w" || k === "W") && whiteboard()) return;
     if (e.isComposing) return;
     // 라이트박스가 열린 동안: Esc·Space·Enter 는 닫기만(발표를 끝내거나 넘기지 않는다), 다른 키는 삼킨다
     if (P.lightbox) { if (k === "Escape" || k === " " || k === "Enter") closeLightbox(); return; }
@@ -1347,6 +1355,18 @@
       case "d": case "D": if (e.shiftKey) { if (P.showToc) setTocDock(!P.tocDock); } else if (P.showNotes) setDock(!P.noteDock); break;
       case "Escape": stop(); break;
     }
+  }
+
+  // wbOn 은 화이트보드 표면이 열려 있는가다. whiteboard 는 화이트보드를 연다(머리 주석 「화이트보드」) — 열기 시작했으면 true, 열 수 없으면 false.
+  // 열 수 있는 조건은 여기 한 곳이다(W 키도 이것을 부른다): 발표 중, 청중 화면이 아님, 검은 화면·한눈에 보기·크게 보기·번호 입력 중이 아님, 계약·모듈이 있음.
+  function wbOn() { const W = window.ItdaWhiteboard; return !!(W && typeof W.isOpen === "function" && W.isOpen()); }
+  function whiteboard() {
+    const W = window.ItdaWhiteboard, host = window.ItdaWhiteboardHost;
+    if (!P.on || P.audience || !root || P.black || P.grid || P.lightbox || digits) return false;
+    if (!W || typeof W.open !== "function" || !host || !host.store || wbOn()) return false;
+    if (ink) ink.pause(); // 그리던 획은 거기까지 확정한다
+    try { Promise.resolve(W.open({ host })).catch(() => {}); } catch (e) { return false; }
+    return wbOn();
   }
 
   // boardDeck 은 보드 발표 중이면 덱({root, scroller}), 아니면 null 이다 — 공유 위치를 재는 쪽(호스트)이 쓴다.
@@ -1385,7 +1405,7 @@
     if (clockEl) clockEl.textContent = P.clock ? clockText(new Date()) : "";
     return true;
   }
-  window.ItdaPresent = { setShareSummary, setPenOnly, setNextPreview, setClock, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, ink: () => ink, state: P,
+  window.ItdaPresent = { setShareSummary, setPenOnly, setNextPreview, setClock, start, startBoard, boardDeck, boardBarWidth, stop, next, prev, jump, show, toggleGrid, setBlack, setNotes, setDock, setToc, setTocDock, closeLightbox, current, whiteboard, ink: () => ink, state: P,
     // inkView 는 청중 화면이 발표자 판서를 받아 그리는 view(ink.js view)다 — 머리 주석 「두 화면 발표」 판서 받기. ink.js 가 없으면 null
     inkView: inkViewOf,
     // inkHeld 는 판서 입력이 진행 중인가다(머리 주석 「펜만 판서」) — 호스트가 손가락 밀기를 버릴지 정할 때 묻는다

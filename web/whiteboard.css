@@ -1,0 +1,96 @@
+/* whiteboard.css — 화이트보드 표면(whiteboard.js). 모든 규칙은 .itda-wb 아래다. CSP style-src 'self' 에서 돈다 — 표면은 style 속성 문자열·HTML 문자열을
+   쓰지 않는다(클래스와 CSSOM 대입 el.style.x = … 만). 판(.itda-wb-stage)은 touch-action: none 이라 모든 손가락 입력이 pointer 로 온다.
+   발표 중에는 present.css 의 겹침 층 규칙(body.presenting > [data-pr-overlay] — z-index 101)이 z-index 를 덮는다. */
+.itda-wb {
+  position: fixed; inset: 0; z-index: 2147482000; overflow: hidden; overscroll-behavior: none;
+  background: #000; color: #eee; outline: none;
+  font: 14px/1.3 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", system-ui, sans-serif;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  touch-action: none;
+}
+.itda-wb-stage { position: absolute; inset: 0; touch-action: none; cursor: crosshair; }
+.itda-wb-stage.grab, .itda-wb-stage.readonly, .itda-wb-stage.locked { cursor: grab; }
+.itda-wb-stage.grabbing { cursor: grabbing; }
+.itda-wb-stage.erasing { cursor: cell; }
+.itda-wb-stage canvas { position: absolute; left: 0; top: 0; touch-action: none; }
+.itda-wb-stage.bg-dark { background: #000; }
+.itda-wb-stage.bg-light { background: #fff; }
+.itda-wb-stage.bg-grid { background-color: #fbfbf7; background-image: linear-gradient(to right, rgba(40, 80, 140, .16) 1px, transparent 1px), linear-gradient(to bottom, rgba(40, 80, 140, .16) 1px, transparent 1px); }
+
+.itda-wb button {
+  font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 0; border-radius: 12px;
+  min-width: 44px; min-height: 44px; padding: 0 10px; touch-action: manipulation; cursor: pointer;
+}
+.itda-wb button.on { background: #2f7cf6; color: #fff; }
+.itda-wb button:disabled { opacity: .35; cursor: default; }
+.itda-wb button:focus { outline: none; }
+.itda-wb button:focus-visible { outline: 2px solid #6aa7ff; }
+.itda-wb .itda-wb-danger { color: #ff7b72; }
+.itda-wb .itda-wb-danger.confirm { background: #c62f26; color: #fff; }
+
+.itda-wb-title {
+  position: absolute; left: calc(10px + env(safe-area-inset-left)); top: calc(10px + env(safe-area-inset-top));
+  max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 4px 10px; border-radius: 10px; background: rgba(28, 28, 32, .72); color: #ddd; font-size: 13px; pointer-events: none;
+}
+.itda-wb-note {
+  position: absolute; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%);
+  max-width: calc(100vw - 24px); box-sizing: border-box; padding: 8px 14px; border-radius: 12px;
+  background: rgba(120, 30, 24, .94); color: #fff; font-size: 13px; pointer-events: none;
+}
+/* 「여는 중」·「닫는 중」 — 판을 바꾸거나 닫는 동안(잠금). 판은 이동·확대만 받는다 */
+.itda-wb-busy {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  padding: 10px 18px; border-radius: 14px; background: rgba(28, 28, 32, .9); color: #eee; font-size: 14px; pointer-events: none;
+}
+
+.itda-wb-bar {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(10px + env(safe-area-inset-bottom));
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 5px; border-radius: 16px;
+  background: rgba(28, 28, 32, .92); box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
+  max-width: calc(100vw - 12px); box-sizing: border-box;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.itda-wb-bar button { padding: 0 8px; }
+.itda-wb-swbtn { display: flex; align-items: center; justify-content: center; }
+.itda-wb-dot { display: block; width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); }
+.itda-wb-wdot { display: block; border-radius: 50%; background: #eee; }
+.itda-wb-wdot.hl { border-radius: 4px; background: rgba(255, 214, 10, .8); }
+
+.itda-wb-pop {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(70px + env(safe-area-inset-bottom));
+  padding: 8px; border-radius: 16px; background: rgba(28, 28, 32, .96);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .45);
+  max-width: calc(100vw - 12px); box-sizing: border-box;
+}
+.itda-wb-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 3px 0; }
+.itda-wb .itda-wb-sw { width: 44px; height: 44px; padding: 0; display: flex; align-items: center; justify-content: center; }
+.itda-wb-sw i { display: block; width: 26px; height: 26px; border-radius: 50%; }
+.itda-wb .itda-wb-sw.on { background: rgba(255, 255, 255, .25); }
+.itda-wb-step i { background: #eee; }
+.itda-wb-sliderrow { gap: 10px; padding: 4px 8px; }
+.itda-wb-slider { flex: 1; min-width: 160px; height: 44px; touch-action: pan-x; }
+.itda-wb-wlab { min-width: 92px; font-size: 13px; text-align: right; }
+
+.itda-wb-list {
+  position: absolute; inset: calc(24px + env(safe-area-inset-top)) max(12px, calc((100vw - 760px) / 2)) calc(80px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; border-radius: 16px; background: rgba(22, 22, 26, .97);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .55);
+}
+.itda-wb-listhead { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.itda-wb-listtitle { flex: 1; font-weight: 600; }
+.itda-wb-items { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; overscroll-behavior: contain; padding: 6px; }
+.itda-wb-item { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; cursor: pointer; }
+.itda-wb-item:hover { background: rgba(255, 255, 255, .05); }
+.itda-wb-item.on { background: rgba(47, 124, 246, .22); }
+.itda-wb-thumb { flex: none; width: 160px; height: 100px; border-radius: 8px; background: #111; box-shadow: 0 0 0 1px rgba(255, 255, 255, .12); }
+.itda-wb-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.itda-wb-iname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itda-wb-itime { font-size: 12px; opacity: .6; }
+.itda-wb-rename { font: inherit; color: #fff; background: #111; border: 1px solid #2f7cf6; border-radius: 8px; padding: 6px 8px; -webkit-user-select: text; user-select: text; }
+.itda-wb-acts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+.itda-wb [hidden] { display: none !important; }
