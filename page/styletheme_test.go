@@ -1,6 +1,7 @@
 package page
 
 import (
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -167,6 +168,178 @@ func TestMarkBgToken(t *testing.T) {
 		}
 		if m := bgRule.FindString(regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(th.CSS, "")); m != "" {
 			t.Errorf("%s: theme.css 가 mark 바탕을 따로 정함 — --mark-bg 토큰으로: %s", info.Name, strings.TrimSpace(m))
+		}
+	}
+}
+
+// 어두운 보드 테마 night(itda-work/itda-hyve#1038 3단계 B)의 보드·슬라이드 글자·면 대비. 어두운 값은 theme.json 이 아니라 theme.css 의 첫 블록
+// (보드 머리·장식·격자와 슬라이드 요소에서 다시 정하는 토큰)에 있어 그 블록을 읽는다. 둘째 블록은 슬라이드에서 --paper 를 슬라이드 바탕으로 덮는다.
+// 바탕(--board-bg·--slide-bg)은 theme.json. 글자는 4.5:1, 차트 계열·상태 띠·표식 원 테두리(그림 표식)는 타일 면 3:1 이다.
+// 쓰는 자리는 base.css 와 이 테마 CSS 의 규칙이다 — 그 규칙이 실제로 그 요소에 걸리는지는 이 시험이 묶지 못하고 Chrome 캡처로 확인했다.
+func TestNightDarkContrast(t *testing.T) {
+	th, ok := builtin(t).Get("night")
+	if !ok {
+		t.Fatal("night 가 없음")
+	}
+	css := regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(th.CSS, "")
+	blocks := regexp.MustCompile(`(?s)\n\.board-head:not\(:where\(\.page-body \*\)\), \.board-deco[^{]*\{([^}]*)\}`).FindStringSubmatch(css)
+	slide := regexp.MustCompile(`(?s)\n\.slide-deco:not\(:where\(\.page-body \*\)\), \.slide-head[^{]*\{( --paper:[^}]*)\}`).FindStringSubmatch(css)
+	if blocks == nil || slide == nil {
+		t.Fatal("night theme.css 에서 어두운 토큰 블록을 찾지 못함")
+	}
+	decl := regexp.MustCompile(`(--[a-z0-9-]+):\s*([^;]+);`)
+	board := map[string]string{}
+	for _, kv := range th.Tokens {
+		board[kv[0]] = kv[1]
+	}
+	for _, m := range decl.FindAllStringSubmatch(blocks[1], -1) {
+		board[m[1]] = strings.TrimSpace(m[2])
+	}
+	sl := map[string]string{}
+	for k, v := range board {
+		sl[k] = v
+	}
+	for _, m := range decl.FindAllStringSubmatch(slide[1], -1) {
+		sl[m[1]] = strings.TrimSpace(m[2])
+	}
+	hex := regexp.MustCompile(`#[0-9a-fA-F]{6}`)
+	color := func(vals map[string]string, n string) string {
+		v := hex.FindString(vals[n]) // --tile-border·--table-top-rule 같은 border 값은 색만
+		if v == "" {
+			t.Fatalf("night: %s 색 값을 풀지 못함 %q", n, vals[n])
+		}
+		return strings.ToLower(v)
+	}
+	check := func(where string, vals map[string]string, fg, bg string, min float64) {
+		if r := contrastRatio(color(vals, fg), color(vals, bg)); r < min {
+			t.Errorf("night %s: %s on %s = %.2f:1 — %.1f:1 이상이어야 함", where, fg, bg, r, min)
+		}
+	}
+	text := []string{"--ink", "--muted", "--accent", "--link", "--chart-text", "--chart-muted", "--diagram-text", "--diagram-muted", "--caption-color",
+		"--kpi-up", "--kpi-down", "--status-ok", "--status-warn", "--status-bad", "--alert-note", "--alert-tip", "--alert-important", "--alert-warning", "--alert-caution", "--alert-todo"}
+	for _, fg := range text {
+		check("보드 타일", board, fg, "--paper", 4.5)
+	}
+	for _, p := range [][2]string{
+		{"--ink", "--board-bg"}, {"--muted", "--board-bg"}, {"--accent", "--board-bg"}, // 머리띠 제목·조직·날짜, 구역 제목 줄(바탕 위)
+		{"--table-head-ink", "--table-head-bg"}, {"--ink", "--table-stripe"}, {"--ink", "--quote-bg"}, {"--ink", "--box-bg"}, {"--ink", "--lead-bg"},
+		{"--ink", "--code-bg"}, {"--code-kw", "--code-bg"}, {"--code-str", "--code-bg"}, {"--code-com", "--code-bg"}, {"--code-num", "--code-bg"},
+		{"--code-fn", "--code-bg"}, {"--code-type", "--code-bg"}, {"--code-op", "--code-bg"}, {"--code-title-fg", "--code-bg"}, {"--ink", "--code-hl-bg"},
+		{"--ink", "--code-diff-add"}, {"--ink", "--code-diff-del"},
+		{"--mark-ink", "--mark-bg"}, {"--accent-ink", "--accent"}, {"--link", "--link-hover-bg"},
+		{"--diagram-text", "--diagram-node-bg"}, {"--diagram-text", "--diagram-cluster-bg"},
+		{"--chart-on", "--chart-1"}, {"--chart-on", "--chart-2"}, {"--chart-on", "--chart-3"}, {"--chart-on", "--chart-4"}, // 칸 안 값(어두운 글자)
+		{"--chart-on", "--chart-5"}, {"--chart-on", "--chart-6"}, {"--chart-on", "--chart-7"}, {"--chart-on", "--chart-8"},
+		{"--chart-on", "--diagram-bar-done"}, {"--chart-on", "--diagram-bar-active"}, {"--chart-on", "--diagram-bar-crit"},
+		{"--tile-bg", "--status-bad"}, // 위험 표식: 채운 원 안의 글자(base.css .tile-status-bad)
+	} {
+		check("보드", board, p[0], p[1], 4.5)
+	}
+	for i := 1; i <= 8; i++ {
+		check("보드 차트", board, "--chart-"+strconv.Itoa(i), "--paper", 3)
+	}
+	for _, fg := range []string{"--ink", "--muted", "--accent", "--accent-2", "--link", "--slide-title-color", "--caption-color"} {
+		check("슬라이드", sl, fg, "--slide-bg", 4.5)
+	}
+	// 슬라이드의 --paper(표·차트 테두리 바탕)와 보드 바탕은 슬라이드 바탕과 같다
+	if color(sl, "--paper") != color(sl, "--slide-bg") || color(board, "--board-bg") != color(board, "--slide-bg") {
+		t.Errorf("night: 슬라이드 --paper(%s)·보드 바탕(%s)이 슬라이드 바탕(%s)과 다름", color(sl, "--paper"), color(board, "--board-bg"), color(sl, "--slide-bg"))
+	}
+	check("슬라이드 구역 번호(큰 글자)", sl, "--accent-3", "--slide-bg", 3)
+	// 문서(A4·이어보기)는 밝다 — base.css :root 의 # 값 위에 classic·night 의 theme.json 토큰을 얹은 값으로, 문서에서 글자에 쓰는 색을 잰다.
+	// 글자색의 자리: 본문·흐린 글·강조(h1·목차·표지·링크·decisions ✔·result 「결과」 — 옅은 강조 면 위), 강조 면 위 흰 글자(steps 번호·actions 머리),
+	// 요약문(--lead-bg 위 본문). h2·h3 제목 번호는 classic 이 --accent-2 로 칠하지만 night 는 theme.css 의 문서 번호 규칙으로 --accent 를 쓴다(아래에서 규칙을 확인).
+	base, err := os.ReadFile(filepath.Join("..", "web", "base.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := string(base[strings.Index(string(base), ":root {"):])
+	root = root[:strings.Index(root, "\n}")]
+	doc := map[string]string{}
+	for _, m := range regexp.MustCompile(`(--[a-z0-9-]+): (#[0-9a-fA-F]{6});`).FindAllStringSubmatch(root, -1) {
+		doc[m[1]] = m[2]
+	}
+	classic, _ := builtin(t).Get("classic")
+	for _, set := range [][][2]string{classic.Tokens, th.Tokens} {
+		for _, kv := range set {
+			doc[kv[0]] = kv[1]
+		}
+	}
+	for _, p := range [][2]string{
+		{"--ink", "--paper"}, {"--muted", "--paper"}, {"--accent", "--paper"},
+		{"--accent", "--accent-soft"}, {"--ink", "--accent-soft"}, {"--accent-ink", "--accent"}, {"--ink", "--lead-bg"},
+	} {
+		check("문서", doc, p[0], p[1], 4.5)
+	}
+	numRule := regexp.MustCompile(`\n\.page-body:not\(\.k-title, \.k-section, \.k-content, \.k-single\) :is\(h2, h3\) \.header-section-number \{ color: var\((--[a-z0-9-]+)\); \}`).FindStringSubmatch(css)
+	if numRule == nil {
+		t.Fatal("night theme.css 에 문서 h2·h3 제목 번호 색 규칙이 없음 — classic 의 --accent-2 번호(흰 바탕 3.17:1)가 그대로 남는다")
+	}
+	check("문서 h2·h3 제목 번호", doc, numRule[1], "--paper", 4.5)
+	// classic·base 에서 --accent-2·--accent-3 을 글자색으로 쓰는 자리는 아래뿐이어야 한다 — 새 자리가 생기면 night 문서 대비를 다시 본다.
+	// 문서에 닿는 것은 h2·h3 번호(위 규칙이 덮는다)뿐이고 나머지는 슬라이드 요소(어두운 토큰 블록의 값 — 위 슬라이드 검사)다.
+	known := map[string]bool{
+		".page-body h2 .header-section-number": true, ".page-body h3 .header-section-number": true, // night 문서 번호 규칙이 덮음
+		".slide-title .header-section-number": true, ".page-body .ss-num": true, // 슬라이드
+	}
+	for name, src := range map[string]string{"classic": classic.CSS, "base.css": string(base)} {
+		rules, err := slideCSSRules(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range rules {
+			if !regexp.MustCompile(`(^|[;{\s])color:\s*var\(--accent-[23]\)`).MatchString(r.Body) {
+				continue
+			}
+			for _, p := range slideSelectorPieces(r.Prelude) {
+				if !known[p] {
+					t.Errorf("%s: %q 가 --accent-2/3 을 글자색으로 쓴다 — night 문서(흰 바탕 %s·%s)에 닿는지 보고 이 목록·문서 번호 규칙을 고친다", name, p, doc["--accent-2"], doc["--accent-3"])
+				}
+			}
+		}
+	}
+}
+
+// night 의 어두운 블록·보드·슬라이드 규칙은 판 구조 요소에만 닿아야 한다(itda-work/itda-hyve#1038 리뷰 1회차 [1]). 쪽·이어보기 문서의 :::slide-panel·{.board-head} 같은
+// 같은 이름 컨테이너는 본문(.page-body) 안에 있고 판 구조 요소는 쪽의 직접 자식이다 — 그래서 구조 class 로 시작하는 조각은 모두 :not(:where(.page-body *)) 로 가둔다.
+// 허용 꼴: (1) 보드 격자 뿌리 .page-body.board-grid, (2) 구조 class 한 덩이 + 가둠, (3) 문서 h2·h3 번호 규칙. 이 시험은 꼴 검사다 — 실제 색은 Chrome 헤드리스로 봤다(보고서).
+func TestNightStructureScoped(t *testing.T) {
+	own, err := fs.ReadFile(builtinFS(t), "night/theme.css") // night 자기 규칙만(th.CSS 는 classic 을 물려받은 것까지). 내장 FS 라 go test -overlay 변이가 닿는다
+	if err != nil {
+		t.Fatal(err)
+	}
+	rules, err := slideCSSRules(string(own))
+	if err != nil {
+		t.Fatal(err)
+	}
+	guarded := regexp.MustCompile(`^(\.(board-head|board-deco|slide-deco|slide-head|slide-foot|slide-panel)|\.page-body(\.k-(title|section|content)|:is\(\.k-title, \.k-section, \.k-content, \.k-single\)))(\.k-[a-z]+)?:not\(:where\(\.page-body \*\)\)([ :]|$)`)
+	n := 0
+	for _, r := range rules {
+		for _, p := range slideSelectorPieces(r.Prelude) {
+			n++
+			switch {
+			case p == ".page-body.board-grid" || strings.HasPrefix(p, ".page-body.board-grid "):
+			case guarded.MatchString(p):
+			case p == ".page-body:not(.k-title, .k-section, .k-content, .k-single) :is(h2, h3) .header-section-number":
+			default:
+				t.Errorf("night: %q — 판 구조 요소로 가두지 않은 조각(문서의 같은 이름 컨테이너에 샌다)", p)
+			}
+		}
+	}
+	if n < 20 {
+		t.Errorf("night: 조각이 %d 개뿐 — CSS 를 못 읽었을 수 있다", n)
+	}
+	for p, want := range map[string]bool{
+		".slide-panel:not(:where(.page-body *))":                     true,
+		".slide-panel":                                               false,
+		".board-head .bh-title":                                      false,
+		".slide-deco.k-section:not(:where(.page-body *))::after":     true,
+		".page-body.k-content:not(:where(.page-body *)) :is(h2, h3)": true,
+		".page-body .ss-num":                                         false,
+		".slide-panelx:not(:where(.page-body *))":                    false,
+	} {
+		if guarded.MatchString(p) != want {
+			t.Errorf("guarded(%q) != %v", p, want)
 		}
 	}
 }

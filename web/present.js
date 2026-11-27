@@ -145,6 +145,15 @@
   const inOverlay = t => !!(t && t.closest && t.closest(OVERLAY));
   // 포커스를 받을 수 있는 것 — 청중 열기에서 덱 사본의 이것들을 포커스 차례에서 뺀다(startAudience)
   const FOCUSABLE = "a[href], area[href], button, input, select, textarea, summary, iframe, audio, video, [tabindex], [contenteditable]";
+  // 게시 강의 용어사전 밑줄(glossary.js termSpan — itda-doc#135)은 발표에서 누르지 않는다: 덱·보드 사본에서 단추 의미(role·tabindex·aria)·표지·꼴 class 를 벗기고
+  // 글자(span 과 그 속)는 그대로 둔다. 미리보기·한눈에 보기는 덱 사본을 다시 복제하므로 따라 벗겨진다. 사전 없는 화면에는 .itda-term 이 없어 아무 일도 없다.
+  const TERM_ATTRS = ["role", "tabindex", "aria-haspopup", "aria-expanded", "data-term"];
+  function plainTerms(c) {
+    for (const x of c.querySelectorAll(".itda-term")) {
+      for (const a of TERM_ATTRS) x.removeAttribute(a);
+      x.classList.remove("itda-term");
+    }
+  }
   const reduce = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   // 장 넘김 전환(present.css .t-*). 모르는 값은 none 이다 — mdoc 이 이미 걸러 주지만 호스트가 다른 값을 넘겨도 클래스가 새지 않게.
   // OUT_MS 는 나가는 장(pr-out)을 보이게 두는 시간 — present.css 의 나가는 움직임(지연 포함)은 이 안에 끝난다(present_test.go 가 묶는다)
@@ -248,6 +257,7 @@
       // 미리보기의 읽기 전용 판서 층(ink.js preview)은 따라오지 않는다: 발표는 같은 판서를 자기 층(attachInk)에 그리므로, 따라오면 두 겹이 되고
       // 지우개·되돌리기·전부 지우기가 복제된 층을 지우지 못한다
       for (const x of c.querySelectorAll(".ink-preview")) x.remove();
+      plainTerms(c);
       c.classList.add("pr-slide");
       deck.appendChild(c);
       P.slides.push(c);
@@ -370,7 +380,7 @@
   // ---- 보드 발표: 보드는 나누지 않는 긴 한 장이라 넘기지 않고 전체 화면에서 굴린다. 폭을 화면에 맞추고 휠·↑↓·Space·PageUp/Down·Home/End 로
   // 굴린다(↑↓ 는 BOARD_LINE, Space·Page 는 한 화면 안쪽). 진행 막대는 굴림 비율이다. 장 번호를 전제한 것(번호·한눈에 보기·노트·목차·번호 Enter)은 없다.
   // 링크·표·그림 라이트박스는 그대로다 — 눌러도 다음 장이 없으니 그 밖의 누르기는 아무것도 하지 않는다. 타일 크게 보기는 발표 중에 쓰지 않는다.
-  // o = { page(미리보기의 보드), ratio, from(시작 굴림 비율 0~1), onSlide(i, total)(시작 0, 끝 -1 — 공유가 꼴을 붙든다), onScroll()(굴릴 때마다),
+  // o = { page(미리보기의 보드), ratio, from(시작 굴림 비율 0~1), motion(false 면 타일 등장 없음 — 없으면 켜짐), onSlide(i, total)(시작 0, 끝 -1 — 공유가 꼴을 붙든다), onScroll()(굴릴 때마다),
   //   onExit(frac)(끝난 굴림 비율), onLink(href)(start 와 같다) }
   const BOARD_LINE = 120; // ↑↓ 한 번의 화면 px
   let boardBox = null, stage = null;
@@ -407,7 +417,15 @@
     const c = o.page.cloneNode(true);
     for (const x of c.querySelectorAll(".src-active, .chart-wait, .chart-play, .toc-focus")) x.classList.remove("src-active", "chart-wait", "chart-play", "toc-focus");
     for (const x of c.querySelectorAll("[id]")) x.removeAttribute("id"); // 미리보기와 id 가 겹치지 않게
+    plainTerms(c);
     c.classList.add("pr-slide", "pr-cur");
+    // 타일 등장(보드 화면 부품 dashboard.js enter — 명세 dashboard.md 8장 「움직임」): 발표 화면에 처음 그리는 것이므로 복제본에서 한 번 돈다 — 굴려야 보이는 타일도 함께(늦춤은 읽는 차례로 0.3초 안).
+    // 복제가 원래 보드의 남은 움직임 표지를 물려받아도 enter 가 지우고 다시 건다. 원래 보드는 건드리지 않아 발표를 닫아도 다시 나타나지 않는다.
+    // o.motion === false 면 걸지 않는다(그래도 남은 표지는 지운다). 움직임 줄이기·인쇄는 CSS 가 멈춘다(base.css 보드 절, 이 파일의 prefers-reduced-motion).
+    // 등장은 아래 document.body 연결 뒤에 건다 — enter 가 표지를 떼는 늦은 끝 시간을 계산 스타일(animation-duration·delay)에서 읽는데(dashboard.js lifeMs),
+    // 문서에 붙지 않은 복제본은 그 값이 비어 최소값(1.2초)이 되어 테마가 늘린 등장을 자른다. 연결과 enter 는 같은 동기 흐름이라 그 사이에 그림이 한 번도 칠해지지 않는다.
+    // 남은 표지는 연결 전에 지운다 — 원래 보드에서 물려받은 표지로 연결 순간 애니메이션이 먼저 돌지 않게.
+    for (const t of c.querySelectorAll(".tile-enter, .tile-changed")) { t.classList.remove("tile-enter", "tile-changed"); t.style.removeProperty("--tile-enter-delay"); }
     deck.appendChild(c);
     P.slides.push(c);
     root.appendChild(el("div", "pr-black"));
@@ -419,6 +437,7 @@
     attachLightbox();
     document.body.appendChild(root);
     document.body.classList.add("presenting");
+    if (o.motion !== false && window.ItdaBoard && window.ItdaBoard.enter) window.ItdaBoard.enter(c); // 연결 뒤 — 위 주석
     P.fsCalls++;
     hostCall("fullscreen", true);
     P.started = Date.now();

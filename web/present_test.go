@@ -20,7 +20,7 @@ import (
 // 판서 받아 그리기(itda-doc#108 — ink.js view 연산·멱등·reset·레이저, 청중 열기의 붙이기, 발표자·청중의 같은 경로)를
 // 노트 표지 점(itda-doc#126 — 보이는 조건·장 넘김 따라가기·누르기·키보드·판서 펜과의 관계·청중·보드·stop)을
 // 가짜 DOM 위에서 node 로 돌린다(testdata/present_ink.cjs). 겹침 층의 CSS 는 TestPresentOverlayCSS 가, 실제 창 안 동작은 호스트 앱의 시험이 본다.
-const presentInkCases = 677 // itda-doc#126 노트 표지 점 50(포커스 받지 않기·숨을 때 포커스 풀기·레이저 커서 포함), 누르기 규칙(가장자리 넘김·분할·배경 그림 크게 보기) 32, itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
+const presentInkCases = 686 // itda-hyve#1084 용어사전 밑줄의 단추 의미가 일반·청중 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 9, itda-doc#126 노트 표지 점 50(포커스 받지 않기·숨을 때 포커스 풀기·레이저 커서 포함), 누르기 규칙(가장자리 넘김·분할·배경 그림 크게 보기) 32, itda-hyve#979 표지 id 가 덱 사본·미리보기·썸네일·보드 사본에 남지 않음 5, itda-hyve-ios#24 발표자 보조(다음 장 미리보기·현재 시각·onState next) 26·미리보기 그림·표 번호 6·배치된 캡션만·장별 캐시 4, itda-doc#95 두 화면 발표 32·끝 콜백 재진입 8·청중 덱 입력 7, itda-doc#100 펜만 판서 28·발표 중 바꾸기(setPenOnly) 26(떼기 놓친 같은 id 의 새 누르기 회수 포함), itda-doc#99 장 넘김 전환 101, itda-doc#105 전환 중 판서 입력 173, itda-doc#108 판서 받아 그리기 97(받는 경계·입력 예산·되풀이 입력·레이저 넘김 포함)
 
 func TestPresentInk(t *testing.T) {
 	node, err := exec.LookPath("node")

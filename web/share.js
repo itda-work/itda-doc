@@ -37,7 +37,8 @@
 // 넓히고 좁힌다(bindNoteGrip — 두 번 누르면 320). 고른 배치·글자 크기·칸 너비는 이 브라우저의 localStorage 에만 둔다(못 쓰면 메모리 — notePrefs). 발표 슬라이드를 따라가는 중 노트가 아래면 그 슬라이드를 위에 붙여 아래 노트까지 보이게 한다(followSpot).
 // 확장(itda-hyve#617): share.js 보다 먼저 실행되는 스크립트가 window.ItdaShareExt(api)(옛 이름 window.HyveShareExt 도 본다) 를 두면, 시작할 때 한 번 불러 화면 부품(api — 아래
 // 「확장을 시작한다」 절)을 넘기고 돌려받은 훅을 그리기 길에서 부른다 — flow(흐름 — 나누기 전, numberBlocks 뒤)·drawn(새 본문을 다 그린 뒤)·tick(목차
-// 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜). 없으면 아무것도 하지 않는다.
+// 강조와 같은 때, 오류 view 포함)·ended(끝난 화면)·wide(목차 서랍 경계를 넘나듦)·resized(보기 영역 크기 바뀜)·files(폴더 목록이 바뀌어 본문·노트 칸 링크를 다시 건 뒤 —
+// itda-hyve#1096, 확장은 api.markLinks 로 제 자리를 다시 건다). 없으면 아무것도 하지 않는다.
 // 시작이나 훅이 던지면 콘솔에만 남기고 확장 없이처럼 이어 간다.
 // 호스트 꼴 적용(itda-hyve#748): 확장이 api.setLook(name) 을 부르면 호스트가 고른 꼴로 다시 그린다 — 사람이 고른 것이 아니라 폴더 공유의 기억한 꼴(nav.setLook)에 적지 않는다.
 // 쪽·이어보기면 state.forced 가 서서 슬라이드·보드 문서에서도 그 꼴로 그린다(lookFor). 사람이 꼴 단추를 누르거나, 발표 꼴로 바꾸거나(follower align), 따라가기가 꺼지면(release) 내려간다.
@@ -63,7 +64,7 @@
 // 폴더 공유(itda-hyve#673): view.json 에 doc(폴더 안 상대 경로)이 올 때만 <base>/files.json 을 받아 사이드바 목차 위에 파일 목록을 그린다(mountFiles — share.html 에
 // 자리가 없고 여기서 만든다). 필드가 없으면(단일 파일·문서 창·뷰어) 요청도 DOM 도 지금과 같다. 문서를 고르면 ?doc= 주소로 화면을 처음부터 불러온다 — 뒤로 가기·새 로고침이
 // 통하고, 문서별 테마 CSS·메모 식별값이 그 화면의 것이 된다. 고른 보기 꼴만 이 탭의 sessionStorage 로 옮긴다. 문서 안 상대 링크는 목록에 있으면 그 문서로(docLink), 없으면
-// 지금처럼 열지 않는다. 갱신 스트림의 files(hello 에는 files_rev)가 오면 목록을 다시 받는다. 세션이 있는데 문서만 없으면 서버가 표시 머리(docMissing)를 단 404 에 오류 view 를
+// 지금처럼 열지 않는다. 열지 않는 링크는 그린 뒤 링크 모양 없이 끄고 title 에 까닭을 단다(markLinks — itda-hyve#1096, 목록이 늦게 오면 다시 건다). 갱신 스트림의 files(hello 에는 files_rev)가 오면 목록을 다시 받는다. 세션이 있는데 문서만 없으면 서버가 표시 머리(docMissing)를 단 404 에 오류 view 를
 // 담아 준다 — 공유 끝이 아니므로 오류 view 를 그리고 파일 목록을 남긴다. 표시가 없는 404 는 지금처럼 공유 끝이다. 그 문서의 스트림은 404 라 files 가 오지 않으므로, 다시 붙기를
 // 기다리는 동안의 재동기화(viewState·resync)가 목록을 잇고 문서가 돌아오면 본문을 되살린다.
 (function () {
@@ -120,6 +121,53 @@
     const want = parts.join("/").normalize("NFC");
     const doc = (docs || []).find(d => d.normalize("NFC") === want);
     return doc === undefined ? null : { doc, hash: m[2] || "" };
+  }
+
+  // LINK_OFF_MSG 는 열지 않는 문서 안 파일 링크의 까닭이다(원천이 linkMsg 를 주지 않을 때 — itda-hyve#1096). 알림(onClick)과 꺼진 링크의 title(markLinks)이 같은 글이다.
+  const LINK_OFF_MSG = "공유 화면은 문서와 그 그림만 보입니다 — 이 파일은 받을 수 없습니다";
+
+  // linkTo 는 문서 안 링크 href 가 이 화면에서 어디로 가는가다 — "hash"(#제목 — 이 문서 안)·"out"(바깥 http(s)·mailto·tel — 새 탭)·{doc, hash}(폴더 안 문서 —
+  // docLink, docs 가 목록일 때만)·null(열지 않는 링크). onClick(누를 때)과 markLinks(그린 뒤 끄기)가 같이 쓴다 — 끄는 링크와 눌러서 안내만 하는 링크가 같은 집합이다.
+  function linkTo(href, cur, docs) {
+    const h = String(href == null ? "" : href);
+    if (h.startsWith("#")) return "hash";
+    if (/^(https?:|mailto:|tel:)/i.test(h)) return "out";
+    return docs ? docLink(h, cur, docs) : null;
+  }
+
+  // markLinks 는 root 안 링크 가운데 열지 않는 것(linkTo 가 null 이고 원천이 살려 두지 않는 것 — o.live(a))을 링크 모양 없이 끈다(itda-hyve#1096):
+  // href 를 data-local-href 로 옮기고(왼쪽·가운데 단추·새 탭으로도 어디로도 가지 않는다 — 뷰어의 localLinks 와 같은 꼴) class link-off·aria-disabled="true"·
+  // title(o.msg — 저자가 단 title 이 있으면 그 뒤에 「 — 까닭」)을 단다. 키보드로 닿도록 tabindex="0"·role="link" 를 둔다(Enter 는 화면의 keydown 이 누르기로 바꾼다 —
+  // 누르면 onClick 이 같은 글로 알린다). 이미 끈 링크가 다시 열리는 것이 되면(폴더 공유의 목록이 늦게 옴 — files) 되살린다. o: { cur, docs, live(a), msg }.
+  function markLinks(root, o) {
+    if (!root || !root.querySelectorAll) return;
+    o = o || {};
+    const msg = o.msg || LINK_OFF_MSG;
+    for (const a of root.querySelectorAll("a[href], a[data-local-href]")) {
+      const has = a.hasAttribute("href");
+      const href = has ? a.getAttribute("href") : a.getAttribute("data-local-href");
+      const off = !(o.live && o.live(a)) && linkTo(href, o.cur, o.docs) === null;
+      const marked = a.classList.contains("link-off");
+      if (off) {
+        if (has) { a.setAttribute("data-local-href", href); a.removeAttribute("href"); }
+        if (!marked) {
+          const t = a.getAttribute("title");
+          if (t !== null) a.setAttribute("data-link-title", t);
+          a.classList.add("link-off");
+        }
+        const own = a.getAttribute("data-link-title");
+        a.setAttribute("title", own ? own + " — " + msg : msg);
+        a.setAttribute("aria-disabled", "true");
+        a.setAttribute("role", "link");
+        a.setAttribute("tabindex", "0");
+      } else if (marked) {
+        if (!has) { a.setAttribute("href", href); a.removeAttribute("data-local-href"); }
+        const own = a.getAttribute("data-link-title");
+        if (own !== null) a.setAttribute("title", own); else a.removeAttribute("title");
+        for (const k of ["data-link-title", "aria-disabled", "role", "tabindex"]) a.removeAttribute(k);
+        a.classList.remove("link-off");
+      }
+    }
   }
 
   // fileTreeHTML 은 문서 목록(슬래시 상대 경로)을 폴더별로 묶은 HTML 이다 — ul > li > a[href="?doc=…"], 폴더는 li > span.dir + ul. 글자·경로는 이스케이프한다.
@@ -1405,7 +1453,9 @@
   // (reloadGate)·끝남(stop·kick·404·403). w 는 window(시험은 가짜 — EventSource·fetch·sessionStorage·location·setTimeout·clearTimeout·
   // addEventListener·document).
   // 원천의 꼴(뷰어의 원천도 같다): { base, linkMsg?, attach(api) → { applyTheme(v), start(), stop() } }.
-  //  - base: 확장(ItdaShareExt)에 넘기는 base. linkMsg: 문서 안 파일 링크를 눌렀을 때의 안내(없으면 공유 화면의 글).
+  //  - base: 확장(ItdaShareExt)에 넘기는 base. linkMsg: 열지 않는 문서 안 파일 링크의 까닭 — 누를 때의 알림이자 꺼진 링크의 title(없으면 LINK_OFF_MSG).
+  //    liveLink(a): 있으면 이 원천이 살려 두는 링크인가(참이면 화면이 끄지 않고 onClick 도 건드리지 않는다 — 브라우저 기본 동작, itda-hyve#1096). 묶은 교안(hyve
+  //    packview.js)이 첨부·교안 링크에 참을 준다. hostSource·뷰어는 두지 않는다.
   //    tabTitle: 있으면 탭 제목을 늘 이 글로 둔다(docTitle — 뷰어). 공유 화면(hostSource)은 두지 않는다 — 문서 제목 그대로.
   //    foldKey(v): 있으면 view v 의 목차 접기 기억 열쇠(itda-hyve#985 — 문서마다 다른 글, ""·없음이면 기억하지 않고 이 화면 메모리만). hostSource 는
   //    주소 경로 + 폴더 공유의 문서(tocFoldKey), 묶은 교안(hyve packview.js)은 문서 주소. 뷰어는 두지 않는다(파일마다 주소가 같다).
@@ -1788,7 +1838,7 @@
   // 정식 이름은 window.ItdaShare 다. window.HyveShare 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
   window.ItdaShare = window.HyveShare = { lookFor, slideZoom, slideFit, SHORT_VIEW_H, backoff, connect, reloadGate, themeKey, themeApplier, fontGate, syncer, follower, backLabel, followAction, pickBlock, fragAt,
     restoreOwnLook, setBoardOK, pauseBackoff, slideGlider,
-    lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, fileTreeHTML, mountFiles, docMissing, viewState,
+    lookSwitchHidden, afterResize, followLink, notesLayout, notesRightFits, notesSwitchState, paintNotesButtons, notePrefs, noteWidth, noteWidthCap, noteResizer, noteGripDrag, slideAnchor, anchorDelta, followSpot, ytFollowGate, initialLook, docLink, LINK_OFF_MSG, linkTo, markLinks, fileTreeHTML, mountFiles, docMissing, viewState,
     hashJump, hashId, headingFinder, tocJumper, tocHTML, tocIDs,
     tocTree, tocAncestors, tocFoldIsOpen, tocFoldFollow, tocFoldShown, tocFoldBulk, tocFoldClean, tocFoldList, tocFoldGet, tocFoldPut, tocFoldKey, tocFoldPrefs, tocFold, paintTocFold, tocBulkHead, paintTocBulk, TOC_FOLD_DOCS, TOC_FOLD_IDS, currentHeading, tocPanel, tocLayout, TOC_REVEAL_PAD, tocCover, tocRevealTop, tocScroller, tocReveal, tocRevealer, tocDocKey, TOC_TOUCH, keyHandler, notesPop, tableMenu, tableCopyClick, appName, docTitle, pick,
     hostSource, pickSource, figArea, figTarget, figClip, figText, figLinked, figFocus, figTipPlace, figTips };
@@ -1913,7 +1963,8 @@
     slide: d => { fol.onSlide(d); zoomCheck(); },
     pos: d => fol.onPos(d),
     toast: msg => toast(msg),
-    files: d => { state.files = d; paintFiles(); },
+    // 목록이 늦게 오거나 바뀌면 폴더 안 문서 링크를 되살리고 목록에서 빠진 문서 링크를 끈다 — 확장(files 훅)도 제 자리(hyve 노트 창)를 다시 건다
+    files: d => { state.files = d; paintFiles(); markAll(); hook("files"); },
     nav: n => { nav = n; },
   });
   const applyTheme = v => linked.applyTheme(v);
@@ -2078,7 +2129,12 @@
       Ask.armSections(flow);
     }
     if (state.look === "dashboard") {
-      window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info });
+      // 움직임(dashboard.js motion): target 은 그릴 때마다 새것이라 앞 그림의 기억은 늘 남는 #pages 에 묶고(motionScope), 문서 열쇠(tocDocKey — 목차 따라가기와 같은 열쇠)가
+      // 바뀌면 처음 그림으로 다룬다(motionDoc — 다른 문서의 같은 제목 타일을 강조하지 않는다). 같은 문서의 호스트 갱신(version)은 등장 없이 바뀐 타일만 강조하고,
+      // 보기 꼴을 쪽·슬라이드로 바꿨다 돌아와도 같은 문서면 다시 그림이다(그 사이 바뀐 타일만 강조). 발표를 따라가는 동안(fol.holdsLook)은 등장을 끈다 —
+      // 그린 직후 scrollToFollow 가 타일 안 블록의 getBoundingClientRect 로 굴리는데 등장 중 translateY 만큼 어긋난다(강조는 자리를 바꾸지 않아 그대로 둔다)
+      window.ItdaBoard.build(flow, target, { ratio: state.ratio, cols: bv.cols, rows: bv.rows, level: bv.level, logo: v.logo, info: v.info,
+        motionScope: $("pages"), motionDoc: tocDocKey(source, v), enter: !fol.holdsLook() });
     } else if (state.look === "slides") {
       const org = (flow.querySelector(".cover-org, .title-org") || {}).textContent || "";
       const r = window.ItdaSlides.build(flow, target, { ratio: state.ratio, level: sv.level, incremental: sv.incremental, fontScale: sv.font_scale, logo: v.logo, footer: org.trim(), info: v.info });
@@ -2125,6 +2181,7 @@
     applyZoom();
     if (fol.active()) scrollToFollow(fol.index, fol.kind, fol.frac); // 따라가는 중이면 읽던 자리 대신 발표자의 슬라이드·내용 위치로
     else viewer.scrollTop = top;
+    markAll(); // 열지 않는 파일 링크를 링크 모양 없이 끈다(itda-hyve#1096) — 확장(drawn)이 보기 전에
     hook("drawn"); // 확장: 새 본문을 다 그렸다
     if (state.hash) { const h = state.hash; state.hash = ""; jumper.jump(h, false); } // 다른 문서의 #제목 링크로 왔다
     paintTocOn();
@@ -2172,6 +2229,7 @@
     const keep = fol.active() ? -1 : slideAtMiddle();
     if (replace) {
       placeSlideNotes($("pages"));
+      markLinks($("notes"), linkOpts()); // 다시 만든 노트 칸의 링크도 같은 규칙으로 끈다(itda-hyve#1096)
       // 노트 칸을 다시 만들었으니 복사 단추(itda-hyve#413)도 다시 붙인다 — 노트 코드의 조각 범위는 그 노트 안(codecopy.js noteOf)
       if (CodeCopy) CodeCopy.arm($("notes"));
     }
@@ -2510,36 +2568,59 @@
   // ytStop 은 함수 선언이다 — 위의 render 가 이 줄보다 먼저 불려도 쓸 수 있게 부품을 부를 때 찾는다.
   function ytStop() { const p = pick(window, "YT"); if (p) p.stop(); }
 
-  // 문서 안 링크·목차 항목: #제목은 그 자리로, 바깥 http(s)·mailto·tel 은 새 탭(토큰 주소가 Referer 로 가지 않게 noreferrer), 그 밖(다른 md 등
-  // 문서 폴더의 파일)은 열지 않는다 — 서버도 404 다. 목차 서랍에서 누르면 이동 뒤 서랍을 닫는다. 뷰어 원천은 그런 링크의 href 를
-  // data-local-href 로 옮겨 두므로(viewer.js localLinks) href 없는 <a data-local-href> 도 같은 안내를 낸다(공유 화면 html 에는 없다).
+  // 문서 안 링크·목차 항목: #제목은 그 자리로, 바깥 http(s)·mailto·tel 은 새 탭(토큰 주소가 Referer 로 가지 않게 noreferrer), 폴더 안 문서는 그 문서로, 그 밖(문서 폴더의
+  // 파일)은 열지 않는다 — 서버도 404 다. 어디로 가는지는 linkTo 가 정하고(그린 뒤 끄는 markLinks 와 같은 함수), 원천이 살려 두는 링크(source.liveLink — 묶은 교안의
+  // 첨부·교안 링크)는 건드리지 않는다. 목차 서랍에서 누르면 이동 뒤 서랍을 닫는다. 끈 링크(markLinks — href 를 data-local-href 로 옮김)와 뷰어 원천이 옮겨 둔
+  // <a data-local-href>(viewer.js localLinks)는 href 가 없어 열지 않는 쪽으로 가고 같은 까닭(linkMsg)을 알린다(itda-hyve#1096).
   function onClick(e) {
     const a = e.target.closest && e.target.closest("a[href], a[data-local-href]");
     if (!a) return;
     if (a.closest("#side-files")) return; // 파일 목록 — 브라우저가 ?doc= 주소로 옮긴다
     const inToc = $("sidebar").contains(a);
     if (!inToc && !$("viewer").contains(a)) return;
+    if (source.liveLink && source.liveLink(a)) return; // 원천이 살려 두는 링크 — 브라우저 기본 동작
     const href = a.getAttribute("href") || "";
-    if (href.startsWith("#")) {
+    const to = linkTo(href, state.view && state.view.doc, state.files && state.view ? state.files.docs : null);
+    if (to === "hash") {
       e.preventDefault();
       jumper.jump(href, inToc); // 직접 옮긴 것 — 따라가기를 먼저 풀고, 옮겼으면 그 제목을 강조한다
       scheduleTocOn();
       return;
     }
-    if (/^(https?:|mailto:|tel:)/i.test(href)) {
+    if (to === "out") {
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       return;
     }
     e.preventDefault();
-    const to = state.files && state.view ? docLink(href, state.view.doc, state.files.docs) : null; // 폴더 안 문서 링크
-    if (to) {
+    if (to) { // 폴더 안 문서 링크
       if (to.doc !== state.view.doc) nav.open(to.doc, to.hash);
       else if (to.hash) { jumper.jump(to.hash, false); scheduleTocOn(); }
       return;
     }
-    toast(source.linkMsg || "문서 안의 파일 링크는 공유 화면에서 열지 않습니다");
+    toast(source.linkMsg || LINK_OFF_MSG);
   }
+
+  // linkOpts 는 지금 화면의 링크 끄기 기준이다(markLinks 의 o) — 지금 문서·폴더 목록(있을 때만)·원천이 살려 두는 링크·까닭 글. markAll 은 본문(#pages)과 노트 칸(#notes)에
+  // 건다. 확장은 api.markLinks(root) 로 제 자리(hyve 노트 창)에 같은 기준을 건다.
+  function linkOpts() {
+    return { cur: state.view && state.view.doc, docs: state.files && state.view ? state.files.docs : null,
+      live: source.liveLink ? a => !!source.liveLink(a) : null, msg: source.linkMsg || LINK_OFF_MSG };
+  }
+  function markAll() {
+    const o = linkOpts();
+    markLinks($("pages"), o);
+    markLinks($("notes"), o);
+  }
+  // 끈 링크(tabindex 0 — markLinks) 위의 Enter 는 누르기로 바꾼다 — href 가 없는 a 는 브라우저가 Enter 로 click 을 내지 않는다. 누르기는 onClick(본문·노트 칸)이나
+  // 확장의 누르기(hyve 노트 창)가 받아 같은 까닭을 알린다.
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Enter" || e.isComposing || e.defaultPrevented || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return; // ⌘/Ctrl+Shift+Enter(발표)는 그대로
+    const a = e.target && e.target.closest ? e.target.closest("a.link-off") : null;
+    if (!a) return;
+    e.preventDefault();
+    a.click();
+  });
 
   for (const b of document.querySelectorAll("[data-notes]")) b.addEventListener("click", () => setNotesMode(b.dataset.notes));
   for (const b of document.querySelectorAll("[data-note-font]")) b.addEventListener("click", () => stepNoteFont(Number(b.dataset.noteFont)));
@@ -2672,7 +2753,8 @@
   const extInit = pick(window, "ShareExt");
   if (typeof extInit === "function") {
     try {
-      ext = extInit({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast, setLook }) || {};
+      ext = extInit({ $, base, state, toc, fol, jumper, findHeading, headingNow, slideAtMiddle, placeSlide, jumpScroll, scheduleTocOn, toast, setLook,
+        markLinks: root => markLinks(root, linkOpts()) }) || {};
     } catch (e) { ext = {}; console.error("share ext:", e); }
   }
   new ResizeObserver(() => {

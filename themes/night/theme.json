@@ -1,0 +1,33 @@
+{
+  "name": "night",
+  "title": "나이트",
+  "description": "운영 상황판: 보드와 슬라이드는 남청 짙은 회색 바탕에 한 단 밝은 타일·가는 테두리, 청록 강조색 하나와 상태 색 셋, 촘촘한 격자에 맞춘 작은 글자. 문서는 인쇄를 생각해 흰 바탕에 같은 청록",
+  "aliases": ["나이트", "야간"],
+  "extends": "classic",
+  "group": "dark",
+  "tokens": {
+    "--ink": "#1c2533",
+    "--muted": "#5d6878",
+    "--accent": "#0b6577",
+    "--accent-2": "#4f9bae",
+    "--accent-3": "#a4d3e0",
+    "--accent-soft": "#e8f2f5",
+    "--rule": "#cad3dc",
+    "--lead-bg": "#f1f7f9",
+    "--slide-bg": "#0f1622",
+    "--board-bg": "#0f1622",
+    "--board-pad": "16pt",
+    "--board-gap": "6pt",
+    "--board-head-h": "24pt",
+    "--tile-radius": "4pt",
+    "--tile-pad": "7pt 9pt",
+    "--tile-head-size": "11pt",
+    "--tile-text-size": "9.5pt"
+  },
+  "derived": {
+    "--accent-2": "oklch(from var(--accent) calc(l + 0.18) c h)",
+    "--accent-3": "oklch(from var(--accent) calc(l + 0.37) calc(c * 0.65) h)",
+    "--accent-soft": "oklch(from var(--accent) 0.955 calc(c * 0.14) h)",
+    "--lead-bg": "oklch(from var(--accent) 0.972 calc(c * 0.09) h)"
+  }
+}
