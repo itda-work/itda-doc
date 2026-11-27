@@ -1,4 +1,4 @@
-// 노트 칸 배치(slides.js placeNotes·notePlacement·noteAfter·layoutNotes·watchNotes, itda-hyve#752)를 작은 가짜 DOM 으로 돌린다. 쪽 rect 는 쪽 높이 × 배율에 앞 쪽들의
+// 노트 칸 배치(slides.js placeNotes·notePlacement·noteSpans·noteAfter·layoutNotes·watchNotes, itda-hyve#752·#1102)를 작은 가짜 DOM 으로 돌린다. 쪽 rect 는 쪽 높이 × 배율에 앞 쪽들의
 // --sn-after(× 배율)를 더한 값이라, 여백을 걸기 전에 위치를 재면 다음 쪽 칸이 어긋난다. 실제 레이아웃(rect·겹침·또렷함)은 itda-hyve selftest 와 눈 확인이 본다.
 const fs = require('fs');
 const vm = require('vm');
@@ -23,7 +23,8 @@ function style() {
 function classes(...init) { const c = new Set(init); return { contains: x => c.has(x), add: x => c.add(x), remove: x => c.delete(x) }; }
 
 // rig 는 쪽 count 장(hidden 번호는 숨김)과 칸(note.h — 내용 높이)을 만든다. 쪽은 왼쪽 100, 첫 위 50, 사이 20, 크기 1000×500(화면 px).
-function rig(count, { hidden = [], empty = [], h = () => 80, zoom = 1 } = {}) {
+// cont 번호는 넘쳐 이어진 장(머리에 .slide-cont)이다.
+function rig(count, { hidden = [], empty = [], cont = [], h = () => 80, zoom = 1 } = {}) {
   const box = { getBoundingClientRect: () => ({ left: 10, top: 5 }) };
   const pages = { style: style(), list: [] };
   const rectOf = i => {
@@ -34,7 +35,8 @@ function rig(count, { hidden = [], empty = [], h = () => 80, zoom = 1 } = {}) {
     }
     return { left: 100, right: 1100, top, bottom: top + 500, width: 1000, height: 500 };
   };
-  for (let i = 0; i < count; i++) pages.list.push({ style: style(), offsetParent: hidden.includes(i) ? null : pages, getBoundingClientRect: () => rectOf(i) });
+  for (let i = 0; i < count; i++) pages.list.push({ style: style(), offsetParent: hidden.includes(i) ? null : pages, getBoundingClientRect: () => rectOf(i),
+    querySelector: sel => (sel === ".slide-head .slide-cont" && cont.includes(i) ? {} : null) });
   pages.querySelectorAll = () => pages.list;
   const notes = { parentElement: box, children: [] };
   for (let i = 0; i < count; i++) {
@@ -87,6 +89,42 @@ eq("여백은 배치 px", S.noteAfter(90, 1.5), 100 / 1.5);
   // 끔: 여백·padding 만 지운다
   S.layoutNotes(r.pages, r.notes, { layout: "off" });
   eq("끔: 쪽 여백이 없다", r.pages.list.map(p => p.style.vars["--sn-after"]), [null, null, null]);
+}
+
+// 이어진 장 흡수(itda-hyve#1102) — 순수 계산. 쪽 차례로 { hidden, empty, cont }, 값은 덮는 마지막 쪽 순번(흡수된 칸은 -1)
+{
+  const m = (empty, cont, hidden) => ({ empty: !!empty, cont: !!cont, hidden: !!hidden });
+  eq("흡수: 노트 1/2장만 — 2/2장을 덮는다", S.noteSpans([m(0, 0), m(1, 1)]), [1, -1]);
+  eq("흡수: 빈 이어진 장 여럿, 다음 묶음에서 멈춤", S.noteSpans([m(0, 0), m(1, 1), m(1, 1), m(1, 0), m(1, 1)]), [2, -1, -1, 3, 4]);
+  eq("흡수: 다음 노트 있는 장에서 멈춤", S.noteSpans([m(0, 0), m(1, 1), m(0, 1), m(1, 1)]), [1, -1, 3, -1]);
+  eq("흡수: 첫 장에 노트 없음 — 빈 칸은 빈 칸을 덮지 않는다", S.noteSpans([m(1, 0), m(1, 1), m(0, 1)]), [0, 1, 2]);
+  eq("흡수: 숨은 쪽에서 멈춤", S.noteSpans([m(0, 0), m(1, 1), m(1, 1, 1), m(1, 1)]), [1, -1, 2, 3]);
+  eq("흡수: 노트 있는 장 뒤 이어진 장이 아니면 그대로", S.noteSpans([m(0, 0), m(1, 0)]), [0, 1]);
+}
+
+// 이어진 장 흡수 — 오른쪽 배치. 쪽 0(노트)·1·2(빈 이어진 장)·3(빈, 다음 묶음)·4(노트, 다음 묶음)·5(빈 이어진 장, 숨음)·6(빈 이어진 장)
+{
+  const r = rig(7, { empty: [1, 2, 3, 5, 6], cont: [1, 2, 5, 6], hidden: [5] });
+  S.layoutNotes(r.pages, r.notes, { layout: "right", zoom: 1, noteW: 320, gap: 20 });
+  // 쪽 0 위 50, 쪽 2 아래 = 50 + 2×520 + 500 = 1590 → 높이 1540
+  eq("흡수: 칸 0 이 쪽 2 아래끝까지", spot(r.notes.children[0]), { hidden: false, left: "1110px", top: "45px", width: "320px", height: "1540px" });
+  eq("흡수: 흡수된 칸은 숨김, 다음 묶음·숨은 쪽 뒤 빈 칸은 그대로", r.notes.children.map(n => n.hidden), [false, true, true, false, false, true, false]);
+  eq("흡수: 다음 묶음의 빈 칸은 제 높이", r.notes.children[3].style.height, "500px");
+  eq("흡수: 숨은 쪽에서 멈춤 — 칸 4 는 제 높이", r.notes.children[4].style.height, "500px");
+  const before = r.notes.children.map(n => n.style.writes.length);
+  S.layoutNotes(r.pages, r.notes, { layout: "right", zoom: 1, noteW: 320, gap: 20 });
+  eq("흡수: 같은 값이면 쓰지 않음", r.notes.children.map(n => n.style.writes.length), before);
+  // 아래 배치로 바꾸면 흡수하지 않는다 — 빈 칸은 아래 배치 규칙대로 접히고(showEmpty 면 보임) 칸 0 은 내용 높이
+  S.layoutNotes(r.pages, r.notes, { layout: "below", zoom: 1, noteW: 320, gap: 20, showEmpty: true });
+  eq("아래: 흡수 없음 — 빈 칸이 돌아옴", r.notes.children.map(n => n.hidden), [false, false, false, false, false, true, false]);
+  eq("아래: 칸 0 높이는 내용", r.notes.children[0].style.height, "");
+  // 오른쪽으로 돌아오면 다시 흡수, 흡수된 장에 노트가 생기면(칸을 다시 만든 것과 같은 꼴) 제자리로
+  S.layoutNotes(r.pages, r.notes, { layout: "right", zoom: 1, noteW: 320, gap: 20 });
+  eq("오른쪽 복귀: 다시 흡수", [r.notes.children[1].hidden, r.notes.children[0].style.height], [true, "1540px"]);
+  r.notes.children[2].classList.remove("sn-empty");
+  S.layoutNotes(r.pages, r.notes, { layout: "right", zoom: 1, noteW: 320, gap: 20 });
+  eq("노트 추가: 쪽 2 칸이 돌아오고 칸 0 은 쪽 1 까지", [r.notes.children[1].hidden, r.notes.children[2].hidden, r.notes.children[0].style.height, r.notes.children[2].style.height],
+    [true, false, "1020px", "500px"]);
 }
 
 // placeNotes: into 가 있으면 칸을 그 상자에, 지울 때도 그 상자에서

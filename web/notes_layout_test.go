@@ -8,7 +8,8 @@ import (
 	"testing"
 )
 
-// 노트 칸 배치(slides.js placeNotes·notePlacement·noteAfter·layoutNotes·watchNotes, itda-hyve#752): 오른쪽·아래·끔의 좌표와 #pages·쪽 여백, 숨은 쪽·빈 칸, 같은 값 다시 쓰지 않음,
+// 노트 칸 배치(slides.js placeNotes·notePlacement·noteSpans·noteAfter·layoutNotes·watchNotes, itda-hyve#752): 오른쪽·아래·끔의 좌표와 #pages·쪽 여백, 숨은 쪽·빈 칸, 같은 값 다시 쓰지 않음,
+// 오른쪽 배치의 이어진 장 흡수(itda-hyve#1102),
 // 칸을 넣는 상자(into), 높이가 바뀌면 다시 놓기. 작은 가짜 DOM 으로 node 에서 돌린다(testdata/notes_layout.cjs). 실제 레이아웃은 itda-hyve selftest 가 본다.
 func TestNotesLayout(t *testing.T) {
 	node, err := exec.LookPath("node")
