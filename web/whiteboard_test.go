@@ -21,8 +21,12 @@ import (
 // 접근 방식 리뷰 반영분: 판별 기록기(번호·합치기·거부 뒤 멈춤과 retry·동기 throw), 떠나기(그 자리 put·시도 토큰·전체 기한), 관리 작업(복제·삭제 철회,
 // 결과 미확정, 삭제 뒤 폐기, 이름 맞추기), 저장소 경계(store 객체 교체는 잇지 않음), 숨김 즉시 put, 좌표 범위(화면 전체 묶기·범위 밖 점에서 획 끝내기·
 // serialize 던짐) — 손으로 푸는 store 로 실제 호출 차례·같은 판 save 최대 동시 수·최종 저장 본문을 본다.
-// 실제 그리기(canvas 픽셀)·CSS 배치·실기 Pencil 입력은 보지 않는다(미검증 — 데모로 본다).
-const whiteboardCases = 359
+// 그림(④-1a 추가): 형식(images 왕복·검증 거부·없는 옛 본문), 넣기(paste·파일 고르기·안 넣는 경우·줄이기·상한), 고르기 도구(격자 옮기기·크기·
+// 손가락·Esc·지우기), 되돌리기, 지우개, 타일 그리기 차례, 디코드 실패 보존, bitmap close, 미리보기 — 가짜 createImageBitmap·toDataURL 위에서 본다.
+// 그림 리뷰 1회차 반영분: 그림 층(층 차례·조작 전·중·후 그리기 차례·획 타일에 그림 없음·그림만 옮기면 획 타일을 다시 굽지 않음), 크기 조절의
+// 유효성(네 귀 × 좌표 양끝 × 작은 그림·극단 비율 — serialize·닫기), 닿지 않는 그림의 bitmap 회수(늦은 디코드 포함), 큰 그림 디코드 축소.
+// 실제 그리기(canvas 픽셀)·CSS 배치·실기 Pencil 입력·실제 그림 디코드·인코드는 보지 않는다(미검증 — 데모로 본다).
+const whiteboardCases = 492
 
 func TestWhiteboard(t *testing.T) {
 	node, err := exec.LookPath("node")
@@ -87,6 +91,8 @@ func TestWhiteboardFS(t *testing.T) {
 	bad := regexp.MustCompile(`window\.go\b|window\.runtime\b|(?i:hyve)|(?i:wails)`)
 	net := regexp.MustCompile(`\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|navigator\.serviceWorker|\bimport\s*\(|indexedDB|localStorage|sessionStorage`)
 	inline := regexp.MustCompile(`setAttribute\(\s*["']style["']|style\s*=\s*["']|\.innerHTML\s*=|\.outerHTML|insertAdjacentHTML|setAttribute\(\s*["']on[a-z]+["']`)
+	// 그림은 base64 를 바이트로 풀어 Blob → createImageBitmap 으로만 디코드한다 — data·blob URL 을 만들거나 <img>·Image 로 읽지 않는다(CSP img-src 에 기대지 않게)
+	imgURL := regexp.MustCompile(`createObjectURL|new\s+Image\s*\(|createElement\(\s*["']img["']`)
 	for _, name := range []string{"wbcore.js", "whiteboard.js", "whiteboard.css"} {
 		b, err := fs.ReadFile(FS, name)
 		if err != nil {
@@ -102,6 +108,9 @@ func TestWhiteboardFS(t *testing.T) {
 			}
 			if m := inline.FindString(src); m != "" {
 				t.Errorf("%s 에 %q — CSP 에서 막히는 인라인 스타일·HTML 문자열", name, m)
+			}
+			if m := imgURL.FindString(src); m != "" {
+				t.Errorf("%s 에 %q — 그림은 바이트 → Blob → createImageBitmap 으로만 디코드한다", name, m)
 			}
 		}
 	}

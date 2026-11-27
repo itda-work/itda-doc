@@ -5,7 +5,12 @@
 //
 // 파일 형식 v1 — JSON 한 덩어리(정본은 이 주석과 parse·serialize):
 //   { "format": "itda-whiteboard", "v": 1, "name": 문자열, "bg": "dark"|"light"|"grid", "view": { "x", "y", "z" },
-//     "strokes": [ { "t": "pen"|"hl", "c": 색 번호(0~COLORS-1), "w": 굵기(판 단위, W_MIN~W_MAX), "p": [x, y, 필압, …] } ] }
+//     "strokes": [ { "t": "pen"|"hl", "c": 색 번호(0~COLORS-1), "w": 굵기(판 단위, W_MIN~W_MAX), "p": [x, y, 필압, …] } ],
+//     "images": [ { "x", "y", "w", "h", "mime": "image/png"|"image/jpeg", "data": base64 } ] }
+//   · images 는 판에 붙인 그림이다 — 넣은 차례(앞이 아래)이고, 그림은 늘 모든 획 아래에 깔린다. 그림이 없으면 키를 쓰지 않는다(없는 파일도 그대로 읽는다).
+//     x·y 는 왼쪽 위(판 좌표 — 좌표 범위 안), w·h 는 판 단위 크기(IMG_MIN(0.01)~COORD_MAX), data 는 그림 파일 바이트의 base64(패딩 포함, 글자 A-Z a-z 0-9 + / = 만).
+//     그림 수·바이트 합(base64 를 푼 바이트) 상한은 LIMIT.images(200)·LIMIT.imageBytes(24MB) — 넘으면 읽기를 거부한다.
+//     쓸 때 x·y·w·h 는 소수 둘째 자리로 반올림하고 w·h 는 IMG_MIN~COORD_MAX 로 끌어 맞춘다. x·y 가 범위 밖이면 획의 점처럼 RangeError 를 던진다.
 //   · 수치 범위(상수): 좌표 |x|·|y| ≤ COORD_MAX(1e9), 굵기 W_MIN(0.01) ≤ w ≤ W_MAX(10000), 보기 z 는 ZMIN~ZMAX(0.1~8), 보기 x·y 는 좌표 범위.
 //     이 범위 안에서는 색인(Grid)·타일(tilesFor)의 칸 번호가 안전한 정수라 반복이 끝난다(범위 밖 값이 와도 두 함수는 끌어 맞춰 끝낸다).
 //   · 쓸 때 좌표(x·y, view.x·y)는 소수 둘째 자리, 필압과 굵기는 셋째 자리로 반올림한다(serialize). 굵기는 W_MIN 아래로 내려가지 않고,
@@ -13,8 +18,9 @@
 //     조용히 바꾸지 않게. 표면은 범위 밖 점을 받지 않으므로 — whiteboard.js addPoint — 던지는 것은 내부 불변식이 깨졌을 때다).
 //     serialize 가 돌려준 결과는 상한(LIMIT) 안이면 늘 parse 를 통과한다. 필압은 0~1 이다.
 //   · 읽을 때 검증한다(parse): format·v(1 이상 정수), 배열·숫자 유한성, 색 번호 범위, 점 배열 길이(3 의 배수, 3 이상), 좌표·굵기 범위,
-//     획 수·점 수 상한(LIMIT — 넘으면 읽기를 거부한다). 틀리면 { ok: false, error } 이고 판을 열지 않는다.
-//   · 모르는 최상위 키는 버리지 않고 extra 에 담아 다시 쓴다(뒤 판이 더한 키를 옛 판이 고쳐 써도 잃지 않게). 획 안의 모르는 키는 버린다.
+//     획 수·점 수 상한(LIMIT — 넘으면 읽기를 거부한다), 그림(images — 배열, 좌표 범위·w·h 범위·mime 은 둘만·data 는 base64 글자만·수와 바이트 합 상한).
+//     틀리면 { ok: false, error } 이고 판을 열지 않는다. 그림을 디코드할 수 있는가는 보지 않는다(표면이 판을 열 때 디코드하고, 안 되면 자리 표시로 둔다).
+//   · 모르는 최상위 키는 버리지 않고 extra 에 담아 다시 쓴다(뒤 판이 더한 키를 옛 판이 고쳐 써도 잃지 않게). 획·그림 안의 모르는 키는 버린다.
 //   · v 가 VERSION 보다 크면 readOnly 로 연다(읽을 수 있으면 보여 주되 고쳐 쓰지 않는다 — 쓰는 쪽은 whiteboard.js).
 //   · bg 가 모르는 값이면 "dark" 로 읽는다. view 가 없으면 {0, 0, 1}, z 는 ZMIN~ZMAX 로, x·y 는 좌표 범위로 끌어 맞춘다(거부하지 않는다).
 (function (root, factory) {
@@ -258,16 +264,44 @@
   const FORMAT = "itda-whiteboard", VERSION = 1;
   const COLORS = 8; // 색 번호 개수(whiteboard.js 의 팔레트 길이와 같다)
   const BGS = ["dark", "light", "grid"];
-  // LIMIT 은 판 하나의 상한이다(잠정 — 화이트보드 기획 ④). 넘는 파일은 읽지 않고, 표면은 넘게 그리지 않는다(whiteboard.js room).
-  const LIMIT = { strokes: 50000, points: 3000000 };
-  const KNOWN = ["format", "v", "name", "bg", "view", "strokes"];
+  // LIMIT 은 판 하나의 상한이다(잠정 — 화이트보드 기획 ④). 넘는 파일은 읽지 않고, 표면은 넘게 그리거나 넣지 않는다(whiteboard.js room·imgRoom).
+  // images 는 그림 수, imageBytes 는 그림 바이트(base64 를 푼 크기) 합이다.
+  const LIMIT = { strokes: 50000, points: 3000000, images: 200, imageBytes: 24 * 1024 * 1024 };
+  const KNOWN = ["format", "v", "name", "bg", "view", "strokes", "images"];
+  const MIMES = ["image/png", "image/jpeg"], IMG_MIN = 0.01; // 그림의 mime·w·h 하한(머리 주석 「images」)
   const r2 = x => Math.round(x * 100) / 100, r3 = x => Math.round(x * 1000) / 1000, r4 = x => Math.round(x * 10000) / 10000;
   const rv = x => r2(clamp(x, -COORD_MAX, COORD_MAX)), rw = w => clamp(r3(w), W_MIN, W_MAX); // 보기·굵기 — 범위 안으로 끌어 맞춘 반올림(serialize)
   // rp 는 획의 점 좌표다 — 끌어 맞추지 않는다(범위 밖이면 던진다 — 머리 주석 「쓸 때」).
   const rp = x => { if (!(Number.isFinite(x) && Math.abs(x) <= COORD_MAX)) throw new RangeError("획의 점 좌표 " + x + " 가 좌표 범위(±" + COORD_MAX + ") 밖이다"); return r2(x); };
   const fin = x => typeof x === "number" && Number.isFinite(x);
 
-  // serialize 는 판 b = { name, bg, view: {x, y, z}, strokes: [{ tool, color, w, pts }], extra } 를 파일 본문(JSON 문자열)으로 만든다.
+  // ---- base64(그림 data) — 표면은 data URL 을 fetch·<img> 로 읽지 않고 이것으로 바이트를 푼다(CSP 에 기대지 않게 — whiteboard.js)
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", B64RE = /^[A-Za-z0-9+/]*={0,2}$/;
+  const B64V = new Int16Array(128).fill(-1);
+  for (let i = 0; i < 64; i++) B64V[B64.charCodeAt(i)] = i;
+  // b64Ok 는 s 가 비지 않은 패딩 포함 base64 인가다(글자·길이 4 의 배수). b64Bytes 는 풀면 몇 바이트인가다(b64Ok 인 s 만).
+  const b64Ok = s => typeof s === "string" && s.length > 0 && s.length % 4 === 0 && B64RE.test(s);
+  const b64Bytes = s => (s.length / 4) * 3 - (s.endsWith("==") ? 2 : s.endsWith("=") ? 1 : 0);
+  // b64Decode 는 b64Ok 인 s 를 바이트(Uint8Array)로 푼다.
+  function b64Decode(s) {
+    const out = new Uint8Array(b64Bytes(s));
+    let o = 0;
+    for (let i = 0; i < s.length; i += 4) {
+      const a = B64V[s.charCodeAt(i)], b = B64V[s.charCodeAt(i + 1)], c = B64V[s.charCodeAt(i + 2)], d = B64V[s.charCodeAt(i + 3)];
+      const n = (a << 18) | (b << 12) | ((c < 0 ? 0 : c) << 6) | (d < 0 ? 0 : d);
+      out[o++] = n >> 16;
+      if (o < out.length) out[o++] = (n >> 8) & 255;
+      if (o < out.length) out[o++] = n & 255;
+    }
+    return out;
+  }
+  // imageBox 는 그림 im = { x, y, w, h } 의 판 상자다.
+  const imageBox = im => [im.x, im.y, im.x + im.w, im.y + im.h];
+
+  const ri = w => clamp(r2(w), IMG_MIN, COORD_MAX); // 그림 w·h — 범위 안으로 끌어 맞춘 반올림(serialize)
+
+  // serialize 는 판 b = { name, bg, view: {x, y, z}, strokes: [{ tool, color, w, pts }], images: [{ x, y, w, h, mime, data }], extra } 를
+  // 파일 본문(JSON 문자열)으로 만든다(그림이 없으면 images 키를 쓰지 않는다).
   // extra(모르는 최상위 키)는 아는 키 뒤에 그대로 싣는다 — 아는 키와 이름이 겹치면 아는 키가 이긴다.
   // 획의 점 좌표가 범위 밖이면 RangeError 를 던진다(부르는 쪽은 저장을 멈추고 판을 메모리에 둔다 — whiteboard.js snapshot).
   function serialize(b) {
@@ -279,13 +313,15 @@
       for (let i = 0; i < s.pts.length; i += 3) { p[i] = rp(s.pts[i]); p[i + 1] = rp(s.pts[i + 1]); p[i + 2] = r3(s.pts[i + 2]); }
       out.strokes.push({ t: s.tool === "hl" ? "hl" : "pen", c: s.color, w: rw(s.w), p });
     }
+    const imgs = b.images || [];
+    if (imgs.length) out.images = imgs.map(im => ({ x: rp(im.x), y: rp(im.y), w: ri(im.w), h: ri(im.h), mime: im.mime, data: im.data }));
     const extra = b.extra || {};
     for (const k of Object.keys(extra)) if (!KNOWN.includes(k)) out[k] = extra[k];
     return JSON.stringify(out);
   }
 
   // parse 는 파일 본문을 검증해 { ok: true, board, readOnly, v } 또는 { ok: false, error } 를 돌려준다. lim 은 시험용 상한(없으면 LIMIT).
-  // board = { name, bg, view, strokes: [{ tool, color, w, pts }], extra }.
+  // board = { name, bg, view, strokes: [{ tool, color, w, pts }], images: [{ x, y, w, h, mime, data }], extra }(images 가 없는 파일은 빈 배열).
   function parse(text, lim) {
     lim = lim || LIMIT;
     let j;
@@ -323,9 +359,27 @@
       }
       strokes.push({ tool: s.t, color: s.c, w: s.w, pts });
     }
+    const images = [];
+    if (j.images != null) {
+      const maxN = lim.images != null ? lim.images : LIMIT.images, maxB = lim.imageBytes != null ? lim.imageBytes : LIMIT.imageBytes;
+      if (!Array.isArray(j.images)) return { ok: false, error: "images 가 배열이 아니다" };
+      if (j.images.length > maxN) return { ok: false, error: "그림이 상한(" + maxN + ")을 넘는다" };
+      let bytes = 0;
+      for (let k = 0; k < j.images.length; k++) {
+        const g = j.images[k], bad = why => ({ ok: false, error: "그림 " + k + ": " + why });
+        if (!g || typeof g !== "object") return bad("객체가 아니다");
+        if (!fin(g.x) || !fin(g.y) || Math.abs(g.x) > COORD_MAX || Math.abs(g.y) > COORD_MAX) return bad("x·y 가 좌표 범위(±" + COORD_MAX + ")의 유한수가 아니다");
+        if (!fin(g.w) || !fin(g.h) || g.w < IMG_MIN || g.h < IMG_MIN || g.w > COORD_MAX || g.h > COORD_MAX) return bad("w·h 가 " + IMG_MIN + "~" + COORD_MAX + " 의 유한수가 아니다");
+        if (!MIMES.includes(g.mime)) return bad("mime 이 " + MIMES.join("·") + " 가 아니다");
+        if (!b64Ok(g.data)) return bad("data 가 base64 가 아니다");
+        bytes += b64Bytes(g.data);
+        if (bytes > maxB) return { ok: false, error: "그림 바이트 합이 상한(" + maxB + ")을 넘는다" };
+        images.push({ x: g.x, y: g.y, w: g.w, h: g.h, mime: g.mime, data: g.data });
+      }
+    }
     const extra = {};
     for (const key of Object.keys(j)) if (!KNOWN.includes(key)) extra[key] = j[key];
-    const board = { name: j.name || "", bg: BGS.includes(j.bg) ? j.bg : "dark", view, strokes, extra };
+    const board = { name: j.name || "", bg: BGS.includes(j.bg) ? j.bg : "dark", view, strokes, images, extra };
     return { ok: true, board, readOnly: j.v > VERSION, v: j.v };
   }
 
@@ -333,6 +387,6 @@
     ZMIN, ZMAX, COORD_MAX, W_MIN, W_MAX, clamp, toWorld, toScreen, anchor, zoomAt, panBy, boundView, inRange, snap,
     penRadius, speedPressure, outline, curve, strokeBox, boxHit, segDist, strokeRadius, hitStroke,
     Grid, tileWorld, tileBox, tilesFor,
-    FORMAT, VERSION, COLORS, BGS, LIMIT, serialize, parse,
+    FORMAT, VERSION, COLORS, BGS, LIMIT, MIMES, IMG_MIN, serialize, parse, b64Ok, b64Bytes, b64Decode, imageBox,
   };
 });

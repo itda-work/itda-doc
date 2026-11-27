@@ -69,6 +69,17 @@ class El {
   blur() {}
   select() {}
   getContext() { if (this.tag !== "canvas") return null; this.ctx = this.ctx || ctx2d(); return this.ctx; }
+  // 그림 시험용: canvas 의 toDataURL 은 그린 그림의 크기·투명을 머리 「IMG 폭 높이 투명」 에 싣고 world.imgK × 화소 수 만큼 채운 바이트의 base64 다.
+  // file input 의 click 은 연 수를 센다(고른 파일은 시험이 files 에 넣고 change 를 보낸다).
+  toDataURL(type) {
+    const src = this.ctx && this.ctx._src, alpha = !!(src && src.alpha), k = world.cur.imgK == null ? 0.05 : world.cur.imgK;
+    const head = "IMG " + this.width + " " + this.height + " " + (alpha ? 1 : 0) + " ";
+    const body = head + "x".repeat(Math.max(0, Math.floor(this.width * this.height * k) - head.length));
+    const mime = type === "image/jpeg" ? "image/jpeg" : "image/png";
+    (world.cur.encodes = world.cur.encodes || []).push({ w: this.width, h: this.height, mime, bytes: body.length });
+    return "data:" + mime + ";base64," + Buffer.from(body, "latin1").toString("base64");
+  }
+  click() { this.clicked = (this.clicked || 0) + 1; }
   cloneNode(deep) {
     const c = new El(this.tag); c.className = this.className; c.attrs = { ...this.attrs }; c.dataset = { ...this.dataset }; c._text = this._text;
     if (deep) for (const k of this.kids) c.appendChild(k.cloneNode(true));
@@ -76,10 +87,26 @@ class El {
   }
   listeners(t, capture) { return (this.on[t] || []).filter(x => capture === undefined || x.capture === capture).length; }
 }
-// ctx2d 는 그리기 명령을 버린다(세는 것만 — fills·strokes).
+// ctx2d 는 그리기 명령을 버린다(세는 것만 — fills·strokes). ops 는 clearRect·drawImage·fill·fillRect 의 차례다(그림이 획 아래인가 — 최근 것만 든다).
+// drawImage 는 그린 원천을 _src 로 둔다(가짜 toDataURL·getImageData 가 그 투명을 본다).
+// draws 는 drawImage 의 원천과 그때 setTransform 의 평행 이동 tx 다({ src, tx } — 그림 층의 그리기 차례·자리를 본다, 최근 것만).
 function ctx2d() {
-  const t = { fills: 0, strokes: 0 };
-  return new Proxy(t, { get(o, k) { if (k in o) return o[k]; if (k === "fill") return () => { o.fills++; }; if (k === "stroke") return () => { o.strokes++; }; return () => {}; }, set(o, k, v) { o[k] = v; return true; } });
+  const t = { fills: 0, strokes: 0, ops: [], draws: [], _src: null, _t: null };
+  const op = (o, x) => { o.ops.push(x); if (o.ops.length > 4000) o.ops.splice(0, 2000); };
+  return new Proxy(t, { get(o, k) {
+    if (k in o) return o[k];
+    if (k === "fill") return () => { o.fills++; op(o, "fill"); };
+    if (k === "stroke") return () => { o.strokes++; };
+    if (k === "clearRect") return () => op(o, "clear");
+    if (k === "fillRect") return () => op(o, "rect");
+    if (k === "setTransform") return (...a) => { o._t = a; };
+    if (k === "drawImage") return src => {
+      o._src = src; op(o, src && src.tag === "canvas" ? "canvas" : "img");
+      o.draws.push({ src, tx: o._t ? o._t[4] : 0 }); if (o.draws.length > 4000) o.draws.splice(0, 2000);
+    };
+    if (k === "getImageData") return () => ({ data: new Uint8ClampedArray([0, 0, 0, o._src && o._src.alpha ? 0 : 255, 0, 0, 0, 255]) });
+    return () => {};
+  }, set(o, k, v) { o[k] = v; return true; } });
 }
 class Path2D { constructor(d) { this.d = d; this.n = 0; } moveTo() { this.n++; } lineTo() { this.n++; } closePath() {} arc() { this.n++; } }
 
@@ -102,9 +129,25 @@ function world(files) {
   const doc = new El("#document"), win = new El("window"), body = new El("body");
   doc.body = body; body.parentNode = doc; doc.activeElement = body; doc.visibilityState = "visible";
   win.document = doc;
-  doc.createElement = t => new El(t.toLowerCase());
+  const w = { doc, win, body, raf: [], timers: new Map(), clock: 1000, seq: 0, bitmaps: [], canvases: [], imgK: 0.05, encodes: [] };
+  doc.createElement = t => { const e = new El(t.toLowerCase()); if (e.tag === "canvas") w.canvases.push(e); return e; };
   doc.createElementNS = (ns, t) => new El(t);
-  const w = { doc, win, body, raf: [], timers: new Map(), clock: 1000, seq: 0 };
+  // 가짜 createImageBitmap: 시험이 만든 파일({ type, _img: { w, h, alpha, bad } })은 그 크기로, Blob(판 본문의 data 를 푼 것)은 바이트의 머리
+  // 「IMG 폭 높이 투명」 으로, canvas 는 그 폭·높이로 디코드한다(머리가 없거나 bad 면 거부 — 디코드 실패). 만든 bitmap 은 w.bitmaps 에 남는다(close 했는가를 본다).
+  win.Blob = Blob;
+  win.createImageBitmap = async src => {
+    let info = null;
+    if (src && src.tag === "canvas") info = { w: src.width, h: src.height, alpha: !!(src.ctx && src.ctx._src && src.ctx._src.alpha), from: "canvas" }; // 줄인 canvas(fitBitmap)
+    else if (src && src._img) info = src._img;
+    else if (src && typeof src.arrayBuffer === "function") {
+      const m = /^IMG (\d+) (\d+) (\d)/.exec(Buffer.from(await src.arrayBuffer()).toString("latin1"));
+      if (m) info = { w: +m[1], h: +m[2], alpha: m[3] === "1" };
+    }
+    if (!info || info.bad) throw new Error("디코드 실패");
+    const b = { width: info.w, height: info.h, alpha: !!info.alpha, closed: false, close() { this.closed = true; } };
+    w.bitmaps.push(b);
+    return b;
+  };
   world.cur = w;
   Object.assign(win, {
     devicePixelRatio: 2, navigator: { platform: "MacIntel" }, matchMedia: () => ({ matches: false }), TextEncoder,
@@ -119,6 +162,7 @@ function world(files) {
   win.setTimeout = setTimeout_; win.clearTimeout = clearTimeout_;
   const ctx = vm.createContext({ window: win, document: doc, URL, performance: win.performance, setTimeout: setTimeout_, clearTimeout: clearTimeout_,
     setInterval: () => 0, clearInterval() {}, requestAnimationFrame: win.requestAnimationFrame, console, TextEncoder });
+  w.ctx = ctx;
   for (const f of files || ["wbcore.js", "whiteboard.js"]) vm.runInContext(fs.readFileSync(path.join(webDir, f), "utf8"), ctx, { filename: f });
   w.W = win.ItdaWhiteboard;
   w.C = win.ItdaWbCore;
@@ -358,7 +402,7 @@ function boardText(C, n, o) {
     ok("표면: style 속성을 쓰지 않는다", root.querySelectorAll("*").every(e => !("style" in e.attrs)));
     const bar = root.querySelector(".itda-wb-bar");
     const acts = bar.kids.map(b => b.dataset.act + (b.dataset.tool || b.dataset.pop || ""));
-    ok("도구 막대: 펜·형광펜·지우개·색·굵기(색과 따로)·되돌리기·다시·배경·목록·닫기", acts.join() === "toolpen,toolhl,toolerase,popcolor,popwidth,undo,redo,popbg,list,close", acts);
+    ok("도구 막대: 펜·형광펜·지우개·고르기·그림·색·굵기(색과 따로)·되돌리기·다시·배경·목록·닫기", acts.join() === "toolpen,toolhl,toolerase,toolselect,image,popcolor,popwidth,undo,redo,popbg,list,close", acts);
     click(w, btn(root, "pop", { pop: "color" }));
     ok("색: 팝오버에 8개", !root.querySelector(".itda-wb-pop-color").hidden && root.querySelectorAll(".itda-wb-pop-color button").length === 8);
     click(w, btn(root, "pop", { pop: "width" }));
@@ -1803,6 +1847,654 @@ function boardText(C, n, o) {
     ok("기한2: 첫 save 를 합쳐 요청부터 8초에 잠근 채 「판을 열지 못했습니다」·목록", D.engine.locked() && /판을 열지 못했습니다/.test(noteOf(a.root)) && !a.root.querySelector(".itda-wb-list").hidden && D.state.task === null, [D.engine.locked(), noteOf(a.root)]);
     m.calls.filter(c => !c.done).forEach(c => c.res()); await settle();
     await w.W.close();
+  }
+
+  // ---- 12. 그림(itda-hyve#699 ④-1a 추가): 형식(images 왕복·검증 거부·없는 옛 본문), 넣기(paste·파일 고르기·안 넣는 경우·줄이기·상한),
+  // 고르기 도구(고르기·풀기·겹침·격자 옮기기·크기·손가락·Esc·지우기), 되돌리기, 지우개, 그리기 차례, 디코드 실패 보존, bitmap close, 미리보기
+  {
+    const imgFile = (wd, ht, alpha, extra) => ({ type: alpha ? "image/png" : "image/jpeg", _img: Object.assign({ w: wd, h: ht, alpha: !!alpha }, extra) });
+    const paste = (w, list, target) => dispatch(w, target || focused(w), "paste", { clipboardData: {
+      items: list.map(f => (f.kind ? f : { kind: "file", type: f.type, getAsFile: () => f })), files: [] } });
+    const settleImg = async w => { await settle(30); frames(w, 3); };
+    const b64 = s => Buffer.from(s, "latin1").toString("base64");
+    const imgData = (wd, ht, alpha) => b64("IMG " + wd + " " + ht + " " + (alpha ? 1 : 0) + " xxxx");
+    const imgBoard = (C, images, o) => C.serialize(Object.assign({ name: "그림판", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [], images }, o));
+    const imgs = eng => [...eng.images.values()].sort((a, b) => a.id - b.id);
+    const noteTxt = root => root.querySelector(".itda-wb-note").hidden ? "" : root.querySelector(".itda-wb-note").textContent;
+    const mouse = (w, t, type, x, y, o) => ptr(w, t, type, Object.assign({ pointerId: 1, pointerType: "mouse", clientX: x, clientY: y }, o));
+    const drag = (w, t, from, to, o) => { mouse(w, t, "pointerdown", from[0], from[1], o); w.clock += 4; mouse(w, t, "pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2, o); w.clock += 4; mouse(w, t, "pointermove", to[0], to[1], o); mouse(w, t, "pointerup", to[0], to[1], o); frames(w, 1); };
+
+    // 형식
+    {
+      const { C } = world();
+      const d1 = imgData(200, 100, false), d2 = imgData(50, 50, true);
+      const text = imgBoard(C, [{ x: 1.234, y: -5, w: 320, h: 160.005, mime: "image/jpeg", data: d1 }, { x: 64, y: 64, w: 32, h: 32, mime: "image/png", data: d2 }]);
+      const j = JSON.parse(text), r = C.parse(text);
+      ok("그림 형식: images 는 x·y·w·h·mime·data 꼴, 넣은 차례, 좌표는 둘째 자리", Array.isArray(j.images) && Object.keys(j.images[0]).join() === "x,y,w,h,mime,data" && j.images[0].x === 1.23 && j.images[0].h === 160.01 && j.images[1].mime === "image/png", j.images);
+      ok("그림 형식: 왕복 — 읽은 판을 다시 쓰면 같은 본문", r.ok && r.board.images.length === 2 && r.board.images[0].data === d1 && C.serialize(r.board) === text, r);
+      ok("그림 형식: 그림이 없으면 images 키를 쓰지 않는다(옛 본문과 같다)", !("images" in JSON.parse(boardText(C, 2))) && boardText(C, 2) === C.serialize(Object.assign(C.parse(boardText(C, 2)).board, { images: [] })));
+      ok("그림 형식: images 가 없는 옛 본문도 읽는다(빈 배열)", C.parse(boardText(C, 1)).ok && C.parse(boardText(C, 1)).board.images.length === 0);
+      const base = () => JSON.parse(text);
+      const rej = (name, mut, re, lim) => { const o = base(); mut(o); const p = C.parse(JSON.stringify(o), lim); ok("그림 검증: " + name, !p.ok && (!re || re.test(p.error)), p); };
+      rej("mime 이 png·jpeg 가 아니면 거부", o => { o.images[0].mime = "image/svg+xml"; }, /mime/);
+      rej("data 에 base64 가 아닌 글자가 있으면 거부", o => { o.images[0].data = "AAA!"; }, /base64/);
+      rej("data 길이가 4 의 배수가 아니면 거부", o => { o.images[0].data = "AAAAA"; }, /base64/);
+      rej("data 가 비면 거부", o => { o.images[0].data = ""; }, /base64/);
+      rej("data 가 data URL 이면 거부", o => { o.images[0].data = "data:image/png;base64," + d2; }, /base64/);
+      rej("w 가 0 이면 거부", o => { o.images[0].w = 0; }, /w·h/);
+      rej("h 가 유한하지 않으면 거부", o => { o.images[0].h = "1"; }, /w·h/);
+      rej("x 가 좌표 범위 밖이면 거부", o => { o.images[0].x = 2e9; }, /x·y/);
+      rej("images 가 배열이 아니면 거부", o => { o.images = {}; }, /images/);
+      rej("그림 수가 상한을 넘으면 거부", () => {}, /그림이 상한/, { strokes: 10, points: 10, images: 1 });
+      rej("그림 바이트 합이 상한을 넘으면 거부", () => {}, /바이트/, { strokes: 10, points: 10, images: 10, imageBytes: C.b64Bytes(d1) + C.b64Bytes(d2) - 1 });
+      ok("그림 검증: 상한 상수는 그림 200·24MB, 바이트 합이 딱 상한이면 읽는다", C.LIMIT.images === 200 && C.LIMIT.imageBytes === 24 * 1024 * 1024
+        && C.parse(text, { strokes: 10, points: 10, images: 2, imageBytes: C.b64Bytes(d1) + C.b64Bytes(d2) }).ok);
+      {
+        const raw = Buffer.from([0, 1, 2, 250, 251, 252, 253, 254, 255, 7]);
+        const okAll = [raw.subarray(0, 10), raw.subarray(0, 9), raw.subarray(0, 8)].every(b => { const s = b.toString("base64"); return C.b64Ok(s) && C.b64Bytes(s) === b.length && Buffer.from(C.b64Decode(s)).equals(b); });
+        ok("base64: 패딩 0·1·2 개 모두 바이트 수·풀기가 맞다", okAll);
+      }
+      ok("그림 형식: 쓸 때 w·h 는 0.01 아래로 내려가지 않는다", JSON.parse(imgBoard(C, [{ x: 0, y: 0, w: 0.001, h: 5, mime: "image/png", data: d2 }])).images[0].w === 0.01);
+      let threw = null;
+      try { imgBoard(C, [{ x: 1e10, y: 0, w: 5, h: 5, mime: "image/png", data: d2 }]); } catch (e) { threw = e; }
+      ok("그림 형식: 쓸 때 x 가 범위 밖이면 RangeError", threw instanceof RangeError || (threw && threw.name === "RangeError"), threw && threw.message);
+    }
+
+    // 넣기 — paste 로 화면 가운데에, 격자에 맞춰, 고르기 도구로
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { root, stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      w.W.debug().prefs.tool = "pen";
+      const kv = key(w, null, "v", "KeyV", { metaKey: true }), kc = key(w, null, "v", "KeyV", { ctrlKey: true });
+      ok("넣기: ⌘V·Ctrl+V 키는 기본 동작을 막지 않는다(막으면 paste 사건이 오지 않는다) — 아래 화면으로는 보내지 않고 도구도 바꾸지 않는다",
+        !kv.dp && !kc.dp && kv.stopped && D.prefs.tool === "pen");
+      const e = paste(w, [{ kind: "string", type: "text/plain", getAsFile: () => null }]);
+      await settleImg(w);
+      ok("넣기: 클립보드에 그림이 없으면 아무 일도 없다(아래 화면으로 보내지도 않는다)", eng.images.size === 0 && !e.dp && e.stopped && noteTxt(root) === "");
+      const e2 = paste(w, [{ kind: "string", type: "text/plain", getAsFile: () => null }, imgFile(1000, 500, false)]);
+      await settleImg(w);
+      const im = imgs(eng)[0];
+      ok("넣기: paste 의 image/* 항목 하나를 넣는다(기본 동작을 막는다)", e2.dp && eng.images.size === 1 && im && im.mime === "image/jpeg", eng.stats());
+      ok("넣기: 화면 가운데, 긴 변 480 화면 px, 왼쪽 위와 폭이 격자(32)에 맞고 높이는 비율대로", im.x === 416 && im.y === 256 && im.w === 480 && im.h === 240, [im.x, im.y, im.w, im.h]);
+      ok("넣기: 넣은 뒤 고르기 도구로 바뀌고 그 그림이 골라진다", D.prefs.tool === "select" && eng.selected() === im && stage.classList.contains("selecting"));
+      ok("넣기: 디코드된 bitmap 을 든다", im.bmp && im.state === "ok" && !im.bmp.closed);
+      ok("넣기: 고른 그림 옆에 「지우기」 단추", !root.querySelector(".itda-wb-imgdel").hidden && root.querySelector(".itda-wb-imgdel").style.left === "904px", root.querySelector(".itda-wb-imgdel").style.left);
+      advance(w, 2100); await settle();
+      const saved = w.C.parse(ctl.lastSave);
+      ok("넣기: 판 파일 안에 들어가 저장된다(mime·data·자리)", saved.ok && saved.board.images.length === 1 && saved.board.images[0].data === im.data && saved.board.images[0].x === 416, saved.error);
+      // 작은 그림은 원래 크기
+      paste(w, [imgFile(100, 50, true)]);
+      await settleImg(w);
+      const small = imgs(eng)[1];
+      ok("넣기: 원래 크기가 480 보다 작으면 원래 크기(폭은 격자 배수), 투명이 있으면 PNG", small && small.w === 96 && small.h === 48 && small.mime === "image/png", small && [small.w, small.h, small.mime]);
+      // 확대한 채 넣으면 화면 px 기준
+      eng.view = { x: eng.view.x, y: eng.view.y, z: 2 };
+      paste(w, [imgFile(1000, 500, false)]);
+      await settleImg(w);
+      const z2 = imgs(eng)[2];
+      ok("넣기: 처음 크기는 화면 px 기준(배율 2 면 판 단위 240 → 격자 배수 256)", z2 && z2.w === 256 && z2.h === 128 && z2.x % 32 === 0 && z2.y % 32 === 0, z2 && [z2.x, z2.y, z2.w]);
+      await w.W.close();
+    }
+    // 넣지 않는 경우 — 입력 칸 초점·잠금·읽기 전용
+    {
+      const w = world(), mem = w.W.memoryStore();
+      await mem.create("가"); await mem.save("wb1", boardText(w.C, 1, { name: "가" }));
+      const { root, D } = await openWb(w, mem, { id: "wb1" });
+      const eng = D.engine;
+      click(w, btn(root, "list")); await settle();
+      click(w, root.querySelectorAll(".itda-wb-item")[0].querySelectorAll("button").find(b => b.dataset.act === "rename")); await settle();
+      const inp = root.querySelector(".itda-wb-rename");
+      const e = paste(w, [imgFile(300, 300, false)]);
+      await settleImg(w);
+      ok("안 넣음: 이름 칸에 초점이 있으면 글자 붙여넣기로 두고 그림을 넣지 않는다", inp && w.doc.activeElement === inp && eng.images.size === 0 && !e.dp && !e.stopped);
+      key(w, null, "Escape", "Escape"); key(w, null, "Escape", "Escape");
+      eng.lock(true);
+      paste(w, [imgFile(300, 300, false)]);
+      await settleImg(w);
+      ok("안 넣음: 잠긴 동안", eng.images.size === 0);
+      eng.lock(false);
+      // 준비하는 사이 잠기면 버린다
+      paste(w, [imgFile(300, 300, false)]);
+      eng.lock(true);
+      await settleImg(w);
+      ok("안 넣음: 준비하는 사이 잠기면 버린다", eng.images.size === 0);
+      eng.lock(false);
+      await w.W.close();
+      const w2 = world(), m2 = w2.W.memoryStore();
+      await m2.create("새"); await m2.save("wb1", JSON.stringify(Object.assign(JSON.parse(imgBoard(w2.C, [{ x: 0, y: 0, w: 320, h: 160, mime: "image/jpeg", data: imgData(200, 100) }])), { v: 2 })));
+      const b = await openWb(w2, m2, { id: "wb1" });
+      await settleImg(w2);
+      paste(w2, [imgFile(300, 300, false)]);
+      await settleImg(w2);
+      ok("안 넣음: 읽기 전용 판(안내한다) — 그 판의 그림은 보인다", b.D.engine.readOnly() && b.D.engine.images.size === 1 && imgs(b.D.engine)[0].state === "ok" && /읽기 전용/.test(noteTxt(b.root)), noteTxt(b.root));
+      key(w2, null, "v", "KeyV");
+      const v0 = b.D.engine.view.x;
+      drag(w2, b.stage, [100, 100], [150, 100]);
+      ok("안 넣음: 읽기 전용이면 고르기 도구의 끌기도 이동이다(그림은 그대로)", imgs(b.D.engine)[0].x === 0 && b.D.engine.view.x !== v0 && b.D.engine.selected() === null);
+      ok("안 넣음: 읽기 전용이면 「그림」 단추가 꺼진다", btn(b.root, "image").disabled);
+      await w2.W.close();
+    }
+    // 파일 고르기·줄이기·상한
+    {
+      const w = world();
+      const { root, D } = await openWb(w, w.W.memoryStore());
+      const eng = D.engine, fileIn = root.querySelector(".itda-wb-file");
+      click(w, btn(root, "image"));
+      ok("파일 고르기: 「그림」 단추가 accept=image/* 파일 칸을 연다", fileIn && fileIn.type === "file" && fileIn.accept === "image/*" && fileIn.clicked === 1 && fileIn.hidden);
+      fileIn.files = [imgFile(4000, 3000, false)];
+      w.encodes.length = 0;
+      dispatch(w, fileIn, "change", {});
+      await settleImg(w);
+      const a = imgs(eng)[0];
+      ok("파일 고르기: 고른 그림을 넣는다", eng.images.size === 1 && a);
+      ok("줄이기: 긴 변이 2000 을 넘으면 2000 으로 줄여 JPEG 로 인코드", w.encodes.length === 1 && w.encodes[0].w === 2000 && w.encodes[0].h === 1500 && w.encodes[0].mime === "image/jpeg", w.encodes);
+      ok("줄이기: 판 본문에 든 그림이 줄인 크기다", /^IMG 2000 1500 0/.test(Buffer.from(a.data, "base64").toString("latin1")) && a.w === 480 && a.h === 360);
+      w.imgK = 1; w.encodes.length = 0;
+      paste(w, [imgFile(4000, 3000, false)]);
+      await settleImg(w);
+      const sizes = w.encodes.map(x => x.w + "x" + x.h).join();
+      ok("줄이기: 1.5MB 를 넘으면 긴 변을 0.75 배씩 줄여 다시 인코드", sizes === "2000x1500,1500x1125,1125x844" && eng.images.size === 2 && imgs(eng)[1].bytes <= 1.5 * 1024 * 1024, sizes);
+      w.imgK = 100; w.encodes.length = 0;
+      paste(w, [imgFile(4000, 3000, false)]);
+      await settleImg(w);
+      ok("상한: 4번 줄여도 1.5MB 를 넘으면 넣지 않고 안내(인코드 5번)", eng.images.size === 2 && w.encodes.length === 5 && /1\.5MB/.test(noteTxt(root)), [w.encodes.length, noteTxt(root)]);
+      w.imgK = 0.05;
+      paste(w, [imgFile(10, 10, false, { bad: true })]);
+      await settleImg(w);
+      ok("상한: 디코드하지 못하는 그림은 넣지 않고 안내", eng.images.size === 2 && /읽지 못해/.test(noteTxt(root)), noteTxt(root));
+      w.C.LIMIT.images = 2;
+      paste(w, [imgFile(100, 100, false)]);
+      await settleImg(w);
+      ok("상한: 그림 수 상한이면 넣지 않고 안내", eng.images.size === 2 && /가득/.test(noteTxt(root)), noteTxt(root));
+      w.C.LIMIT.images = 200; w.C.LIMIT.imageBytes = eng.stats().imageBytes + 10;
+      paste(w, [imgFile(100, 100, false)]);
+      await settleImg(w);
+      ok("상한: 그림 바이트 합 상한이면 넣지 않고 안내", eng.images.size === 2 && /가득/.test(noteTxt(root)));
+      w.C.LIMIT.imageBytes = 24 * 1024 * 1024;
+      await w.W.close();
+    }
+    // 고르기 도구 — 고르기·풀기·겹침·격자 옮기기·크기·되돌리기·지우기·Esc
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { root, stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      paste(w, [imgFile(1000, 500, false)]);
+      await settleImg(w);
+      const im = imgs(eng)[0];
+      eng.select(null); frames(w, 1);
+      ok("고르기: 풀면 「지우기」 단추를 숨긴다", root.querySelector(".itda-wb-imgdel").hidden);
+      mouse(w, stage, "pointerdown", 500, 300); mouse(w, stage, "pointerup", 500, 300); frames(w, 1);
+      ok("고르기: 그림을 누르면 골라진다(움직이지 않으면 되돌리기 단계가 없다)", eng.selected() === im && eng.stats().undo === 1);
+      mouse(w, stage, "pointerdown", 100, 100); mouse(w, stage, "pointerup", 100, 100);
+      ok("고르기: 빈 곳을 누르면 풀린다", eng.selected() === null);
+      const v0 = eng.view.x;
+      drag(w, stage, [100, 100], [160, 100]);
+      ok("고르기: 빈 곳을 마우스로 끌면 판 이동", eng.view.x === v0 - 60 && im.x === 416, [eng.view.x, v0]);
+      drag(w, stage, [160, 100], [100, 100]);
+      // 옮기기
+      ctl.log = [];
+      mouse(w, stage, "pointerdown", 500, 300); w.clock += 4;
+      mouse(w, stage, "pointermove", 530, 310);
+      for (const c of w.canvases) if (c.ctx) c.ctx.ops.length = 0; // 이 프레임에 그린 것만 본다
+      frames(w, 1);
+      ok("옮기기: 끄는 동안 옅은 격자(바탕이 격자가 아니어도)·조작 중 자리는 mode.g(그림은 뗄 때까지 제자리)", eng.snapping() && stage.classList.contains("snapping") && im.x === 416 && eng.mode.g.x === 448, eng.mode && eng.mode.g);
+      {
+        const rebaked = w.canvases.filter(c => c.width === 512 && c.ctx && c.ctx.ops.includes("clear")), liveC = stage.querySelector(".itda-wb-live"), imgC = stage.querySelector(".itda-wb-img");
+        const last = imgC.ctx.draws[imgC.ctx.draws.length - 1];
+        ok("옮기기: 끄는 그림은 그림 층에 지금 자리로 그리고, live 층에는 그림이 없고, 획 타일은 다시 굽지 않는다",
+          rebaked.length === 0 && !liveC.ctx.ops.includes("img") && last && last.src === im.bmp && last.tx === 448 * 2 + Math.round(-eng.view.x * 2), [rebaked.length, liveC.ctx.ops, last && last.tx]);
+      }
+      mouse(w, stage, "pointermove", 550, 320);
+      advance(w, 2100); await settle();
+      ok("옮기기: 끄는 동안은 저장하지 않는다", ctl.log.filter(x => /^save/.test(x)).length === 0, ctl.log);
+      mouse(w, stage, "pointerup", 550, 320); frames(w, 1);
+      ok("옮기기: 왼쪽 위가 격자에 붙는다(+50,+20 → 480,288)", im.x === 480 && im.y === 288 && im.w === 480 && im.h === 240 && !im.live && !eng.snapping() && !stage.classList.contains("snapping"), [im.x, im.y]);
+      advance(w, 2100); await settle();
+      ok("옮기기: 뗀 뒤 자동 저장", w.C.parse(ctl.lastSave).board.images[0].x === 480);
+      // 크기 — 오른쪽 아래 귀
+      mouse(w, stage, "pointerdown", 962, 530); w.clock += 4; // 귀(960, 528) 옆
+      mouse(w, stage, "pointermove", 1080, 600); mouse(w, stage, "pointerup", 1080, 600); frames(w, 1);
+      ok("크기: 귀를 끌면 비율을 지키고 폭이 격자 배수, 맞은편 귀(왼쪽 위) 고정", im.x === 480 && im.y === 288 && im.w === 608 && im.h === 304, [im.x, im.y, im.w, im.h]);
+      mouse(w, stage, "pointerdown", 1088, 592); w.clock += 4;
+      mouse(w, stage, "pointermove", 300, 100); mouse(w, stage, "pointerup", 300, 100); frames(w, 1);
+      ok("크기: 최소 폭은 격자 한 칸", im.w === 32 && im.h === 16 && im.x === 480 && im.y === 288, [im.w, im.h]);
+      // 왼쪽 위 귀 — 오른쪽 아래 고정
+      mouse(w, stage, "pointerdown", 481, 289); w.clock += 4;
+      mouse(w, stage, "pointermove", 300, 200); mouse(w, stage, "pointerup", 300, 200); frames(w, 1);
+      ok("크기: 왼쪽 위 귀를 끌면 오른쪽 아래가 고정, 움직인 귀의 x 가 격자에", im.x + im.w === 512 && near(im.y + im.h, 304) && im.x % 32 === 0 && im.w === 224 && near(im.h, 112), [im.x, im.y, im.w, im.h]);
+      // 되돌리기·다시 하기 — 크기·옮기기·넣기
+      const geo = () => [im.x, im.y, im.w, im.h].join();
+      key(w, null, "z", "KeyZ", { metaKey: true }); frames(w, 1);
+      ok("되돌리기: 크기 한 단계", geo() === "480,288,32,16", geo());
+      key(w, null, "z", "KeyZ", { metaKey: true }); key(w, null, "z", "KeyZ", { metaKey: true }); key(w, null, "z", "KeyZ", { metaKey: true });
+      ok("되돌리기: 옮기기 한 단계", geo() === "416,256,480,240", geo());
+      key(w, null, "z", "KeyZ", { metaKey: true });
+      ok("되돌리기: 넣기 한 단계(그림이 빠지고 고르기가 풀린다)", eng.images.size === 0 && eng.selected() === null);
+      key(w, null, "z", "KeyZ", { metaKey: true, shiftKey: true }); key(w, null, "z", "KeyZ", { metaKey: true, shiftKey: true });
+      ok("다시 하기: 넣기·옮기기", eng.images.size === 1 && geo() === "480,288,480,240", geo());
+      // 지우기 — Delete 키·되돌리기·Backspace·단추
+      eng.select(im); key(w, null, "Delete", "Delete");
+      ok("지우기: Delete 로 고른 그림을 지운다", eng.images.size === 0 && eng.selected() === null);
+      key(w, null, "z", "KeyZ", { metaKey: true });
+      ok("되돌리기: 지우기 한 단계(되살린 그림은 bitmap 을 그대로 든다)", eng.images.size === 1 && im.bmp && !im.bmp.closed);
+      eng.select(im); key(w, null, "Backspace", "Backspace");
+      ok("지우기: Backspace", eng.images.size === 0);
+      key(w, null, "z", "KeyZ", { metaKey: true });
+      eng.select(im); frames(w, 1);
+      click(w, root.querySelector(".itda-wb-imgdel"));
+      ok("지우기: 고른 그림 옆 「지우기」 단추", eng.images.size === 0);
+      key(w, null, "z", "KeyZ", { metaKey: true });
+      // 겹침 — 나중에 넣은 것이 잡힌다
+      paste(w, [imgFile(1000, 500, false)]);
+      await settleImg(w);
+      const top = imgs(eng)[1];
+      eng.select(null);
+      mouse(w, stage, "pointerdown", 600, 330); mouse(w, stage, "pointerup", 600, 330);
+      ok("겹침: 겹친 곳을 누르면 나중에 넣은 그림이 골라진다", top && eng.selected() === top && top.id > im.id);
+      // Esc 차례
+      key(w, null, "Escape", "Escape");
+      ok("Esc: 고르기 풀기가 먼저(표면은 열린 채)", eng.selected() === null && w.W.isOpen());
+      // 지우개는 그림을 지우지 않는다, 펜은 그림 위에 그린다
+      key(w, null, "e", "KeyE");
+      drag(w, stage, [420, 260], [900, 500]);
+      ok("지우개: 그림을 지우지 않는다", eng.images.size === 2);
+      key(w, null, "p", "KeyP");
+      const n0 = eng.strokes.size;
+      stroke(w, stage, line(500, 300, 700, 400, 6));
+      ok("펜: 그림 위에 그대로 그린다(고르기 도구가 아니면 그림을 잡지 않는다)", eng.strokes.size === n0 + 1 && imgs(eng)[1].x === top.x);
+      await w.W.close();
+    }
+    // 손가락 — 고르기 도구에서 그림 위에서 시작할 때만 조작
+    {
+      const w = world();
+      const { stage, D } = await openWb(w, w.W.memoryStore());
+      const eng = D.engine;
+      paste(w, [imgFile(1000, 500, false)]);
+      await settleImg(w);
+      const im = imgs(eng)[0];
+      const touch = (type, id, x, y) => ptr(w, stage, type, { pointerId: id, pointerType: "touch", clientX: x, clientY: y, pressure: 0 });
+      const v0 = eng.view.x;
+      touch("pointerdown", 21, 100, 100); w.clock += 4; touch("pointermove", 21, 160, 100); touch("pointerup", 21, 160, 100);
+      ok("손가락: 고르기 도구에서도 빈 곳에서 시작하면 이동(그림은 그대로·고르기도 그대로)", eng.view.x === v0 - 60 && im.x === 416 && eng.selected() === im);
+      touch("pointerdown", 22, 160, 100); touch("pointerup", 22, 160, 100);
+      ok("손가락: 빈 곳을 톡 치면 고르기를 푼다", eng.selected() === null);
+      eng.view = { x: v0, y: eng.view.y, z: 1 };
+      touch("pointerdown", 23, 500, 300); w.clock += 4; touch("pointermove", 23, 600, 300); touch("pointerup", 23, 600, 300);
+      ok("손가락: 고르기 도구에서 그림 위에서 시작하면 그림을 옮긴다", im.x === 512 && eng.view.x === v0, [im.x, eng.view.x]);
+      touch("pointerdown", 24, 600, 300); w.clock += 4; touch("pointermove", 24, 700, 300);
+      touch("pointerdown", 25, 800, 500);
+      ok("손가락: 두 손가락이 되면 하던 그림 조작은 제자리로, 오므리기", im.x === 512 && eng.mode && eng.mode.kind === "pinch" && eng.stats().undo === 2);
+      touch("pointerup", 24, 700, 300); touch("pointerup", 25, 800, 500);
+      key(w, null, "p", "KeyP");
+      const v1 = eng.view.x;
+      touch("pointerdown", 26, 600, 300); w.clock += 4; touch("pointermove", 26, 650, 300); touch("pointerup", 26, 650, 300);
+      ok("손가락: 펜 도구에서는 그림 위에서 시작해도 이동", im.x === 512 && eng.view.x === v1 - 50);
+      key(w, null, "v", "KeyV");
+      ptr(w, stage, "pointerdown", { pointerId: 27, pointerType: "pen", clientX: 100, clientY: 600, pressure: 0.5 }); w.clock += 4;
+      ptr(w, stage, "pointermove", { pointerId: 27, pointerType: "pen", clientX: 130, clientY: 600, pressure: 0.5 });
+      ptr(w, stage, "pointerup", { pointerId: 27, pointerType: "pen", clientX: 130, clientY: 600, pressure: 0 });
+      ok("펜: 고르기 도구에서 빈 곳을 끌면 판 이동", eng.view.x === v1 - 80 && eng.strokes.size === 0);
+      await w.W.close();
+    }
+    // 그리기 차례·디코드 실패 보존·bitmap close·미리보기
+    {
+      const w = world(), ctl = {}, mem = w.W.memoryStore(), store = logged(mem, ctl);
+      await mem.create("가"); await mem.create("나");
+      const bad = b64("깨진 그림 바이트".replace(/[^\x00-\x7f]/g, "?"));
+      await mem.save("wb1", imgBoard(w.C, [{ x: 0, y: 0, w: 320, h: 160, mime: "image/jpeg", data: imgData(200, 100) }, { x: 400, y: 0, w: 64, h: 64, mime: "image/png", data: bad }], { name: "가" }));
+      await mem.save("wb2", imgBoard(w.C, [{ x: 0, y: 0, w: 320, h: 160, mime: "image/png", data: imgData(80, 40, true) }], { name: "나" }));
+      const { root, stage, D } = await openWb(w, store, { id: "wb1" });
+      await settleImg(w);
+      const eng = D.engine, [good, broken] = imgs(eng);
+      ok("열기: 판을 열면 그림을 디코드해 든다", good.state === "ok" && good.bmp && !good.bmp.closed);
+      ok("디코드 실패: 자리 표시로 남는다(판에서 지우지 않는다)", broken.state === "bad" && !broken.bmp && eng.images.size === 2);
+      stroke(w, stage, line(10, 10, 300, 150, 6));
+      advance(w, 2100); await settle();
+      const sv = w.C.parse(ctl.lastSave);
+      ok("디코드 실패: 다시 저장해도 그 그림의 data 를 잃지 않는다", sv.ok && sv.board.images.length === 2 && sv.board.images[1].data === bad && sv.board.strokes.length === 1);
+      // 그리기 차례 — 그림은 그림 층(획 층 아래)에, 획 타일에는 굽지 않는다. 그림을 넣어도 획 타일을 버리지 않는다
+      const imgC = stage.querySelector(".itda-wb-img");
+      ok("층 차례: stage 안 canvas 는 아래부터 그림 → 획 타일(base) → live", stage.kids.filter(k => k.tag === "canvas").map(k => k.className).join() === "itda-wb-img,itda-wb-base,itda-wb-live");
+      for (const c of w.canvases) if (c.ctx) { c.ctx.ops.length = 0; c.ctx.draws.length = 0; }
+      paste(w, [imgFile(1000, 1000, false)]);
+      await settleImg(w);
+      const tilesNow = w.canvases.filter(c => c.width === 512 && c.ctx && c.ctx.ops.includes("clear"));
+      const newest = imgs(eng)[2];
+      ok("그리기 차례: 그림을 넣으면 그림 층만 다시 그린다(획 타일을 다시 굽지 않는다)", tilesNow.length === 0 && imgC.ctx.draws.some(d => d.src === newest.bmp), tilesNow.length);
+      ok("그리기 차례: 획 타일에는 그림이 없다", w.canvases.filter(c => c.width === 512 && c.ctx).every(c => !c.ctx.ops.includes("img")));
+      imgC.ctx.ops.length = 0;
+      eng.setBg("light"); frames(w, 1);
+      ok("그리기 차례: 바탕을 바꾸면 그림 층도 다시 그린다(자리 표시 색이 바탕을 따른다)", imgC.ctx.ops.includes("clear") && imgC.ctx.ops.includes("rect"), imgC.ctx.ops);
+      eng.setBg("dark"); frames(w, 1);
+      const before = w.bitmaps.length;
+      key(w, null, "]", "BracketRight"); await settleImg(w);
+      ok("떠나기: 판을 바꾸면 앞 판의 bitmap 을 모두 close 한다", D.state.id === "wb2" && good.bmp === null && w.bitmaps.slice(0, before).every(b => b.closed), w.bitmaps.map(b => b.closed));
+      const cur2 = imgs(eng)[0];
+      ok("떠나기: 새 판의 그림을 디코드한다", cur2 && cur2.state === "ok" && !cur2.bmp.closed);
+      // 미리보기 — 다른 판(wb1)의 그림을 디코드해 그리고 곧바로 close
+      const nb = w.bitmaps.length;
+      click(w, btn(root, "list")); await settleImg(w);
+      const fresh = w.bitmaps.slice(nb);
+      const thumbs = root.querySelectorAll(".itda-wb-thumb");
+      ok("미리보기: 다른 판의 그림을 디코드해 그리고 곧바로 close 한다", fresh.length >= 2 && fresh.every(b => b.closed) && thumbs.some(c => c.ctx && c.ctx.ops.includes("canvas")), [fresh.length, fresh.map(b => b.closed)]);
+      ok("미리보기: 지금 판은 엔진이 든 bitmap 으로 그린다", thumbs.some(c => c.ctx && c.ctx.ops.includes("img")) && !cur2.bmp.closed);
+      key(w, null, "Escape", "Escape");
+      await w.W.close();
+      ok("닫기: 표면을 떼면 든 bitmap 을 모두 close 한다", w.bitmaps.every(b => b.closed), w.bitmaps.map(b => b.closed));
+    }
+    // 겹침 차례(리뷰 1회차 [3]) — 겹친 두 그림 A(먼저)·B 와 획: 조작 전·중·후 그림 층의 그리기 차례가 넣은 차례 그대로(층 차례로 획 아래),
+    // 끄는 그림은 그림 층의 제 차례에 지금 자리로, live 층에는 그림이 없고, 그림만 옮기면 획 타일을 다시 굽지 않는다. 획 타일 굽기에 그림이 없다.
+    {
+      const w = world(), mem = w.W.memoryStore();
+      await mem.create("겹침");
+      await mem.save("wb1", imgBoard(w.C, [{ x: 0, y: 0, w: 320, h: 320, mime: "image/jpeg", data: imgData(100, 100) }, { x: 160, y: 160, w: 320, h: 320, mime: "image/jpeg", data: imgData(100, 100) }],
+        { name: "겹침", strokes: [{ tool: "pen", color: 0, w: 4, pts: [10, 10, 0.5, 200, 200, 0.5, 400, 400, 0.5] }] }));
+      const { stage, D } = await openWb(w, mem, { id: "wb1" });
+      await settleImg(w);
+      const eng = D.engine, [A, B] = imgs(eng), imgC = stage.querySelector(".itda-wb-img"), liveC = stage.querySelector(".itda-wb-live");
+      const reset = () => { for (const c of w.canvases) if (c.ctx) { c.ctx.ops.length = 0; c.ctx.draws.length = 0; } };
+      const drawn = () => imgC.ctx.draws.map(d => (d.src === A.bmp ? "A" : d.src === B.bmp ? "B" : "?")).join();
+      const txOf = im => { const d = imgC.ctx.draws.find(x => x.src === im.bmp); return d ? d.tx : NaN; };
+      const rebaked = () => w.canvases.filter(c => c.width === 512 && c.ctx && c.ctx.ops.includes("clear")).length;
+      const ox = () => Math.round(-eng.view.x * 2);
+      key(w, null, "v", "KeyV");
+      reset(); eng.view = { x: 1, y: 0, z: 1 }; frames(w, 1);
+      const before = drawn();
+      reset();
+      mouse(w, stage, "pointerdown", 100, 100); w.clock += 4; mouse(w, stage, "pointermove", 300, 300); frames(w, 1);
+      const during = drawn(), duringTx = txOf(A), liveImg = liveC.ctx.ops.includes("img"), rbDuring = rebaked();
+      reset();
+      mouse(w, stage, "pointerup", 300, 300); frames(w, 1);
+      const after = drawn(), afterTx = txOf(A), rbAfter = rebaked();
+      ok("겹침 차례: 조작 전·중·후 그림 층의 그리기 차례가 넣은 차례(A → B) 그대로", before === "A,B" && during === "A,B" && after === "A,B", [before, during, after]);
+      ok("겹침 차례: 끄는 동안 A 는 그림 층의 제 차례에 지금 자리(192)로, 뗀 뒤 그 자리에 남는다", eng.selected() === A && duringTx === 192 * 2 + ox() && A.x === 192 && afterTx === duringTx, [duringTx, afterTx, A.x]);
+      ok("겹침 차례: 끄는 동안 live 층에는 그림이 없다(테두리·손잡이만)", !liveImg && eng.strokes.size === 1);
+      ok("겹침 차례: 그림만 옮기면 획 타일을 다시 굽지 않는다(끄는 동안·뗀 뒤)", rbDuring === 0 && rbAfter === 0, [rbDuring, rbAfter]);
+      reset(); eng.view = { x: 1, y: 0, z: 1.5 }; advance(w, 400); frames(w, 3);
+      const baked = w.canvases.filter(c => c.width === 512 && c.ctx && c.ctx.ops.includes("clear") && c.ctx.ops.includes("fill"));
+      ok("겹침 차례: 획 타일 굽기에 그림이 없다(배율이 바뀌어 다시 구워도)", baked.length > 0 && baked.every(c => !c.ctx.ops.includes("img")) && drawn() === "A,B", [baked.length, drawn()]);
+      ok("층 차례: 그림 층·획 층·live 층이 stage 안에 그 차례로(뒤의 것이 위)", stage.kids.filter(k => k.tag === "canvas").map(k => k.className).join() === "itda-wb-img,itda-wb-base,itda-wb-live");
+      // 끄는 중 휠로 판을 옮겨 처음 자리가 화면 밖이 되어도, 지금 자리가 화면 안이면 그 그림을 그린다(색인은 처음 자리를 든다)
+      eng.view = { x: 0, y: 0, z: 1 }; advance(w, 400); frames(w, 3);
+      mouse(w, stage, "pointerdown", 500, 500); w.clock += 4;
+      dispatch(w, stage, "wheel", { deltaX: 3000, deltaY: 0, deltaMode: 0, clientX: 500, clientY: 500 });
+      reset();
+      mouse(w, stage, "pointermove", 600, 500); frames(w, 1);
+      const offTx = txOf(A);
+      mouse(w, stage, "pointerup", 600, 500); frames(w, 1);
+      ok("겹침 차례: 끄는 그림의 처음 자리가 화면 밖이어도 지금 자리(화면 안)에 그린다", eng.view.x === 3000 && offTx === 3296 * 2 - 6000 && A.x === 3296, [eng.view.x, offTx, A.x]);
+      await w.W.close();
+    }
+    // 크기 조절의 유효성(리뷰 1회차 [1]) — 네 귀 × 좌표 양끝 × 작은 그림(16×16)·극단 비율에서 조절 뒤 serialize 가 던지지 않고 닫힌다.
+    {
+      const M = 1e9;
+      const inside = im => [im.x, im.y, im.w, im.h].every(Number.isFinite) && im.w >= 0.01 && im.h >= 0.01 && im.w <= M && im.h <= M && im.x >= -M && im.y >= -M && im.x + im.w <= M && im.y + im.h <= M;
+      const cases = [
+        { name: "왼쪽 위 끝 16×16", g: { x: -M, y: -M, w: 16, h: 16 }, view: { x: -M, y: -M, z: 8 } },
+        { name: "오른쪽 아래 끝 16×16", g: { x: M - 16, y: M - 16, w: 16, h: 16 }, view: { x: M, y: M, z: 8 } },
+        { name: "왼쪽 끝 16×16(리뷰어 재현 자리)", g: { x: -M, y: 64, w: 16, h: 16 }, view: { x: -M, y: 0, z: 8 } },
+        { name: "오른쪽 위 끝 16×16", g: { x: M - 16, y: -M, w: 16, h: 16 }, view: { x: M, y: -M, z: 8 } },
+        { name: "납작한 그림 4096×0.02 왼쪽 끝", g: { x: -M, y: 0, w: 4096, h: 0.02 }, view: { x: -M, y: -10, z: 0.25 } },
+        { name: "긴 그림 0.02×4096 아래 끝", g: { x: 0, y: M - 4096, w: 0.02, h: 4096 }, view: { x: -10, y: M, z: 0.25 } },
+        { name: "아주 긴 그림 0.01×1e6 위 끝", g: { x: 0, y: -M, w: 0.01, h: 1e6 }, view: { x: -10, y: -M, z: 1 } },
+      ];
+      const moves = [[-1, -1], [1, 1], [-300, -300], [300, 300], [-300, 300], [300, -300]];
+      for (const cs of cases) {
+        const w = world(), mem = w.W.memoryStore();
+        const text = imgBoard(w.C, [Object.assign({ mime: "image/png", data: imgData(16, 16, true) }, cs.g)], { name: "경계", view: cs.view });
+        await mem.create("경계"); await mem.save("wb1", text);
+        const { D, stage } = await openWb(w, mem, { id: "wb1" });
+        await settleImg(w);
+        const eng = D.engine, im = imgs(eng)[0], bad = [];
+        key(w, null, "v", "KeyV");
+        for (let c = 0; c < 4; c++) for (const [dx, dy] of moves) {
+          eng.select(im); frames(w, 1);
+          const a = w.C.toScreen(eng.view, c === 1 || c === 2 ? im.x + im.w : im.x, c === 2 || c === 3 ? im.y + im.h : im.y);
+          mouse(w, stage, "pointerdown", a.x, a.y); w.clock += 4;
+          mouse(w, stage, "pointermove", a.x + dx / 2, a.y + dy / 2); w.clock += 4;
+          if (eng.mode && eng.mode.g && !inside(eng.mode.g)) bad.push({ c, dx, dy, during: eng.mode.g }); // 조작 중 자리도 늘 유효하다
+          mouse(w, stage, "pointermove", a.x + dx, a.y + dy);
+          if (eng.mode && eng.mode.g && !inside(eng.mode.g)) bad.push({ c, dx, dy, during: eng.mode.g });
+          mouse(w, stage, "pointerup", a.x + dx, a.y + dy); frames(w, 1);
+          let err = null;
+          try { w.C.serialize(eng.board()); } catch (e) { err = e.message; }
+          if (err || !inside(im)) bad.push({ c, dx, dy, x: im.x, y: im.y, w: im.w, h: im.h, err });
+        }
+        const closed = await w.W.close();
+        ok("크기 유효성: " + cs.name + " — 네 귀·여러 방향 조절 뒤 serialize 가 던지지 않고 그림이 범위 안, 닫힌다", bad.length === 0 && closed === true, bad.slice(0, 3));
+      }
+      // 리뷰어 재현 값 그대로: x=-1e9, y=64, w=h=16, z=8, 왼쪽 위 귀에서 1px
+      {
+        const w = world(), mem = w.W.memoryStore();
+        await mem.create("경계"); await mem.save("wb1", imgBoard(w.C, [{ x: -M, y: 64, w: 16, h: 16, mime: "image/png", data: imgData(16, 16) }], { name: "경계", view: { x: -M, y: 0, z: 8 } }));
+        const { D, stage } = await openWb(w, mem, { id: "wb1" });
+        await settleImg(w);
+        const eng = D.engine, im = imgs(eng)[0];
+        eng.setTool("select"); eng.select(im); frames(w, 2);
+        const a = w.C.toScreen(eng.view, im.x, im.y);
+        ptr(w, stage, "pointerdown", { pointerId: 91, clientX: a.x, clientY: a.y });
+        ptr(w, stage, "pointermove", { pointerId: 91, clientX: a.x + 1, clientY: a.y + 1 });
+        ptr(w, stage, "pointermove", { pointerId: 91, clientX: a.x - 1, clientY: a.y - 1 });
+        ptr(w, stage, "pointerup", { pointerId: 91, clientX: a.x - 1, clientY: a.y - 1 });
+        let err = null;
+        try { w.C.serialize(eng.board()); } catch (e) { err = e.message; }
+        ok("크기 유효성: 리뷰어 재현(x=-1e9·16×16·z=8·왼쪽 위 귀 1px) — 범위 밖을 만들지 않고 그 움직임을 적용하지 않는다", !err && im.x === -M && im.w === 16 && im.h === 16 && eng.stats().undo === 0, [err, im.x, im.w]);
+        ok("크기 유효성: 리뷰어 재현 뒤 닫기가 된다", await w.W.close() === true);
+      }
+      // 납작한 그림의 높이 하한(IMG_MIN)·범위를 넘어 걸친 옛 그림·뗄 때 다시 보기
+      {
+        const w = world(), mem = w.W.memoryStore();
+        await mem.create("경계");
+        await mem.save("wb1", imgBoard(w.C, [{ x: 0, y: 0, w: 4096, h: 0.02, mime: "image/png", data: imgData(16, 16) },
+          { x: M - 10, y: 200, w: 100, h: 100, mime: "image/png", data: imgData(16, 16) }, { x: 0, y: 400, w: 9344, h: 0.02, mime: "image/png", data: imgData(16, 16) }],
+          { name: "경계", view: { x: -10, y: -10, z: 0.25 } }));
+        const { D, stage } = await openWb(w, mem, { id: "wb1" });
+        await settleImg(w);
+        const eng = D.engine, [flat, over, flat2] = imgs(eng);
+        key(w, null, "v", "KeyV");
+        eng.select(flat); frames(w, 1);
+        const a = w.C.toScreen(eng.view, flat.x + flat.w, flat.y + flat.h);
+        mouse(w, stage, "pointerdown", a.x, a.y); w.clock += 4; mouse(w, stage, "pointermove", a.x - 1000, a.y); mouse(w, stage, "pointerup", a.x - 1000, a.y); frames(w, 1);
+        ok("크기 유효성: 아주 납작한 그림은 높이가 IMG_MIN 아래로 내려가지 않는 격자 배수 폭(2048)에서 멈춘다", flat.w === 2048 && near(flat.h, 0.01) && flat.h >= 0.01 && flat.x === 0, [flat.w, flat.h]);
+        // 부동소수 경계: 9344×0.02 는 4672 폭이면 높이가 0.00999… 라 한 칸 더(4704)에서 멈춘다
+        eng.select(flat2); frames(w, 1);
+        const a2 = w.C.toScreen(eng.view, flat2.x + flat2.w, flat2.y + flat2.h);
+        mouse(w, stage, "pointerdown", a2.x, a2.y); w.clock += 4; mouse(w, stage, "pointermove", a2.x - 3000, a2.y); mouse(w, stage, "pointerup", a2.x - 3000, a2.y); frames(w, 1);
+        ok("크기 유효성: 높이 하한의 부동소수 경계(9344×0.02)에서도 멈춘 폭의 높이가 IMG_MIN 이상(4704)", flat2.w === 4704 && flat2.h >= 0.01, [flat2.w, flat2.h]);
+        eng.view = { x: M - 1200, y: 0, z: 1 }; frames(w, 1);
+        eng.select(over); frames(w, 1);
+        const geo = () => [over.x, over.y, over.w, over.h].join(), g0 = geo(), u0 = eng.stats().undo;
+        const tl = w.C.toScreen(eng.view, over.x, over.y);
+        mouse(w, stage, "pointerdown", tl.x, tl.y); w.clock += 4; mouse(w, stage, "pointermove", tl.x + 40, tl.y + 40); mouse(w, stage, "pointerup", tl.x + 40, tl.y + 40); frames(w, 1);
+        ok("크기 유효성: 범위를 넘어 걸친 옛 그림(x+w > 1e9)의 맞은편 귀가 범위 밖이면 크기 조절을 적용하지 않는다", geo() === g0 && eng.stats().undo === u0, geo());
+        const body = w.C.toScreen(eng.view, over.x + 5, over.y + 50);
+        mouse(w, stage, "pointerdown", body.x, body.y); w.clock += 4; mouse(w, stage, "pointermove", body.x - 3, body.y); mouse(w, stage, "pointerup", body.x - 3, body.y); frames(w, 1);
+        ok("크기 유효성: 그 그림을 옮기면 범위 안으로 들어온다(x+w ≤ 1e9)", over.x + over.w <= M && over.w === 100 && eng.stats().undo === u0 + 1, geo());
+        // 뗄 때 다시 본다 — 조작 중 자리가 (어떤 까닭으로든) 유효하지 않으면 제자리로(되돌리기 단계 없음)
+        const g1 = geo(), u1 = eng.stats().undo, c = w.C.toScreen(eng.view, over.x + 50, over.y + 50);
+        mouse(w, stage, "pointerdown", c.x, c.y); w.clock += 4; mouse(w, stage, "pointermove", c.x - 64, c.y);
+        const ok1 = eng.mode && eng.mode.g && eng.mode.g.x !== over.x;
+        eng.mode.g = { x: M - 50, y: over.y, w: over.w, h: over.h };
+        mouse(w, stage, "pointerup", c.x - 64, c.y); frames(w, 1);
+        ok("크기 유효성: 뗄 때 한 번 더 보아 유효하지 않으면 제자리로 둔다", ok1 && geo() === g1 && eng.stats().undo === u1, geo());
+        ok("크기 유효성: 그 뒤에도 본문을 만들 수 있고 닫힌다", await w.W.close() === true);
+      }
+    }
+    // bitmap 회수(리뷰 1회차 [2]) — 지금 판에도 되돌리기·다시 하기 더미에도 닿지 않는 그림의 bitmap 은 close 한다(늦게 끝난 디코드도).
+    {
+      const w = world(), { D } = await openWb(w, w.W.memoryStore()), eng = D.engine;
+      const data = imgData(64, 64, false), p = { mime: "image/jpeg", data, bytes: w.C.b64Bytes(data), nat: 64 };
+      const openN = () => w.bitmaps.filter(b => !b.closed).length, last = () => imgs(eng)[imgs(eng).length - 1];
+      for (let i = 0; i < 205; i++) { eng.insertImage(p, 64, 64); await settle(); eng.undo(); }
+      ok("bitmap 회수: 넣기 → 되돌리기 → 다른 그림 넣기 205번 뒤 열린 bitmap 은 닿는 그림 수(다시 하기 더미의 하나)와 같다",
+        w.bitmaps.length === 205 && eng.images.size === 0 && eng.stats().undo === 0 && eng.stats().redo === 1 && openN() === 1, [w.bitmaps.length, eng.stats(), openN()]);
+      eng.redo();
+      const A = last();
+      eng.select(A); eng.deleteSelected();
+      eng.insertImage(p, 64, 64); await settle();
+      const B = last();
+      ok("bitmap 회수: 되돌리기 더미에서 닿는 지운 그림은 그대로 든다", A.bmp && !A.bmp.closed && B.bmp && !B.bmp.closed && openN() === 2, openN());
+      eng.undo();
+      eng.insertImage(p, 64, 64); await settle();
+      const Cc = last();
+      ok("bitmap 회수: 새 작업이 버린 다시 하기의 그림은 close, 되돌리기 더미의 지운 그림은 든다", B.bmp === null && A.bmp && !A.bmp.closed && Cc.bmp && openN() === 2, openN());
+      const n0 = w.bitmaps.length;
+      eng.insertImage(p, 64, 64);
+      const X = last();
+      eng.undo(); eng.insertImage(p, 64, 64); // X 는 디코드가 끝나기 전에 닿지 않게 됐다
+      await settle();
+      const fresh = w.bitmaps.slice(n0);
+      ok("bitmap 회수: 늦게 끝난 디코드도 닿지 않는 그림이면 곧바로 close(든 수 = 지금 그림 + 더미에서 닿는 그림)", X.bmp === null && fresh.length === 2 && fresh[0].closed && !fresh[1].closed && openN() === 3 && eng.images.size === 2,
+        [fresh.map(b => b.closed), openN(), eng.images.size]);
+      // 늦게 끝난 디코드: 지웠지만 되돌리기 더미에서 닿는 그림은 든다(되돌리면 그대로 보인다)
+      eng.insertImage(p, 64, 64);
+      const Z = last();
+      eng.select(Z); eng.deleteSelected(); // 디코드가 끝나기 전에 지웠다
+      await settle();
+      ok("bitmap 회수: 늦게 끝난 디코드라도 되돌리기 더미에서 닿는 그림이면 든다", Z.bmp && !Z.bmp.closed && !eng.images.has(Z.id));
+      eng.undo();
+      ok("bitmap 회수: 되돌리면 그 그림이 든 bitmap 으로 돌아온다", eng.images.has(Z.id) && Z.bmp && !Z.bmp.closed);
+      await w.W.close();
+      ok("bitmap 회수: 닫으면 모두 close", openN() === 0);
+    }
+    // bitmap 회수: 파일에서 읽은 그림(더미에 없다)은 지금 판에 있으므로 회수하지 않는다
+    {
+      const w = world(), mem = w.W.memoryStore();
+      await mem.create("가"); await mem.save("wb1", imgBoard(w.C, [{ x: 0, y: 0, w: 320, h: 160, mime: "image/jpeg", data: imgData(200, 100) }], { name: "가" }));
+      const { D } = await openWb(w, mem, { id: "wb1" });
+      await settleImg(w);
+      const eng = D.engine, L = imgs(eng)[0], data = imgData(64, 64, false), p = { mime: "image/jpeg", data, bytes: w.C.b64Bytes(data), nat: 64 };
+      eng.insertImage(p, 64, 64); await settle(); eng.undo();
+      eng.insertImage(p, 64, 64); await settle(); // 버린 다시 하기 — reap
+      ok("bitmap 회수: 파일에서 읽은 지금 판의 그림은 그대로 든다(버린 다시 하기의 그림만 close)", L.bmp && !L.bmp.closed && w.bitmaps.filter(b => !b.closed).length === 2);
+      await w.W.close();
+    }
+    // 큰 그림(리뷰 1회차 의견) — 파일에서 읽은 긴 변 2000 초과 그림은 디코드할 때 줄여 들고 큰 것은 close, 본문의 data·w·h 는 그대로. 미리보기도 같다.
+    {
+      const w = world(), ctl = {}, mem = w.W.memoryStore(), store = logged(mem, ctl);
+      await mem.create("큰 그림"); await mem.create("다른 판");
+      const big = imgData(3000, 1500, false);
+      await mem.save("wb1", imgBoard(w.C, [{ x: 0, y: 0, w: 600, h: 300, mime: "image/jpeg", data: big }], { name: "큰 그림" }));
+      await mem.save("wb2", imgBoard(w.C, [{ x: 0, y: 0, w: 600, h: 300, mime: "image/jpeg", data: big }], { name: "다른 판" }));
+      const { root, stage, D } = await openWb(w, store, { id: "wb1" });
+      await settleImg(w);
+      const eng = D.engine, im = imgs(eng)[0], bigB = w.bitmaps.filter(b => b.width === 3000);
+      ok("큰 그림: 3000×1500 그림은 2000×1000 bitmap 으로 줄여 들고 큰 bitmap 은 close", im.bmp && im.bmp.width === 2000 && im.bmp.height === 1000 && !im.bmp.closed
+        && bigB.length === 1 && bigB[0].closed, w.bitmaps.map(b => b.width + "x" + b.height + (b.closed ? "c" : "")));
+      stroke(w, stage, line(700, 400, 800, 450, 6)); advance(w, 2100); await settle();
+      const sv = w.C.parse(ctl.lastSave);
+      ok("큰 그림: 다시 저장한 본문의 data·w·h 는 그대로", sv.ok && sv.board.images[0].data === big && sv.board.images[0].w === 600 && sv.board.images[0].h === 300 && sv.board.strokes.length === 1);
+      const nb = w.bitmaps.length;
+      click(w, btn(root, "list")); await settleImg(w);
+      const fresh = w.bitmaps.slice(nb);
+      ok("큰 그림: 미리보기 디코드도 줄여 그리고 모두 close", fresh.some(b => b.width === 3000) && fresh.some(b => b.width === 2000 && b.height === 1000) && fresh.every(b => b.closed),
+        fresh.map(b => b.width + "x" + b.height + (b.closed ? "c" : "")));
+      key(w, null, "Escape", "Escape");
+      await w.W.close();
+    }
+  }
+
+  // ---- 13. 쓰는 중 자동 저장이 획을 끊지 않는다(조정 세션 추가 지시): 2초 타이머·save 성공 뒤 「곧바로 한 번 더」 는 그리기·지우기 중이면 미루고,
+  // 뗀 뒤 저장한다. 숨김은 여전히 그 자리에서 확정한다.
+  {
+    const pen = (w, t, type, x, y) => ptr(w, t, type, { pointerId: 31, pointerType: "pen", clientX: x, clientY: y, pressure: type === "pointerup" ? 0 : 0.5 });
+    const saves = ctl => ctl.log.filter(x => /^save/.test(x)).length;
+    const last = (w, ctl) => w.C.parse(ctl.lastSave).board;
+    // 앞 획의 2초가 긴 획 도중에 온다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      advance(w, 2100); await settle(); ctl.log = [];
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      advance(w, 1000);
+      pen(w, stage, "pointerdown", 100, 300);
+      for (let i = 1; i <= 10; i++) { w.clock += 4; pen(w, stage, "pointermove", 100 + i * 20, 300); }
+      advance(w, 1500); await settle(); // 앞 획의 타이머(2초)가 이 획 도중에 온다
+      ok("쓰는 중: 앞 획의 자동 저장이 와도 save 를 부르지 않고 획을 끊지 않는다", saves(ctl) === 0 && eng.mode && eng.mode.kind === "draw" && eng.strokes.size === 1, [saves(ctl), eng.mode && eng.mode.kind]);
+      advance(w, 2100); await settle();
+      ok("쓰는 중: 미룬 타이머가 다시 와도 쥐고 있는 동안은 미룬다", saves(ctl) === 0 && eng.mode && eng.mode.kind === "draw");
+      for (let i = 11; i <= 20; i++) { w.clock += 4; pen(w, stage, "pointermove", 100 + i * 20, 300); }
+      pen(w, stage, "pointerup", 500, 300); frames(w, 1);
+      const s2 = lastStroke(eng);
+      ok("쓰는 중: 뗀 뒤 한 획으로 남는다(점 21개)", eng.strokes.size === 2 && s2.pts.length / 3 === 21, s2 && s2.pts.length / 3);
+      advance(w, 2100); await settle();
+      ok("쓰는 중: 뗀 뒤 자동 저장이 두 획을 한 번에 쓴다", saves(ctl) === 1 && last(w, ctl).strokes.length === 2 && last(w, ctl).strokes[1].pts.length === 63, ctl.log);
+      await w.W.close();
+    }
+    // 저장이 도는 중 긋기 시작한 획 — save 성공 뒤 「곧바로 한 번 더」 가 끊지 않는다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      advance(w, 2100); await settle(); ctl.log = [];
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      ctl.hold.save = true;
+      advance(w, 2100); await settle();
+      ok("저장 중: (준비) 첫 획의 save 가 돌고 있다", saves(ctl) === 1 && ctl.waiting.length === 1);
+      stroke(w, stage, line(100, 200, 200, 200, 4)); // 저장 중 또 바뀜 — 자동 저장 대기(st.timer)
+      pen(w, stage, "pointerdown", 100, 300);
+      for (let i = 1; i <= 5; i++) { w.clock += 4; pen(w, stage, "pointermove", 100 + i * 20, 300); }
+      ctl.hold.save = false; ctl.release(); await settle();
+      ok("저장 중: save 성공 때 쓰는 중이면 곧바로 한 번 더 하지 않는다(획이 끊기지 않는다)", saves(ctl) === 1 && eng.mode && eng.mode.kind === "draw" && eng.strokes.size === 2, [ctl.log, eng.mode && eng.mode.kind]);
+      for (let i = 6; i <= 10; i++) { w.clock += 4; pen(w, stage, "pointermove", 100 + i * 20, 300); }
+      pen(w, stage, "pointerup", 300, 300); frames(w, 1);
+      ok("저장 중: 뗀 뒤 한 획으로 남는다(점 11개)", eng.strokes.size === 3 && lastStroke(eng).pts.length / 3 === 11);
+      advance(w, 2100); await settle();
+      ok("저장 중: 뗀 뒤 자동 저장이 세 획을 쓴다", saves(ctl) === 2 && last(w, ctl).strokes.length === 3, ctl.log);
+      await w.W.close();
+    }
+    // 지우는 중도 같다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      stroke(w, stage, line(100, 100, 300, 100, 4));
+      stroke(w, stage, line(100, 200, 300, 200, 4));
+      advance(w, 2100); await settle();
+      stroke(w, stage, line(100, 400, 300, 400, 4)); // 자동 저장 대기
+      ctl.log = [];
+      key(w, null, "e", "KeyE");
+      const er = (type, x, y) => ptr(w, stage, type, { pointerId: 32, pointerType: "pen", clientX: x, clientY: y, pressure: 0.5 });
+      er("pointerdown", 200, 80); w.clock += 4; er("pointermove", 200, 110);
+      advance(w, 2100); await settle();
+      ok("지우는 중: 자동 저장이 와도 미루고 지우기를 끊지 않는다", saves(ctl) === 0 && eng.mode && eng.mode.kind === "erase" && eng.strokes.size === 2, [saves(ctl), eng.mode && eng.mode.kind]);
+      w.clock += 4; er("pointermove", 200, 160); w.clock += 4; er("pointermove", 200, 210); er("pointerup", 200, 210); frames(w, 1);
+      ok("지우는 중: 뗀 뒤 한 번의 지우기(되돌리기 한 단계에 두 획)", eng.strokes.size === 1 && eng.stats().undo === 4);
+      key(w, null, "z", "KeyZ", { metaKey: true });
+      ok("지우는 중: 되돌리면 두 획이 함께 돌아온다", eng.strokes.size === 3);
+      key(w, null, "z", "KeyZ", { metaKey: true, shiftKey: true });
+      advance(w, 2100); await settle();
+      ok("지우는 중: 뗀 뒤 저장한다", saves(ctl) === 1 && last(w, ctl).strokes.length === 1, ctl.log);
+      await w.W.close();
+    }
+    // 이동(손가락)은 쥐고 있어도 미루지 않는다 — 판을 바꾸지 않으니 끊을 획이 없다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      advance(w, 2100); await settle(); ctl.log = [];
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      const touch = (type, x) => ptr(w, stage, type, { pointerId: 33, pointerType: "touch", clientX: x, clientY: 400, pressure: 0 });
+      touch("pointerdown", 400); w.clock += 4; touch("pointermove", 450);
+      advance(w, 2100); await settle();
+      ok("이동 중: 자동 저장을 미루지 않는다(이동은 그대로 잇는다)", saves(ctl) === 1 && D.engine.mode && D.engine.mode.kind === "pan", [ctl.log, D.engine.mode && D.engine.mode.kind]);
+      touch("pointerup", 450);
+      await w.W.close();
+    }
+    // 숨김은 여전히 그 자리에서 확정한다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const eng = D.engine;
+      advance(w, 2100); await settle(); ctl.log = [];
+      pen(w, stage, "pointerdown", 100, 300);
+      for (let i = 1; i <= 5; i++) { w.clock += 4; pen(w, stage, "pointermove", 100 + i * 20, 300); }
+      w.doc.visibilityState = "hidden"; dispatch(w, w.doc, "visibilitychange", {}); await settle();
+      ok("숨김: 쓰는 중이어도 미루지 않고 그 자리에서 획을 확정해 저장한다", !eng.mode && eng.strokes.size === 1 && saves(ctl) === 1 && last(w, ctl).strokes.length === 1, [eng.mode, ctl.log]);
+      w.doc.visibilityState = "visible";
+      await w.W.close();
+    }
   }
 
   console.log("WHITEBOARD DONE cases=" + cases + " failed=" + failed);

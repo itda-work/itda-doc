@@ -67,17 +67,24 @@
 //   숨겨져 멈춘 페이지·막힌 메인 스레드에서 8초 기한이 벽시계대로 지켜진다고 보장하지 않는다.
 // 잠금: 판을 바꾸는 동안(떠나기 시작부터 새 판이 다 뜰 때까지 — 전환·새 판·지금 판 삭제·처음 열기), 지금 판의 관리 작업 동안, 닫는 동안,
 // 지금 판이 삭제된 뒤(다음 판이 뜰 때까지 — 다음 판 열기가 기한을 넘기면 목록에서 고를 때까지) 표면은
-// 「여는 중」·「닫는 중」 등을 보이고 그리기·지우기·되돌리기·배경 바꾸기를 받지 않는다(이동·확대는 된다 — 펜·마우스 끌기도 이동).
+// 「여는 중」·「닫는 중」 등을 보이고 그리기·지우기·되돌리기·배경 바꾸기·그림 넣기·옮기기·지우기를 받지 않는다(이동·확대는 된다 — 펜·마우스 끌기도 이동.
+// 잠글 때 진행 중 그림 조작은 확정하고 고르기를 푼다).
 //
 // 저장 때(save): 판이 바뀐 뒤 SAVE_QUIET(2초) 조용하면, 그리고 판 전환·새 판·복제·닫기·visibilitychange(hidden)·pagehide 때(숨김은 처리기 안에서
-// 곧바로 commit·put 한다). 저장이 확인됐을 때 자동 저장을 기다리는 변경이 있으면 2초를 기다리지 않고 곧바로 한 번 더 한다. 실패하면 표면 위 한 줄 안내(.itda-wb-note)를 보이고 판은 화면과 기록기에 그대로 두며, 다음 변경 때 다시 한다.
+// 곧바로 commit·put 한다). 저장이 확인됐을 때 자동 저장을 기다리는 변경이 있으면 2초를 기다리지 않고 곧바로 한 번 더 한다.
+// 자동 저장(2초 타이머)과 그 「곧바로 한 번 더」 는 포인터를 쥔 그리기·지우기·그림 조작 중(엔진 busy)이면 부르지 않고 미룬다 — 쓰는 중 획을
+// 끊지 않는다(뗀 뒤의 변경이 타이머를 새로 건다). 떠나는 길·숨김은 미루지 않고 그 자리에서 진행 중 획을 확정한다. 실패하면 표면 위 한 줄 안내(.itda-wb-note)를 보이고 판은 화면과 기록기에 그대로 두며, 다음 변경 때 다시 한다.
 // 판에 좌표 범위 밖 점이 있어 본문을 만들지 못하면(wbcore serialize — 내부 불변식이 깨졌을 때) 저장을 멈추고 판은 엔진에 둔 채 안내한다.
 // 저장소 구분: 기록기·마지막 판·미리보기 캐시는 store 객체마다 따로다 — 같은 id 를 쓰는 두 store 가 섞이지 않는다.
 // 미리보기: 다른 판은 본문을 읽어 작은 canvas 에 그리고 그 canvas 만 캐시한다(store 마다 최대 40개, 오래 쓰지 않은 것부터 버림, 같은 판 요청은 하나로).
-// 상한: 판 하나는 wbcore LIMIT(획·점) 안, 진행 중 획 하나는 STROKE_PTS(2만) 점까지 — 닿으면 그 획을 끝내고 안내한다(떼고 다시 그어야 새 획).
+//   그림은 하나씩 디코드해 그리고 곧바로 close 한다 — 디코드가 안 되는 그림은 옅은 사각형이다.
+// 상한: 판 하나는 wbcore LIMIT(획·점·그림 수·그림 바이트) 안, 진행 중 획 하나는 STROKE_PTS(2만) 점까지 — 닿으면 그 획을 끝내고 안내한다(떼고 다시 그어야 새 획).
+//   든 bitmap 의 화소 합 상한은 없다 — 판의 그림 200개(LIMIT.images)와 되돌리기·다시 하기 더미에서 닿는 지운 그림까지, 그림 하나는 긴 변 IMG_SIDE(2000px)
+//   까지다(파일에서 읽은 큰 그림도 디코드할 때 줄여 든다 — 줄이지 못하면 원래 크기). 화면 밖 그림의 bitmap 도 놓지 않는다.
 // CSP: style 속성 문자열·HTML 문자열을 쓰지 않는다(CSSOM 대입 el.style.x = … 과 클래스만 — style-src 'self' 에서 된다).
-// 「바뀜」 은 획·배경·이름이다. 보기(이동·확대)만 바뀐 것은 저장을 부르지 않고 다음 저장·전환·닫기 때 함께 싣는다.
-// 읽기 전용 — 파일의 v 가 이 판보다 크거나, 본문을 읽지 못했으면(형식·검증 실패, load 실패) 보기만 하고 그리기·배경 바꾸기·저장을 하지 않는다.
+//   그림은 data URL 을 fetch·<img src> 로 읽지 않고 blob URL 도 만들지 않는다 — base64 를 바이트로 풀어 Blob → createImageBitmap(아래 「그림」).
+// 「바뀜」 은 획·배경·이름·그림(넣기·옮기기·크기·지우기)이다. 보기(이동·확대)만 바뀐 것은 저장을 부르지 않고 다음 저장·전환·닫기 때 함께 싣는다.
+// 읽기 전용 — 파일의 v 가 이 판보다 크거나, 본문을 읽지 못했으면(형식·검증 실패, load 실패) 보기만 하고 그리기·배경 바꾸기·그림 넣기·옮기기·저장을 하지 않는다.
 //
 // 입력(엔진 — 화이트보드 기획 ⓪ 스파이크 시제품 wb.js 그대로): Apple Pencil(pen) = 그리기(필압 굵기), 손가락 하나 = 이동, 둘 = 오므려 확대·이동,
 // 펜으로 쓰는 중 닿은 손가락(손바닥)과 펜이 닿은 순간 이미 닿아 있던 손가락은 뗄 때까지 무시, 마우스 끌기 = 그리기(속도 굵기), 휠 = 이동,
@@ -87,8 +94,24 @@
 // 좌표 범위: 보기는 화면 전체가 ±COORD_MAX 안이도록 묶는다(wbcore boundView — 이동·확대·크기 바꾸기·판 읽기). 그래도 범위 밖 점(화면 밖으로 붙잡은
 // 포인터 등)이 오면 — 쓴 점·coalesced·뗀 자리 어느 길이든 — 그 획을 거기서 끝내고 안내한다(다시 들어와도 잇지 않는다). 첫 점부터 밖이면 획을 만들지 않는다.
 // 범위 밖 예측 꼬리는 그리지 않는다.
-// 키(열린 동안 — 창 붙잡기 단계에서 표면이 먼저 받고 아래 화면으로 보내지 않는다): P 펜 · H 형광펜 · E 지우개 · ⌘Z(Windows Ctrl) 되돌리기 ·
-// ⇧⌘Z·⌘Y 다시 하기 · [ ] 이전·다음 판(목록 차례) · W 닫기 · Esc 한 겹씩(이름 고치기·삭제 확인 → 목록 → 팝오버 → 닫기) · Space 누른 채 끌기 = 이동.
+// 그림: 판에 그림을 넣는다 — ⌘V(paste 사건 — 입력 칸에 초점이 없을 때 클립보드의 첫 image/* 하나, 그림이 없으면 아무 일도 하지 않는다)와
+//   도구 막대 「그림」(<input type="file" accept="image/*"> — iPad 에는 ⌘V 가 없다). 넣을 때 디코드(createImageBitmap) → 긴 변이 IMG_SIDE(2000px)를
+//   넘으면 줄임 → 다시 인코드(투명 화소가 있으면 PNG, 없으면 JPEG 0.85) → 바이트가 IMG_BYTES(1.5MB)를 넘으면 긴 변을 0.75 배씩 줄여 다시(4번까지 —
+//   그래도 넘으면 넣지 않고 안내). 판 하나의 그림 수·바이트 합 상한(wbcore LIMIT.images 200·imageBytes 24MB)을 넘으면 넣지 않고 안내한다.
+//   놓는 자리는 화면 가운데, 처음 크기는 화면 px 로 긴 변 IMG_SHOW_PX(480 — 원래 그림이 더 작으면 원래 크기)이고 왼쪽 위와 폭을 격자(GRID 32 판 단위)에
+//   맞춘다(높이는 비율대로). 넣은 뒤 고르기 도구로 바꾸고 그 그림을 고른다. 읽기 전용·잠금이면 넣지 않는다. 그림은 판 파일 안에 들어간다(wbcore
+//   「images」 — 저장·복제는 본문을 따른다). 붙여넣은 그림은 판 본문으로만 나간다(네트워크 요청이 없다). 그림은 늘 획 아래에 그린다(그 위에 쓴다 —
+//   그림 층이 획 층 아래다. 옮기기·크기 조절 중에도 그림끼리·획과의 차례는 같다).
+// 고르기 도구(V): 그림을 누르면 고른다(테두리 + 네 귀 손잡이 — 화면 px 크기). 빈 곳을 누르면 풀고, 펜·마우스로 빈 곳을 끌면 판 이동이다.
+//   겹친 그림은 나중에 넣은 것이 잡힌다. 몸통 끌기 = 옮기기(왼쪽 위가 격자에 붙는다), 귀 끌기 = 크기(비율을 지키고 맞은편 귀는 고정, 폭이 격자 배수 —
+//   최소 격자 한 칸). 결과가 저장할 수 있는 자리(x·y·x+w·y+h 가 좌표 범위 안, w·h 가 IMG_MIN 이상)인 것이 격자보다 먼저다 — 고정한 귀를 둔 채
+//   그런 결과가 없으면(좌표 끝의 작은 그림 등) 그 움직임은 적용하지 않고, 뗄 때도 한 번 더 보아 아니면 제자리로 둔다. 옮기기·크기 조절 동안은 바탕이 격자가 아니어도 옅은 격자를 보인다. 고른 그림 옆 「지우기」·Delete·Backspace 로 지운다.
+//   그림 조작은 펜·마우스다 — 손가락 하나는 고르기 도구에서도 이동이고, 고르기 도구일 때에 한해 그림(손잡이) 위에서 시작한 손가락 하나만 그림 조작이다
+//   (펜이 없는 기기를 위해 — 빈 곳을 톡 치면 고르기를 푼다). 두 손가락은 확대(하던 그림 조작은 제자리로). 지우개는 그림을 지우지 않는다.
+//   넣기·옮기기·크기·지우기는 저마다 되돌리기 한 단계다. 끌기 동안은 저장하지 않는다(뗀 뒤 자동 저장 타이머로).
+// 키(열린 동안 — 창 붙잡기 단계에서 표면이 먼저 받고 아래 화면으로 보내지 않는다): P 펜 · H 형광펜 · E 지우개 · V 고르기 · Delete·Backspace 고른 그림 지우기 ·
+// ⌘Z(Windows Ctrl) 되돌리기 · ⇧⌘Z·⌘Y 다시 하기 · ⌘V 붙여넣기(이 키만 기본 동작을 막지 않는다 — paste 사건이 와야 한다) · [ ] 이전·다음 판(목록 차례) · W 닫기 ·
+// Esc 한 겹씩(고른 그림 풀기 → 이름 고치기·삭제 확인 → 목록 → 팝오버 → 닫기) · Space 누른 채 끌기 = 이동.
 // 포인터·휠·터치·클릭도 표면 안의 것은 창 붙잡기 단계에서 표면이 처리하고 전파를 멈춘다(아래 화면의 처리기는 받지 않는다).
 (function () {
   "use strict";
@@ -109,9 +132,17 @@
   const THUMB_CACHE = 40;        // 미리보기 캐시 상한(store 마다 — 넘으면 오래 쓰지 않은 것부터 버린다)
   const STORE_WAIT = 8000;       // store 요청 하나를 기다리는 끝(ms) — 넘으면 실패로 본다(머리 주석 「기다림」)
   const STROKE_PTS = 20000;      // 진행 중 획 하나의 점 상한 — 닿으면 그 획을 끝낸다(떼고 다시 그어야 새 획)
+  const IMG_SIDE = 2000;         // 넣는 그림의 긴 변 상한(px) — 넘으면 줄여 다시 인코드한다
+  const IMG_BYTES = 1.5 * 1024 * 1024; // 그림 하나의 인코드 바이트 상한 — 넘으면 긴 변을 IMG_SHRINK 배씩 줄여 다시(IMG_RETRY 번까지)
+  const IMG_SHRINK = 0.75, IMG_RETRY = 4, IMG_JPEG_Q = 0.85;
+  const IMG_SHOW_PX = 480;       // 넣은 그림의 처음 크기 — 화면 px 로 긴 변 최대(원래 크기가 더 작으면 원래 크기)
+  const HANDLE_PX = 5;           // 고른 그림 귀 손잡이 반 변(화면 px — 확대와 무관)
+  const HIT_PX = { mouse: 10, pen: 14, touch: 24 }; // 손잡이를 잡는 반지름(화면 px)
   const BG_NAMES = { dark: "검정", light: "흰색", grid: "격자" };
   const SAVE_FAIL = "저장하지 못했습니다 — 판은 이 화면에 그대로 있고, 다음에 바꾸면 다시 저장합니다.";
   const RANGE_FAIL = "판에 좌표 범위 밖의 점이 있어 저장하지 못했습니다 — 판은 이 화면에 그대로 있습니다(마지막 획을 되돌린 뒤 다시 해 보세요).";
+  const IMG_READ_FAIL = "그림을 읽지 못해 넣지 않았습니다.";
+  const IMG_BIG_FAIL = "그림을 줄여도 " + IMG_BYTES / 1024 / 1024 + "MB 를 넘어 넣지 않았습니다.";
 
   // 도구·색·굵기는 판이 아니라 사람의 것이다 — 페이지가 살아 있는 동안 판을 바꾸거나 닫았다 열어도 기억한다(도구마다 따로).
   const prefs = { tool: "pen", color: { pen: 0, hl: 3 }, width: { pen: 4, hl: 24 } };
@@ -237,24 +268,121 @@
   const call = (f, ...a) => { try { return f && f(...a); } catch (e) { return undefined; } };
   const nowMs = () => (window.performance || performance).now();
   const raf = f => window.requestAnimationFrame(f);
+  const snapG = v => Math.round(v / GRID) * GRID; // 격자에 붙이기(판 단위)
+
+  // ---- 그림 디코드·인코드(머리 주석 「그림」). data URL 을 fetch·<img src> 로 읽지 않는다 — base64 를 바이트로 풀어(wbcore b64Decode)
+  // Blob → createImageBitmap 으로 디코드한다(CSP img-src·connect-src 에 기대지 않는다). blob URL 도 만들지 않는다.
+  // 긴 변이 IMG_SIDE 를 넘는 그림(파일에서 읽은 것 — 넣는 길은 이미 줄였다)은 줄인 bitmap 을 돌려주고 큰 것은 close 한다(fitBitmap — 본문의 data·w·h 는 그대로).
+  function decodeImage(mime, data) {
+    const cib = window.createImageBitmap, Bl = window.Blob;
+    if (typeof cib !== "function" || typeof Bl !== "function") return Promise.reject(new Error("createImageBitmap 이 없다"));
+    return Promise.resolve().then(() => cib.call(window, new Bl([C.b64Decode(data)], { type: mime }))).then(fitBitmap);
+  }
+  // fitBitmap 은 bitmap 의 긴 변이 IMG_SIDE 이하이면 그대로, 넘으면 canvas 에 줄여 그린 뒤 createImageBitmap(canvas) 로 만든 작은 bitmap 을 돌려주고
+  // 큰 것은 close 한다. 줄이지 못하면(canvas·createImageBitmap(canvas) 실패) 큰 것을 그대로 돌려준다(그림은 보인다 — 그때는 그 그림의 화소를 줄이지 못한다).
+  function fitBitmap(bmp) {
+    const iw = bmp ? bmp.width : 0, ih = bmp ? bmp.height : 0, long = Math.max(iw, ih);
+    if (!(long > IMG_SIDE)) return bmp;
+    const s = IMG_SIDE / long, w = Math.max(1, Math.round(iw * s)), h = Math.max(1, Math.round(ih * s));
+    let cv = null;
+    const free = () => { if (cv) { cv.width = 0; cv.height = 0; } };
+    try {
+      cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext && cv.getContext("2d");
+      if (!ctx) { free(); return bmp; }
+      ctx.drawImage(bmp, 0, 0, w, h);
+    } catch (e) { free(); return bmp; }
+    return Promise.resolve().then(() => window.createImageBitmap(cv)).then(small => {
+      free();
+      if (!small) return bmp;
+      if (bmp.close) bmp.close();
+      return small;
+    }, () => { free(); return bmp; });
+  }
+  // hasAlpha 는 canvas 에 투명한 화소가 있는가다(알파 훑기). 읽지 못하면 있다고 본다(PNG 로 — 투명을 잃지 않게).
+  function hasAlpha(ctx, w, h) {
+    let d;
+    try { d = ctx.getImageData(0, 0, w, h).data; } catch (e) { return true; }
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 255) return true;
+    return false;
+  }
+  // prepareImage 는 넣을 그림(Blob·File)을 판에 넣을 꼴 { mime, data, bytes, nat, iw, ih }(iw·ih 는 인코드한 크기 px)로 만든다 — 디코드 → 긴 변이 IMG_SIDE 를 넘으면 줄임 →
+  // 다시 인코드(투명이 있으면 PNG, 없으면 JPEG IMG_JPEG_Q). 바이트가 IMG_BYTES 를 넘으면 긴 변을 IMG_SHRINK 배씩 줄여 다시(IMG_RETRY 번까지) —
+  // 그래도 넘으면 거부한다. nat 은 원래 그림의 긴 변(px — 처음 크기를 정할 때 쓴다). 거부 오류의 message 는 사람에게 보일 안내다.
+  function prepareImage(blob) {
+    const cib = window.createImageBitmap;
+    if (typeof cib !== "function") return Promise.reject(new Error(IMG_READ_FAIL));
+    return Promise.resolve().then(() => cib.call(window, blob)).then(bmp => {
+      try { return encodeImage(bmp); } finally { if (bmp && bmp.close) bmp.close(); }
+    }, () => { throw new Error(IMG_READ_FAIL); });
+  }
+  function encodeImage(bmp) {
+    const iw = bmp.width, ih = bmp.height, long = Math.max(iw, ih);
+    if (!(iw > 0 && ih > 0)) throw new Error(IMG_READ_FAIL);
+    let side = Math.min(long, IMG_SIDE), alpha = null;
+    for (let k = 0; k <= IMG_RETRY; k++) {
+      const s = side / long, w = Math.max(1, Math.round(iw * s)), h = Math.max(1, Math.round(ih * s));
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const ctx = cv.getContext && cv.getContext("2d");
+      if (!ctx || !cv.toDataURL) throw new Error(IMG_READ_FAIL);
+      ctx.drawImage(bmp, 0, 0, w, h);
+      if (alpha === null) alpha = hasAlpha(ctx, w, h);
+      let url = "";
+      try { url = cv.toDataURL(alpha ? "image/png" : "image/jpeg", IMG_JPEG_Q); } catch (e) { /* 아래에서 거부 */ }
+      cv.width = 0; cv.height = 0;
+      const m = /^data:(image\/(?:png|jpeg));base64,/.exec(url);
+      if (!m) throw new Error(IMG_READ_FAIL);
+      const data = url.slice(m[0].length);
+      if (!C.b64Ok(data)) throw new Error(IMG_READ_FAIL);
+      const bytes = C.b64Bytes(data);
+      if (bytes <= IMG_BYTES) return { mime: m[1], data, bytes, nat: long, iw: w, ih: h };
+      side *= IMG_SHRINK;
+    }
+    throw new Error(IMG_BIG_FAIL);
+  }
+  // clipImage 는 클립보드(DataTransfer)의 첫 image/* 파일이다(없으면 null).
+  function clipImage(dt) {
+    if (!dt) return null;
+    const items = dt.items || [];
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it && it.kind === "file" && /^image\//.test(it.type || "")) { const f = it.getAsFile && it.getAsFile(); if (f) return f; }
+    }
+    const files = dt.files || [];
+    for (let i = 0; i < files.length; i++) if (files[i] && /^image\//.test(files[i].type || "")) return files[i];
+    return null;
+  }
 
   // ---- 엔진: 판 하나를 그리고 입력을 받는다(시제품 wb.js 를 표면 안으로 옮긴 것 — 측정·HUD·토글을 뺐다).
-  // 층: stage 의 CSS 바탕(검정·흰색·격자) ← base canvas(끝난 획 타일을 옮겨 그린다) ← live canvas(진행 중 획·예측 꼬리·지우개 표시).
+  // 층(아래부터): stage 의 CSS 바탕(검정·흰색·격자) ← 그림 canvas(타일 없이 보기·그림이 바뀔 때마다 화면에 걸친 그림을 넣은 차례로 다시 그린다)
+  //   ← base canvas(끝난 획 타일을 옮겨 그린다 — 타일에 그림은 굽지 않는다) ← live canvas(진행 중 획·예측 꼬리·지우개 표시·고른 그림의 테두리와 손잡이).
   // 보기 view = {x, y, z}: 화면 s = (판 - (x, y)) * z. 입력은 맞추지 않은 view, 그리기는 장치 픽셀에 맞춘 snap(view).
   // 획 s = { id, tool: "pen"|"hl", color(팔레트 번호), w(판 단위 기준 굵기 = 화면 굵기 / 그릴 때 배율), pts[x, y, p, …](판 좌표, 평활 없음),
   //          ox, oy(경로 원점 — 큰 좌표에서 float32 정밀도를 지키려고 경로는 이 점 기준), box, path(Path2D), joins(Path2D|null) }.
   // 타일: 512 장치 px. 배율 단계(Level)마다 따로 굽는다. 이동은 구운 타일을 옮겨 그리기만, 배율이 바뀌면 멈춘 뒤(ZOOM_SETTLE) 보이는 타일만 다시 굽는다
   // — 그동안은 이전 단계 타일을 늘려 그린다(잠깐 흐리다).
-  // cb = { change()(획·배경이 바뀜), view()(보기가 바뀜), bar()(도구 막대를 다시 칠함), down()(판을 누름 — 팝오버 닫기), full()(판 상한),
-  //        long()(한 획의 점 상한), edge()(좌표 범위 밖 점 — 획을 끝냄) }
-  function engine(stage, baseC, liveC, cb) {
-    const bctx = baseC.getContext("2d"), lctx = liveC.getContext("2d");
+  // 그림 im = { id(넣은 차례 — 아래부터), x, y, w, h(판 단위), mime, data(base64), bytes, box, bmp(ImageBitmap|null), state: "wait"|"ok"|"bad", live }.
+  //   그림 canvas 에 id 차례로 그린다(drawImages — 공간 색인 igrid 로 화면에 걸친 것만, rAF 한 번에 묶는다) — 층 차례로 늘 획 아래다. 그림이 바뀌어도
+  //   획 타일은 버리지 않는다. 옮기기·크기 조절 중인 그림도 그 층의 제 차례에 지금 조작 중인 자리·크기(mode.g)로 그린다 — 조작 중에도 차례가 같다.
+  //   디코드는 비동기라 준비되면 그림 층을 다시 그리고, 그때까지(또는 디코드가 안 되면) 옅은 자리 표시를 그린다.
+  //   bmp 는 그 그림이 지금 판이나 되돌리기·다시 하기 더미에서 닿는 동안 든다 — 새 작업(push)이 다시 하기 더미를 비워 닿지 않게 되면 곧바로
+  //   close 하고(reap), 늦게 끝난 디코드도 닿지 않는 그림이면 곧바로 close 한다. 판을 떠나면(load·destroy) 모두 close 한다.
+  // cb = { change()(획·배경·그림이 바뀜), view()(보기가 바뀜), bar()(도구 막대를 다시 칠함), down()(판을 누름 — 팝오버 닫기), full()(판 상한),
+  //        long()(한 획의 점 상한), edge()(좌표 범위 밖 점 — 획을 끝냄), imgFull()(그림 상한), sel(rect|null)(고른 그림의 화면 상자 — 지우기 단추 자리) }
+  function engine(stage, imgC, baseC, liveC, cb) {
+    const ictx = imgC.getContext("2d"), bctx = baseC.getContext("2d"), lctx = liveC.getContext("2d");
     let W = 0, H = 0, dpr = 1;
     let view = { x: 0, y: 0, z: 1 };
     let lastZoomAt = 0, bg = "dark", readOnly = false, locked = false, dead = false;
     const strokes = new Map();     // id → 획(지금 판에 있는 것)
     const grid = new C.Grid(512);
+    const images = new Map();      // id → 그림(지금 판에 있는 것)
+    const igrid = new C.Grid(512);
+    const held = new Set();        // bmp 를 든 그림(판에 있든 되돌리기·다시 하기 더미에서 닿든 — 닿지 않게 되면 reap 이 close, 판을 떠나면 모두 close)
     let nextId = 1, undoStack = [], redoStack = [], totalPts = 0;
+    let nextImg = 1, imgBytes = 0, sel = null, gen = 0, snapping = false; // sel: 고른 그림 · gen: 판을 열 때마다 — 늦은 디코드를 버린다
     const guard = { coal: 0, pred: 0 }; // 좌표 지킴이가 버린 수(진단용)
 
     // ---- 그리기 도구
@@ -298,6 +426,17 @@
       for (let i = 3; i < pts.length; i += 3) p.lineTo(pts[i] - ox, pts[i + 1] - oy);
       return p;
     }
+    // paintImage 는 그림 im 을 판 상자 g(없으면 im 자리)에 그린다 — tx·ty 는 paint 와 같다. 준비되지 않은(디코드 전·실패) 그림은 옅은 자리 표시다.
+    function paintImage(ctx, im, k, tx, ty, g) {
+      g = g || im;
+      ctx.setTransform(k, 0, 0, k, g.x * k + tx, g.y * k + ty);
+      if (im.bmp) { ctx.drawImage(im.bmp, 0, 0, g.w, g.h); return; }
+      ctx.fillStyle = dark() ? "rgba(255,255,255,.08)" : "rgba(0,0,0,.06)";
+      ctx.fillRect(0, 0, g.w, g.h);
+      ctx.strokeStyle = dark() ? "rgba(255,255,255,.25)" : "rgba(0,0,0,.2)";
+      ctx.lineWidth = 1 / k;
+      ctx.strokeRect(0, 0, g.w, g.h);
+    }
     // paint 는 획을 ctx 에 그린다 — 호출자가 setTransform(k, 0, 0, k, tx, ty) 의 tx·ty 를 준다(판 원점 기준 평행 이동, 장치 px).
     function paint(ctx, s, k, tx, ty, path, joins) {
       ctx.setTransform(k, 0, 0, k, s.ox * k + tx, s.oy * k + ty);
@@ -338,8 +477,8 @@
       const c = newCanvas(), ctx = c.getContext("2d");
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, TILE, TILE);
-      const k = L.z * L.dpr, list = grid.query(C.tileBox(i, j, L.T));
-      for (const s of list) paint(ctx, s, k, -i * TILE, -j * TILE);
+      const k = L.z * L.dpr, tb = C.tileBox(i, j, L.T);
+      for (const s of grid.query(tb)) paint(ctx, s, k, -i * TILE, -j * TILE);
       L.tiles.set(i + "," + j, { c, i, j, used: frameNo });
       return nowMs() - t0;
     }
@@ -365,7 +504,81 @@
     // room 은 획 n 개·점 pts 개를 더해도 판 상한(wbcore LIMIT) 안인가다 — 넘는 판은 파일로 다시 읽지 못하므로 넘게 그리지 않는다.
     const room = (n, pts) => strokes.size + n <= C.LIMIT.strokes && totalPts + pts <= C.LIMIT.points;
     const ptsOf = list => list.reduce((a, s) => a + s.pts.length / 3, 0);
+    // ---- 그림 넣고 빼기·옮기기(머리 주석 「그림」)
+    // imgRoom 은 그림 n 개·bytes 바이트를 더해도 판 상한(wbcore LIMIT.images·imageBytes) 안인가다.
+    const imgRoom = (n, bytes) => images.size + n <= C.LIMIT.images && imgBytes + bytes <= C.LIMIT.imageBytes;
+    function addImg(im) { images.set(im.id, im); im.box = C.imageBox(im); igrid.insert(im); imgBytes += im.bytes; }
+    function removeImg(im) { if (images.delete(im.id)) { igrid.remove(im); imgBytes -= im.bytes; if (sel === im) select(null); } }
+    // imgChanged 는 그림 층을 다음 프레임에 다시 그리게 한다(획 타일은 그대로).
+    function imgChanged() { imgDirty = true; kick(); }
+    // setGeom 은 그림을 상자 g 로 옮긴다 — 색인을 바꾸고 그림 층을 다시 그린다.
+    function setGeom(im, g) {
+      if (images.has(im.id)) igrid.remove(im);
+      im.x = g.x; im.y = g.y; im.w = g.w; im.h = g.h; im.box = C.imageBox(im);
+      if (images.has(im.id)) igrid.insert(im);
+      imgChanged();
+    }
+    // imgOk 는 상자 g 가 저장할 수 있는 그림 자리인가다 — 유한, w·h 가 IMG_MIN~COORD_MAX, x·y·x+w·y+h 가 ±COORD_MAX 안(옮기기·크기 조절이 지킨다).
+    const imgOk = g => [g.x, g.y, g.w, g.h].every(Number.isFinite) && g.w >= C.IMG_MIN && g.h >= C.IMG_MIN && g.w <= C.COORD_MAX && g.h <= C.COORD_MAX
+      && g.x >= -C.COORD_MAX && g.y >= -C.COORD_MAX && g.x + g.w <= C.COORD_MAX && g.y + g.h <= C.COORD_MAX;
+    // reach 는 그림 im 이 지금 판이나 되돌리기·다시 하기 더미에서 닿는가다. reap 은 닿지 않는 그림의 bmp 를 close 하고 held 에서 뺀다.
+    const reach = im => images.get(im.id) === im || undoStack.some(o => o.im === im) || redoStack.some(o => o.im === im);
+    function dropBmp(im) { if (im.bmp && im.bmp.close) im.bmp.close(); im.bmp = null; held.delete(im); }
+    function reap() {
+      const r = new Set(images.values());
+      for (const list of [undoStack, redoStack]) for (const o of list) if (o.im) r.add(o.im);
+      for (const im of [...held]) if (!r.has(im)) dropBmp(im);
+    }
+    // decode 는 그림 im 을 비동기로 디코드한다 — 준비되면 그림 층을 다시 그린다. 그사이 판을 떠났거나(gen) 그 그림이 판·더미 어디에서도 닿지 않게
+    // 됐으면(reach) 곧바로 close 한다. 실패하면 자리 표시로 남긴다(본문의 data 는 그대로 — 다시 저장해도 잃지 않는다).
+    function decode(im) {
+      const g = gen;
+      im.state = "wait";
+      decodeImage(im.mime, im.data).then(bmp => {
+        if (dead || g !== gen || !reach(im)) { if (bmp && bmp.close) bmp.close(); return; }
+        im.bmp = bmp; im.state = "ok"; held.add(im);
+        imgChanged();
+      }, () => { if (!dead && g === gen) im.state = "bad"; });
+    }
+    function closeHeld() { for (const im of [...held]) dropBmp(im); }
+    // insertImage 는 준비된 그림 p = { mime, data, bytes, nat }(prepareImage)을 화면 가운데에 넣는다 — 처음 크기는 화면 px 로 긴 변 IMG_SHOW_PX
+    // (원래 긴 변 nat 이 더 작으면 그것), 왼쪽 위와 폭은 격자에 맞춘다(높이는 비율대로). 넣은 뒤 고르기 도구로 바꾸고 그 그림을 고른다.
+    // 읽기 전용·잠금·상한·그리기 중이면 넣지 않는다(false). iw·ih 는 인코드한 그림의 크기다(비율).
+    function insertImage(p, iw, ih) {
+      if (readOnly || locked || (mode && mode.kind !== "pan" && mode.kind !== "pinch")) return false; // 그리기·지우기·그림 조작 중이면 넣지 않는다
+      if (!imgRoom(1, p.bytes)) { cb.imgFull(); return false; }
+      const px = Math.min(IMG_SHOW_PX, p.nat || IMG_SHOW_PX), ratio = ih / iw;
+      const wpx = iw >= ih ? px : px / ratio;
+      const w = C.clamp(Math.max(GRID, snapG(wpx / view.z)), GRID, Math.floor(C.COORD_MAX / GRID) * GRID), h = w * ratio;
+      const c = C.toWorld(view, W / 2, H / 2);
+      const x = C.clamp(snapG(c.x - w / 2), -C.COORD_MAX, C.COORD_MAX - w), y = C.clamp(snapG(c.y - h / 2), -C.COORD_MAX, C.COORD_MAX - h);
+      const im = { id: nextImg++, x, y, w, h, mime: p.mime, data: p.data, bytes: p.bytes, bmp: null, state: "wait" };
+      addImg(im);
+      decode(im);
+      imgChanged();
+      setTool("select");
+      select(im);
+      push({ t: "iadd", im });
+      return true;
+    }
+    function select(im) { if (sel === im) return; sel = im; liveDirty = true; kick(); }
+    // deleteSelected 는 고른 그림을 지운다(되돌리기 한 단계).
+    function deleteSelected() {
+      if (readOnly || locked || mode || !sel) return false;
+      const im = sel;
+      removeImg(im);
+      imgChanged();
+      push({ t: "idel", im });
+      return true;
+    }
     function apply(op, dir) { // dir 1 = 하기, -1 = 되돌리기
+      if (op.t === "imove") { setGeom(op.im, dir === 1 ? op.to : op.from); return true; }
+      if (op.t === "iadd" || op.t === "idel") {
+        const add = (op.t === "iadd") === (dir === 1);
+        if (add) { if (!imgRoom(1, op.im.bytes)) { cb.imgFull(); return false; } addImg(op.im); } else removeImg(op.im);
+        imgChanged();
+        return true;
+      }
       const adding = (op.t === "add") === (dir === 1);
       if (adding && !room(op.list.length, ptsOf(op.list))) { cb.full(); return false; }
       for (const s of op.list) adding ? addStroke(s) : removeStroke(s);
@@ -374,16 +587,92 @@
       else invalidate(op.list);
       return true;
     }
-    function push(op) { undoStack.push(op); redoStack = []; cb.bar(); cb.change(); }
+    // push 는 새 작업이다 — 다시 하기 더미를 비운다. 버린 단계에 그림이 있었으면 닿지 않게 된 그림의 bmp 를 놓는다(reap). 되돌리기 더미에는 상한이 없다.
+    function push(op) { const dropped = redoStack; undoStack.push(op); redoStack = []; if (dropped.some(o => o.im)) reap(); cb.bar(); cb.change(); }
     function undo() { if (readOnly || locked || mode) return; const op = undoStack.pop(); if (!op) return; if (!apply(op, -1)) { undoStack.push(op); return; } redoStack.push(op); cb.bar(); cb.change(); }
     function redo() { if (readOnly || locked || mode) return; const op = redoStack.pop(); if (!op) return; if (!apply(op, 1)) { redoStack.push(op); return; } undoStack.push(op); cb.bar(); cb.change(); }
 
     // ---- 입력
     const ptrs = new Map();        // pointerId → { type, x, y, ignored }
-    let mode = null;               // { kind: "draw"|"erase"|"pan"|"pinch", … }
+    let mode = null;               // { kind: "draw"|"erase"|"pan"|"pinch"|"imove"|"isize", … }
     let space = false, mouse = { x: 0, y: 0 }, hover = null;
     const touches = () => [...ptrs.entries()].filter(([, p]) => p.type === "touch" && !p.ignored);
     const drawTool = () => !readOnly && !locked && (prefs.tool === "pen" || prefs.tool === "hl" || prefs.tool === "erase");
+    const selTool = () => !readOnly && !locked && prefs.tool === "select";
+    const imgMode = () => !!mode && (mode.kind === "imove" || mode.kind === "isize");
+
+    // ---- 고르기 도구(그림 — 머리 주석 「그림」)
+    // hitImage 는 화면 점 (cx, cy) 아래의 맨 위 그림(나중에 넣은 것)이다.
+    function hitImage(cx, cy) {
+      const w = C.toWorld(view, cx, cy);
+      let top = null;
+      for (const im of igrid.query([w.x, w.y, w.x, w.y])) if (w.x >= im.x && w.x <= im.x + im.w && w.y >= im.y && w.y <= im.y + im.h && (!top || im.id > top.id)) top = im;
+      return top;
+    }
+    // hitHandle 은 고른 그림의 귀 손잡이 번호다(0 왼쪽 위·1 오른쪽 위·2 오른쪽 아래·3 왼쪽 아래, 없으면 -1). 화면 px 로 잰다(확대와 무관).
+    function hitHandle(cx, cy, type) {
+      if (!sel) return -1;
+      const a = C.toScreen(view, sel.x, sel.y), b = C.toScreen(view, sel.x + sel.w, sel.y + sel.h), r = HIT_PX[type] || HIT_PX.mouse;
+      const cs = [[a.x, a.y], [b.x, a.y], [b.x, b.y], [a.x, b.y]];
+      let best = -1, bd = Infinity;
+      cs.forEach(([x, y], i) => { const d = Math.hypot(cx - x, cy - y); if (d <= r && d < bd) { bd = d; best = i; } });
+      return best;
+    }
+    // onImage 는 고르기 도구에서 이 누름이 그림 조작으로 시작하는가다(손잡이나 그림 위).
+    const onImage = (cx, cy, type) => hitHandle(cx, cy, type) >= 0 || !!hitImage(cx, cy);
+    // startSelect 는 고르기 도구의 누름이다 — 손잡이면 크기, 그림이면 고르고 옮기기, 빈 곳이면 고르기를 풀고 판 이동.
+    function startSelect(e, type) {
+      const c = hitHandle(e.clientX, e.clientY, type), im = c >= 0 ? sel : hitImage(e.clientX, e.clientY);
+      if (!im) { select(null); startPan(e.pointerId, e.clientX, e.clientY, type); return; }
+      select(im);
+      mode = { kind: c >= 0 ? "isize" : "imove", id: e.pointerId, type, im, c, w0: C.toWorld(view, e.clientX, e.clientY), o: { x: im.x, y: im.y, w: im.w, h: im.h }, g: null };
+    }
+    // imageTo 는 옮기기·크기 조절 중의 포인터 자리다. 옮기기는 왼쪽 위가 격자(GRID)에 붙는다. 크기는 비율을 지키고 맞은편 귀를 고정한 채
+    // 폭이 격자 배수가 되게 한다(맞은편 귀가 격자에 있으면 움직이는 귀의 x 가 격자에 붙는다) — 폭은 격자 한 칸 이상, 그림이 좌표 범위 안에 들 만큼까지.
+    // 유효성(imgOk — 좌표·크기 범위)이 격자 최소 한 칸보다 먼저다: 고정한 귀를 둔 채 유효한 결과가 없으면(좌표 끝의 작은 그림 등) 그 움직임을
+    // 적용하지 않고 직전 유효 상태(d.g, 없으면 처음 자리)를 둔다. 높이가 IMG_MIN 아래로 내려가지 않을 만큼의 폭도 하한이다(아주 납작한 그림).
+    function imageTo(cx, cy) {
+      const d = mode, o = d.o, w = C.toWorld(view, cx, cy), M = C.COORD_MAX;
+      let g;
+      if (d.kind === "imove") {
+        g = { x: C.clamp(snapG(o.x + w.x - d.w0.x), -M, M - o.w), y: C.clamp(snapG(o.y + w.y - d.w0.y), -M, M - o.h), w: o.w, h: o.h };
+      } else {
+        const ratio = o.h / o.w, right = d.c === 1 || d.c === 2, bottom = d.c === 2 || d.c === 3;
+        const ax = right ? o.x : o.x + o.w, ay = bottom ? o.y : o.y + o.h;
+        const room = Math.min(right ? M - ax : ax + M, (bottom ? M - ay : ay + M) / ratio, M, M / ratio);
+        // 폭은 격자 배수로 [minW, maxW] — maxW < minW 면(고정한 귀를 둔 채 들 자리가 없다) 아래 imgOk 가 그 움직임을 버린다
+        let minW = Math.max(GRID, Math.ceil(C.IMG_MIN / ratio / GRID) * GRID);
+        if (minW * ratio < C.IMG_MIN) minW += GRID; // 부동소수로 높이가 하한에 조금 못 미치면 한 칸 더(예: 9344×0.02 → 4672 이면 0.00999…)
+        const maxW = Math.floor(room / GRID) * GRID;
+        const nw = Math.min(Math.max(snapG(right ? w.x - ax : ax - w.x), minW), maxW), nh = nw * ratio;
+        g = { x: right ? ax : ax - nw, y: bottom ? ay : ay - nh, w: nw, h: nh };
+      }
+      if (!imgOk(g)) return; // 유효하지 않은 움직임은 적용하지 않는다(직전 유효 상태를 둔다)
+      const prev = d.g || o;
+      if (g.x === prev.x && g.y === prev.y && g.w === prev.w && g.h === prev.h) return;
+      if (!d.g) setSnapping(true); // 처음 움직일 때 옅은 격자
+      d.g = g;
+      imgDirty = true; liveDirty = true; kick(); // 그림 층의 제 차례에 지금 자리로, 테두리·손잡이는 live 층에
+    }
+    // endImage 는 옮기기·크기 조절을 끝낸다 — 바뀌었으면 되돌리기 한 단계. keep 이 거짓이거나 확정할 자리가 유효하지 않으면(imgOk) 버린다(제자리로).
+    function endImage(keep) {
+      const d = mode;
+      mode = null;
+      setSnapping(false);
+      const im = d.im, g = d.g;
+      imgDirty = true; liveDirty = true; kick();
+      if (!keep || !g || !imgOk(g)) return;
+      const from = { x: im.x, y: im.y, w: im.w, h: im.h };
+      setGeom(im, g);
+      push({ t: "imove", im, from, to: { x: g.x, y: g.y, w: g.w, h: g.h } });
+    }
+    function setSnapping(on) {
+      if (snapping === !!on) return;
+      snapping = !!on;
+      stageClass();
+      if (!snapping && bg !== "grid") { stage.style.backgroundSize = ""; stage.style.backgroundPosition = ""; }
+      baseDirty = true; kick();
+    }
 
     function startTool(e, type) {
       const w = C.toWorld(view, e.clientX, e.clientY);
@@ -472,6 +761,7 @@
     function cancelMode() { // 버린다(오므리기로 바뀐 한 손가락 획 등)
       if (!mode) return;
       if (mode.kind === "erase") endErase();
+      if (imgMode()) { endImage(false); return; } // 그림 조작은 제자리로(오므리기·펜이 끼어듦)
       mode = null; liveDirty = true; kick();
     }
     function eraseTo(x, y) {
@@ -485,7 +775,8 @@
       liveDirty = true; kick();
     }
     function endErase() { const d = mode; mode = null; if (d.removed.length) push({ t: "erase", list: d.removed }); liveDirty = true; kick(); }
-    function startPan(id, x, y, type) { mode = { kind: "pan", id, type, lx: x, ly: y }; stage.classList.add("grabbing"); }
+    // tap 이 참이면 움직이지 않고 뗐을 때 고르기를 푼다(고르기 도구의 손가락 — 빈 곳을 톡 치기).
+    function startPan(id, x, y, type, tap) { mode = { kind: "pan", id, type, lx: x, ly: y, sx: x, sy: y, tap: !!tap }; stage.classList.add("grabbing"); }
     function startPinch() {
       const t = touches().slice(0, 2);
       if (t.length < 2) return;
@@ -495,7 +786,7 @@
     function setView(v) {
       v = C.boundView(v, W, H); // 화면 전체가 좌표 범위 안이다(wbcore boundView)
       if (v.z !== view.z) lastZoomAt = nowMs();
-      view = v; baseDirty = true; liveDirty = true; kick();
+      view = v; baseDirty = true; liveDirty = true; imgDirty = true; kick();
       cb.view();
     }
     const capture = id => { try { stage.setPointerCapture(id); } catch (err) { /* 합성 입력 */ } };
@@ -511,7 +802,7 @@
         else if (mode) cancelMode();
         for (const [, p] of ptrs) if (p.type === "touch") p.ignored = true; // 펜이 닿으면 이미 닿은 손가락(손바닥)은 뗄 때까지 무시
         stage.classList.remove("grabbing");
-        if (drawTool()) startTool(e, type); else startPan(e.pointerId, e.clientX, e.clientY, type);
+        if (drawTool()) startTool(e, type); else if (selTool()) startSelect(e, type); else startPan(e.pointerId, e.clientX, e.clientY, type);
         capture(e.pointerId);
         return;
       }
@@ -519,10 +810,14 @@
         if (mode && mode.type === "pen") { ptrs.get(e.pointerId).ignored = true; return; } // 펜으로 쓰는 중의 손바닥
         const t = touches();
         if (t.length === 1) {
-          if (FINGER_DRAW && drawTool()) startTool(e, "touch"); else startPan(e.pointerId, e.clientX, e.clientY, "touch");
+          // 손가락 하나는 이동 — 고르기 도구에서 그림(손잡이) 위에서 시작했을 때만 그림 조작(펜이 없는 기기를 위해)
+          if (FINGER_DRAW && drawTool()) startTool(e, "touch");
+          else if (selTool() && onImage(e.clientX, e.clientY, "touch")) startSelect(e, "touch");
+          else startPan(e.pointerId, e.clientX, e.clientY, "touch", selTool());
         } else if (t.length === 2) {
           if (mode && mode.kind === "draw") cancelMode(); // 한 손가락 획 → 오므리기로 바뀌면 그 획은 버린다
           else if (mode && mode.kind === "erase") endErase();
+          else if (imgMode()) cancelMode(); // 한 손가락 그림 조작 → 오므리기로 바뀌면 제자리로
           startPinch();
         } else { ptrs.get(e.pointerId).ignored = true; return; }
         capture(e.pointerId);
@@ -530,8 +825,10 @@
       }
       // mouse
       if (mode) return;
-      if (e.button === 1 || (e.button === 0 && (space || !drawTool()))) startPan(e.pointerId, e.clientX, e.clientY, "mouse");
-      else if (e.button === 0) startTool(e, "mouse");
+      if (e.button === 1 || (e.button === 0 && space)) startPan(e.pointerId, e.clientX, e.clientY, "mouse");
+      else if (e.button === 0 && drawTool()) startTool(e, "mouse");
+      else if (e.button === 0 && selTool()) startSelect(e, "mouse");
+      else if (e.button === 0) startPan(e.pointerId, e.clientX, e.clientY, "mouse");
       else return;
       capture(e.pointerId);
     }
@@ -545,6 +842,7 @@
       if (mode.kind === "draw" && mode.id === e.pointerId) takeEvents(e);
       else if (mode.kind === "erase" && mode.id === e.pointerId) { const w = C.toWorld(view, e.clientX, e.clientY); eraseTo(w.x, w.y); }
       else if (mode.kind === "pan" && mode.id === e.pointerId) setView(C.panBy(view, dx, dy));
+      else if (imgMode() && mode.id === e.pointerId) imageTo(e.clientX, e.clientY);
       else if (mode.kind === "pinch" && mode.ids.includes(e.pointerId)) {
         const a = ptrs.get(mode.ids[0]), b = ptrs.get(mode.ids[1]);
         if (!a || !b) return;
@@ -559,7 +857,12 @@
       if (!mode || p.ignored) return;
       if (mode.kind === "draw" && mode.id === e.pointerId) finishDraw();
       else if (mode.kind === "erase" && mode.id === e.pointerId) endErase();
-      else if (mode.kind === "pan" && mode.id === e.pointerId) { mode = null; stage.classList.remove("grabbing"); }
+      else if (mode.kind === "pan" && mode.id === e.pointerId) {
+        const d = mode;
+        mode = null; stage.classList.remove("grabbing");
+        if (d.tap && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 6) select(null);
+      }
+      else if (imgMode() && mode.id === e.pointerId) endImage(e.type !== "pointercancel");
       else if (mode.kind === "pinch" && mode.ids.includes(e.pointerId)) {
         mode = null;
         const rest = touches(); // 두 손가락 중 하나를 떼면 남은 손가락으로 이동을 잇는다(그리기는 새로 닿을 때만)
@@ -594,8 +897,23 @@
     function setSpace(on) { space = !!on; stage.classList.toggle("grab", space); }
 
     // ---- 프레임
-    let rafId = 0, liveDirty = true;
+    let rafId = 0, liveDirty = true, imgDirty = true;
     function kick() { if (!rafId && !dead) rafId = raf(frame); }
+    // drawImages 는 그림 층을 다시 그린다 — 화면에 걸친 그림(공간 색인)을 넣은 차례(id)로. 옮기기·크기 조절 중인 그림은 제 차례에 지금 자리(mode.g)로.
+    // 자리 맞춤은 획 타일과 같다(판 원점의 평행 이동을 장치 px 로 반올림 — composite).
+    function drawImages(v) {
+      const k = v.z * dpr, tx = Math.round(-v.x * k), ty = Math.round(-v.y * k);
+      ictx.setTransform(1, 0, 0, 1, 0, 0);
+      ictx.clearRect(0, 0, imgC.width, imgC.height);
+      if (!images.size) return;
+      const vb = [v.x, v.y, v.x + W / v.z, v.y + H / v.z], d = imgMode() && mode.g ? mode : null;
+      const list = igrid.query(vb);
+      if (d && images.get(d.im.id) === d.im && !list.includes(d.im)) { list.push(d.im); list.sort((a, b) => a.id - b.id); }
+      for (const im of list) {
+        const g = d && d.im === im ? d.g : im;
+        if (C.boxHit(C.imageBox(g), vb)) paintImage(ictx, im, k, tx, ty, g);
+      }
+    }
     function visibleTiles(L, v) { return C.tilesFor(v, W, H, L.T); }
     function composite(v) {
       const k = v.z * dpr;
@@ -664,6 +982,10 @@
         if (baked) baseDirty = true;
         if (baked < todo.length) again = true;
       }
+      if (imgDirty) {
+        imgDirty = false;
+        drawImages(v);
+      }
       if (baseDirty) {
         baseDirty = false;
         composite(v);
@@ -693,6 +1015,7 @@
         }
         paint(lctx, s, k, -v.x * k, -v.y * k, path, joins);
       }
+      drawSel(v); // 고른 그림의 테두리·손잡이만(그림 자체는 그림 층에 — drawImages)
       const eh = mode && mode.kind === "erase" ? C.toScreen(view, mode.ex, mode.ey) : hover && prefs.tool === "erase" ? hover : null;
       if (eh) {
         lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -701,8 +1024,27 @@
         lctx.beginPath(); lctx.arc(eh.x, eh.y, ERASE_PX, 0, Math.PI * 2); lctx.stroke();
       }
     }
+    // drawSel 은 고른 그림의 테두리와 네 귀 손잡이다(화면 px 크기 — 확대와 무관). cb.sel 에 화면 상자를 알린다(지우기 단추 자리).
+    let selKey = "";
+    function drawSel(v) {
+      let r = null;
+      if (sel && images.has(sel.id)) {
+        const g = imgMode() && mode.im === sel && mode.g ? mode.g : sel, a = C.toScreen(v, g.x, g.y);
+        r = { x: a.x, y: a.y, w: g.w * v.z, h: g.h * v.z };
+        lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        lctx.strokeStyle = "#2f7cf6"; lctx.lineWidth = 1.5;
+        lctx.strokeRect(r.x, r.y, r.w, r.h);
+        lctx.fillStyle = "#fff";
+        for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]]) {
+          lctx.fillRect(x - HANDLE_PX, y - HANDLE_PX, 2 * HANDLE_PX, 2 * HANDLE_PX);
+          lctx.strokeRect(x - HANDLE_PX, y - HANDLE_PX, 2 * HANDLE_PX, 2 * HANDLE_PX);
+        }
+      }
+      const key = r ? [r.x, r.y, r.w, r.h].map(Math.round).join() : "";
+      if (key !== selKey) { selKey = key; cb.sel(r); }
+    }
     function paintGrid(v) {
-      if (bg !== "grid") return;
+      if (bg !== "grid" && !snapping) return; // 옮기기·크기 조절 동안은 바탕이 격자가 아니어도 옅은 격자(CSS .snapping)
       let g = GRID * v.z;
       while (g < 12) g *= 4;
       while (g > 160) g /= 4;
@@ -717,23 +1059,25 @@
       const c = W ? C.toWorld(view, W / 2, H / 2) : null; // 가운데를 지킨다
       W = nw; H = nh;
       if (nd !== dpr) { dpr = nd; if (cur) cur.dropAll(); if (prev) prev.dropAll(); cur = prev = null; }
-      for (const cv of [baseC, liveC]) {
+      for (const cv of [imgC, baseC, liveC]) {
         cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
         cv.style.width = W + "px"; cv.style.height = H + "px";
       }
       if (c) view = C.anchor(c, W / 2, H / 2, view.z);
       view = C.boundView(view, W, H);
-      baseDirty = liveDirty = true;
+      baseDirty = liveDirty = imgDirty = true;
       kick();
     }
 
     // ---- 도구·바탕
     function stageClass() {
-      stage.className = "itda-wb-stage bg-" + bg + (space ? " grab" : "") + (prefs.tool === "erase" ? " erasing" : "") + (readOnly ? " readonly" : "") + (locked ? " locked" : "");
+      stage.className = "itda-wb-stage bg-" + bg + (space ? " grab" : "") + (prefs.tool === "erase" ? " erasing" : "") + (prefs.tool === "select" ? " selecting" : "")
+        + (snapping ? " snapping" : "") + (readOnly ? " readonly" : "") + (locked ? " locked" : "");
     }
     function setTool(t) {
-      if (mode && (mode.kind === "draw" || mode.kind === "erase")) return;
+      if (mode && (mode.kind === "draw" || mode.kind === "erase" || imgMode())) return;
       prefs.tool = t; hover = null; liveDirty = true; kick();
+      if (t !== "select") select(null);
       stageClass();
       cb.bar();
     }
@@ -741,6 +1085,7 @@
       bg = C.BGS.includes(b) ? b : "dark";
       stageClass();
       if (bg !== "grid") { stage.style.backgroundSize = ""; stage.style.backgroundPosition = ""; }
+      imgDirty = true; // 그림 자리 표시의 색도 바탕을 따른다
       invalidate("all"); // 기본 펜 색·형광펜 투명도가 바탕을 따른다
     }
     function setBg(b) {
@@ -751,15 +1096,22 @@
     }
 
     // load 는 판 하나를 연다 — 획·보기·바탕을 바꾸고 되돌리기를 비운다. ro 면 읽기 전용(그리기·지우기·바탕 바꾸기 없음 — 끌기는 이동).
+    // 그림은 디코드를 시작해 두고(비동기 — 준비되면 그림 층을 다시 그린다) 앞 판의 bmp 는 모두 close 한다.
     function load(b, ro) {
       mode = null; ptrs.clear(); hover = null;
       strokes.clear(); grid.clear(); totalPts = 0; nextId = 1; undoStack = []; redoStack = [];
+      images.clear(); igrid.clear(); imgBytes = 0; nextImg = 1; sel = null; gen++; closeHeld(); snapping = false;
       if (cur) cur.dropAll(); if (prev) prev.dropAll(); cur = prev = null;
       readOnly = !!ro;
       for (const g of b.strokes || []) {
         const s = { id: nextId++, tool: g.tool, color: g.color, w: g.w, pts: g.pts };
         geom(s);
         addStroke(s);
+      }
+      for (const g of b.images || []) {
+        const im = { id: nextImg++, x: g.x, y: g.y, w: g.w, h: g.h, mime: g.mime, data: g.data, bytes: C.b64Bytes(g.data), bmp: null, state: "wait" };
+        addImg(im);
+        decode(im);
       }
       view = C.boundView(b.view ? { x: b.view.x, y: b.view.y, z: C.clamp(b.view.z, C.ZMIN, C.ZMAX) } : { x: 0, y: 0, z: 1 }, W, H);
       lastZoomAt = 0;
@@ -770,25 +1122,29 @@
     }
     // commit 은 진행 중 그리기·지우기를 거기까지 확정해 판에 넣는다(저장하고 떠나는 모든 길이 먼저 부른다 — 머리 주석 「저장 때」).
     // 이동·오므리기는 그대로 둔다. 펜이 아직 닿아 있어도 이 획은 끝났다 — 떼고 다시 대야 새 획이다.
+    // 그림 옮기기·크기 조절도 거기까지 확정한다.
     function commit() {
       if (!mode) return;
       if (mode.kind === "draw") finishDraw();
       else if (mode.kind === "erase") endErase();
+      else if (imgMode()) endImage(true);
     }
     // lock 은 판을 바꾸거나 닫는 동안의 잠금이다 — 진행 중 획을 확정하고, 그리기·지우기·되돌리기·배경 바꾸기를 받지 않는다(이동·확대는 된다).
     function lock(on) {
-      if (on) commit();
+      if (on) { commit(); select(null); }
       locked = !!on; hover = null; liveDirty = true; kick();
       stageClass();
       cb.bar();
     }
-    // board 는 지금 판의 획·보기·바탕이다(쓴 차례 — serialize 에 넘긴다).
+    // board 는 지금 판의 획·그림·보기·바탕이다(쓴 차례·넣은 차례 — serialize 에 넘긴다). 그림의 bmp 는 미리보기용이다(serialize 는 쓰지 않는다).
     function board() {
       const list = [...strokes.values()].sort((a, b) => a.id - b.id).map(s => ({ tool: s.tool, color: s.color, w: s.w, pts: s.pts }));
-      return { bg, view: { x: view.x, y: view.y, z: view.z }, strokes: list };
+      const imgs = [...images.values()].sort((a, b) => a.id - b.id).map(im => ({ x: im.x, y: im.y, w: im.w, h: im.h, mime: im.mime, data: im.data, bmp: im.bmp }));
+      return { bg, view: { x: view.x, y: view.y, z: view.z }, strokes: list, images: imgs };
     }
     function destroy() {
       dead = true;
+      gen++; closeHeld();
       if (rafId && window.cancelAnimationFrame) window.cancelAnimationFrame(rafId);
       rafId = 0;
       if (cur) cur.dropAll(); if (prev) prev.dropAll(); cur = prev = null;
@@ -797,15 +1153,52 @@
 
     return {
       load, board, destroy, resize, pointer, leave, wheel, gesture, setSpace, setTool, setBg, undo, redo, colorOf, hlAlpha, kick, frame, commit, lock,
-      busy: () => !!mode, canUndo: () => !readOnly && !locked && undoStack.length > 0, canRedo: () => !readOnly && !locked && redoStack.length > 0,
+      // busy 는 포인터를 쥔 채 판을 바꾸는 중인가다(그리기·지우기·그림 옮기기·크기 — 이동·오므리기는 아니다). 자동 저장은 이 동안 미룬다(scheduleSave·follow).
+      busy: () => !!mode && (mode.kind === "draw" || mode.kind === "erase" || imgMode()), canUndo: () => !readOnly && !locked && undoStack.length > 0, canRedo: () => !readOnly && !locked && redoStack.length > 0,
       readOnly: () => readOnly, locked: () => locked, bg: () => bg, strokes, guard,
+      images, insertImage, deleteSelected, imgRoom, gen: () => gen, selected: () => sel, select: im => select(im || null), snapping: () => snapping,
       get view() { return view; }, set view(v) { setView(v); }, get mode() { return mode; }, get size() { return { W, H, dpr }; },
-      stats: () => ({ strokes: strokes.size, points: totalPts, undo: undoStack.length, redo: redoStack.length, tiles: (cur ? cur.tiles.size : 0) + (prev ? prev.tiles.size : 0) }),
+      stats: () => ({ strokes: strokes.size, points: totalPts, images: images.size, imageBytes: imgBytes, undo: undoStack.length, redo: redoStack.length, tiles: (cur ? cur.tiles.size : 0) + (prev ? prev.tiles.size : 0) }),
     };
   }
 
-  // ---- 미리보기: 판 b(parse 의 board 꼴)를 canvas 에 맞춰 그린다(목록 — 획 THUMB_MAX 개까지).
-  function drawThumb(cv, b) {
+  // ---- 미리보기: 판 b(parse 의 board 꼴)를 canvas 에 맞춰 그린다(목록 — 획 THUMB_MAX 개까지). 그림은 획 아래에 — layer(thumbLayer 가 그린
+  // canvas)가 있으면 그것을, 없으면 그림마다 b.images[i].bmp(지금 판 — 엔진이 든 것)나 옅은 사각형을 그린다.
+  // thumbFit 은 판 b 를 W × H 장치 px 에 맞추는 변환 { k, tx, ty } 다(그릴 것이 없으면 null).
+  function thumbFit(b, Wd, Hd, d) {
+    const list = (b.strokes || []).slice(0, THUMB_MAX), imgs = b.images || [];
+    if (!list.length && !imgs.length) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const take = bx => { x0 = Math.min(x0, bx[0]); y0 = Math.min(y0, bx[1]); x1 = Math.max(x1, bx[2]); y1 = Math.max(y1, bx[3]); };
+    for (const s of list) take(C.strokeBox(s.pts, s.w));
+    for (const im of imgs) take(C.imageBox(im));
+    const pad = 6 * d, k = Math.min((Wd - 2 * pad) / Math.max(1e-6, x1 - x0), (Hd - 2 * pad) / Math.max(1e-6, y1 - y0), 2 * d);
+    return { k, tx: (Wd - (x1 - x0) * k) / 2 - x0 * k, ty: (Hd - (y1 - y0) * k) / 2 - y0 * k };
+  }
+  function thumbImage(ctx, im, bmp, f, darkBg) {
+    ctx.setTransform(f.k, 0, 0, f.k, f.tx, f.ty);
+    if (bmp) { ctx.drawImage(bmp, im.x, im.y, im.w, im.h); return; }
+    ctx.fillStyle = darkBg ? "rgba(255,255,255,.14)" : "rgba(0,0,0,.1)";
+    ctx.fillRect(im.x, im.y, im.w, im.h);
+  }
+  // thumbLayer 는 다른 판의 그림을 하나씩 디코드해 미리보기 크기 canvas 에 그린 것이다(그린 곧바로 close — bmp 를 하나만 든다).
+  // 디코드가 안 되는 그림은 옅은 사각형이다. 그림이 없으면 null.
+  function thumbLayer(b) {
+    const imgs = b.images || [];
+    if (!imgs.length) return Promise.resolve(null);
+    const d = window.devicePixelRatio || 1, layer = document.createElement("canvas");
+    layer.width = Math.round(THUMB_W * d); layer.height = Math.round(THUMB_H * d);
+    const ctx = layer.getContext && layer.getContext("2d"), f = thumbFit(b, layer.width, layer.height, d);
+    if (!ctx || !f) return Promise.resolve(null);
+    let chain = Promise.resolve();
+    for (const im of imgs) {
+      chain = chain.then(() => decodeImage(im.mime, im.data).then(bmp => {
+        try { thumbImage(ctx, im, bmp, f, b.bg === "dark"); } finally { if (bmp && bmp.close) bmp.close(); }
+      }, () => thumbImage(ctx, im, null, f, b.bg === "dark")));
+    }
+    return chain.then(() => layer);
+  }
+  function drawThumb(cv, b, layer) {
     const d = window.devicePixelRatio || 1, ctx = cv.getContext && cv.getContext("2d");
     cv.width = Math.round(THUMB_W * d); cv.height = Math.round(THUMB_H * d);
     if (!ctx) return;
@@ -813,14 +1206,13 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = darkBg ? "#000" : b.bg === "grid" ? "#fbfbf7" : "#fff";
     ctx.fillRect(0, 0, cv.width, cv.height);
+    const f = thumbFit(b, cv.width, cv.height, d);
+    if (!f) return;
+    if (layer) ctx.drawImage(layer, 0, 0);
+    else for (const im of b.images || []) thumbImage(ctx, im, im.bmp || null, f, darkBg);
     const list = (b.strokes || []).slice(0, THUMB_MAX);
-    if (!list.length) return;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const s of list) { const bx = C.strokeBox(s.pts, s.w); x0 = Math.min(x0, bx[0]); y0 = Math.min(y0, bx[1]); x1 = Math.max(x1, bx[2]); y1 = Math.max(y1, bx[3]); }
-    const pad = 6 * d, k = Math.min((cv.width - 2 * pad) / Math.max(1e-6, x1 - x0), (cv.height - 2 * pad) / Math.max(1e-6, y1 - y0), 2 * d);
-    const tx = (cv.width - (x1 - x0) * k) / 2 - x0 * k, ty = (cv.height - (y1 - y0) * k) / 2 - y0 * k;
     const color = c => (c === 0 ? (darkBg ? "#f2f2f2" : "#141414") : COLORS[c]);
-    ctx.setTransform(k, 0, 0, k, tx, ty);
+    ctx.setTransform(f.k, 0, 0, f.k, f.tx, f.ty);
     for (const s of list) {
       const pts = C.curve(s.pts, s.w * 0.25);
       if (s.tool === "hl") {
@@ -907,6 +1299,7 @@
     root.setAttribute("aria-label", "화이트보드");
     root.tabIndex = -1;
     const stage = root.appendChild(el("div", "itda-wb-stage bg-dark"));
+    const imgC = stage.appendChild(el("canvas", "itda-wb-img"));   // 층 차례(아래부터): 그림 → 획 타일 → 진행 중·고르기 표시(엔진 머리 주석 「층」)
     const baseC = stage.appendChild(el("canvas", "itda-wb-base"));
     const liveC = stage.appendChild(el("canvas", "itda-wb-live"));
     const title = root.appendChild(el("div", "itda-wb-title"));
@@ -918,8 +1311,13 @@
     busyEl.setAttribute("role", "status");
 
     const bar = root.appendChild(el("div", "itda-wb-bar"));
-    const tools = { pen: button("itda-wb-tool", "펜", "tool", "펜 (P)"), hl: button("itda-wb-tool", "형광", "tool", "형광펜 (H)"), erase: button("itda-wb-tool", "지우개", "tool", "지우개 (E)") };
+    const tools = { pen: button("itda-wb-tool", "펜", "tool", "펜 (P)"), hl: button("itda-wb-tool", "형광", "tool", "형광펜 (H)"), erase: button("itda-wb-tool", "지우개", "tool", "지우개 (E)"),
+      select: button("itda-wb-tool", "고르기", "tool", "고르기 — 그림 옮기기·크기 (V)") };
     for (const t of Object.keys(tools)) { tools[t].dataset.tool = t; bar.appendChild(tools[t]); }
+    const imageBtn = bar.appendChild(button("", "그림", "image", "그림 넣기 (⌘V 로 붙여넣기도 된다)"));
+    const fileIn = root.appendChild(el("input", "itda-wb-file")); // 그림 고르기(iPad 에는 ⌘V 가 없다) — 보이지 않고 「그림」 단추가 연다
+    fileIn.type = "file"; fileIn.accept = "image/*"; fileIn.hidden = true; fileIn.tabIndex = -1;
+    fileIn.setAttribute("aria-hidden", "true");
     const colorBtn = bar.appendChild(button("itda-wb-swbtn", null, "pop", "색"));
     colorBtn.dataset.pop = "color";
     const colorDot = colorBtn.appendChild(el("i", "itda-wb-dot"));
@@ -947,6 +1345,9 @@
     const bgRow = pops.bg.appendChild(el("div", "itda-wb-row"));
     const bgBtns = C.BGS.map(b => { const x = bgRow.appendChild(button("", BG_NAMES[b], "bg")); x.dataset.bg = b; return x; });
 
+    const imgDel = root.appendChild(button("itda-wb-imgdel itda-wb-danger", "지우기", "imgdel", "그림 지우기 (Delete)")); // 고른 그림 옆
+    imgDel.hidden = true;
+
     const listEl = root.appendChild(el("div", "itda-wb-list"));
     listEl.hidden = true;
     listEl.setAttribute("role", "dialog");
@@ -957,12 +1358,38 @@
     listHead.appendChild(button("", "닫기", "listclose", "목록 닫기 (Esc)"));
     const items = listEl.appendChild(el("div", "itda-wb-items"));
 
-    const eng = engine(stage, baseC, liveC, {
+    const eng = engine(stage, imgC, baseC, liveC, {
       change, view: () => {}, bar: paintBar, down: closePops, // 보기만 바뀐 것은 저장을 부르지 않는다 — 다음 스냅샷에 함께 실린다
       edge: () => showNote("판의 끝(좌표 범위)에 닿아 획을 끝냈습니다 — 안쪽에서 다시 그으세요.", "full"),
       full: () => showNote("판이 가득 찼습니다(획 " + C.LIMIT.strokes + "·점 " + C.LIMIT.points + " 상한) — 이 획은 넣지 않았습니다.", "full"),
       long: () => showNote("한 획의 점이 " + STROKE_PTS + "개에 닿아 획을 끝냈습니다 — 떼고 다시 그으세요.", "full"),
+      imgFull: () => showNote("그림이 가득 찼습니다(판 하나에 " + C.LIMIT.images + "개·" + Math.round(C.LIMIT.imageBytes / 1024 / 1024) + "MB 상한) — 이 그림은 넣지 않았습니다.", "full"),
+      sel: placeImgDel,
     });
+    // placeImgDel 은 고른 그림(화면 상자 r) 오른쪽 위 옆에 「지우기」 단추를 둔다(화면 안으로 끌어 맞춘다). 고친 수 없는 판이면 숨긴다.
+    function placeImgDel(r) {
+      if (!r || eng.readOnly() || eng.locked()) { imgDel.hidden = true; return; }
+      const { W, H } = eng.size;
+      imgDel.hidden = false;
+      imgDel.style.left = Math.round(C.clamp(r.x + r.w + 8, 4, Math.max(4, W - 90))) + "px";
+      imgDel.style.top = Math.round(C.clamp(r.y, 4, Math.max(4, H - 110))) + "px";
+    }
+    // insertImage 는 그림(Blob·File)을 줄이고 인코드해(prepareImage) 지금 판의 화면 가운데에 넣는다(머리 주석 「그림」). 읽기 전용·잠금이면 넣지 않는다.
+    // 준비하는 사이 판이 바뀌었거나(gen) 잠겼으면 버린다. 넣었으면 true.
+    function insertImage(blob) {
+      if (!blob || !alive()) return Promise.resolve(false);
+      if (eng.readOnly()) { showNote("읽기 전용 판에는 그림을 넣지 않습니다.", "full"); return Promise.resolve(false); }
+      if (eng.locked()) return Promise.resolve(false);
+      if (!eng.imgRoom(1, 0)) { showNote("그림이 가득 찼습니다(판 하나에 " + C.LIMIT.images + "개 상한) — 이 그림은 넣지 않았습니다.", "full"); return Promise.resolve(false); }
+      const g = eng.gen();
+      return prepareImage(blob).then(p => {
+        if (!alive() || eng.gen() !== g || eng.readOnly() || eng.locked()) return false;
+        return eng.insertImage(p, p.iw, p.ih);
+      }).catch(err => {
+        if (alive() && eng.gen() === g) showNote(err && err.message ? err.message : IMG_READ_FAIL, "full");
+        return false;
+      });
+    }
 
     // ---- 잠금: 판을 바꾸거나 닫는 동안(머리 주석 「잠금」)
     function lock(text) { st.locked = text; busyEl.textContent = text; busyEl.hidden = false; root.classList.add("busy"); eng.lock(true); }
@@ -980,6 +1407,7 @@
       undoBtn.disabled = !eng.canUndo();
       redoBtn.disabled = !eng.canRedo();
       bgBtn.disabled = eng.readOnly() || eng.locked();
+      imageBtn.disabled = eng.readOnly() || eng.locked();
       const t = drawKind();
       colorDot.style.background = eng.colorOf(prefs.color[t]);
       const wd = Math.max(4, Math.min(28, t === "hl" ? prefs.width[t] * 0.6 : prefs.width[t] * 1.6));
@@ -1011,7 +1439,9 @@
     }
     function scheduleSave() {
       clearTimeout(st.timer);
-      st.timer = setTimeout(() => { st.timer = 0; if (alive()) save(); }, SAVE_QUIET);
+      // 쓰는·지우는·그림을 끄는 중(eng.busy)이면 넣지 않는다 — save 의 commit 이 진행 중 획을 끊지 않게 다시 2초 뒤로 미룬다
+      // (뗀 뒤의 변경이 타이머를 새로 건다). 떠나는 길(닫기·전환·새 판·복제·삭제·숨김)은 미루지 않고 그 자리에서 확정한다.
+      st.timer = setTimeout(() => { st.timer = 0; if (!alive()) return; if (eng.busy()) scheduleSave(); else save(); }, SAVE_QUIET);
     }
     const textNow = () => C.serialize(Object.assign(eng.board(), { name: st.name, extra: st.extra }));
     // snapshot 은 진행 중 그리기·지우기를 확정하고 지금 판의 본문을 그 자리에서 기록기에 넣는다(put — 다른 대기 뒤로 미루지 않는다).
@@ -1043,7 +1473,8 @@
           if (it && Number.isFinite(r.modified)) { it.modified = r.modified; it.bytes = r.bytes; }
           st.closeFailed = false; // 저장이 한 번 되면 닫기 첫 실패 안내를 다시 센다
           clearNote("save");
-          if (st.timer && !st.task) save(); // 저장 중 또 바뀌었다(자동 저장 대기) — 2초를 기다리지 않고 곧바로 한 번 더
+          // 저장 중 또 바뀌었다(자동 저장 대기) — 2초를 기다리지 않고 곧바로 한 번 더. 쓰는 중(eng.busy)이면 타이머에 맡긴다(획을 끊지 않게)
+          if (st.timer && !st.task && !eng.busy()) save();
         } else if (dirty(r)) showNote(SAVE_FAIL, "save");
         return v === "ok";
       });
@@ -1111,8 +1542,12 @@
           return (mem != null ? Promise.resolve(mem) : ask("load", id)).then(t => {
             const r = typeof t === "string" && t.trim() ? C.parse(t) : null;
             if (!r || !r.ok || !alive()) return null;
+            return thumbLayer(r.board).then(layer => ({ r, layer }), () => ({ r, layer: null }));
+          }, () => null).then(x => {
+            if (!x || !alive()) return null;
             const pic = el("canvas");
-            drawThumb(pic, r.board);
+            drawThumb(pic, x.r.board, x.layer);
+            if (x.layer) { x.layer.width = 0; x.layer.height = 0; }
             if (mem == null) { // 저장소의 본문만 캐시한다(저장하지 못한 본문은 modified 와 맞지 않는다)
               B.thumbs.delete(id); B.thumbs.set(id, { modified, canvas: pic });
               while (B.thumbs.size > THUMB_CACHE) B.thumbs.delete(B.thumbs.keys().next().value);
@@ -1132,7 +1567,7 @@
     function closeList() { st.listOpen = false; st.confirm = null; st.renaming = null; st.renameEl = null; listEl.hidden = true; items.textContent = ""; }
 
     // ---- 판 읽기·바꾸기
-    function emptyBoard(name) { return { name: name || "", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [], extra: {} }; }
+    function emptyBoard(name) { return { name: name || "", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [], images: [], extra: {} }; }
     const why = err => (err && err.message ? " — " + err.message : "");
     // show 는 판을 보인다 — 지금 판의 기록기를 바꾸고(연 세션 수), 이름은 목록(호스트)의 것을 먼저 쓴다(rename 뒤 본문 이름이 낡았어도 다음 저장에서 맞춘다).
     // 깨끗한 기록기면 지금 엔진의 본문을 「저장소에 있는 본문」 으로 둔다(바뀐 것 없이 떠나면 저장하지 않게). fresh 면 두지 않는다(새 판 — 곧바로 쓴다).
@@ -1398,6 +1833,7 @@
       const code = e.code || "", k = e.key || "", mod = e.metaKey || e.ctrlKey;
       const onButton = t && t.tagName === "BUTTON" && inside(t);
       if (k === "Tab" || (onButton && (k === "Enter" || k === " "))) return; // 포커스 이동·단추 누르기는 기본 동작
+      if (mod && !e.altKey && !e.shiftKey && (code === "KeyV" || k.toLowerCase() === "v")) return; // ⌘V — 기본 동작을 막으면 paste 사건이 오지 않는다(그림 넣기는 onPaste)
       e.preventDefault();
       const is = (c, ch) => code === c || k.toLowerCase() === ch;
       if (k === "Escape") { escape(); return; }
@@ -1410,10 +1846,13 @@
       if (is("KeyP", "p")) eng.setTool("pen");
       else if (is("KeyH", "h")) eng.setTool("hl");
       else if (is("KeyE", "e")) eng.setTool("erase");
+      else if (is("KeyV", "v")) eng.setTool("select");
+      else if (k === "Delete" || k === "Backspace") eng.deleteSelected();
       else if (is("BracketLeft", "[")) stepBoard(-1);
       else if (is("BracketRight", "]")) stepBoard(1);
     }
     function escape() {
+      if (eng.selected()) { eng.select(null); return; } // 고르기 풀기가 먼저
       if (st.renaming != null) { st.renaming = null; st.renameEl = null; paintList(); return; }
       if (st.confirm != null) { st.confirm = null; paintList(); return; }
       if (st.listOpen) { closeList(); return; }
@@ -1437,6 +1876,8 @@
       else if (a === "bg") eng.setBg(b.dataset.bg);
       else if (a === "undo") eng.undo();
       else if (a === "redo") eng.redo();
+      else if (a === "image") { closePops(); fileIn.value = ""; if (fileIn.click) fileIn.click(); } // 고르면 change(route)
+      else if (a === "imgdel") eng.deleteSelected();
       else if (a === "list") { if (st.listOpen) closeList(); else openList(); }
       else if (a === "close") close();
       else if (a === "listclose") closeList();
@@ -1457,6 +1898,7 @@
       else if (/^gesture/.test(type)) eng.gesture(type, e);
       else if (type === "contextmenu" || type === "dblclick" || type === "dragstart" || (type === "selectstart" && !isText(t))) e.preventDefault();
       else if (type === "click") onClick(e, t);
+      else if (type === "change" && t === fileIn) { const f = fileIn.files && fileIn.files[0]; fileIn.value = ""; if (f) insertImage(f); }
       else if (type === "input" && t === slider) {
         const k = drawKind();
         prefs.width[k] = Number(slider.value);
@@ -1471,6 +1913,18 @@
       if (!inside(t) && !/^gesture/.test(e.type)) return; // 표면 밖(호스트가 더 위에 띄운 층 등)은 건드리지 않는다
       route(e, t);
       e.stopPropagation();
+    }
+    // 붙여넣기(⌘V) — 입력 칸(표면 안의 이름 칸이든 호스트 층의 칸이든)에 초점이 있으면 건드리지 않는다(글자 붙여넣기는 기본 동작).
+    // 그 밖에는 표면 몫이다(아래 화면으로 보내지 않는다) — 클립보드의 첫 image/* 를 넣고, 그림이 없으면 아무 일도 하지 않는다.
+    const isField = t => !!t && (t.tagName === "TEXTAREA" || t.isContentEditable === true
+      || (t.tagName === "INPUT" && !/^(range|button|checkbox|radio|file|submit|reset|color|image)$/i.test(t.type || "")));
+    function onPaste(e) {
+      if (S !== api || isField(e.target) || isField(document.activeElement)) return;
+      e.stopPropagation();
+      const f = clipImage(e.clipboardData);
+      if (!f) return;
+      e.preventDefault();
+      insertImage(f);
     }
     // 숨김 저장 — 처리기 안에서 곧바로 진행 중 획을 확정하고 기록기에 넣는다(다른 대기 뒤로 미루지 않는다 — 머리 주석 「저장 때」)
     const hideSave = () => { save(); };
@@ -1487,6 +1941,7 @@
     function start(id) {
       prevFocus = document.activeElement || null;
       for (const t of KEY_TYPES) listen(window, t, onCap, true);
+      listen(window, "paste", onPaste, true);
       for (const t of CAP_TYPES) listen(window, t, onCap, NOT_PASSIVE.includes(t) ? { capture: true, passive: false } : true);
       listen(document, "visibilitychange", onHidden);
       listen(window, "pagehide", onPageHide);
@@ -1569,7 +2024,7 @@
       if (n > 0) { retry(st.rec); follow(st.rec, n, nowMs() + STORE_WAIT); }
     }
 
-    const api = { start, close: closeSurface, root, engine: eng, state: st, save, bag: B, applyName, buried };
+    const api = { start, close: closeSurface, root, engine: eng, state: st, save, bag: B, applyName, buried, insertImage };
     return api;
   }
 
