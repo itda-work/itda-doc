@@ -588,7 +588,8 @@
 
   // placeNotes 는 box(#pages) 안의 슬라이드마다 노트 칸을 만들어 o.into(#notes)에 붙인다. o = { notes[](build 의 값), on(붙일지), into(칸을 넣을 상자 — 없으면
   // 칸을 쪽 바로 뒤 형제로), grip(오른쪽 배치에서 끌어 너비를 바꾸는 손잡이 .sn-grip 을 칸 왼쪽에 둘지) }. on 이 거짓이면 지우기만 한다.
-  // 노트가 없는 슬라이드는 넘쳐 생긴 「(계속)」 장이든 아니든 「노트 없음」(오른쪽 배치에서만 보이고 아래 배치에서는 접힌다, itda-hyve#518).
+  // 노트가 없는 슬라이드는 넘쳐 생긴 「(계속)」 장이든 아니든 「노트 없음」(오른쪽 배치에서만 보이고 아래 배치에서는 접힌다, itda-hyve#518). 오른쪽 배치에서
+  // 노트 있는 장 바로 뒤의 빈 「(계속)」 장 칸은 layoutNotes 가 숨기고 앞 칸을 늘인다(noteSpans, itda-hyve#1102).
   function placeNotes(box, o) {
     for (const x of (o.into || box).querySelectorAll(":scope > .slide-note")) x.remove();
     if (!o.on) return;
@@ -623,6 +624,21 @@
       return { hidden: false, left: Math.round(r.left - box.left), top: Math.round(r.bottom - box.top + NOTE_BELOW_GAP), width: Math.round(r.width), height: null };
     });
   }
+  // noteSpans 는 오른쪽 배치에서 칸마다 몇 번째 쪽 아래끝까지 늘어나는지 고른다(DOM 없음, itda-hyve#1102). marks 는 쪽 차례로 쪽마다 { hidden(숨은 쪽), empty(노트 없는 칸
+  // .sn-empty), cont(넘쳐 이어진 장 — 머리에 .slide-cont) }. 돌려주는 값 ends[i] 는 칸 i 가 덮는 마지막 쪽의 순번(늘지 않으면 i), 앞 칸에 흡수돼 숨길 칸이면 -1 이다.
+  // 노트 있는 칸은 바로 뒤따르는 「노트 없음이면서 이어진 장」 들을 흡수한다 — 다음 노트 있는 칸·이어진 장이 아닌 쪽(다음 묶음)·숨은 쪽에서 멈춘다. 노트 없는 칸은
+  // 앞에 덮어 줄 노트 있는 칸이 없으면 제자리에 서고(「노트 없음」) 뒤의 빈 칸을 흡수하지 않는다 — 빈 칸이 빈 칸을 덮지 않는다. 노트를 어느 장에 붙이는지(notePage)는 건드리지 않는다.
+  function noteSpans(marks) {
+    const ends = marks.map((_, i) => i);
+    let owner = -1;
+    marks.forEach((m, i) => {
+      if (m.hidden) owner = -1;
+      else if (!m.empty) owner = i;
+      else if (m.cont && owner >= 0) { ends[i] = -1; ends[owner] = i; }
+      else owner = -1;
+    });
+    return ends;
+  }
   // noteAfter 는 아래 배치에서 칸 높이 h(화면 px)만큼 다음 쪽을 밀 여백이다 — 쪽은 transform 안이라 배치 px(1/zoom)로 돌려준다.
   function noteAfter(h, zoom) { return (h + NOTE_BELOW_GAP) / zoom; }
 
@@ -640,9 +656,18 @@
     if (!right && !below) return;
     const kids = [...notes.children];
     const pageOf = n => list[Number(n.dataset.slide) - 1];
+    // 오른쪽 배치: 노트 있는 칸이 뒤따르는 빈 「(계속)」 장 칸을 흡수해 그 장 아래끝까지 늘어난다(noteSpans, itda-hyve#1102). 흡수된 칸은 숨긴다 — 칸마다 매번
+    // 다시 고르므로 배치를 바꾸거나 칸을 다시 만들면 제자리로 돌아온다. 칸은 쪽 차례(placeNotes)이고, 쪽 번호가 이어지지 않으면(쪽 없는 칸) 끊는다.
+    const ends = right ? noteSpans(kids.map((n, i) => {
+      const pg = pageOf(n);
+      return { hidden: !pg || pg.offsetParent === null || (i > 0 && Number(n.dataset.slide) !== Number(kids[i - 1].dataset.slide) + 1),
+        empty: n.classList.contains("sn-empty"), cont: !!(pg && pg.querySelector(".slide-head .slide-cont")) };
+    })) : null;
+    const endOf = new Map();
     // 아래 배치: 너비 먼저 → 높이 재기 → 여백 걸기 → 위치. 칸 높이는 위치와 무관해 한 번으로 끝난다.
-    const shown = kids.filter(n => {
-      const pg = pageOf(n), hide = !pg || pg.offsetParent === null || (below && !o.showEmpty && n.classList.contains("sn-empty"));
+    const shown = kids.filter((n, i) => {
+      if (ends && ends[i] > i) endOf.set(n, pageOf(kids[ends[i]]));
+      const pg = pageOf(n), hide = !pg || pg.offsetParent === null || (ends && ends[i] < 0) || (below && !o.showEmpty && n.classList.contains("sn-empty"));
       n.hidden = hide;
       if (hide) { delete n.snH; if (pg) after(pg, ""); }
       else if (below) { put(n, "width", px(Math.round(pg.getBoundingClientRect().width))); put(n, "height", ""); }
@@ -653,7 +678,12 @@
       shown.forEach((n, i) => { n.snH = hs[i]; after(pageOf(n), px(noteAfter(hs[i], o.zoom))); });
     } else for (const n of shown) delete n.snH;
     const b = notes.parentElement.getBoundingClientRect();
-    const spots = notePlacement(shown.map(n => pageOf(n).getBoundingClientRect()), b, o);
+    const spots = notePlacement(shown.map(n => {
+      const r = pageOf(n).getBoundingClientRect(), end = endOf.get(n);
+      if (!end) return r;
+      const bottom = end.getBoundingClientRect().bottom; // 흡수한 마지막 장의 아래끝까지(사이 간격 포함)
+      return { left: r.left, top: r.top, right: r.right, bottom, width: r.width, height: bottom - r.top };
+    }), b, o);
     shown.forEach((n, i) => {
       const s = spots[i];
       put(n, "left", px(s.left)); put(n, "top", px(s.top)); put(n, "width", px(s.width));
@@ -682,5 +712,5 @@
   }
 
   // 정식 이름은 window.ItdaSlides 다. window.HyveSlides 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
-  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, notePlacement, noteAfter, layoutNotes, watchNotes, noteHTML, NOTE_FONTS, noteFontStep };
+  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, notePlacement, noteSpans, noteAfter, layoutNotes, watchNotes, noteHTML, NOTE_FONTS, noteFontStep };
 })();
