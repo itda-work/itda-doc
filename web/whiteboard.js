@@ -15,6 +15,12 @@
 //       닫기를 요청한 때부터 STORE_WAIT(8초) 안에 확인되지 않으면 첫 닫기라도 본문을 기록기에 남긴 채 닫는다(앞 일 — 전환 등 — 은 기다리지 않는다).
 //       판에 좌표 범위 밖 점이 있어 본문을 만들지 못하면 닫지 않는다(false — 닫으면 판을 잃는다).
 //   ItdaWhiteboard.isOpen() · ItdaWhiteboard.toggle(opts)(열렸으면 close, 아니면 open(opts))
+//   ItdaWhiteboard.unsaved(store) → string[]  그 store 객체에서 저장 성공을 아직 확인하지 못한 기록기 본문이 있는 판 id 의 새 배열(차례에 뜻 없음).
+//       동기·읽기 전용이다 — 저장을 시작하지도 기록기·저장소별 상태를 만들거나 바꾸지도 않는다. 표면이 열려 있는지와 상관없이 그 store 의 기록기를 모두 본다.
+//       판별은 아래 「기록기」 의 미저장(가장 새 번호 > done — 도는 save 만 있어도, 그 뒤 더 새 스냅샷이 있어도 든다)이고, 삭제가 된 판(gone)은 뺀다.
+//       「디스크에 없음」 이 아니라 「이 store 의 save 성공을 확인하지 못함」 이다. 엔진에만 있는 변경(아직 기록기에 넣지 않은 획 — 자동 저장을 기다리거나
+//       본문을 만들지 못한 것)은 들지 않는다 — 열린 표면의 마지막 획까지 지키려면 close() 가 true 인 것을 먼저 확인한다. 이 페이지에서 쓴 적 없는
+//       store 는 빈 배열이고, store 가 객체(함수 포함)가 아니면 TypeError 를 던진다.
 //   ItdaWhiteboard.memoryStore()  메모리 저장소(아래 store 계약을 그대로 따른다 — 시험·데모용, 페이지를 닫으면 사라진다).
 //   ItdaWhiteboard.debug()  열린 동안의 엔진 손잡이(시험·진단용 — 계약 아님). 닫혀 있으면 null.
 //
@@ -2028,6 +2034,14 @@
     return api;
   }
 
+  // unsaved 는 store 의 미저장 판 id 다(머리 주석 「unsaved」) — bags.get 으로만 본다(조회가 bag·기록기를 만들지 않는다). 판별은 dirty 그대로다.
+  function unsaved(store) {
+    if (store === null || (typeof store !== "object" && typeof store !== "function")) throw new TypeError("ItdaWhiteboard.unsaved: store 객체가 필요합니다");
+    const B = bags.get(store), out = [];
+    if (B) for (const [id, r] of B.recs) if (dirty(r)) out.push(id);
+    return out;
+  }
+
   // memoryStore 는 저장 계약(머리 주석)을 메모리로 따르는 저장소다 — 시험·데모용.
   function memoryStore() {
     const files = new Map();
@@ -2048,7 +2062,7 @@
   const sp0 = f => Promise.resolve().then(f);
 
   window.ItdaWhiteboard = {
-    open, close, isOpen, toggle, memoryStore,
+    open, close, isOpen, toggle, unsaved, memoryStore,
     // debug 의 rec·dirty·latest·put·watch 는 지금 store 의 기록기를 들여다보는 손잡이다(시험용 — put 은 그 판의 기록기에 본문을 넣는다).
     debug: () => {
       if (!S) return null;
