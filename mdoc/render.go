@@ -215,9 +215,17 @@ func (r *htmlRenderer) codeBlock(w util.BufWriter, src []byte, node ast.Node, en
 		if cols != 0 {
 			attr(w, "data-cols", strconv.Itoa(cols))
 		}
-		for _, msg := range cwarns {
+		// 코드 배율·맞춤(itda-hyve#1116): 펜스 줄 scale=0.55~1.5·fit — 화면(pager.js)이 그 블록의 --code-scale 을 건다(slidescale.go)
+		sc, swarns := parseCodeScale(string(fenceInfo(fc, src)))
+		if sc != "" {
+			attr(w, "data-scale", sc)
+		}
+		for _, msg := range append(cwarns, swarns...) {
 			r.st.warn(r.st.lines.line(fc.Pos()), WarnBadAttribute, msg)
 		}
+	}
+	if info.fit {
+		attr(w, "data-fit", "on")
 	}
 	if info.noNumber {
 		attr(w, "data-ln", "off") // 이 블록만 줄 번호 끄기(itda-hyve#1024) — 화면(codelines.js)이 번호 없이 감싼다(codenonumber.go)

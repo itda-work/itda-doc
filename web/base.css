@@ -738,7 +738,8 @@ menclose { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
 /* 코드 */
 .page-body code { font-family: var(--font-mono); font-size: 0.88em; background: var(--code-bg); border-radius: 2pt; padding: 0.5pt 3pt; }
-.page-body pre { font-family: var(--font-mono); font-size: var(--code-size); line-height: 1.55; background: var(--code-bg);
+/* --code-scale: 코드 블록 하나의 배율(펜스 줄 scale=·fit, itda-hyve#1116) — pager.js(codeScales·fitCodeWidth·placeCodeFit)가 그 pre 에만 걸고, 없으면 1 */
+.page-body pre { font-family: var(--font-mono); font-size: calc(var(--code-size) * var(--code-scale, 1)); line-height: 1.55; background: var(--code-bg);
   padding: 7pt 10pt; border-radius: 3pt; margin: 8pt 0; white-space: pre-wrap; overflow-wrap: anywhere; word-break: normal; }
 .page-body pre code { background: none; padding: 0; font-size: inherit; }
 /* 표 머리 안 인라인 코드: 글자색은 머리 글자색(--table-head-ink, 머리 안 링크면 그 링크 색)을 따르고, 상자는 그 글자색을 옅게 깐다 —
@@ -954,13 +955,16 @@ nav.toc .toc-section-number { margin-right: 3pt; }
 /* ---- 슬라이드(설계 5장). 같은 쪽 상자(.page)를 1280×720(16:9)·960×720(4:3) 으로 쓴다 — 인쇄하면 960×540pt·720×540pt.
    글자·여백은 --slide-* 토큰이고 색·글꼴·로고는 문서 테마 그대로다. 테마는 .slide-deco·.slide-head·.slide-cover·.slide-section·
    .slide-foot 과 종류 클래스(k-title·k-section·k-content·k-single — 쪽 안의 요소에 붙는다)로 슬라이드만의 모양을 더한다. */
+/* 본문 글자 토큰은 장 배율(--slide-body-scale — 제목 {scale=}·{.fit}, itda-hyve#1116)이 있으면 그것을, 없으면 문서 배율(--slide-scale)을 곱한다.
+   slides.js makeGroup 이 그 장의 쪽(.page)에만 --slide-body-scale 을 건다 — 사용자 정의 속성은 선언된 요소(.page.slide)에서 값이 계산되어
+   상속되므로 쪽에 걸어야 아래 토큰이 바뀐다. 슬라이드 머리(.slide-title)·바닥글·표지·구역 제목·패널·배경 캡션은 --slide-scale 그대로다 */
 .page.slide {
-  --text-size: calc(var(--slide-text-size) * var(--slide-scale)); --line-height: var(--slide-line-height); --paragraph-gap: 9pt;
-  --h1-size: calc(var(--slide-title-size) * 0.86 * var(--slide-scale)); --h2-size: calc(var(--slide-title-size) * 0.78 * var(--slide-scale));
-  --h3-size: calc(var(--slide-text-size) * 1.12 * var(--slide-scale));
-  --h4-size: calc(var(--slide-text-size) * var(--slide-scale)); --h1-gap-top: 6pt; --h1-gap-bottom: 8pt; --h2-gap-top: 12pt; --h3-gap-top: 10pt;
-  --table-size: calc(var(--slide-table-size) * var(--slide-scale)); --code-size: calc(var(--slide-code-size) * var(--slide-scale));
-  --lead-size: calc(var(--slide-lead-size) * var(--slide-scale)); --caption-size: calc(13pt * var(--slide-scale));
+  --text-size: calc(var(--slide-text-size) * var(--slide-body-scale, var(--slide-scale))); --line-height: var(--slide-line-height); --paragraph-gap: 9pt;
+  --h1-size: calc(var(--slide-title-size) * 0.86 * var(--slide-body-scale, var(--slide-scale))); --h2-size: calc(var(--slide-title-size) * 0.78 * var(--slide-body-scale, var(--slide-scale)));
+  --h3-size: calc(var(--slide-text-size) * 1.12 * var(--slide-body-scale, var(--slide-scale)));
+  --h4-size: calc(var(--slide-text-size) * var(--slide-body-scale, var(--slide-scale))); --h1-gap-top: 6pt; --h1-gap-bottom: 8pt; --h2-gap-top: 12pt; --h3-gap-top: 10pt;
+  --table-size: calc(var(--slide-table-size) * var(--slide-body-scale, var(--slide-scale))); --code-size: calc(var(--slide-code-size) * var(--slide-body-scale, var(--slide-scale)));
+  --lead-size: calc(var(--slide-lead-size) * var(--slide-body-scale, var(--slide-scale))); --caption-size: calc(13pt * var(--slide-body-scale, var(--slide-scale)));
   background: var(--slide-bg); word-break: keep-all;
 }
 .page.slide .page-body { top: var(--slide-pad-top); bottom: var(--slide-pad-bottom); left: var(--slide-pad-x); right: var(--slide-pad-x); }
@@ -1182,8 +1186,8 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 .page.slide .page-body > p.fit-row > br { display: none; }
 .page.slide .page-body > p.fit-row > a { display: block; line-height: 0; }
 .page.slide .page-body > p.fit-row img.img-fit { display: block; width: auto; height: calc(var(--body-h, 200mm) * 0.3); max-width: none; max-height: none; object-fit: contain; }
-.page.slide .page-body > p.fit-row > .fr-cap { display: block; contain: inline-size; font-size: calc(13pt * var(--slide-scale)); color: var(--caption-color); text-align: center; line-height: 1.3; }
-.page.slide .footnotes { font-size: calc(13pt * var(--slide-scale)); }
+.page.slide .page-body > p.fit-row > .fr-cap { display: block; contain: inline-size; font-size: calc(13pt * var(--slide-body-scale, var(--slide-scale))); color: var(--caption-color); text-align: center; line-height: 1.3; }
+.page.slide .footnotes { font-size: calc(13pt * var(--slide-body-scale, var(--slide-scale))); }
 .page.slide .page-body > :is(ul, ol) > li::marker { color: var(--accent); }
 
 /* 제목 슬라이드 */
@@ -1209,9 +1213,9 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 
 /* 하나만 있는 슬라이드: 그것을 크게, 가운데에 */
 .page.slide.k-single .page-body { display: flex; flex-direction: column; justify-content: center; }
-.page.slide .page-body .slide-only.lead { font-size: calc(var(--slide-lead-size) * 1.2 * var(--slide-scale)); line-height: 1.5; }
-.page.slide .page-body table.slide-only { font-size: calc(var(--slide-table-size) * 1.3 * var(--slide-scale)); }
-.page.slide .page-body blockquote.slide-only { font-size: calc(var(--slide-text-size) * var(--slide-scale)); }
+.page.slide .page-body .slide-only.lead { font-size: calc(var(--slide-lead-size) * 1.2 * var(--slide-body-scale, var(--slide-scale))); line-height: 1.5; }
+.page.slide .page-body table.slide-only { font-size: calc(var(--slide-table-size) * 1.3 * var(--slide-body-scale, var(--slide-scale))); }
+.page.slide .page-body blockquote.slide-only { font-size: calc(var(--slide-text-size) * var(--slide-body-scale, var(--slide-scale))); }
 .overflow-clipped { outline: 1pt dashed #c53030; }
 
 /* ---- KPI(표준 어휘 kpi, itda-work/itda-hyve#362). mdoc 이 요구 구조(정의 목록·3열 표)가 있을 때만 .kpi.kpi-tiles > dl > .kpi-item 을 낸다 — 없으면 종전 div.kpi
@@ -1228,7 +1232,7 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 .page-body .kpi-item > dd:first-of-type ~ dd.kpi-down { color: var(--kpi-down); }
 .page-body .kpi-tiles.kpi-wrap .kpi-item > dd:first-of-type { white-space: normal; }
 .page-body .kpi-tiles.kpi-noaux .kpi-item > dd:first-of-type ~ dd { display: none; }
-.page.slide .page-body .kpi-item > dd:first-of-type { font-size: calc(var(--slide-kpi-size) * var(--slide-scale)); }
+.page.slide .page-body .kpi-item > dd:first-of-type { font-size: calc(var(--slide-kpi-size) * var(--slide-body-scale, var(--slide-scale))); }
 .page.slide .page-body .kpi-item { padding: 8pt 14pt; }
 
 /* ---- 보드(명세 spec/dashboard.md, itda-work/itda-hyve#362). 보드(.page.board)는 한 장이다. 폭은 슬라이드와 같고(1280·960px) 높이는 내용을 따르되 기준 상자(720px)보다

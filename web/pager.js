@@ -93,6 +93,104 @@
     }
     for (const el of rootEl.querySelectorAll("[data-w]")) applyWidth(el);
     sizeDiagrams(rootEl);
+    codeScales(rootEl);
+  }
+
+  // ---- 코드 블록 배율·맞춤(itda-hyve#1116). mdoc 이 펜스 줄 scale=(0.55~1.5 — 검사를 마친 값)을 pre 의 data-scale 로, fit 낱말을 data-fit 으로
+  // 낸다(mdoc/slidescale.go). 화면은 그 pre 에만 --code-scale 을 CSSOM 으로 건다 — base.css 가 font-size 를 --code-size × --code-scale 로 그린다
+  // (글자 크기로 줄인다 — transform 이 아니라 줄 바꿈이 다시 계산되고, 흐리지 않으며 PDF 에 실제 크기가 남는다). 값은 놓인 자리의 코드 크기에
+  // 곱하는 배율이다(슬라이드면 장 배율·문서 배율을 곱한 크기에, A4 면 --code-size 에).
+  //   scale=  codeScales 가 건다(adoptWidths — 쪽 보기·이어보기·슬라이드가 모두 부른다).
+  //   fit     ① 폭: fitQueueCode 가 쪽을 나누기 전 첫 쪽 본문에 블록을 잠깐 넣어 가장 긴 줄이 줄바꿈 없이 들어가는 배율을 찾는다(fitQueueMath 와
+  //           같은 길 — 쪽 보기·슬라이드. 이어보기는 나누지 않아 폭 맞춤이 없다). ② 높이(슬라이드만 — opts.fitFill): 맨 위 블록이면 placeCodeFit 이
+  //           놓인 자리에서 넘칠 때 들어가는 가장 큰 배율로 더 줄인다. 상한은 scale= 값(없으면 1), 하한은 CODE_MIN. 하한에서도 넘치면 하한 배율로
+  //           지금처럼 나뉜다. 다단(cols=) 블록은 폭 맞춤을 하지 않는다(단 폭으로 재지 않는다 — 높이 맞춤은 한다).
+  const CODE_MIN = 0.55, CODE_MAX = 1.5;
+  const scaleNumRe = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
+  // codeScaleOf 는 pre 의 scale= 값(범위 밖·없으면 1)이다 — 맞춤의 상한이기도 하다.
+  function codeScaleOf(pre) {
+    const v = pre.getAttribute("data-scale") || "";
+    const n = scaleNumRe.test(v) ? Number(v) : NaN;
+    return n >= CODE_MIN && n <= CODE_MAX ? n : 1;
+  }
+  // setCodeScale 은 --code-scale 을 건다. 1 이면 지운다(값 없는 것과 같다). 소수 넷째 자리에서 내린다(올리면 맞춘 자리를 넘을 수 있다).
+  function setCodeScale(pre, s) {
+    const v = Math.floor(s * 10000) / 10000;
+    if (v === 1) pre.style.removeProperty("--code-scale");
+    else pre.style.setProperty("--code-scale", String(v));
+  }
+  function codeScaleNow(pre) {
+    const v = Number(pre.style.getPropertyValue("--code-scale"));
+    return v > 0 ? v : 1;
+  }
+  function codeScales(rootEl) {
+    for (const pre of rootEl.querySelectorAll("pre[data-scale]")) setCodeScale(pre, codeScaleOf(pre));
+  }
+  // fitCodeWidth 는 놓인 자리(본문·목록 칸 등)에 있는 pre 하나를 가장 긴 줄이 줄바꿈 없이 들어가는 배율로 맞춘다. 재기: 줄바꿈을 끄고(white-space: pre)
+  // code 를 max-content 블록으로 둔 폭(줄 번호 칸 포함 — 번호 칸도 ch 라 글자와 함께 준다)을 pre 내용 폭(clientWidth − 좌우 안쪽 여백)과 견준다. offsetWidth·
+  // clientWidth 는 배치 px 라 보기 영역의 transform 배율과 무관하다. 글자 폭은 배율에 거의 비례하므로 비율로 한 번 줄이고, 반올림·최소 글자 크기(WebKit 9px —
+  // 그 밑으로는 줄지 않는다)로 남는 넘침은 3%씩 몇 번 더 줄인다. 하한에서 멈춘다(그때는 지금처럼 줄이 바뀐다). 돌려주는 값은 건 배율이다.
+  function fitCodeWidth(pre) {
+    const top = codeScaleOf(pre);
+    setCodeScale(pre, top);
+    const code = pre.querySelector(":scope > code");
+    if (!code || pre.hasAttribute("data-cols")) return top;
+    const cs = getComputedStyle(pre);
+    const avail = pre.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+    if (!(avail > 0)) return top; // 숨은 자리는 잴 수 없다
+    pre.style.setProperty("white-space", "pre");
+    code.style.setProperty("display", "block");
+    code.style.setProperty("width", "max-content");
+    let s = top;
+    const wide = code.offsetWidth;
+    if (wide > avail + 0.5) {
+      s = Math.max(CODE_MIN, top * avail / wide);
+      setCodeScale(pre, s);
+      for (let i = 0; i < 8 && s > CODE_MIN && code.offsetWidth > avail + 0.5; i++) { s = Math.max(CODE_MIN, s * 0.97); setCodeScale(pre, s); }
+    }
+    for (const p of ["display", "width"]) code.style.removeProperty(p);
+    pre.style.removeProperty("white-space");
+    if (!code.getAttribute("style")) code.removeAttribute("style");
+    return s;
+  }
+  // fitQueueCode 는 나눌 블록 가운데 fit 코드 블록이 든 것을 첫 쪽 본문에 잠깐 넣어 폭을 맞춘다(fitQueueMath 와 같다 — 흐름은 쪽 밖이라 글자 크기·폭이 다르다).
+  function fitQueueCode(queue) {
+    const hosts = queue.filter(n => (n.tagName === "PRE" && n.hasAttribute("data-fit")) || n.querySelector("pre[data-fit]"));
+    if (!hosts.length) return;
+    for (const n of hosts) body.appendChild(n);
+    for (const pre of body.querySelectorAll("pre[data-fit]")) fitCodeWidth(pre);
+    for (const n of hosts) body.removeChild(n);
+  }
+  // placeCodeFit 은 슬라이드 맨 위의 fit 코드 블록을 놓는다(opts.fitFill). 지금 배율(폭 맞춤 뒤)로 들어가면 그대로. 넘치면:
+  //   1. 쪽에 앞 블록이 있고(제목만 있는 쪽은 빈 쪽으로 친다) 놓인 자리에 본문 높이의 30% 도 남지 않으면 false — 새 쪽에서 다시(그림 .fit 의 placeFit 과 같은 규칙)
+  //   2. 하한(CODE_MIN)에서 들어가면 [하한, 지금 배율] 을 이분 탐색(7회)해 들어가는 가장 큰 배율로 놓고 true
+  //   3. 하한에서도 안 들어가면 빈 쪽이 아닐 때 false(새 쪽에서 다시), 빈 쪽이면 하한 배율을 걸고 null — 부르는 쪽이 지금처럼 나눈다(줄 단위 splitPre)
+  // 한 번 놓기를 마친 블록에는 data-fit-done 을 단다 — 나뉜 뒷조각(shallow 가 속성·배율을 옮긴다)은 같은 하한 배율로 다시 맞추지 않고 나뉜다.
+  function placeCodeFit(pre, empty) {
+    const fresh = empty || onlyKeepNext();
+    const hi = codeScaleNow(pre);
+    pre.setAttribute("data-fit-done", "");
+    body.appendChild(pre);
+    if (fits()) return true;
+    const cs = getComputedStyle(pre);
+    const prev = pre.previousElementSibling;
+    const top = (prev ? deepBottom(prev) : bodyBottom - bodyHeight) + (parseFloat(cs.marginTop) || 0);
+    const again = () => { body.removeChild(pre); pre.removeAttribute("data-fit-done"); setCodeScale(pre, hi); return false; };
+    if (!fresh && bodyBottom - top < bodyHeight * 0.3) return again();
+    setCodeScale(pre, CODE_MIN);
+    if (fits()) {
+      let lo = CODE_MIN, up = hi;
+      for (let i = 0; i < 7; i++) {
+        const m = (lo + up) / 2;
+        setCodeScale(pre, m);
+        if (fits()) lo = m; else up = m;
+      }
+      setCodeScale(pre, lo);
+      return true;
+    }
+    if (!fresh) return again();
+    body.removeChild(pre);
+    return null;
   }
 
   // 그림 자리(itda-hyve#475): ```mermaid 펜스 줄의 ratio·width·height 를 mdoc 이 검사해 data-diagram-* 로 낸 값을
@@ -771,6 +869,7 @@
     leadIns = new WeakSet(queue.filter(leadIn));
     newPage(false);
     fitQueueMath(queue);
+    fitQueueCode(queue);
     let guard = 0;
     while (queue.length && guard++ < 200000) {
       const n = queue.shift();
@@ -794,6 +893,12 @@
       if (opts.fitFill && (n.tagName === "FIGURE" && n.classList.contains("fig-fit") || n.tagName === "P" && n.classList.contains("fit-row"))) {
         if (placeFit(n, queue, empty)) continue;
         queue.unshift(...carryHeadings(), n); newPage(false); continue;
+      }
+      // fit 코드 블록(itda-hyve#1116 — 슬라이드만): 높이를 놓인 자리에 맞춘다. null 이면 하한 배율로 아래 보통 길(나누기)을 탄다
+      if (opts.fitFill && n.tagName === "PRE" && n.hasAttribute("data-fit") && !n.hasAttribute("data-fit-done")) {
+        const placed = placeCodeFit(n, empty);
+        if (placed) continue;
+        if (placed === false) { queue.unshift(...carryHeadings(), n); newPage(false); continue; }
       }
       if (softKeep(n) && !empty) {
         body.appendChild(n);

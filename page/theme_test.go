@@ -260,12 +260,13 @@ func TestTokenTableMatchesBaseCSS(t *testing.T) {
 	}
 	for _, m := range regexp.MustCompile(`var\((--[a-z0-9-]+)`).FindAllStringSubmatch(css, -1) {
 		local := map[string]bool{"--c": true, "--d": true, "--panel-w": true, "--panel-gap": true, "--img-max-h": true, "--slide-head-h": true, "--body-h": true, "--kpi-fit": true, "--board-rows": true, "--tz-left": true, "--tz-top": true, "--tz-width": true, "--tz-height": true,
-			"--tile-status": true, "--tile-enter-delay": true,
+			"--tile-status": true, "--tile-enter-delay": true, "--slide-body-scale": true, "--code-scale": true,
 			"--mark-ink": true, "--del-ink": true, "--kbd-line": true, "--head-code-bg": true, "--head-code-line": true, "--footnote-align": true}
 		if _, ok := code[m[1]]; !ok && !local[m[1]] {
 			// --c·--d·--panel-w·--panel-gap 은 규칙 안의 지역 변수(알림 색·차트 항목 차례·분할 그림 패널 폭과 틈 itda-hyve#550),
 			// --img-max-h·--slide-head-h·--body-h·--kpi-fit·--board-rows·--tz-* 는 화면(쪽 나눔기·슬라이드 나눔기·보드 나눔기 dashboard.js fitKPI·build·zoomer)이 재어 거는 값,
 			// --tile-status 는 상태 타일 규칙 안의 지역 변수(--status-* 하나를 고른다), --tile-enter-delay 는 dashboard.js enter 가 타일마다 거는 등장 늦춤(itda-hyve#1038 3단계 B·C),
+			// --slide-body-scale·--code-scale 은 slides.js·pager.js 가 그 장·그 코드 블록에만 거는 배율이고 읽는 쪽이 var() 대체값을 갖는다(itda-hyve#1116 — 기본값을 :root 에 두면 장 배율 없는 장에서 대체값이 쓰이지 않는다),
 			// --mark-ink·--del-ink·--kbd-line·--head-code-*·--footnote-align 은 표 머리 규칙 안에서만 값을 얻고 읽는 쪽이 var() 대체값을 갖는 지역 변수(itda-doc#41, page/actionshead_test.go)
 			t.Errorf("base.css 가 쓰는 %s 에 기본값이 없음", m[1])
 		}
@@ -326,6 +327,9 @@ func TestSlideFontSizeValueForms(t *testing.T) {
 		"calc(var(--slide-section-size) * 1.5 * var(--slide-scale))",
 		"0.88em", "1em", ".5em", "50%", "inherit",
 		"calc(13pt * var(--slide-scale)) !important",
+		// 본문 배율 꼴(itda-hyve#1116 — 장 배율이 있으면 그것, 없으면 문서 배율)
+		"calc(13pt * var(--slide-body-scale, var(--slide-scale)))",
+		"calc(var(--slide-table-size) * 1.3 * var(--slide-body-scale,var(--slide-scale)))",
 	}
 	for _, v := range ok {
 		if !slideFontSizeOK(v) {
@@ -341,6 +345,9 @@ func TestSlideFontSizeValueForms(t *testing.T) {
 		"calc(2 * var(--slide-scale))",                         // 길이 인수가 없다(단위 없는 font-size)
 		"calc(44pt * 2pt * var(--slide-scale))",                // 길이 인수가 둘
 		"44pt !important", "larger", "",
+		"calc(13pt * var(--slide-body-scale))",                                          // 대체값 없음 — 장 배율이 없는 장에서 무효
+		"calc(13pt * var(--slide-body-scale, 0.9))",                                     // 대체값이 문서 배율이 아니다
+		"calc(13pt * var(--slide-body-scale, var(--slide-scale)) * var(--slide-scale))", // 배율 중복
 	}
 	for _, v := range bad {
 		if slideFontSizeOK(v) {
