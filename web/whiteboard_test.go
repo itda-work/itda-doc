@@ -30,9 +30,11 @@ import (
 // 중계 출구·보기 전용 화면(④-3a): 묶음 형식(sha-256·검증·반올림), 출구(off·reset·증분·긋는 중 안 보냄·보기 합치기·send 차례·full·실패 뒤 reset·
 // image 먼저·같은 해시 한 번·조각 reset·긴 획 조각·닫힘·판 전환·이름·저장과 무관), 왕복(보내는 쪽 board() = 뷰어의 판), 뷰어(검증·resync·상한·따라가기).
 // 중계 리뷰 1회차: 처음 열기의 list 거부(읽기 전용 빈 판·안내), 상한(획·점·그림 수)에 찬 판의 지우기→넣기·되돌리기 왕복(빼기 먼저),
-// 5만 획 일괄 지우기의 d 조각·묶음 크기, 크기 단언(넘으면 내지 않고 reset).
+// 5만 획 일괄 지우기의 d 조각·묶음 크기, 크기 단언(넘으면 내지 않고 reset), 출구마다의 상한 max(48KB 에서 큰 판 reset·긴 획·큰 빼기 목록·증분이 그 안·
+// 뷰어가 같다, 없음은 기준 커밋과 해시까지 같은 reset·증분, 작은 값은 8KB 로 눌러 쓴다, 8KB 에서 제어 문자 200자 이름·긴 획, 수가 아닌 값은
+// TypeError 이고 앞 출구가 그대로 돈다), image 없는 출구(i·g·x 만).
 // 실제 그리기(canvas 픽셀)·CSS 배치·실기 Pencil 입력·실제 그림 디코드·인코드는 보지 않는다(미검증 — 데모로 본다).
-const whiteboardCases = 618
+const whiteboardCases = 647
 
 func TestWhiteboard(t *testing.T) {
 	node, err := exec.LookPath("node")
