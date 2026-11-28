@@ -99,3 +99,9 @@
 .itda-wb-rename { font: inherit; color: #fff; background: #111; border: 1px solid #2f7cf6; border-radius: 8px; padding: 6px 8px; -webkit-user-select: text; user-select: text; }
 .itda-wb-acts { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 .itda-wb [hidden] { display: none !important; }
+
+/* 보기 전용 화면(whiteboard.js viewer) — 호스트가 준 mount 를 채운다(mount 는 위치를 가진 요소여야 한다). 판을 끄면(.off) 판 이름표를 숨긴다 */
+.itda-wb.itda-wb-viewer { position: absolute; z-index: auto; }
+.itda-wb-viewer .itda-wb-stage { cursor: grab; }
+.itda-wb-viewer .itda-wb-stage.grabbing { cursor: grabbing; }
+.itda-wb-viewer.off .itda-wb-title { display: none; }
