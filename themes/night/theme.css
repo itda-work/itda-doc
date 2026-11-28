@@ -36,7 +36,7 @@
   --diagram-label-bg: #172130; --diagram-cluster-bg: #1a2534; --diagram-cluster-border: #2d3b50; --diagram-grid: #2d3b50; --diagram-exclude-bg: #263345;
   --diagram-bar-done: #8795aa; --diagram-bar-active: #38c6de; --diagram-bar-crit: #ff6f6f; --diagram-bar-crit-border: #e4eaf3;
   --kpi-up: #43d08a; --kpi-down: #ff6f6f;
-  --status-ok: #43d08a; --status-warn: #f3b74a; --status-bad: #ff6f6f;
+  --status-ok: #43d08a; --status-warn: #f3b74a; --status-bad: #ff6f6f; --board-link: #9eabbe;
   --tile-bg: #172130; --tile-border: 0.75pt solid #2a3a52;
   color: var(--ink);
 }

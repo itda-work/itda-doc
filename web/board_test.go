@@ -134,6 +134,122 @@ func TestBoardMotionCSS(t *testing.T) {
 	}
 }
 
+// 타일 잇기(itda-work/itda-hyve#1038 3단계 D): dashboard.js 의 links 와 순수 함수를 node 로 돌린다(testdata/board_links.cjs) —
+// 가장자리 고르기(linkSides)·꺾는 꼴(linkRoute — 곧은 선·ㄹ자)·한 가장자리에 여럿 벌리기와 혼자 닿는 끝 곧게 맞추기(linkEnds)·촉 크기와 자리(linkGeometry),
+// to 없는 문서의 보드 마크업이 이 변경 전(main ba85877)과 같음, 선 층의 자리(격자 맨 끝)·속성(aria-hidden)·선마다 data-board-from·data-board-to·좌표,
+// 화면에서도 틀린 도착을 버림, 읽는 프로그램용 글, 결정적·거듭 부름, 크게 보기 동안 tile-under, 발표 복제(id 를 지운 복제본)에 선이 따라가고 id·id 참조가 없음.
+func TestBoardLinks(t *testing.T) { runBoardNode(t, "board_links.cjs", "LINKS") }
+
+// 타일 잇기의 CSS: 선 층 규칙은 @media 밖이라 화면·인쇄에 함께 닿는다(어느 @media 안에도 board-link 규칙이 없다). 크게 보기 동안 숨기는 규칙(.tile-under)은
+// @media screen 안에만 있다. 선 층은 z-index -1(타일·구역 줄 밑)이고, 색 --board-link 는 :root 에서 var(--muted) — 보드 격자 안에서 --muted 를 다시 정하는
+// night 는 그 블록에서 --board-link 도 준다. present.js startBoard 는 복제본에 links 를 다시 부르지 않는다(복제의 id 를 지운다).
+// CSS 를 해석하지 않는 꼴 검사다 — 계산 스타일·그림은 Chrome 헤드리스 캡처로 봤다.
+func TestBoardLinksCSS(t *testing.T) {
+	read := func(n string) string {
+		b, err := FS.ReadFile(n) // 내장 FS 로 읽어 go test -overlay 변이가 닿는다
+		if err != nil {
+			t.Fatal(err)
+		}
+		return regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(string(b), "")
+	}
+	css := read("base.css")
+	// @media 블록과 그 밖을 가른다
+	var top strings.Builder
+	media := map[string][]string{} // @media 머리 → 블록 몸
+	for i := 0; i < len(css); {
+		j := strings.Index(css[i:], "@media")
+		if j < 0 {
+			top.WriteString(css[i:])
+			break
+		}
+		top.WriteString(css[i : i+j])
+		open := strings.IndexByte(css[i+j:], '{')
+		head := strings.TrimSpace(css[i+j : i+j+open])
+		depth, k := 1, i+j+open+1
+		for ; k < len(css) && depth > 0; k++ {
+			switch css[k] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+			}
+		}
+		media[head] = append(media[head], css[i+j+open+1:k-1])
+		i = k
+	}
+	rule := regexp.MustCompile(`(?s)([^{}]*)\{([^{}]*)\}`)
+	rulesOf := func(s, sel string) []string {
+		var out []string
+		for _, m := range rule.FindAllStringSubmatch(s, -1) {
+			if strings.Contains(m[1], sel) {
+				out = append(out, m[2])
+			}
+		}
+		return out
+	}
+	for head, blks := range media {
+		for _, b := range blks {
+			if strings.Contains(b, "board-link") || strings.Contains(b, "tile-links-label") {
+				t.Errorf("%s 안에 타일 잇기 규칙 — 화면과 인쇄가 같아야 한다", head)
+			}
+		}
+	}
+	layer := rulesOf(top.String(), ".page-body.board-grid .board-links")
+	if len(layer) != 1 || !strings.Contains(layer[0], "position: absolute") || !strings.Contains(layer[0], "z-index: -1") || !strings.Contains(layer[0], "pointer-events: none") {
+		t.Errorf("선 층 규칙(@media 밖 하나 — 절대 위치·z-index -1·누르기 통과)이 아님: %q", layer)
+	}
+	line := rulesOf(top.String(), ".page-body.board-grid .board-link-line")
+	if len(line) != 1 || !strings.Contains(line[0], "stroke: var(--board-link)") || !strings.Contains(line[0], "stroke-width: var(--board-link-width)") || !strings.Contains(line[0], "fill: none") {
+		t.Errorf("선 규칙이 토큰을 쓰지 않음: %q", line)
+	}
+	if head := rulesOf(top.String(), ".page-body.board-grid .board-link-head"); len(head) != 1 || !strings.Contains(head[0], "fill: var(--board-link)") {
+		t.Errorf("촉 규칙이 선 색을 쓰지 않음: %q", head)
+	}
+	if lbl := rulesOf(top.String(), ".page-body.board-grid .tile-head > span.tile-links-label"); len(lbl) != 1 || !strings.Contains(lbl[0], "clip-path: inset(50%)") {
+		t.Errorf("읽는 프로그램용 글이 눈에서 숨지 않음: %q", lbl)
+	}
+	// 숨김은 links 가 만든 직계 span 만 — 문서가 제목·본문에 class tile-links-label 을 달아도 숨지 않는다(리뷰 1회차 [1])
+	for _, m := range rule.FindAllStringSubmatch(top.String(), -1) {
+		for _, sel := range strings.Split(m[1], ",") {
+			if strings.Contains(sel, "tile-links-label") && !strings.HasSuffix(strings.TrimSpace(sel), ".tile-head > span.tile-links-label") {
+				t.Errorf("tile-links-label 규칙이 직계 span 밖에도 닿음: %q", strings.TrimSpace(sel))
+			}
+		}
+	}
+	// 크게 보기 동안 숨김: .tile-under 규칙은 @media screen 안에만(선 층도 격자의 형제라 zoomer 가 tile-under 를 단다)
+	var under int
+	for _, b := range media["@media screen"] {
+		for _, d := range rulesOf(b, ".page-body.board-grid .tile-under") {
+			if strings.Contains(d, "visibility: hidden") {
+				under++
+			}
+		}
+	}
+	if under != 1 || len(rulesOf(top.String(), ".tile-under")) != 0 {
+		t.Errorf("크게 보기의 .tile-under 숨김이 @media screen 안 하나가 아님(안 %d, 밖 %d)", under, len(rulesOf(top.String(), ".tile-under")))
+	}
+	root := regexp.MustCompile(`(?s):root \{(.*?)\}`).FindStringSubmatch(css)
+	if root == nil || !strings.Contains(root[1], "--board-link-width: 1.25pt;") || !strings.Contains(root[1], "--board-link: var(--muted);") {
+		t.Error(":root 에 --board-link: var(--muted)·--board-link-width: 1.25pt 가 있어야 한다")
+	}
+	// :root 의 var(--muted) 는 :root 에서 계산돼 내려온다 — 보드 격자 안에서 --muted 를 다시 정하는 night 는 --board-link 도 그 블록에서 준다(어두운 바탕 위 선)
+	night, err := os.ReadFile(filepath.Join("..", "themes", "night", "theme.css"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if blk := regexp.MustCompile(`(?s)\.page-body\.board-grid,[^{]*\{([^}]*)\}`).FindStringSubmatch(string(night)); blk == nil || !strings.Contains(blk[1], "--muted: #9eabbe;") || !strings.Contains(blk[1], "--board-link: #9eabbe;") {
+		t.Error("night: 보드 격자 블록에 --board-link 가 --muted 와 같은 밝은 값으로 있어야 한다")
+	}
+	js := read("present.js")
+	a, b := strings.Index(js, "function startBoard("), strings.Index(js, "function boardFrac(")
+	if a < 0 || b < a {
+		t.Fatal("present.js 에서 startBoard 를 찾지 못함")
+	}
+	if sb := js[a:b]; strings.Contains(sb, "ItdaBoard.links") || !strings.Contains(sb, `c.querySelectorAll("[id]")`) {
+		t.Error("present.js startBoard: 복제본의 id 를 지우고 links 는 다시 부르지 않아야 한다(복제할 때 따라간 선 층이 그대로 맞다)")
+	}
+}
+
 func runBoardNode(t *testing.T, runnerName, tag string) {
 	node, err := exec.LookPath("node")
 	if err != nil {

@@ -183,6 +183,10 @@
   --board-enter-rise: 6px;
   --board-enter-stagger: 1;
   --board-flash-time: 1s;
+  /* 타일 잇기(타일을 여는 제목의 to= — itda-work/itda-hyve#1038 3단계 D, dashboard.js links)의 선·화살촉 색과 선 굵기. 화살촉 크기는 틈(--board-gap)이 정한다.
+     --board-link 는 :root 의 --muted 로 계산돼 내려온다 — 보드 격자 안에서 --muted 를 다시 정하는 테마(night)는 --board-link 도 그 블록에서 준다 */
+  --board-link: var(--muted);
+  --board-link-width: 1.25pt;
 
   --caption-size: 9pt;
   --caption-color: var(--muted);
@@ -1295,6 +1299,15 @@ a.yt.yt-ph::before { content: "YouTube 영상 · " attr(href); position: absolut
 :where(.page.board) .page-body.board-grid .tile-status-bad::before { content: "✕"; content: "✕" / ""; }
 :where(.page.board) .page-body.board-grid .tile-status-bad { background: var(--tile-status); color: var(--tile-bg); } /* 가장 무거운 것은 채운 원 — 모양으로도 가른다 */
 :where(.page.board) .page-body.board-grid .tile-status-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+/* 타일 잇기(itda-work/itda-hyve#1038 3단계 D — dashboard.js links): 격자 맨 끝의 선 층(svg.board-links > g.board-link > path.board-link-line + path.board-link-head).
+   좌표는 격자 안 px 라 격자 왼쪽 위에 붙인다. z-index -1 — 쪽 상자(.page, contain: paint)의 쌓임 맥락에서 보드 바탕 위·격자 안 모든 것(타일·구역 줄) 밑이다.
+   선 색은 --board-link(기본 --muted), 굵기는 --board-link-width. 읽는 프로그램에는 선 대신 출발 타일 머리의 숨긴 글(직계 span.tile-links-label — 문서가 제목에 같은 class 를 달아도 그 제목은 숨지 않는다)이 간다. 화면·인쇄가 같다
+   (크게 보기 동안 숨기는 것은 아래 크게 보기 절의 .tile-under — @media screen) */
+:where(.page.board) .page-body.board-grid .board-links { position: absolute; left: 0; top: 0; z-index: -1; overflow: visible; pointer-events: none; margin: 0; }
+:where(.page.board) .page-body.board-grid .board-link-line { fill: none; stroke: var(--board-link); stroke-width: var(--board-link-width); stroke-linejoin: miter; stroke-linecap: butt; }
+:where(.page.board) .page-body.board-grid .board-link-head { fill: var(--board-link); stroke: none; }
+:where(.page.board) .page-body.board-grid .tile-head > span.tile-links-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* 움직임(3단계 C — dashboard.js motion): 처음 그린 보드의 타일 등장(.tile-enter — 늦춤은 인라인 --tile-enter-delay), 다시 그린 보드의 본문이 바뀐 타일 강조(.tile-changed).
    화면이고 움직임을 줄이지 않을 때만 돈다 — 인쇄·PDF(@media print)·움직임 줄이기에는 이 규칙이 없다. 끝 모양이 기본 모양이다: keyframes 는 처음 모양(from)만 적고,
