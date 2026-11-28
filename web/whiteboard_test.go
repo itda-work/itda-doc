@@ -25,8 +25,10 @@ import (
 // 손가락·Esc·지우기), 되돌리기, 지우개, 타일 그리기 차례, 디코드 실패 보존, bitmap close, 미리보기 — 가짜 createImageBitmap·toDataURL 위에서 본다.
 // 그림 리뷰 1회차 반영분: 그림 층(층 차례·조작 전·중·후 그리기 차례·획 타일에 그림 없음·그림만 옮기면 획 타일을 다시 굽지 않음), 크기 조절의
 // 유효성(네 귀 × 좌표 양끝 × 작은 그림·극단 비율 — serialize·닫기), 닿지 않는 그림의 bitmap 회수(늦은 디코드 포함), 큰 그림 디코드 축소.
+// 미저장 판 조회(④-1b): unsaved(store) — 닫힌 store·도는 save·늦은 성공·오래된 번호 성공·삭제·두 store·쓴 적 없는 store·잘못된 인자·조회 전후 불변·
+// 저장 실패 뒤 다시 열기(list 시간 초과·즉시 거부·여는 중 닫기).
 // 실제 그리기(canvas 픽셀)·CSS 배치·실기 Pencil 입력·실제 그림 디코드·인코드는 보지 않는다(미검증 — 데모로 본다).
-const whiteboardCases = 492
+const whiteboardCases = 510
 
 func TestWhiteboard(t *testing.T) {
 	node, err := exec.LookPath("node")

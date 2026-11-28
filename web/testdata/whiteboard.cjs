@@ -2497,5 +2497,108 @@ function boardText(C, n, o) {
     }
   }
 
+  // ---- 14. 미저장 판 조회 ItdaWhiteboard.unsaved(store)(itda-hyve#699 ④-1b): 기록기의 dirty 그대로 — 닫힌 표면·도는 save·늦은 성공·삭제·
+  // 두 store·쓴 적 없는 store·잘못된 인자·조회가 상태를 바꾸지 않음·저장 실패 뒤 다시 열기의 세 실패 길을 실제 표면으로 본다.
+  {
+    const ids = (w, s) => w.W.unsaved(s).slice().sort().join();
+    const snap = r => r ? JSON.stringify([r.want && r.want.n, r.running && r.running.n, r.done, r.halted, r.blocked, r.editors, r.gone, r.waiters.size]) : "없음";
+    // 저장이 거부된 채 두 번 닫으면 닫힌 store 에서도 그 판이 나온다 — 조회는 store 를 부르지 않고 기록기를 바꾸지 않는다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const id = D.state.id;
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      ctl.fail.save = true;
+      const c1 = await w.W.close(), c2 = await w.W.close();
+      await settle();
+      ok("unsaved: 저장 거부 뒤 닫힌 store 에서도 그 판이 나온다", c1 === false && c2 === true && !w.W.isOpen() && ids(w, store) === id, [c1, c2, w.W.unsaved(store)]);
+      const before = snap(D.rec(id)), n = ctl.log.length, size = D.recs.size;
+      const a = w.W.unsaved(store), b = w.W.unsaved(store);
+      ok("unsaved: 조회 전후 그 판 기록기의 번호 필드·store 호출 수·기록기 수가 그대로이고 매번 새 배열이다", snap(D.rec(id)) === before && ctl.log.length === n && D.recs.size === size && a !== b && Array.isArray(a), [before, snap(D.rec(id)), ctl.log.slice(n)]);
+      a.push("x");
+      ok("unsaved: 돌려준 배열을 고쳐도 다음 조회에 번지지 않는다", ids(w, store) === id);
+      ok("unsaved: 쓴 적 없는 store 는 빈 배열", w.W.unsaved(w.W.memoryStore()).length === 0 && w.W.unsaved({}).length === 0 && w.W.unsaved(() => {}).length === 0);
+      const bad = [undefined, null, "wb1", 1, true].map(v => { try { w.W.unsaved(v); return "통과"; } catch (e) { return e && e.name === "TypeError" && e.constructor && e.constructor.name === "TypeError" ? "TypeError" : String(e); } });
+      ok("unsaved: store 가 객체가 아니면 TypeError(빈 배열로 뭉개지 않는다)", bad.every(x => x === "TypeError"), bad);
+    }
+    // 도는 save 만 있어도 미저장, 그 뒤 더 새 want 가 있으면 옛 번호의 성공이 지우지 않는다, 늦은 성공 뒤에는 빠진다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const id = D.state.id;
+      advance(w, 2100); await settle();
+      ok("unsaved: (준비) 첫 판 저장 뒤 비어 있다", w.W.unsaved(store).length === 0, w.W.unsaved(store));
+      ctl.hold.save = true;
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      advance(w, 2100); await settle();
+      const r = D.rec(id);
+      ok("unsaved: running 만 있어도 미저장", r && r.running && !r.want && ids(w, store) === id, snap(r));
+      stroke(w, stage, line(100, 200, 200, 200, 4));
+      D.save();
+      ok("unsaved: running 뒤 더 새 want 가 있어도 미저장", r.running && r.want && r.want.n > r.running.n && ids(w, store) === id, snap(r));
+      const newer = r.want.n;
+      ctl.fail.save = true; ctl.hold.save = false;
+      ctl.release(); await settle();
+      ok("unsaved: 오래된 번호의 성공이 최신 want 를 지우지 않는다", r.done < newer && ids(w, store) === id, snap(r));
+      ctl.fail.save = false; ctl.hold.save = true;
+      const closing = w.W.close(); await settle();
+      advance(w, 8100); await settle();
+      const closed = await closing;
+      ok("unsaved: (준비) 기한을 넘겨 닫혔고 save 가 돈다", !w.W.isOpen() && r.running && ids(w, store) === id, [closed, snap(r)]);
+      ctl.hold.save = false; ctl.release(); await settle();
+      ok("unsaved: 늦은 성공 뒤에는 빠진다(표면이 닫혀 있어도)", r.done >= newer && w.W.unsaved(store).length === 0, snap(r));
+    }
+    // 삭제(trash)가 된 판은 빠진다 · 두 store 가 같은 판 id 를 써도 섞이지 않는다
+    {
+      const w = world(), mem = w.W.memoryStore();
+      await mem.create("가"); await mem.save("wb1", boardText(w.C, 1, { name: "가" }));
+      await mem.create("나"); await mem.save("wb2", boardText(w.C, 2, { name: "나" }));
+      const ctl = {}, store = logged(mem, ctl);
+      let o = await openWb(w, store, { id: "wb1" });
+      stroke(w, o.stage, line(100, 100, 200, 100, 4));
+      ctl.fail.save = true;
+      await w.W.close(); await w.W.close(); await settle();
+      ok("unsaved: (준비) wb1 이 미저장으로 닫혔다", ids(w, store) === "wb1");
+      // 같은 id 를 쓰는 다른 store
+      const mem2 = w.W.memoryStore();
+      await mem2.create("다"); await mem2.save("wb1", boardText(w.C, 1));
+      const ctl2 = {}, store2 = logged(mem2, ctl2);
+      const o2 = await openWb(w, store2, { id: "wb1" });
+      ok("unsaved: 두 store 가 같은 판 id — 깨끗한 store2 는 비고 store 는 그대로", w.W.unsaved(store2).length === 0 && ids(w, store) === "wb1" && o2.D.state.id === "wb1", [w.W.unsaved(store2), w.W.unsaved(store)]);
+      stroke(w, o2.stage, line(100, 100, 200, 100, 4));
+      ctl2.fail.save = true;
+      await w.W.close(); await w.W.close(); await settle();
+      ok("unsaved: 두 store 가 같은 판 id — 둘 다 미저장이면 각자 나온다", ids(w, store2) === "wb1" && ids(w, store) === "wb1");
+      // store 로 wb2 를 열어 목록에서 wb1 을 삭제
+      ctl.fail.save = false;
+      o = await openWb(w, store, { id: "wb2" });
+      click(w, btn(o.root, "list")); await settle();
+      const del = () => o.root.querySelectorAll(".itda-wb-item").find(x => x.dataset.id === "wb1").querySelectorAll("button").find(b => b.dataset.act === "trash");
+      click(w, del()); click(w, del()); await settle();
+      ok("unsaved: trash 가 된 판(gone)은 빠진다 — 다른 store 의 같은 id 는 그대로", ctl.log.includes("trash:wb1") && !ids(w, store).split(",").includes("wb1") && ids(w, store2) === "wb1", [ctl.log, w.W.unsaved(store)]);
+      await w.W.close();
+    }
+    // 저장 실패 뒤 같은 store 를 다시 열다 list 가 시간을 넘기거나·곧바로 거부되거나·여는 중 닫혀도 이전 판이 계속 나온다
+    for (const mode of ["시간 초과", "즉시 거부", "여는 중 닫기"]) {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const id = D.state.id;
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      ctl.fail.save = true;
+      await w.W.close(); await w.W.close(); await settle();
+      const before = ids(w, store);
+      if (mode === "즉시 거부") ctl.fail.list = true; else ctl.hold.list = true;
+      w.win.ItdaWhiteboardHost = { store };
+      const opened = w.W.open().then(() => "열림", e => "거부"); await settle();
+      if (mode === "시간 초과") { advance(w, 8100); await settle(); }
+      else if (mode === "즉시 거부") { frames(w, 2); await w.W.close(); await w.W.close(); }
+      else { await w.W.close(); await w.W.close(); }
+      advance(w, 8100); await settle();
+      ctl.hold.list = false; ctl.release(); await settle();
+      const res = await opened;
+      ok("unsaved: 저장 실패 뒤 다시 열기 — " + mode + " 에도 이전 판이 계속 나온다", before === id && ids(w, store) === id && !w.W.isOpen(), [before, res, w.W.unsaved(store), ctl.log]);
+    }
+  }
+
   console.log("WHITEBOARD DONE cases=" + cases + " failed=" + failed);
 })().catch(e => { console.log("예외 " + (e && e.stack || e)); console.log("WHITEBOARD DONE cases=" + cases + " failed=" + (failed + 1)); });
