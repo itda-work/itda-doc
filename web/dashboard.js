@@ -18,6 +18,8 @@
 // KPI 값은 --kpi-min-size 까지 줄인 뒤 공백에서 줄을 바꾸고, 그래도 한 낱말이 칸보다 넓으면(또는 아래로 넘치면) 보조 글을 숨기고
 // 타일 머리에 「…」 를 달고 잘린다. 글은 잘리고 타일 머리에 「…」. 화면·PDF 가 같은 규칙이다(PDF 는 화면의 보드를 찍는다).
 // 타일을 여는 제목의 class ok·warn·bad 는 타일 상태다 — 타일에 tile-ok·tile-warn·tile-bad, 머리에 표식 자리(tileStatus·markStatus, itda-hyve#1038 3단계 B).
+// 타일을 여는 제목의 to=도착 id[,…] 는 타일 잇기다 — 격자 맨 끝 선 층(svg.board-links)에 출발 → 도착 화살표 선, 출발 타일 머리에 읽는 프로그램용 글
+// (links·linkGeometry, 3단계 D). 선은 타일 밑에 깔리고 배치(pack)를 바꾸지 않는다. to 가 없으면 선 층도 글도 없다.
 // 같은 대상에 처음 그리면 타일 등장, 다시 그리면 본문이 바뀐 타일 강조(motion — o.motion === false 면 없음, 3단계 C). 움직임은 base.css 의 CSS animation 만이다.
 (function () {
   "use strict";
@@ -270,6 +272,182 @@
     head.insertBefore(s, head.firstChild);
   }
 
+  // ---- 타일 잇기(itda-work/itda-hyve#1038 3단계 D): 타일을 여는 제목의 to=도착 id[,…](mdoc boardlink.go 가 검사해 data-to 로 보낸다).
+  // links 가 보드 한 장의 격자(.board-grid) 맨 끝에 선 층 하나(svg.board-links — aria-hidden)를 넣는다. 선 층은 z-index -1 이라 타일·구역 줄 밑,
+  // 보드 바탕 위에 깔린다(쪽 상자 .page 가 contain: paint 로 쌓임 맥락이다) — 타일 사이 틈에서 보이고, 사이에 낀 타일 밑으로 지나 가려진다(돌아가는 길은 찾지 않는다).
+  // 좌표는 격자 안 CSS px(타일의 offsetLeft·offsetTop·offsetWidth·offsetHeight — transform·확대에 흔들리지 않는다)이고 선 층도 격자에 붙어 보드와 함께 확대·축소·이동한다.
+  // 선마다 g.board-link 에 data-board-from·data-board-to(출발·도착 제목 id)를 남긴다. 화살촉은 marker 가 아니라 채운 삼각형 path 다 — svg 에 id 가 없어
+  // 발표가 보드를 복제해도(present.js startBoard — 복제의 id 를 지운다) 겹치거나 끊길 id 참조가 없다. 읽는 프로그램에는 출발 타일 머리의 숨긴 글
+  // (span.tile-links-label 「→ 도착 제목」)이 간다. to 가 하나도 없으면 아무것도 만들지 않는다(마크업이 이 기능 전과 같다).
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const LINK_STEP = 14; // 한 가장자리에 여럿 닿을 때 벌리는 간격(px)의 상한 — 가장자리 길이 / (선 수 + 1) 이 더 작으면 그것
+
+  // linkTargets 는 타일 제목의 data-to 를 도착 id 목록으로 읽는다(쉼표로 나눔, 항목 앞뒤 공백 뗌, 빈 항목·겹침 뺌 — mdoc 이 이미 뗀 것에 대한 방어).
+  function linkTargets(title) {
+    const d = title && title.dataset ? title.dataset.to : "";
+    const out = [];
+    for (const s of String(d || "").split(",")) { const id = s.trim(); if (id && !out.includes(id)) out.push(id); }
+    return out;
+  }
+
+  // linkSides 는 a 에서 b 로 가는 선이 나가는 a 의 가장자리와 들어가는 b 의 가장자리다. a·b = {x, y, w, h}(격자 안 px).
+  // b 가 a 보다 온전히 오른쪽이면 오른쪽 → 왼쪽, 온전히 왼쪽이면 왼쪽 → 오른쪽. 열이 겹치면 b 가 아래면 아래 → 위, 아니면 위 → 아래.
+  function linkSides(a, b) {
+    if (b.x >= a.x + a.w) return ["right", "left"];
+    if (b.x + b.w <= a.x) return ["left", "right"];
+    return b.y >= a.y + a.h ? ["bottom", "top"] : ["top", "bottom"];
+  }
+
+  // linkEnds 는 선마다 두 끝의 자리를 정한다. rects[i] = 타일 i 의 사각형, links = [[출발, 도착], …](타일 번호).
+  // 돌려주는 out[k] = { sides: [나가는, 들어가는 가장자리], p: [[x, y], [x, y]], rank, of } — rank·of 는 출발 가장자리에서의 차례·그 가장자리에 닿는 끝 수(꺾는 자리를 나눈다).
+  // 한 타일의 한 가장자리에 닿는 끝(나가는 것·들어오는 것)은 그 가장자리를 따라 벌린다 — 상대 타일의 가운데(세로 가장자리는 y, 가로 가장자리는 x) 차례로,
+  // 같으면 선 차례·끝 차례로. 간격은 min(LINK_STEP, 가장자리 길이 / (끝 수 + 1)), 가운데를 기준으로 고르게 놓는다. 그 뒤 혼자 닿는 끝은 맞은편 끝의 줄로
+  // 맞춰 곧은 선이 되게 한다(아래 「곧게 맞추기」). 같은 입력이면 같은 자리다.
+  function linkEnds(rects, links) {
+    const out = links.map(([f, t]) => ({ sides: linkSides(rects[f], rects[t]), p: [null, null], n: [1, 1], rank: 0, of: 1 }));
+    const groups = new Map();
+    links.forEach(([f, t], k) => {
+      for (const [me, other, end] of [[f, t, 0], [t, f, 1]]) {
+        const key = me + ":" + out[k].sides[end];
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ k, end, me, other });
+      }
+    });
+    for (const g of groups.values()) {
+      const r = rects[g[0].me], side = out[g[0].k].sides[g[0].end];
+      const vert = side === "left" || side === "right"; // 세로 가장자리 — y 를 따라 벌린다
+      const mid = q => (vert ? q.y + q.h / 2 : q.x + q.w / 2);
+      g.sort((a, b) => mid(rects[a.other]) - mid(rects[b.other]) || a.k - b.k || a.end - b.end);
+      const n = g.length, step = Math.min(LINK_STEP, (vert ? r.h : r.w) / (n + 1)), c = mid(r);
+      const edge = side === "left" ? r.x : side === "right" ? r.x + r.w : side === "top" ? r.y : r.y + r.h;
+      g.forEach((e, i) => {
+        const v = c + (i - (n - 1) / 2) * step;
+        out[e.k].p[e.end] = vert ? [edge, v] : [v, edge];
+        out[e.k].n[e.end] = n;
+        if (e.end === 0) { out[e.k].rank = i; out[e.k].of = n; }
+      });
+    }
+    // 곧게 맞추기: 두 가장자리가 마주 보는 구간(세로 가장자리면 y, 가로면 x 의 겹침)이 있으면, 혼자 닿는 끝을 맞은편 끝의 줄로 옮겨 곧은 선이 되게 한다 —
+    // 둘 다 혼자면 겹침의 가운데로, 한쪽만 혼자면 벌린 쪽의 자리가 겹침 안(양 끝 2px 안쪽)일 때 그 자리로. 둘 다 여럿이면 벌린 자리 그대로다.
+    links.forEach(([f, t], k) => {
+      const e = out[k], a = rects[f], b = rects[t], vert = e.sides[0] === "left" || e.sides[0] === "right", ax = vert ? 1 : 0;
+      const lo = vert ? Math.max(a.y, b.y) : Math.max(a.x, b.x), hi = vert ? Math.min(a.y + a.h, b.y + b.h) : Math.min(a.x + a.w, b.x + b.w);
+      if (!(hi - lo > 0)) return;
+      const inside = v => v >= lo + 2 && v <= hi - 2;
+      if (e.n[0] === 1 && e.n[1] === 1) e.p[0][ax] = e.p[1][ax] = (lo + hi) / 2;
+      else if (e.n[1] === 1 && inside(e.p[0][ax])) e.p[1][ax] = e.p[0][ax];
+      else if (e.n[0] === 1 && inside(e.p[1][ax])) e.p[0][ax] = e.p[1][ax];
+    });
+    return out.map(e => ({ sides: e.sides, p: e.p, rank: e.rank, of: e.of }));
+  }
+
+  // linkRoute 는 p0(나가는 가장자리 side 위)에서 p1 로 가는 직각 꺾은선의 점들이다. 두 끝이 한 줄이면(0.5px 안) 곧은 선 [p0, p1'] —
+  // p1' 은 p0 와 같은 줄로 맞춘 끝이다. 아니면 출발 옆 틈에서 두 번 꺾는다: 나가는 방향으로 off 만큼 간 자리에서 꺾어 p1 의 줄로 간 뒤 p1 로.
+  function linkRoute(p0, side, p1, off) {
+    const [x0, y0] = p0, [x1, y1] = p1;
+    if (side === "left" || side === "right") {
+      if (Math.abs(y0 - y1) < 0.5) return [p0, [x1, y0]];
+      const bx = x0 + (side === "right" ? off : -off);
+      return [p0, [bx, y0], [bx, y1], p1];
+    }
+    if (Math.abs(x0 - x1) < 0.5) return [p0, [x0, y1]];
+    const by = y0 + (side === "bottom" ? off : -off);
+    return [p0, [x0, by], [x1, by], p1];
+  }
+
+  // linkHead 는 꺾은선 pts 의 끝에 붙는 화살촉이다 — { line: 촉 밑동까지 줄인 점들, head: 삼각형 세 점 }. len = 촉 길이(틈 안에 보이게 — linkSize).
+  function linkHead(pts, len) {
+    const [ex, ey] = pts[pts.length - 1], [px, py] = pts[pts.length - 2];
+    const d = Math.hypot(ex - px, ey - py) || 1, ux = (ex - px) / d, uy = (ey - py) / d, w = len * 0.45;
+    const bx = ex - ux * len, by = ey - uy * len;
+    return { line: pts.slice(0, -1).concat([[bx + ux * 0.5, by + uy * 0.5]]), head: [[ex, ey], [bx - uy * w, by + ux * w], [bx + uy * w, by - ux * w]] };
+  }
+
+  // linkSize 는 틈 폭(px)에 맞춘 화살촉 길이다 — 틈의 0.75 배를 5px 와 10px 사이로 자른 값(틈보다 길지 않다 — 촉이 타일 밑에 숨지 않게).
+  function linkSize(gap) { return Math.min(gap, Math.max(5, Math.min(10, gap * 0.75))); }
+
+  // linkGeometry 는 순수한 그림 계산이다: rects·links·gap(격자 틈 px) → 선마다 { line, head }(점 좌표는 0.1px 로 반올림). 꺾는 자리는 출발 옆 틈의 앞부분
+  // ((틈 − 촉 길이) 안)을 그 가장자리 끝 수로 나눠 정한다 — 같은 가장자리에서 나가는 선의 꺾는 줄이 겹치지 않고, 꺾은 뒤 도착까지 촉 길이 넘게 남는다.
+  // gap 은 잰 틈 그대로다 — 0 이면 0 이고, 잴 수 없을 때(NaN·음수·무한)만 12px 로 본다. 틈이 0 이면(타일이 맞붙음) 촉을 둘 자리가 없어 촉은 없고(head 가 빈 목록)
+  // 선은 줄이지 않고 도착 가장자리에서 끝난다. 꺾는 자리는 출발 가장자리 위다(타일 밑에 깔려 빈 칸을 지나는 부분만 보인다). 같은 점이 잇따르면 하나로 줄인다.
+  function linkGeometry(rects, links, gap) {
+    const g = Number.isFinite(gap) && gap >= 0 ? gap : 12, len = linkSize(g), r1 = v => Math.round(v * 10) / 10;
+    const dedupe = ps => ps.filter((p, i) => !i || p[0] !== ps[i - 1][0] || p[1] !== ps[i - 1][1]);
+    return linkEnds(rects, links).map(e => {
+      const off = (g - len) * (e.rank + 1) / (e.of + 1);
+      const route = linkRoute(e.p[0], e.sides[0], e.p[1], off);
+      if (!(len > 0)) return { line: dedupe(route.map(p => p.map(r1))), head: [], sides: e.sides };
+      const h = linkHead(route, len);
+      return { line: h.line.map(p => p.map(r1)), head: h.head.map(p => p.map(r1)), sides: e.sides };
+    });
+  }
+
+  // links 는 보드 한 장(page — .page.board)의 선 층을 (다시) 그린다. 돌려주는 값은 그린 선 수다. build 가 넘침 처리 뒤에 부른다.
+  // 옛 선 층·읽는 프로그램용 글을 먼저 지우므로 거듭 불러도 같다. 도착은 같은 보드의 타일 제목 id 로 찾는다 — 없는 id·자기 자신·겹침은 버린다.
+  // 좌표는 격자 안 px 라 보드를 옮기거나(공유 보는 화면의 무대 → #pages) 확대해도 다시 그릴 일이 없다. 격자를 잴 수 없으면(display: none — 폭 0)
+  // 선 층을 만들지 않는다(읽는 프로그램용 글은 단다) — 그런 호스트는 보인 뒤 ItdaBoard.links(page) 를 부른다. 발표의 복제본은 id 가 지워져 다시 그릴 수 없다 —
+  // 복제할 때 따라간 선 층이 그대로 맞다(폭이 같다).
+  function links(page) {
+    // 자식만 훑는다(선택자 해석 없이) — to 가 없는 보드에서는 지울 것도 그릴 것도 없이 끝난다
+    const kids = e => (e ? [...e.children] : []);
+    const grid = kids(page).find(c => c.classList.contains("board-grid"));
+    if (!grid) return 0;
+    const tiles = kids(grid).filter(c => c.classList.contains("tile"));
+    const thead = t => kids(t).find(c => c.classList.contains("tile-head"));
+    for (const x of kids(grid)) if (x.classList.contains("board-links")) x.remove();
+    // 지우는 것은 links 가 만든 직계 span.tile-links-label 뿐이다 — 문서가 제목에 같은 class 를 달아도(자유 어휘) 제목은 건드리지 않는다
+    const ours = x => x.tagName === "SPAN" && x.classList.contains("tile-links-label");
+    for (const t of tiles) for (const x of kids(thead(t))) if (ours(x)) x.remove();
+    const heads = tiles.map(t => kids(thead(t)).find(isHeading) || null);
+    // 같은 id 의 타일이 둘이면(직접 적은 id 의 겹침 — mdoc 은 duplicate-id 경고와 함께 둘 다 남긴다) 도착은 읽는 차례로 첫 타일이다.
+    // 자기 id 와 같은 도착은 버린다(mdoc boardLinks 의 「자기 자신」 과 같은 판정 — 겹친 id 의 둘째 타일이 첫 타일로 잇지 않는다)
+    const byId = new Map();
+    heads.forEach((h, i) => { if (h && h.id && !byId.has(h.id)) byId.set(h.id, i); });
+    const pairs = [];
+    heads.forEach((h, i) => {
+      for (const id of linkTargets(h)) {
+        const j = byId.get(id);
+        if (j != null && j !== i && id !== h.id) pairs.push([i, j]);
+      }
+    });
+    if (!pairs.length) return 0;
+    // 읽는 프로그램용 글: 출발 타일 머리 끝에 「→ 도착 제목」(여럿이면 쉼표로) — 눈에는 안 보인다(base.css .tile-links-label)
+    const name = j => squash(heads[j].textContent);
+    tiles.forEach((t, i) => {
+      const to = pairs.filter(p => p[0] === i).map(p => "→ " + name(p[1]));
+      if (to.length) thead(t).appendChild(el("span", "tile-links-label", to.join(", ")));
+    });
+    const W = grid.offsetWidth, H = grid.offsetHeight;
+    if (!(W > 0 && H > 0)) return 0;
+    const rects = tiles.map(t => ({ x: t.offsetLeft, y: t.offsetTop, w: t.offsetWidth, h: t.offsetHeight }));
+    const cs = typeof getComputedStyle === "function" ? getComputedStyle(grid) : null;
+    const gap = cs ? parseFloat(cs.columnGap) : NaN;
+    const geo = linkGeometry(rects, pairs, gap);
+    const svg = document.createElementNS(SVGNS, "svg");
+    svg.setAttribute("class", "board-links");
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    svg.setAttribute("width", String(W));
+    svg.setAttribute("height", String(H));
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    const pts = ps => ps.map((p, i) => (i ? "L" : "M") + p[0] + " " + p[1]).join(" ");
+    geo.forEach((g, k) => {
+      const a = svg.appendChild(document.createElementNS(SVGNS, "g"));
+      a.setAttribute("class", "board-link");
+      a.setAttribute("data-board-from", heads[pairs[k][0]].id);
+      a.setAttribute("data-board-to", heads[pairs[k][1]].id);
+      const line = a.appendChild(document.createElementNS(SVGNS, "path"));
+      line.setAttribute("class", "board-link-line");
+      line.setAttribute("d", pts(g.line));
+      if (!g.head.length) return; // 틈 0 — 촉 없음(linkGeometry)
+      const head = a.appendChild(document.createElementNS(SVGNS, "path"));
+      head.setAttribute("class", "board-link-head");
+      head.setAttribute("d", pts(g.head) + " Z");
+    });
+    grid.appendChild(svg);
+    return pairs.length;
+  }
+
   // ---- 움직임(3단계 C): 처음 그릴 때 등장, 다시 그릴 때 본문이 바뀐 타일 강조. 움직임은 base.css 의 CSS animation 만이다 —
   // JS 는 class(tile-enter·tile-changed)와 늦춤(--tile-enter-delay)만 달고, 끝나면(animationend) 뗀다. 그 이벤트가 오지 않을 때의 늦은 끝은 lifeMs(계산된 시간 + 늦춤 + 0.5초, 최소 SETTLE_MS)이고,
   // 늦은 끝에 타일에서 아직 도는 애니메이션이 있으면 그 끝까지 다시 기다린다(rest). 그래서 build 를 문서 밖·animation 을 끈 무대에서 불러 lifeMs 가 최소값을 읽어도,
@@ -399,7 +577,7 @@
   // motionScope 는 앞 그림의 기억을 묶을 요소다(없으면 target — 그릴 때마다 새 target 을 만드는 호스트는 늘 남는 요소를 준다).
   // motionDoc 은 문서의 열쇠다 — 앞 그림과 다르면(=== 아님) 처음 그림으로 다룬다(한 자리에서 여러 문서를 바꿔 그리는 호스트). 기억을 아예 버리려면 forget(scope).
   // enter === false 면 등장만 끈다(강조는 그대로 — 그린 직후 타일 안 블록 자리를 재서 굴리는 화면, 예: 공유 보는 화면의 발표 따라가기).
-  // 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms, moved(자리를 지키지 못한 고정 타일 수), entered(등장을 건 타일 수), changed(강조한 타일 수) — 뒤 셋은 있을 때만 }
+  // 돌려주는 값: { overflow(「…」 로 잘린 타일 수), ms, moved(자리를 지키지 못한 고정 타일 수), links(그린 선 수 — 타일 잇기), entered(등장을 건 타일 수), changed(강조한 타일 수) — 뒤 넷은 있을 때만 }
   function build(flow, target, o) {
     const t0 = performance.now();
     const SIZE = window.ItdaSlides.SIZE;
@@ -478,11 +656,14 @@
     window.ItdaPager.fitMath(pg);
     let overflow = 0;
     for (const t of target.querySelectorAll(".page.board .tile")) if (fitTile(t)) overflow++;
+    // 타일 잇기(to): 타일 크기가 정해진 뒤(넘침 처리 뒤)에 선 층을 그린다. to 가 없으면 아무것도 만들지 않는다
+    const linked = links(pg);
     // moved: 적은 자리를 지키지 못해 자동 배치로 돌린 타일 수(내용 너비 때문에야 드러난 겹침 — mdoc 경고가 없는 경우). 없으면 키가 없다
     // 움직임: 이 대상(o.motionScope 가 있으면 그것)에 처음 그리면 등장, 다시 그리면 본문이 바뀐 타일 강조. o.motion === false 면 둘 다 없다
     const mv = motion(o.motionScope || target, pg, seen, o.motion !== false, o.motionDoc, o.enter !== false);
     const out = { overflow, ms: Math.round(performance.now() - t0) };
     if (moved) out.moved = moved.length;
+    if (linked) out.links = linked;
     if (mv.entered) out.entered = mv.entered;
     if (mv.changed) out.changed = mv.changed;
     return out;
@@ -708,5 +889,6 @@
   }
 
   // 정식 이름은 window.ItdaBoard 다(새 전역이라 옛 Hyve* 별칭은 없다). 기준 상자 크기는 slides.js(window.ItdaSlides.SIZE)를, 수식 맞춤은 pager.js(window.ItdaPager.fitMath)를 쓴다 — 그 뒤에 싣는다.
-  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, autoScale, tileItem, tileStatus, tileKeys, enterDelays, enter, forget, zoomer, zoomBox, zoomHit, zoomStep, zoomKey };
+  window.ItdaBoard = { build, groups, pack, slots, tileWidth, tileAttrs, autoScale, tileItem, tileStatus, tileKeys, enterDelays, enter, forget, zoomer, zoomBox, zoomHit, zoomStep, zoomKey,
+    links, linkTargets, linkSides, linkEnds, linkRoute, linkGeometry };
 })();

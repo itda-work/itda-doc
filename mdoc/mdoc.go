@@ -120,6 +120,7 @@ const (
 	WarnFolderSlidesUnused    = "folder-slides-unused"    // 폴더 _metadata.yml 의 slides 설정을 문서에 slides: 가 없어 쓰지 않음 — 렌더는 그대로(inherit.go folderSlidesUnused, itda-hyve#543)
 	WarnDashboardSources      = "dashboard-sources"       // dashboard.sources·refresh — 이 판은 실시간 소스를 지원하지 않아 표를 그대로 그림(meta.go parseDashboard, itda-work/itda-hyve#362)
 	WarnDashboardPlace        = "dashboard-place"         // 보드 타일 제목의 at·span 이 틀림·격자 밖·앞 타일과 겹침·타일 제목이 아님 — 그 속성을 버리고 자동 배치(boardplace.go, itda-work/itda-hyve#1038)
+	WarnDashboardLink         = "dashboard-link"          // 보드 타일 제목의 to 도착이 없는 id·타일 아닌 제목·자기 자신·중복·빈 항목, 또는 타일 제목이 아닌 곳의 to — 그 도착만 버림(boardlink.go, itda-work/itda-hyve#1038 3단계 D)
 	WarnKPIAmbiguous          = "kpi-ambiguous"           // :::kpi 안에 정의 목록과 3열 표가 함께 — 정의 목록이 KPI, 표는 그대로(kpi.go)
 	WarnKPIEmpty              = "kpi-empty"               // 보드 문서의 :::kpi 안에 정의 목록·3열 표가 없어 KPI 로 그리지 않음(kpi.go)
 	WarnTodoLeft              = "todo-left"               // 남은 [!TODO] 알림(노트 안 제외)이 있음 — 개수를 알림, - [ ] 항목은 세지 않음, 렌더는 그대로(todos.go collectTodos, itda-doc#74)

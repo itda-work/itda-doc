@@ -52,6 +52,7 @@ func (st *state) boardPlace(doc ast.Node) {
 		lvl = slideLevel(doc)
 	}
 	tiles := map[*ast.Heading]bool{}
+	var order []*ast.Heading          // 타일을 여는 제목(읽는 차례) — to 검사(boardLinks)가 쓴다
 	hidden := map[*ast.Heading]bool{} // 보드에 넣지 않는 맨 위 제목(1 로 건너뛴 것)
 	var seg []boardCell               // 이 구역에서 자리를 지킨 고정 타일
 	for c := doc.FirstChild(); c != nil; c = c.NextSibling() {
@@ -70,6 +71,7 @@ func (st *state) boardPlace(doc ast.Node) {
 			seg = nil
 		case isHeading && h.Level == lvl:
 			tiles[h] = true
+			order = append(order, h)
 			if cell, ok := st.tilePlace(h, cols); ok {
 				if slices.ContainsFunc(seg, cell.overlaps) {
 					st.dropBoardKey(h, "at", "타일 자리 at="+v0(st, h)+" 가 앞의 타일과 겹쳐 자동으로 놓음")
@@ -81,18 +83,23 @@ func (st *state) boardPlace(doc ast.Node) {
 	}
 	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
 		if h, ok := n.(*ast.Heading); ok && entering && !tiles[h] {
-			for _, k := range []string{"at", "span"} {
+			for _, k := range []string{"at", "span", "to"} {
+				code := WarnDashboardPlace
+				if k == "to" {
+					code = WarnDashboardLink // 타일 잇기(boardlink.go)
+				}
 				if _, has := st.boardKey(h, k); has {
 					if hidden[h] {
-						st.dropBoardKey(h, k, "제목의 "+k+" — 보드에 넣지 않는 제목(.notes·.pause·.footnotes)이어서 버림")
+						st.dropKey(h, k, code, "제목의 "+k+" — 보드에 넣지 않는 제목(.notes·.pause·.footnotes)이어서 버림")
 					} else {
-						st.dropBoardKey(h, k, "제목의 "+k+" 은 보드 타일을 여는 제목(맨 위 "+strconv.Itoa(lvl)+"단계)에만 써서 버림")
+						st.dropKey(h, k, code, "제목의 "+k+" 은 보드 타일을 여는 제목(맨 위 "+strconv.Itoa(lvl)+"단계)에만 써서 버림")
 					}
 				}
 			}
 		}
 		return ast.WalkContinue, nil
 	})
+	st.boardLinks(order)
 }
 
 // tilePlace 는 타일 제목 h 의 at·span 을 읽어 틀린 것을 경고와 함께 떼고, at 이 남으면 고정 칸을 돌려준다.
@@ -157,9 +164,14 @@ func (st *state) boardKey(h *ast.Heading, key string) (string, bool) {
 	return attrs{Data: info.data}.get(key)
 }
 
-// dropBoardKey 는 제목 h 의 key 속성을 경고와 함께 뗀다 — 화면은 그 속성이 없는 것처럼 놓는다.
+// dropBoardKey 는 제목 h 의 key 속성을 dashboard-place 경고와 함께 뗀다 — 화면은 그 속성이 없는 것처럼 놓는다.
 func (st *state) dropBoardKey(h *ast.Heading, key, msg string) {
+	st.dropKey(h, key, WarnDashboardPlace, msg)
+}
+
+// dropKey 는 제목 h 의 key 속성을 code 경고와 함께 뗀다.
+func (st *state) dropKey(h *ast.Heading, key, code, msg string) {
 	info := st.headings[h]
 	info.data = attrs{Data: info.data}.without(key)
-	st.warn(st.lines.line(h.Pos()), WarnDashboardPlace, msg)
+	st.warn(st.lines.line(h.Pos()), code, msg)
 }
