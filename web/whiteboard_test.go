@@ -25,8 +25,14 @@ import (
 // 손가락·Esc·지우기), 되돌리기, 지우개, 타일 그리기 차례, 디코드 실패 보존, bitmap close, 미리보기 — 가짜 createImageBitmap·toDataURL 위에서 본다.
 // 그림 리뷰 1회차 반영분: 그림 층(층 차례·조작 전·중·후 그리기 차례·획 타일에 그림 없음·그림만 옮기면 획 타일을 다시 굽지 않음), 크기 조절의
 // 유효성(네 귀 × 좌표 양끝 × 작은 그림·극단 비율 — serialize·닫기), 닿지 않는 그림의 bitmap 회수(늦은 디코드 포함), 큰 그림 디코드 축소.
+// 미저장 판 조회(④-1b): unsaved(store) — 닫힌 store·도는 save·늦은 성공·오래된 번호 성공·삭제·두 store·쓴 적 없는 store·잘못된 인자·조회 전후 불변·
+// 저장 실패 뒤 다시 열기(list 시간 초과·즉시 거부·여는 중 닫기).
+// 중계 출구·보기 전용 화면(④-3a): 묶음 형식(sha-256·검증·반올림), 출구(off·reset·증분·긋는 중 안 보냄·보기 합치기·send 차례·full·실패 뒤 reset·
+// image 먼저·같은 해시 한 번·조각 reset·긴 획 조각·닫힘·판 전환·이름·저장과 무관), 왕복(보내는 쪽 board() = 뷰어의 판), 뷰어(검증·resync·상한·따라가기).
+// 중계 리뷰 1회차: 처음 열기의 list 거부(읽기 전용 빈 판·안내), 상한(획·점·그림 수)에 찬 판의 지우기→넣기·되돌리기 왕복(빼기 먼저),
+// 5만 획 일괄 지우기의 d 조각·묶음 크기, 크기 단언(넘으면 내지 않고 reset).
 // 실제 그리기(canvas 픽셀)·CSS 배치·실기 Pencil 입력·실제 그림 디코드·인코드는 보지 않는다(미검증 — 데모로 본다).
-const whiteboardCases = 492
+const whiteboardCases = 618
 
 func TestWhiteboard(t *testing.T) {
 	node, err := exec.LookPath("node")

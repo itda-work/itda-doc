@@ -15,6 +15,15 @@
 //       닫기를 요청한 때부터 STORE_WAIT(8초) 안에 확인되지 않으면 첫 닫기라도 본문을 기록기에 남긴 채 닫는다(앞 일 — 전환 등 — 은 기다리지 않는다).
 //       판에 좌표 범위 밖 점이 있어 본문을 만들지 못하면 닫지 않는다(false — 닫으면 판을 잃는다).
 //   ItdaWhiteboard.isOpen() · ItdaWhiteboard.toggle(opts)(열렸으면 close, 아니면 open(opts))
+//   ItdaWhiteboard.unsaved(store) → string[]  그 store 객체에서 저장 성공을 아직 확인하지 못한 기록기 본문이 있는 판 id 의 새 배열(차례에 뜻 없음).
+//       동기·읽기 전용이다 — 저장을 시작하지도 기록기·저장소별 상태를 만들거나 바꾸지도 않는다. 표면이 열려 있는지와 상관없이 그 store 의 기록기를 모두 본다.
+//       판별은 아래 「기록기」 의 미저장(가장 새 번호 > done — 도는 save 만 있어도, 그 뒤 더 새 스냅샷이 있어도 든다)이고, 삭제가 된 판(gone)은 뺀다.
+//       「디스크에 없음」 이 아니라 「이 store 의 save 성공을 확인하지 못함」 이다. 엔진에만 있는 변경(아직 기록기에 넣지 않은 획 — 자동 저장을 기다리거나
+//       본문을 만들지 못한 것)은 들지 않는다 — 열린 표면의 마지막 획까지 지키려면 close() 가 true 인 것을 먼저 확인한다. 이 페이지에서 쓴 적 없는
+//       store 는 빈 배열이고, store 가 객체(함수 포함)가 아니면 TypeError 를 던진다.
+//   ItdaWhiteboard.relay({ send, image? }) → { stop(), reset() }  중계 출구(아래 「중계」). 다시 부르면 앞 출구를 멈추고 바꾼다. send 가 함수가 아니면 TypeError.
+//   ItdaWhiteboard.viewer({ mount?, image?, onView?, onState? }) → { apply(batchText), setFollow(bool), following(), close() }  보기 전용 화면(아래 「보기 전용 화면」).
+//       표면이 열려 있으면 던지고, 뷰어가 열려 있는 동안 open 은 거부한다 — 한 페이지에 표면과 뷰어를 함께 띄우지 않는다고 가정한다(도구·색 prefs 를 같이 쓴다).
 //   ItdaWhiteboard.memoryStore()  메모리 저장소(아래 store 계약을 그대로 따른다 — 시험·데모용, 페이지를 닫으면 사라진다).
 //   ItdaWhiteboard.debug()  열린 동안의 엔진 손잡이(시험·진단용 — 계약 아님). 닫혀 있으면 null.
 //
@@ -113,6 +122,33 @@
 // ⌘Z(Windows Ctrl) 되돌리기 · ⇧⌘Z·⌘Y 다시 하기 · ⌘V 붙여넣기(이 키만 기본 동작을 막지 않는다 — paste 사건이 와야 한다) · [ ] 이전·다음 판(목록 차례) · W 닫기 ·
 // Esc 한 겹씩(고른 그림 풀기 → 이름 고치기·삭제 확인 → 목록 → 팝오버 → 닫기) · Space 누른 채 끌기 = 이동.
 // 포인터·휠·터치·클릭도 표면 안의 것은 창 붙잡기 단계에서 표면이 처리하고 전파를 멈춘다(아래 화면의 처리기는 받지 않는다).
+//
+// 중계(relay) — 강사의 판을 다른 화면(보기 전용 화면)으로 내보낸다. 묶음 형식은 wbcore.js 「중계 묶음 v1」 이 정본이다.
+//   · 걸지 않으면 연산을 만들지 않는다(엔진 갈고리는 출구가 없으면 아무 일도 하지 않는다). 걸려 있는 동안:
+//     표면이 닫혔거나 첫 판이 뜨기 전이면 k "off" 를 한 번, 판이 보이면(처음 열기·전환·새 판·삭제 뒤 다음 판 — show) k "reset" 을, 판이 바뀌면 증분("")을 낸다.
+//     읽기 전용으로 연 판(못 읽은 판은 빈 판)도 보이는 그대로다. 바뀐 뒤 RELAY_MS(100ms) 모아 낸다 — 보기는 그사이 마지막 값 하나, 넣었다 뺀 획은 나가지 않는다.
+//   · 획은 손을 뗀 뒤 확정된 것만(push — 긋는 중의 점은 보내지 않는다), 지우개는 뗀 뒤 한 번에, 되돌리기·다시 하기로 돌아온 획·그림은 같은 id 로 다시 넣는다
+//     (겹침 차례가 id 차례라 원래 자리에 든다). 획·그림의 id 는 엔진의 id 다(판을 열 때마다 1 부터 — 그때 reset 이 나간다).
+//   · send(batchText) 는 값이나 Promise 를 돌려준다 — 앞 호출이 끝나야 다음을 부르고, 기다리는 동안의 연산은 다음 묶음에 합친다. "full" 이면 곧바로 reset 을 다시 낸다.
+//     거부·던짐은 삼키고 멈춘다 — 다음 바뀜(획·배경·이름·그림·보기·판 전환·닫기·reset()) 때 reset 부터 다시 한다. 중계는 그리기·저장과 묶이지 않는다(타이머 뒤에서 돈다).
+//   · image(hash, bytes, mime) 는 그림 파일 바이트(Uint8Array)를 그 그림을 처음 가리키는 묶음의 send 보다 먼저 한 번 넘긴다(같은 해시는 이 출구에서 다시 넘기지 않는다).
+//     Promise 면 끝난 뒤 send 한다. 실패하면 send 와 같이 멈추고, 다음 바뀜 때 reset 과 함께 다시 넘긴다. image 가 없으면 연산(해시)만 나간다.
+//     해시는 sha-256(wbcore sha256Hex)이고 그림 객체마다 한 번 센다(그림 하나 1.5MB 에 수십 ms — 판을 열 때 그림이 많으면 첫 reset 이 그만큼 늦다).
+//   · 묶음 하나는 BATCH_MAX(192KB) 안이다 — 큰 판의 reset 은 여러 묶음(첫 묶음만 reset), 한 묶음에 들지 않는 획은 s 와 a 여럿으로, 긴 빼기 목록은
+//     d·x 여럿으로 나뉜다. 내기 전에 묶음마다 크기를 재고, 넘으면 내지 않는다(다음 바뀜 때 reset 부터 — 위 「거부·던짐」 과 같다).
+//   · 증분 안의 차례는 빼기(d·x) → 그림 자리(g) → 넣기(i·s·a) → 머리(h) → 보기(v)다 — 받는 쪽이 쥔 것은 빼는 동안은 앞 판의 부분집합, 넣는 동안은 최종 판의 부분집합이라 두 판이 상한 안이면 중간도 상한 안이다
+//     (상한에 찬 판에서 지우고 곧바로 그어도 받는 쪽이 새 획을 버리지 않는다). reset 은 머리 → 그림 → 획 → 보기다.
+//   · reset() 은 다음 묶음을 reset 으로 한다(중간에 붙은 받는 쪽 — 호스트가 부른다). stop() 은 그 뒤로 아무것도 내지 않는다(도는 send 는 끝까지 둔다).
+//   · 전달 계약: 받는 쪽은 낸 차례대로 한 번씩 받는다고 본다(연산에 순번이 없다 — 빠지거나 다시 온 묶음은 가려내지 못한다). 빠졌으면 호스트가 reset() 으로 되돌린다.
+// 보기 전용 화면(viewer) — store·목록·도구 막대 없이 엔진을 읽기 전용으로 쓴다(이동·확대와 판 이름표만). mount(없으면 document.body)를 채운다.
+//   · apply(batchText) → true(적용함) · false(읽지 못함 — 꼴이 틀림·형식 v 가 다름) · "resync"(앞 상태와 어긋남 — reset 전의 증분, 없는 획에 잇기·없는 그림 옮기기).
+//     true 가 아니면 호스트는 보내는 쪽에 reset 을 청한다 — false 뒤로는 reset(또는 off)을 받을 때까지 증분에 "resync" 를 돌려준다. 예외를 밖으로 던지지 않는다.
+//     받은 값은 믿지 않는다 — wbcore parseBatch 의 검사(좌표·굵기·색·z·mime·해시)를 거치고 하나라도 틀리면 그 묶음 전체를 버린다. 판 상한(LIMIT 획·점·그림 수)을
+//     넘는 넣기는 그 연산만 버린다(true). 판 이름은 textContent 로만 넣는다.
+//   · image(hash) → Blob|바이트|null(Promise 여도 된다) — 그림 바이트를 호스트에서 받아 createImageBitmap 으로 디코드한다(null·실패면 옅은 자리 표시 상자).
+//   · 따라가기: 처음엔 따라간다 — 강사가 보는 영역(보기 연산 v 의 x·y 와 W/z × H/z)이 내 화면에 다 들어오게 맞춘다(비율이 달라도 잘리지 않는다, 배율은 ZMIN~ZMAX).
+//     내가 이동·확대하면 풀린다 — onView(false). setFollow(true) 는 곧바로 다시 맞춘다 — onView(true). 「강사 보기로」 단추는 호스트 몫이다(following()).
+//   · onState({ on, name }) 은 켜짐(reset)·꺼짐(off)·이름이 바뀔 때 부른다. close() 는 떼고 그 뒤 apply 는 false 다.
 (function () {
   "use strict";
   const C = window.ItdaWbCore;
@@ -534,7 +570,7 @@
     function decode(im) {
       const g = gen;
       im.state = "wait";
-      decodeImage(im.mime, im.data).then(bmp => {
+      (im.load ? Promise.resolve().then(im.load) : decodeImage(im.mime, im.data)).then(bmp => { // load: 보기 전용 화면의 그림 원천(호스트 image(hash))
         if (dead || g !== gen || !reach(im)) { if (bmp && bmp.close) bmp.close(); return; }
         im.bmp = bmp; im.state = "ok"; held.add(im);
         imgChanged();
@@ -571,12 +607,15 @@
       push({ t: "idel", im });
       return true;
     }
+    // touch 는 작업 op 가 건드린 획·그림을 중계에 알린다(cb.touch — 표면의 중계 출구가 그 판의 바뀐 것만 다시 본다. 없으면 아무 일도 없다).
+    function touch(op) { if (!cb.touch) return; if (op.im) cb.touch("i", op.im); else for (const s of op.list) cb.touch("s", s); }
     function apply(op, dir) { // dir 1 = 하기, -1 = 되돌리기
-      if (op.t === "imove") { setGeom(op.im, dir === 1 ? op.to : op.from); return true; }
+      if (op.t === "imove") { setGeom(op.im, dir === 1 ? op.to : op.from); touch(op); return true; }
       if (op.t === "iadd" || op.t === "idel") {
         const add = (op.t === "iadd") === (dir === 1);
         if (add) { if (!imgRoom(1, op.im.bytes)) { cb.imgFull(); return false; } addImg(op.im); } else removeImg(op.im);
         imgChanged();
+        touch(op);
         return true;
       }
       const adding = (op.t === "add") === (dir === 1);
@@ -585,10 +624,11 @@
       // 다시 하기로 돌아온 새 획은 맨 위라 덧그리고, 되돌리기로 돌아온 지운 획(옛 획)은 차례를 지키려고 그 자리 타일을 다시 굽는다
       if (adding && op.t === "add" && op.list.length <= 60) { for (const s of op.list) addToTiles(s); kick(); }
       else invalidate(op.list);
+      touch(op);
       return true;
     }
     // push 는 새 작업이다 — 다시 하기 더미를 비운다. 버린 단계에 그림이 있었으면 닿지 않게 된 그림의 bmp 를 놓는다(reap). 되돌리기 더미에는 상한이 없다.
-    function push(op) { const dropped = redoStack; undoStack.push(op); redoStack = []; if (dropped.some(o => o.im)) reap(); cb.bar(); cb.change(); }
+    function push(op) { const dropped = redoStack; undoStack.push(op); redoStack = []; if (dropped.some(o => o.im)) reap(); touch(op); cb.bar(); cb.change(); }
     function undo() { if (readOnly || locked || mode) return; const op = undoStack.pop(); if (!op) return; if (!apply(op, -1)) { undoStack.push(op); return; } redoStack.push(op); cb.bar(); cb.change(); }
     function redo() { if (readOnly || locked || mode) return; const op = redoStack.pop(); if (!op) return; if (!apply(op, 1)) { redoStack.push(op); return; } undoStack.push(op); cb.bar(); cb.change(); }
 
@@ -1067,6 +1107,7 @@
       view = C.boundView(view, W, H);
       baseDirty = liveDirty = imgDirty = true;
       kick();
+      if (cb.resized) cb.resized(); // 화면 크기·보기가 바뀌었다(cb.view 와 달리 사람이 옮긴 것이 아니다 — 중계·보기 전용 화면의 따라가기)
     }
 
     // ---- 도구·바탕
@@ -1142,6 +1183,43 @@
       const imgs = [...images.values()].sort((a, b) => a.id - b.id).map(im => ({ x: im.x, y: im.y, w: im.w, h: im.h, mime: im.mime, data: im.data, bmp: im.bmp }));
       return { bg, view: { x: view.x, y: view.y, z: view.z }, strokes: list, images: imgs };
     }
+    // ---- 받은 연산(보기 전용 화면 — viewer 만 쓴다. 판은 읽기 전용으로 연다). 획·그림의 id 는 받은 그대로다 — 겹침 차례가 id 차례라(grid.query·board)
+    // 되돌리기로 돌아온 획도 원래 자리에 든다. 판 상한(room·imgRoom)을 넘는 넣기는 하지 않는다(false). 없는 id 를 가리키는 잇기·옮기기는 null(어긋남).
+    // 바뀐 획은 모았다가 flush 에서 그 자리 타일을 한 번에 버린다(다음 프레임에 다시 굽는다).
+    let rlist = [];
+    const remote = {
+      clear(b) { load({ bg: b || "dark", view, strokes: [], images: [] }, true); rlist = []; },
+      put(id, tool, color, w, pts) {
+        const old = strokes.get(id);
+        if (old) { removeStroke(old); rlist.push(old); }
+        if (!room(1, pts.length / 3)) return false;
+        const s = { id, tool, color, w, pts };
+        geom(s); addStroke(s); rlist.push(s);
+        return true;
+      },
+      append(id, pts) {
+        const s = strokes.get(id);
+        if (!s) return null;
+        if (!room(0, pts.length / 3)) return false;
+        removeStroke(s); rlist.push({ box: s.box });
+        s.pts = s.pts.concat(pts);
+        geom(s); addStroke(s); rlist.push(s);
+        return true;
+      },
+      del(id) { const s = strokes.get(id); if (s) { removeStroke(s); rlist.push(s); } },
+      iput(id, g, mime, hash, src) {
+        const old = images.get(id);
+        if (old) { removeImg(old); dropBmp(old); }
+        if (!imgRoom(1, 0)) { imgChanged(); return false; }
+        const im = { id, x: g.x, y: g.y, w: g.w, h: g.h, mime, hash, data: null, bytes: 0, bmp: null, state: "wait", load: src };
+        addImg(im); decode(im); imgChanged();
+        return true;
+      },
+      igeom(id, g) { const im = images.get(id); if (!im) return null; setGeom(im, g); return true; },
+      idel(id) { const im = images.get(id); if (im) { removeImg(im); dropBmp(im); imgChanged(); } },
+      bg(b) { if (b !== bg) applyBg(b); },
+      flush() { if (rlist.length) invalidate(rlist); rlist = []; },
+    };
     function destroy() {
       dead = true;
       gen++; closeHeld();
@@ -1152,7 +1230,7 @@
     }
 
     return {
-      load, board, destroy, resize, pointer, leave, wheel, gesture, setSpace, setTool, setBg, undo, redo, colorOf, hlAlpha, kick, frame, commit, lock,
+      load, board, destroy, resize, remote, pointer, leave, wheel, gesture, setSpace, setTool, setBg, undo, redo, colorOf, hlAlpha, kick, frame, commit, lock,
       // busy 는 포인터를 쥔 채 판을 바꾸는 중인가다(그리기·지우기·그림 옮기기·크기 — 이동·오므리기는 아니다). 자동 저장은 이 동안 미룬다(scheduleSave·follow).
       busy: () => !!mode && (mode.kind === "draw" || mode.kind === "erase" || imgMode()), canUndo: () => !readOnly && !locked && undoStack.length > 0, canRedo: () => !readOnly && !locked && redoStack.length > 0,
       readOnly: () => readOnly, locked: () => locked, bg: () => bg, strokes, guard,
@@ -1255,6 +1333,7 @@
     const host = o.host || window.ItdaWhiteboardHost;
     if (!C) return Promise.reject(new Error("wbcore.js(window.ItdaWbCore)가 먼저 실려야 한다"));
     if (!host || !host.store) return Promise.reject(new Error("저장 계약(ItdaWhiteboardHost.store)이 없다"));
+    if (viewers) return Promise.reject(new Error("보기 전용 화면(viewer)이 열려 있는 동안에는 표면을 열지 않는다"));
     const s = S = surface(host);
     s.ready = s.start(o.id);
     return s.ready;
@@ -1268,6 +1347,7 @@
     // st.rec 은 지금 판의 기록기다(st.id 와 함께 바뀐다). st.task 는 지금 도는 시도(판 바꾸기·새 판·관리 작업·처음 열기·닫기 — 한 번에 하나).
     const st = {
       host, id: null, rec: null, name: "", extra: {}, readOnly: true, list: [], timer: 0, task: null,
+      shown: false, // shown: 판을 한 번이라도 보였다(show — 그 전에는 중계가 off 다)
       closing: null, closeFailed: false, confirm: null, renaming: null, pop: "", listOpen: false, noteKind: "",
       locked: "", gone: false, thumbWait: new Map(), // gone: 지금 판이 남의 삭제(또는 늦은 삭제)로 사라졌다 — 다음 판을 연 뒤 안내한다
     };
@@ -1359,7 +1439,8 @@
     const items = listEl.appendChild(el("div", "itda-wb-items"));
 
     const eng = engine(stage, imgC, baseC, liveC, {
-      change, view: () => {}, bar: paintBar, down: closePops, // 보기만 바뀐 것은 저장을 부르지 않는다 — 다음 스냅샷에 함께 실린다
+      change, view: relayKick, bar: paintBar, down: closePops, // 보기만 바뀐 것은 저장을 부르지 않는다 — 다음 스냅샷에 함께 실린다(중계에는 보기 연산으로 나간다)
+      touch: relayTouch, resized: relayKick,
       edge: () => showNote("판의 끝(좌표 범위)에 닿아 획을 끝냈습니다 — 안쪽에서 다시 그으세요.", "full"),
       full: () => showNote("판이 가득 찼습니다(획 " + C.LIMIT.strokes + "·점 " + C.LIMIT.points + " 상한) — 이 획은 넣지 않았습니다.", "full"),
       long: () => showNote("한 획의 점이 " + STROKE_PTS + "개에 닿아 획을 끝냈습니다 — 떼고 다시 그으세요.", "full"),
@@ -1436,6 +1517,7 @@
     function change() {
       if (st.noteKind === "full") clearNote("full");
       scheduleSave();
+      relayKick(); // 배경 바꾸기도 여기로 온다(머리 연산)
     }
     function scheduleSave() {
       clearTimeout(st.timer);
@@ -1580,6 +1662,7 @@
       st.closeFailed = false;
       if (id != null) B.lastId = id;
       eng.load(board, ro);
+      st.shown = true; relayRestart(); // 판이 보인다 — 중계는 이 판으로 reset 을 낸다
       const r = st.rec;
       if (r && !ro && !fresh && !dirty(r) && !r.running) { try { r.saved = textNow(); } catch (e) { r.saved = null; } }
       clearNote();
@@ -1985,6 +2068,7 @@
       root.remove();
       if (prevFocus && prevFocus.focus) { try { prevFocus.focus(); } catch (e) { /* 떨어진 요소 */ } }
       call(host.onClose, failed ? { unsaved: !!kept, failed: true } : { unsaved: !!kept });
+      relayKick(); // 표면이 닫혔다 — 중계는 off 를 낸다
     }
     // closeSurface 는 닫기다(머리 주석 close) — 앞 시도(전환 등)를 밀어내고(그 늦은 결과는 버린다) 잠근 뒤, 그 자리에서 지금 판을 기록기에 넣는다.
     // 기다리는 것은 그 저장의 확인 하나이고, 기한은 닫기를 요청한 때부터 STORE_WAIT 다(앞 일을 기다리지 않는다).
@@ -2017,6 +2101,7 @@
       const it = st.list.find(x => x.id === st.id);
       if (it) it.name = name;
       paintBar();
+      relayKick(); // 머리 연산(이름)
       if (st.readOnly || !st.rec) return;
       let text;
       try { text = textNow(); } catch (e) { return; }
@@ -2026,6 +2111,302 @@
 
     const api = { start, close: closeSurface, root, engine: eng, state: st, save, bag: B, applyName, buried, insertImage };
     return api;
+  }
+
+  // ---- 중계 출구(머리 주석 「중계」). 한 번에 하나다(R). 엔진의 갈고리(touch — push·되돌리기·다시 하기)가 건드린 획·그림을 모으고, 묶음을 낼 때
+  // 「보낸 것」(sent — 이 reset 뒤로 받는 쪽에 있다고 아는 획·그림·머리·보기)과 지금 엔진을 그 획·그림에 한해 견주어 연산을 만든다(합친 결과만 나간다 —
+  // 넣었다 뺀 획은 나가지 않는다). 판을 다시 열면(show — 엔진 load) reset 이다. 보내는 일은 판 그리기·저장과 묶이지 않는다(타이머 뒤 — 실패는 삼킨다).
+  const RELAY_MS = 100;          // 바뀐 뒤 이만큼(ms) 모아 한 번에 낸다(보기는 그사이 마지막 값만)
+  const RELAY_CHUNK = C ? C.BATCH_MAX - 1024 : 0; // 연산 하나(획 조각)의 상한 — 묶음 머리·쉼표 여유를 뺀다
+  let R = null;
+  const imgHash = new WeakMap(); // 그림 객체 → sha-256 hex(한 번만 센다 — 되돌리기로 돌아온 그림은 같은 객체다)
+  function hashOf(im) {
+    let h = imgHash.get(im);
+    if (!h) imgHash.set(im, (h = C.sha256Hex(C.b64Decode(im.data))));
+    return h;
+  }
+  function relay(o) {
+    if (!o || typeof o.send !== "function") throw new TypeError("ItdaWhiteboard.relay: send 함수가 필요합니다");
+    if (!C) throw new Error("wbcore.js(window.ItdaWbCore)가 먼저 실려야 한다");
+    if (R) stopRelay(R);
+    const r = R = { send: o.send, image: typeof o.image === "function" ? o.image : null, stale: true, halted: false, busy: false, timer: 0, stopped: false,
+      ts: new Set(), ti: new Set(), sent: null, given: new Set() };
+    relayWake();
+    return { stop: () => stopRelay(r), reset: () => { if (R !== r) return; r.stale = true; relayKick(); } };
+  }
+  function stopRelay(r) { r.stopped = true; clearTimeout(r.timer); r.timer = 0; if (R === r) R = null; }
+  // relayTouch 는 엔진이 건드린 획(s)·그림(i)을 모은다. relayKick 은 바뀜 알림이다 — 실패 뒤 멈춘 출구도 여기서 다시 움직인다(「다음 변화 때 reset 부터」).
+  // relayRestart 는 판을 새로 보였다는 알림이다(reset). relayWake 는 타이머를 건다(보내는 중·멈춤이면 걸지 않는다 — 보낸 뒤 다시 본다).
+  function relayTouch(kind, obj) { const r = R; if (!r) return; (kind === "i" ? r.ti : r.ts).add(obj); relayKick(); }
+  function relayKick() { if (R) { R.halted = false; relayWake(); } }
+  function relayRestart() { if (R) { R.stale = true; relayKick(); } }
+  function relayWake() {
+    const r = R;
+    if (!r || r.stopped || r.busy || r.timer || r.halted) return;
+    r.timer = setTimeout(() => { r.timer = 0; relayFlush(r); }, RELAY_MS);
+  }
+  const called = f => new Promise(ok => ok(f()));
+  // relayFlush 는 지금 낼 묶음들을 만들어 차례로 보낸다 — 앞 send 가 끝나야 다음을 부른다. 그림 바이트(image)는 그 그림을 처음 가리키는 묶음보다 먼저 넘긴다.
+  // send 가 "full" 이면 남은 묶음을 버리고 곧바로 reset 을 다시 낸다. 거부·던짐(image 포함)이면 남은 묶음을 버리고 멈춘다 — 다음 바뀜(relayKick) 때 reset 부터.
+  function relayFlush(r) {
+    if (R !== r || r.stopped || r.busy) return;
+    let batches;
+    try { batches = relayBatches(r); } catch (e) { r.stale = true; r.halted = true; return; } // 내부 오류 — 그리기·저장에 번지지 않게 삼킨다
+    if (!batches.length) return;
+    r.busy = true;
+    let i = 0;
+    const fail = () => { r.busy = false; r.stale = true; r.halted = true; };
+    const next = () => {
+      if (R !== r || r.stopped) return;
+      if (i >= batches.length) { r.busy = false; relayWake(); return; }
+      const b = batches[i++];
+      called(() => giveImages(r, b.imgs)).then(() => (R === r && !r.stopped ? called(() => r.send(b.text)) : undefined)).then(res => {
+        if (R !== r || r.stopped) return;
+        if (res === "full") { r.busy = false; r.stale = true; relayWake(); return; }
+        next();
+      }, fail);
+    };
+    next();
+  }
+  // giveImages 는 묶음이 처음 가리키는 그림의 바이트를 호스트에 넘긴다(같은 해시는 이 출구에서 한 번만 — 실패하면 다시 넘길 수 있게 지운다).
+  function giveImages(r, list) {
+    if (!r.image || !list.length) return undefined;
+    const ps = [];
+    for (const { hash, im } of list) {
+      if (r.given.has(hash) || r.stopped) continue;
+      r.given.add(hash);
+      ps.push(called(() => r.image(hash, C.b64Decode(im.data), im.mime)).catch(e => { r.given.delete(hash); throw e; }));
+    }
+    return ps.length ? Promise.all(ps) : undefined;
+  }
+  // relayBatches 는 지금 낼 묶음 [{ text, imgs }] 이다. 판이 보이지 않으면(표면이 닫혔거나 첫 판이 뜨기 전) off 하나(이미 냈으면 없다).
+  // reset 이 필요하면(처음·판을 다시 엶·full·실패 뒤·엔진의 판이 바뀜) 판 전체, 아니면 건드린 획·그림과 머리·보기의 바뀐 것만이다.
+  function relayBatches(r) {
+    const s = S && S.state.shown ? S : null;
+    if (!s) {
+      r.ts.clear(); r.ti.clear();
+      if (r.sent && !r.sent.on && !r.stale) return [];
+      r.stale = false; r.sent = { on: false };
+      return [{ text: C.batchText("off", []), imgs: [] }];
+    }
+    const eng = s.engine, st = s.state, ops = [];
+    let k = "";
+    const put = (op, img) => { try { ops.push({ op: op(), img }); return true; } catch (e) { return false; } }; // 범위 밖(내부 불변식이 깨짐) — 그 연산만 뺀다
+    const sendStroke = (sent, st0) => { if (put(() => C.wireStroke(st0.id, st0))) sent.strokes.set(st0.id, st0); };
+    const geomKey = im => { try { return JSON.stringify(C.wireGeom(im.id, im)); } catch (e) { return ""; } };
+    const sendImage = (sent, im) => {
+      const hash = hashOf(im);
+      if (put(() => C.wireImage(im.id, im, hash), { hash, im })) sent.imgs.set(im.id, { im, key: geomKey(im) });
+    };
+    let sent = r.sent;
+    if (r.stale || !sent || !sent.on || sent.gen !== eng.gen()) {
+      k = "reset"; r.stale = false; r.ts.clear(); r.ti.clear();
+      sent = r.sent = { on: true, gen: eng.gen(), name: null, bg: null, view: "", strokes: new Map(), imgs: new Map() };
+      for (const im of [...eng.images.values()].sort((a, b) => a.id - b.id)) sendImage(sent, im);
+      for (const st0 of [...eng.strokes.values()].sort((a, b) => a.id - b.id)) sendStroke(sent, st0);
+    } else {
+      // 증분의 차례는 빼기(획 d·그림 x) → 자리 바꾸기(g) → 넣기(i·s) → 머리 → 보기다. 받는 쪽은 어느 연산 뒤에도 (보낸 것 − 뺀 것) ∪ 넣은 것의
+      // 부분집합만 쥐므로 보내는 쪽 최종 상태(상한 안)보다 많아지지 않는다 — 상한에 찬 판에서 지우고 같은 구간에 그어도 넣기를 버리지 않는다.
+      // 되돌리기로 같은 id 가 빠졌다 돌아오면 엔진의 같은 객체라(now·was 둘 다 참) 아무것도 나가지 않는다. 빠진 채면 d·x, 돌아온 채면 s·i 하나다.
+      // 같은 id 에 다른 객체가 들었으면(was 의 획이 엔진에 없다) 빼기를 먼저 내고 넣는다 — 받는 쪽의 「같은 id 면 바꾼다」 에 기대지 않는다.
+      const xs = [], ds = [], gs = []; // ops 에는 sendImage·sendStroke 가 넣기를 쌓는다 — 빼기·자리 바꾸기는 끝에 그 앞으로 끼운다
+      for (const im of [...r.ti].sort((a, b) => a.id - b.id)) {
+        const now = eng.images.get(im.id) === im, was = sent.imgs.get(im.id);
+        if (now && (!was || was.im !== im)) { if (was) { xs.push(im.id); sent.imgs.delete(im.id); } sendImage(sent, im); }
+        else if (!now && was && was.im === im) { xs.push(im.id); sent.imgs.delete(im.id); }
+        else if (now && was) { const key = geomKey(im); if (key && key !== was.key) { gs.push({ op: JSON.parse(key) }); was.key = key; } }
+      }
+      for (const st0 of [...r.ts].sort((a, b) => a.id - b.id)) {
+        const now = eng.strokes.get(st0.id) === st0, was = sent.strokes.get(st0.id);
+        if (now && was !== st0) { if (was) { ds.push(st0.id); sent.strokes.delete(st0.id); } sendStroke(sent, st0); }
+        else if (!now && was === st0) { ds.push(st0.id); sent.strokes.delete(st0.id); }
+      }
+      r.ts.clear(); r.ti.clear();
+      const pre = [];
+      if (ds.length) pre.push({ op: ["d", ds] });
+      if (xs.length) pre.push({ op: ["x", xs] });
+      ops.splice(0, 0, ...pre, ...gs);
+    }
+    const head = C.wireHead(st.name, eng.bg());
+    if (head[1] !== sent.name || head[2] !== sent.bg) {
+      if (k === "reset") ops.unshift({ op: head }); else ops.push({ op: head }); // reset 은 머리가 맨 앞(첫 조각에서 이름이 바로 보인다), 증분은 넣기 뒤
+      sent.name = head[1]; sent.bg = head[2];
+    }
+    const { W, H } = eng.size, vk = JSON.stringify(C.wireView(eng.view, W, H));
+    if (vk !== sent.view) { ops.push({ op: JSON.parse(vk) }); sent.view = vk; }
+    if (!ops.length) return [];
+    return relaySplit(k, ops);
+  }
+  // relaySplit 은 연산들을 BATCH_MAX 안의 묶음들로 나눈다 — 첫 묶음만 k(reset 이면 나머지는 증분 ""). 한 묶음에 들지 않는 획은 s 와 a 여럿으로,
+  // 긴 빼기 목록(d·x)은 같은 이름의 연산 여럿으로 나눈다(차례는 그대로 — 빼기 조각이 모두 나간 뒤에 넣기가 나간다).
+  // 내기 전에 모든 묶음의 UTF-8 바이트를 다시 재고, 하나라도 BATCH_MAX 를 넘으면 아무것도 내지 않고 던진다(relayFlush 가 받아 다음 바뀜 때 reset).
+  function relaySplit(k, ops) {
+    const out = [], head = C.utf8Len(C.batchText("reset", [])) + 16;
+    let cur = [], imgs = [], size = head;
+    const close = () => {
+      const text = C.batchText(out.length ? "" : k, cur);
+      if (C.utf8Len(text) > C.BATCH_MAX) throw new RangeError("중계 묶음이 BATCH_MAX 를 넘는다");
+      out.push({ text, imgs }); cur = []; imgs = []; size = head;
+    };
+    const add = (str, img) => {
+      const n = C.utf8Len(str) + 1;
+      if (cur.length && size + n > C.BATCH_MAX) close();
+      cur.push(str); size += n;
+      if (img) imgs.push(img);
+    };
+    const parts = op => (op[0] === "s" ? strokeParts(op) : op[0] === "d" || op[0] === "x" ? idParts(op) : [JSON.stringify(op)]);
+    for (const { op, img } of ops) for (const str of parts(op)) add(str, img);
+    if (cur.length || !out.length) close();
+    return out;
+  }
+  // idParts 는 빼기 연산 [이름, [id, …]] 하나를 RELAY_CHUNK 안의 조각들로 나눈다(id 는 안전한 정수라 글자는 ASCII 다).
+  function idParts(op) {
+    const whole = JSON.stringify(op);
+    if (whole.length <= RELAY_CHUNK) return [whole];
+    const out = [], base = JSON.stringify([op[0], []]).length;
+    let ids = [], len = base;
+    for (const id of op[1]) {
+      const n = String(id).length + (ids.length ? 1 : 0);
+      if (ids.length && len + n > RELAY_CHUNK) { out.push(JSON.stringify([op[0], ids])); ids = []; len = base; }
+      len += String(id).length + (ids.length ? 1 : 0);
+      ids.push(id);
+    }
+    if (ids.length) out.push(JSON.stringify([op[0], ids]));
+    return out;
+  }
+  // strokeParts 는 획 연산 하나를 RELAY_CHUNK 안의 조각들(["s", …, 앞 점] 과 ["a", id, 다음 점] 여럿)로 나눈다(점은 3 개씩 끊는다 — 글자는 ASCII 다).
+  function strokeParts(op) {
+    const whole = JSON.stringify(op);
+    if (whole.length <= RELAY_CHUNK) return [whole];
+    const p = op[5], n = p.length / 3;
+    for (let parts = Math.ceil(whole.length / RELAY_CHUNK) + 1; ; parts++) {
+      const per = Math.ceil(n / parts) * 3, strs = [];
+      let fits = true;
+      for (let i = 0; i < p.length && fits; i += per) {
+        const seg = p.slice(i, i + per), str = JSON.stringify(i === 0 ? ["s", op[1], op[2], op[3], op[4], seg] : ["a", op[1], seg]);
+        if (str.length > RELAY_CHUNK) fits = false; else strs.push(str);
+      }
+      if (fits) return strs;
+    }
+  }
+
+  // ---- 보기 전용 화면(머리 주석 「보기 전용 화면」). store·목록·도구 막대 없이 엔진을 읽기 전용으로 쓴다 — 이동·확대와 판 이름표만.
+  let viewers = 0;
+  function viewer(o) {
+    o = o || {};
+    if (!C) throw new Error("wbcore.js(window.ItdaWbCore)가 먼저 실려야 한다");
+    if (S) throw new Error("ItdaWhiteboard.viewer: 화이트보드 표면이 열려 있는 동안에는 보기 전용 화면을 열지 않는다");
+    const mount = o.mount || document.body, imageFn = typeof o.image === "function" ? o.image : null;
+    const root = el("div", "itda-wb itda-wb-viewer off");
+    root.setAttribute("aria-label", "화이트보드(보기 전용)");
+    const stage = root.appendChild(el("div", "itda-wb-stage bg-dark"));
+    const imgC = stage.appendChild(el("canvas", "itda-wb-img")), baseC = stage.appendChild(el("canvas", "itda-wb-base")), liveC = stage.appendChild(el("canvas", "itda-wb-live"));
+    const title = root.appendChild(el("div", "itda-wb-title"));
+    title.hidden = true;
+    let follow = true, setting = false, closed = false, need = true, sv = null, on = false, name = "";
+    const noop = () => {};
+    const eng = engine(stage, imgC, baseC, liveC, { change: noop, bar: noop, down: noop, full: noop, long: noop, edge: noop, imgFull: noop, sel: noop,
+      view: () => { if (!setting && follow) { follow = false; call(o.onView, false); } }, // 사람이 옮기거나 확대했다 — 따라가기를 푼다
+      resized: () => fit() });
+    viewers++;
+    mount.appendChild(root);
+    eng.resize();
+    eng.load({ bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [], images: [] }, true);
+    // 그림 원천: 호스트 image(hash) 의 Blob(또는 바이트) → createImageBitmap. null·실패면 디코드 실패(자리 표시 — 옅은 상자)다.
+    const source = (hash, mime) => () => Promise.resolve().then(() => (imageFn ? imageFn(hash) : null)).then(b => {
+      if (!b) throw new Error("그림 바이트가 없다");
+      const isBytes = ArrayBuffer.isView(b) || Object.prototype.toString.call(b) === "[object ArrayBuffer]";
+      return window.createImageBitmap(isBytes ? new window.Blob([b], { type: mime }) : b);
+    }).then(fitBitmap);
+    // fit 은 따라가는 동안 강사가 보는 영역(sv)이 내 화면에 다 들어오게(비율이 달라도 잘리지 않게) 가운데 맞춘다.
+    function fit() {
+      if (!follow || !sv || closed) return;
+      const { W, H } = eng.size;
+      if (!(W > 0 && H > 0)) return;
+      const rw = sv.W / sv.z, rh = sv.H / sv.z, z = C.clamp(Math.min(W / rw, H / rh), C.ZMIN, C.ZMAX);
+      const cx = sv.x + rw / 2, cy = sv.y + rh / 2;
+      setting = true;
+      try { eng.view = { x: cx - W / 2 / z, y: cy - H / 2 / z, z }; } finally { setting = false; }
+    }
+    function setOn(v, nm) {
+      const was = on, wasName = name;
+      on = !!v; name = on ? nm : "";
+      title.textContent = name; title.hidden = !name; // 받은 이름은 textContent 로만 넣는다
+      root.classList.toggle("off", !on);
+      if (on !== was || name !== wasName) call(o.onState, { on, name });
+    }
+    function clearBoard() { eng.remote.clear("dark"); sv = null; }
+    // step 은 검증된 연산 하나를 적용한다 — 어긋남(없는 획에 잇기·없는 그림 옮기기)이면 false. 상한을 넘는 넣기는 버리고 계속한다.
+    function step(op) {
+      const rm = eng.remote;
+      if (op.op === "h") { setOn(true, op.name); rm.bg(op.bg); }
+      else if (op.op === "s") rm.put(op.id, op.tool, op.color, op.w, op.pts);
+      else if (op.op === "a") return rm.append(op.id, op.pts) !== null;
+      else if (op.op === "d") for (const id of op.ids) rm.del(id);
+      else if (op.op === "i") rm.iput(op.id, op, op.mime, op.hash, source(op.hash, op.mime));
+      else if (op.op === "g") return rm.igeom(op.id, op) !== null;
+      else if (op.op === "x") for (const id of op.ids) rm.idel(id);
+      else if (op.op === "v") { sv = { x: op.x, y: op.y, z: op.z, W: op.W, H: op.H }; fit(); }
+      return true;
+    }
+    // apply 는 묶음 하나를 받는다(머리 주석 「보기 전용 화면」 — 돌려주는 값 true·false·"resync"). 예외를 밖으로 던지지 않는다.
+    function apply(text) {
+      if (closed) return false;
+      let b;
+      try { b = C.parseBatch(text); } catch (e) { b = { ok: false }; }
+      if (!b.ok) { need = true; return false; }
+      if (b.k === "off") { clearBoard(); setOn(false, ""); need = false; return true; }
+      if (b.k !== "reset" && need) return "resync";
+      let bad = false;
+      try {
+        if (b.k === "reset") clearBoard();
+        for (const op of b.ops) if (!step(op)) { bad = true; break; }
+        if (b.k === "reset" && !on) setOn(true, ""); // 머리 연산이 없는 reset 도 켜진 판이다
+      } catch (e) { bad = true; }
+      try { eng.remote.flush(); } catch (e) { bad = true; }
+      if (bad) { need = true; return "resync"; }
+      need = false;
+      return true;
+    }
+    function setFollow(v) {
+      if (closed) return;
+      const was = follow;
+      follow = !!v;
+      if (follow) fit();
+      if (follow !== was) call(o.onView, follow);
+    }
+    const listeners = [];
+    const listen = (t, type, f, opts) => { t.addEventListener(type, f, opts); listeners.push([t, type, f, opts]); };
+    for (const type of ["pointerdown", "pointermove", "pointerup", "pointercancel", "lostpointercapture"]) listen(stage, type, e => eng.pointer(type, e));
+    listen(stage, "pointerleave", () => eng.leave());
+    listen(stage, "wheel", e => eng.wheel(e), { passive: false });
+    for (const type of ["gesturestart", "gesturechange", "gestureend"]) listen(stage, type, e => eng.gesture(type, e), { passive: false });
+    for (const type of ["touchstart", "touchmove", "contextmenu"]) listen(stage, type, e => e.preventDefault(), { passive: false });
+    const onResize = () => eng.resize();
+    listen(window, "resize", onResize);
+    if (window.visualViewport) listen(window.visualViewport, "resize", onResize);
+    function close() {
+      if (closed) return;
+      closed = true; viewers--;
+      for (const [t, type, f, opts] of listeners) t.removeEventListener(type, f, opts);
+      listeners.length = 0;
+      eng.destroy();
+      root.remove();
+    }
+    return {
+      apply, setFollow, following: () => follow, close,
+      // debug 는 시험·진단용 손잡이다(계약 아님) — board 는 받은 판(획은 id 차례, 그림은 해시와 함께)이다.
+      debug: () => ({ engine: eng, root, need: () => need, on: () => on, name: () => name, sender: () => sv,
+        board: () => ({ bg: eng.bg(), strokes: eng.board().strokes, images: [...eng.images.values()].sort((a, b) => a.id - b.id).map(im => ({ id: im.id, x: im.x, y: im.y, w: im.w, h: im.h, mime: im.mime, hash: im.hash })) }) }),
+    };
+  }
+
+  // unsaved 는 store 의 미저장 판 id 다(머리 주석 「unsaved」) — bags.get 으로만 본다(조회가 bag·기록기를 만들지 않는다). 판별은 dirty 그대로다.
+  function unsaved(store) {
+    if (store === null || (typeof store !== "object" && typeof store !== "function")) throw new TypeError("ItdaWhiteboard.unsaved: store 객체가 필요합니다");
+    const B = bags.get(store), out = [];
+    if (B) for (const [id, r] of B.recs) if (dirty(r)) out.push(id);
+    return out;
   }
 
   // memoryStore 는 저장 계약(머리 주석)을 메모리로 따르는 저장소다 — 시험·데모용.
@@ -2048,7 +2429,7 @@
   const sp0 = f => Promise.resolve().then(f);
 
   window.ItdaWhiteboard = {
-    open, close, isOpen, toggle, memoryStore,
+    open, close, isOpen, toggle, unsaved, memoryStore, relay, viewer,
     // debug 의 rec·dirty·latest·put·watch 는 지금 store 의 기록기를 들여다보는 손잡이다(시험용 — put 은 그 판의 기록기에 본문을 넣는다).
     debug: () => {
       if (!S) return null;
