@@ -76,6 +76,7 @@ func (st *state) processHeadings(hs []*ast.Heading, doc ast.Node) {
 		info.text = plainText(h, st.src)
 		info.inNotes = inNotes(h)
 	}
+	st.slideHeadingAttrs(doc, hs) // 장 배율 scale=·.fit 값 검사(itda-hyve#1116 — slidescale.go)
 
 	// 2) 나머지는 GitHub 규칙으로 id 를 만든다. 겹치면 -1, -2.
 	// next 는 base 마다 다음에 볼 번호다 — 그보다 작은 번호는 이미 쓰였고 쓰인 id 는 계속 쓰인 채라 다시 보지 않는다

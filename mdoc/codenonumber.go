@@ -28,7 +28,11 @@ const codeNoNumberWord = "nonumber"
 // 값 없는 낱말에는 그 규칙이 맞지 않아 따로 훑는다(리뷰 1회차 [1]): 낱말은 맨 앞·unicode.IsSpace 공백 뒤에서 시작해 다음 공백까지,
 // 낱말 안의 따옴표 구간("…"·'…')은 닫는 따옴표까지 공백을 품은 채 한 덩어리다. 닫히지 않은 따옴표면 줄 끝까지가 그 낱말이라
 // 뒤는 읽지 않는다(fenceAttrWords 와 같다). 낱말 전체가 정확히 nonumber 일 때만 참이다.
-func hasCodeNoNumber(info string) bool {
+func hasCodeNoNumber(info string) bool { return hasCodeWord(info, codeNoNumberWord) }
+
+// hasCodeWord 는 info string 에 값 없는 낱말 word 가 정확히 있는지 본다 — 훑기 규칙은 위 hasCodeNoNumber 와 같다(코드 맞춤 fit 도
+// 이 길이다 — slidescale.go).
+func hasCodeWord(info, word string) bool {
 	i := 0
 	for i < len(info) {
 		r, sz := utf8.DecodeRuneInString(info[i:])
@@ -52,7 +56,7 @@ func hasCodeNoNumber(info string) bool {
 			}
 			i += sz2
 		}
-		if info[start:i] == codeNoNumberWord {
+		if info[start:i] == word {
 			return true
 		}
 	}

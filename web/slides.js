@@ -195,6 +195,48 @@
     return { h, n, rounds };
   }
 
+  // ---- 장 배율·장 맞춤(itda-hyve#1116). 슬라이드를 여는 제목의 속성 {scale=0.6~1.5}·{.fit}(mdoc 이 값을 검사해 data-scale·class fit 으로 낸다 —
+  // mdoc/slidescale.go). 내용 장(content·single)의 제목에만 뜻이 있다 — 구역 장·제목 슬라이드·제목 없는 장(--- 뒤)·주석 장은 없다.
+  //   scale  이 장(과 그 「(계속)」 장)의 본문 배율 — 문서 배율(slides.font-scale)을 대신하는 절대값. 쪽에 --slide-body-scale 로 걸고 base.css 가
+  //          본문 글자 토큰에만 곱한다(머리·바닥글·패널·배경 캡션은 문서 배율 그대로).
+  //   .fit   본문이 한 장에 다 들어가는 가장 큰 배율(fitBodyScale) — 상한은 그 장의 배율(scale 이 있으면 그것, 없으면 문서 배율), 하한 BODY_MIN.
+  //          「다 들어간다」는 마른 나눔이 한 장이고 잘림(paginate 의 overflow — 나눌 수 없는 블록이 빈 장에서도 넘쳐 잘린 채 놓인 수)이 0 인 것이다.
+  //          하한에서도 들지 않으면 하한 배율 그대로 기존 처리를 따른다 — 「(계속)」 장이 생기고, 나눌 수 없는 블록은 잘린 채 놓인다.
+  //          장 수·잘림은 실제 나눔과 같은 옵션의 마른 나눔(사본)으로 잰다 — 차례로 나타내기의 조각은 모두 보인 채로 잰다(나눔은 늘 그렇다).
+  const BODY_MIN = 0.6, BODY_MAX = 1.5, FIT_ROUNDS = 6;
+  const SCALE_NUM = /^(?:\d+(?:\.\d+)?|\.\d+)$/;
+  // bodyAttrs 는 묶음 g 의 장 속성 { scale(0 이면 없음), fit } 이다. 없거나 뜻이 없는 묶음이면 null.
+  function bodyAttrs(g) {
+    if (!g.title || (g.kind !== "content" && g.kind !== "single") || !g.title.getAttribute) return null;
+    const v = g.title.getAttribute("data-scale") || "";
+    const n = SCALE_NUM.test(v) ? Number(v) : NaN;
+    const scale = n >= BODY_MIN && n <= BODY_MAX ? n : 0;
+    const fit = !!g.title.classList && g.title.classList.contains("fit");
+    return scale || fit ? { scale, fit } : null;
+  }
+  // docScale 은 장 맞춤의 상한이 될 문서 배율이다 — build 가 건 값(slides.font-scale), 없으면 쪽에 계산된 --slide-scale(base.css 기본 0.9·테마), 못 읽으면 0.9.
+  function docScale(pageEl, scale) {
+    if (scale) return Number(scale);
+    const cs = getComputedStyle(pageEl);
+    const v = Number(String((cs.getPropertyValue && cs.getPropertyValue("--slide-scale")) || "").trim());
+    return v > 0 ? v : 0.9;
+  }
+  // fitBodyScale 은 measure(s)(배율 s 로 나눈 결과 { pages: 장 수, overflow: 잘린 블록 수 })가 「한 장·잘림 0」인 가장 큰 배율을 [lo, hi] 에서
+  // 고른다(DOM 없음 — 재기는 넘겨받는다). hi 에서 들면 hi, lo 에서도 안 들면(두 장 이상이거나 잘림) lo, 그 사이는 이분 탐색 FIT_ROUNDS(6)번
+  // — 폭 0.9 면 약 0.014 안쪽이다. 돌려주는 값은 드는 쪽(소수 셋째 자리 내림).
+  function fitBodyScale(hi, lo, measure) {
+    const fits = s => { const r = measure(s); return r.pages <= 1 && r.overflow === 0; };
+    lo = Math.min(lo, hi);
+    if (fits(hi)) return hi;
+    if (!fits(lo)) return lo;
+    let a = lo, b = hi;
+    for (let i = 0; i < FIT_ROUNDS; i++) {
+      const m = (a + b) / 2;
+      if (fits(m)) a = m; else b = m;
+    }
+    return Math.floor(a * 1000) / 1000;
+  }
+
   function headClone(h, cont) {
     const t = document.createElement("div");
     t.className = "slide-title";
@@ -464,7 +506,10 @@
       //   2. 표지가 줄을 바꿀 수 있는 제목이면 headHeight 가 사본으로 장 수를 세며 실제 장 수의 자릿수 표지로 높이를 고른다.
       //      그 높이로 원본을 한 번 나눈다. 한 장이거나 실제 표지가 줄을 바꾸지 않으면 plain 이 남아 나눈 결과는 이전과 같다
       //      — 다만 사본 나눔이 한 번 더 든다(넘치지 않는 장도 이런 제목이면 한 쪽짜리 사본 나눔 한 번).
-      let headH = 0;
+      //   3. 장 배율·장 맞춤(bodyAttrs — itda-hyve#1116): 본문 배율을 sub 에 --slide-body-scale 로 건 뒤 나눈다(머리 높이와 무관하다). .fit 이면
+      //      plain 높이의 마른 나눔으로 한 장·잘림 0 이 되는 배율을 고르고(fitBodyScale), 하한에서도 넘쳐 「(계속)」 표지가 붙으면 위 2 가 그 배율로 다시 센다.
+      let headH = 0, bodyScale = 0;
+      const ba = bodyAttrs(g);
       if (g.title && g.kind !== "section") {
         const probe = document.createElement("div");
         probe.className = "page " + cls;
@@ -483,17 +528,29 @@
         headH = plainH;
         sub.style.setProperty("--slide-head-h", plainH + "px");
         f.remove();
+        // measure 는 머리 높이 h·본문 배율 s(0 이면 걸지 않음)로 사본을 나눈 결과 { pages: 장 수, overflow: 잘린 블록 수 } 다.
+        // 장 맞춤(fitBodyScale)은 둘 다 보고, 머리 높이(headHeight)는 장 수만 본다(표지 자릿수는 장 수로 정해진다).
+        const measure = (h, s) => {
+          const dry = document.createElement("div");
+          dry.style.setProperty("--slide-head-h", h + "px");
+          if (s) dry.style.setProperty("--slide-body-scale", String(s));
+          target.appendChild(dry);
+          const r = window.ItdaPager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
+          const pages = dry.querySelectorAll(":scope > .page").length;
+          dry.remove();
+          return { pages, overflow: (r && r.overflow) || 0 };
+        };
+        if (ba) {
+          bodyScale = ba.scale;
+          if (ba.fit) {
+            const hi = ba.scale || docScale(probe, scale);
+            const s = fitBodyScale(hi, BODY_MIN, x => measure(plainH, x));
+            bodyScale = s === hi && !ba.scale ? 0 : s; // 문서 배율 그대로 한 장이면 걸지 않는다
+          }
+          if (bodyScale) sub.style.setProperty("--slide-body-scale", String(bodyScale));
+        }
         if (tagged(DIGITS_MAX) > plainH) {
-          const count = h => {
-            const dry = document.createElement("div");
-            dry.style.setProperty("--slide-head-h", h + "px");
-            target.appendChild(dry);
-            window.ItdaPager.paginate(f.cloneNode(true), dry, { pageClass: cls, fitFill: true }); // 실제 나눔과 같은 옵션(.fit 높이 채우기)
-            const n = dry.querySelectorAll(":scope > .page").length;
-            dry.remove();
-            return n;
-          };
-          headH = headHeight(plainH, tagged, count).h;
+          headH = headHeight(plainH, tagged, h => measure(h, bodyScale).pages).h;
           sub.style.setProperty("--slide-head-h", headH + "px");
         }
         probe.remove();
@@ -521,7 +578,7 @@
     let ok = true;
     for (const [j, pg] of pages.entries()) {
       // 잴 때 임시 상자(sub)에 걸린 값(그림 최대 높이·제목 높이)을 쪽으로 옮긴다 — sub 를 지우면 사라져 차트가 커지고 잘렸다
-      for (const k of ["--img-max-h", "--slide-head-h"]) { const v = sub.style.getPropertyValue(k); if (v) pg.style.setProperty(k, v); }
+      for (const k of ["--img-max-h", "--slide-head-h", "--slide-body-scale"]) { const v = sub.style.getPropertyValue(k); if (v) pg.style.setProperty(k, v); }
       if (scale) pg.style.setProperty("--slide-scale", scale);
       pg.dataset.kind = g.kind;
       notes.push(noteHTML(slots[j].map(i => g.notes[i].el)));
@@ -712,5 +769,5 @@
   }
 
   // 정식 이름은 window.ItdaSlides 다. window.HyveSlides 는 옛 이름(호환용 별칭) — 같은 객체를 한 번에 대입한다.
-  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, SIZE, placeNotes, notePlacement, noteSpans, noteAfter, layoutNotes, watchNotes, noteHTML, NOTE_FONTS, noteFontStep };
+  window.ItdaSlides = window.HyveSlides = { build, groups, notePage, headHeight, fitBodyScale, SIZE, placeNotes, notePlacement, noteSpans, noteAfter, layoutNotes, watchNotes, noteHTML, NOTE_FONTS, noteFontStep };
 })();

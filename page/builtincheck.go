@@ -252,7 +252,10 @@ func slideGuardChecked(piece string) bool {
 //	calc(var(--slide-*-size) * <수…> * var(--slide-scale))   calc(var(--slide-title-size) * 0.86 * var(--slide-scale))
 //	<수>em · <수>% · inherit
 //
-// calc 의 곱셈 인수는 길이(pt 수·size 토큰) 정확히 하나, var(--slide-scale) 정확히 하나, 나머지는
+// 배율 자리에는 본문 배율 꼴 var(--slide-body-scale, var(--slide-scale))(장 배율이 있으면 그것, 없으면 문서 배율 — itda-hyve#1116,
+// 본문 안 요소용)도 받는다 — calc(13pt * var(--slide-body-scale, var(--slide-scale))). 대체값 없는 var(--slide-body-scale) 는 받지 않는다
+// (장 배율이 없는 장에서 값이 비어 font-size 가 통째로 무효가 된다).
+// calc 의 곱셈 인수는 길이(pt 수·size 토큰) 정확히 하나, 배율 정확히 하나, 나머지는
 // 무차원 수만 — 길이가 없으면(단위 없는 font-size)·길이가 둘이면·배율이 중복되면(제곱) 실패(리뷰 4회차 [2]).
 // 사용자 정의 속성은 대소문자를 가린다.
 const fsNum = `-?(?:\d+(?:\.\d+)?|\.\d+)`
@@ -275,7 +278,7 @@ func slideFontSizeOK(v string) bool {
 	length, scale := 0, 0
 	for term := range strings.SplitSeq(m[1], "*") {
 		switch {
-		case term == "var(--slide-scale)":
+		case term == "var(--slide-scale)", term == "var(--slide-body-scale,var(--slide-scale))":
 			scale++
 		case fsPt.MatchString(term), fsSizeTok.MatchString(term):
 			length++
