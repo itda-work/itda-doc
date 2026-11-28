@@ -23,6 +23,26 @@
 //   · 모르는 최상위 키는 버리지 않고 extra 에 담아 다시 쓴다(뒤 판이 더한 키를 옛 판이 고쳐 써도 잃지 않게). 획·그림 안의 모르는 키는 버린다.
 //   · v 가 VERSION 보다 크면 readOnly 로 연다(읽을 수 있으면 보여 주되 고쳐 쓰지 않는다 — 쓰는 쪽은 whiteboard.js).
 //   · bg 가 모르는 값이면 "dark" 로 읽는다. view 가 없으면 {0, 0, 1}, z 는 ZMIN~ZMAX 로, x·y 는 좌표 범위로 끌어 맞춘다(거부하지 않는다).
+//
+// 중계 묶음 v1 — 표면이 강사의 판을 보기 전용 화면으로 내보내는 연산(whiteboard.js relay → viewer). 정본은 이 주석과 parseBatch·wire*:
+//   묶음은 JSON 한 줄 { "v": 1, "k": "reset"|""|"off", "ops": [연산, …] } 이다(키 차례도 이대로).
+//   · k "reset" 은 그 묶음부터 판 전체를 새로 만든다(받는 쪽은 지금 상태를 버린다). 큰 판의 reset 은 여러 묶음으로 나뉜다 — 첫 묶음만 "reset",
+//     나머지는 "" 로 이어 붙는다(받는 쪽이 중간 상태를 잠깐 그려도 된다). "" 는 앞 상태에 더하는 증분, "off" 는 표면이 닫혔다(판 없음 — ops 는 비었다).
+//   · 연산(배열 — 첫 칸이 이름. 수의 반올림은 파일 형식과 같다 — 좌표 둘째 자리, 필압·굵기 셋째 자리, 보기 z 넷째 자리):
+//       ["h", 이름, bg]                       판 머리 — reset 안에, 그리고 이름·배경이 바뀔 때. 이름은 NAME_MAX(200) 글자까지.
+//       ["s", id, "pen"|"hl", 색 번호, 굵기, [x, y, 필압, …]]  획 넣기(새 획·되돌리기로 돌아온 획 모두). 겹침 차례는 id 차례다(작은 id 가 아래).
+//                                             같은 id 가 이미 있으면 바꾼다. 손을 뗀 뒤 확정된 획만 온다(긋는 중의 점은 오지 않는다).
+//       ["a", id, [x, y, 필압, …]]             바로 앞의 s 에 점을 잇는다 — 한 묶음에 들지 않는 긴 획만 s 와 a 여럿으로 나뉜다. 없는 id 면 어긋남.
+//       ["d", [id, …]]                         획 빼기(지우개·되돌리기). 없는 id 는 건너뛴다.
+//       ["i", id, x, y, w, h, mime, 해시]      그림 넣기(넣기·되돌리기). 바이트는 싣지 않는다 — 해시는 그림 파일 바이트의 sha-256(소문자 hex 64 글자)이다.
+//                                             겹침 차례는 id 차례이고 그림은 늘 모든 획 아래다. 같은 id 가 이미 있으면 바꾼다.
+//       ["g", id, x, y, w, h]                  그림 옮기기·크기. 없는 id 면 어긋남.
+//       ["x", [id, …]]                         그림 빼기. 없는 id 는 건너뛴다.
+//       ["v", x, y, z, W, H]                   강사의 보기(화면 왼쪽 위의 판 좌표·배율)와 화면 크기(CSS px — 정수 1~VIEW_PX).
+//     획·그림의 id 는 1 이상 안전한 정수이고 한 reset 안에서만 뜻이 있다(reset 은 앞 id 를 모두 버린다). 모르는 이름의 연산은 건너뛴다(뒤 판이 더한 연산).
+//   · 읽을 때(parseBatch) 파일 형식과 같은 수치 범위(좌표·굵기·색·필압·그림 w·h·mime)를 보고, 하나라도 틀리면 그 묶음 전체를 거부한다.
+//     v 가 1 이 아니거나 k 를 모르면 거부한다(v 는 형식이 바뀔 때만 올린다). 판 상한(LIMIT)은 묶음을 적용하는 쪽이 본다(whiteboard.js viewer).
+//   · 크기: 내는 쪽은 묶음 하나를 BATCH_MAX(192KB — UTF-8 바이트) 안으로 낸다. 읽는 쪽은 BATCH_READ(1MB 글자)를 넘는 본문을 읽지 않는다.
 (function (root, factory) {
   const m = factory();
   if (typeof module === "object" && module.exports) module.exports = m;
@@ -300,6 +320,13 @@
 
   const ri = w => clamp(r2(w), IMG_MIN, COORD_MAX); // 그림 w·h — 범위 안으로 끌어 맞춘 반올림(serialize)
 
+  // roundPts 는 획의 점을 쓸 꼴로 반올림한다(좌표 둘째·필압 셋째 자리) — 좌표가 범위 밖이면 RangeError(rp). serialize 와 중계(wireStroke)가 같이 쓴다.
+  function roundPts(pts) {
+    const p = new Array(pts.length);
+    for (let i = 0; i < pts.length; i += 3) { p[i] = rp(pts[i]); p[i + 1] = rp(pts[i + 1]); p[i + 2] = r3(pts[i + 2]); }
+    return p;
+  }
+
   // serialize 는 판 b = { name, bg, view: {x, y, z}, strokes: [{ tool, color, w, pts }], images: [{ x, y, w, h, mime, data }], extra } 를
   // 파일 본문(JSON 문자열)으로 만든다(그림이 없으면 images 키를 쓰지 않는다).
   // extra(모르는 최상위 키)는 아는 키 뒤에 그대로 싣는다 — 아는 키와 이름이 겹치면 아는 키가 이긴다.
@@ -308,11 +335,7 @@
     const v = b.view || { x: 0, y: 0, z: 1 };
     const out = { format: FORMAT, v: VERSION, name: String(b.name || ""), bg: BGS.includes(b.bg) ? b.bg : "dark",
       view: { x: rv(v.x), y: rv(v.y), z: r4(clamp(v.z, ZMIN, ZMAX)) }, strokes: [] };
-    for (const s of b.strokes || []) {
-      const p = new Array(s.pts.length);
-      for (let i = 0; i < s.pts.length; i += 3) { p[i] = rp(s.pts[i]); p[i + 1] = rp(s.pts[i + 1]); p[i + 2] = r3(s.pts[i + 2]); }
-      out.strokes.push({ t: s.tool === "hl" ? "hl" : "pen", c: s.color, w: rw(s.w), p });
-    }
+    for (const s of b.strokes || []) out.strokes.push({ t: s.tool === "hl" ? "hl" : "pen", c: s.color, w: rw(s.w), p: roundPts(s.pts) });
     const imgs = b.images || [];
     if (imgs.length) out.images = imgs.map(im => ({ x: rp(im.x), y: rp(im.y), w: ri(im.w), h: ri(im.h), mime: im.mime, data: im.data }));
     const extra = b.extra || {};
@@ -383,7 +406,140 @@
     return { ok: true, board, readOnly: j.v > VERSION, v: j.v };
   }
 
+  // ---- 중계 묶음 v1(머리 주석 「중계 묶음 v1」)
+  const BATCH_V = 1, BATCH_MAX = 192 * 1024, BATCH_READ = 1024 * 1024, NAME_MAX = 200, VIEW_PX = 100000;
+  const BATCH_KINDS = ["reset", "", "off"], HASH_RE = /^[0-9a-f]{64}$/;
+  // wire* 는 내는 쪽의 연산을 만든다(반올림은 파일 형식과 같다). 획·그림 자리가 좌표 범위 밖이면 RangeError 를 던진다(부르는 쪽이 그 연산을 뺀다).
+  const wireName = name => Array.from(String(name || "")).slice(0, NAME_MAX).join("");
+  const wireHead = (name, bg) => ["h", wireName(name), BGS.includes(bg) ? bg : "dark"];
+  const wireStroke = (id, s) => ["s", id, s.tool === "hl" ? "hl" : "pen", s.color, rw(s.w), roundPts(s.pts)];
+  const wireImage = (id, im, hash) => ["i", id, rp(im.x), rp(im.y), ri(im.w), ri(im.h), im.mime, hash];
+  const wireGeom = (id, im) => ["g", id, rp(im.x), rp(im.y), ri(im.w), ri(im.h)];
+  const wireView = (v, W, H) => ["v", rv(v.x), rv(v.y), r4(clamp(v.z, ZMIN, ZMAX)), clamp(Math.round(W) || 1, 1, VIEW_PX), clamp(Math.round(H) || 1, 1, VIEW_PX)];
+  // batchText 는 미리 JSON 으로 만든 연산 문자열들(opStrs)로 묶음 한 줄을 만든다 — JSON.stringify({ v, k, ops }) 와 같은 글자다.
+  const batchText = (k, opStrs) => '{"v":' + BATCH_V + ',"k":' + JSON.stringify(k) + ',"ops":[' + opStrs.join(",") + "]}";
+  // utf8Len 은 문자열의 UTF-8 바이트 수다(묶음 크기 상한을 잰다).
+  function utf8Len(s) {
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      if (c < 0x80) n++;
+      else if (c < 0x800) n += 2;
+      else if (c >= 0xd800 && c < 0xdc00 && i + 1 < s.length) { n += 4; i++; }
+      else n += 3;
+    }
+    return n;
+  }
+  const safeId = x => Number.isSafeInteger(x) && x >= 1;
+  // batchPts 는 점 배열 p 를 검증해 필압을 0~1 로 끌어 맞춘 새 배열을 돌려준다(틀리면 null — parse 의 획 검사와 같다).
+  function batchPts(p) {
+    if (!Array.isArray(p) || p.length < 3 || p.length % 3) return null;
+    const out = new Array(p.length);
+    for (let i = 0; i < p.length; i++) {
+      const x = p[i];
+      if (!fin(x)) return null;
+      if (i % 3 !== 2 && Math.abs(x) > COORD_MAX) return null;
+      out[i] = i % 3 === 2 ? clamp(x, 0, 1) : x;
+    }
+    return out;
+  }
+  const batchIds = a => (Array.isArray(a) && a.every(safeId) ? a.slice() : null);
+  const imgGeomOk = (x, y, w, h) => fin(x) && fin(y) && Math.abs(x) <= COORD_MAX && Math.abs(y) <= COORD_MAX
+    && fin(w) && fin(h) && w >= IMG_MIN && h >= IMG_MIN && w <= COORD_MAX && h <= COORD_MAX;
+  // parseBatch 는 묶음 본문을 검증해 { ok: true, k, ops } 또는 { ok: false, error } 를 돌려준다. ops 는 풀어 쓴 객체다:
+  //   { op: "h", name, bg } · { op: "s", id, tool, color, w, pts } · { op: "a", id, pts } · { op: "d", ids } · { op: "i", id, x, y, w, h, mime, hash }
+  //   · { op: "g", id, x, y, w, h } · { op: "x", ids } · { op: "v", x, y, z, W, H }(x·y 는 좌표 범위로, z 는 ZMIN~ZMAX 로 끌어 맞춘다).
+  // 모르는 이름의 연산은 건너뛴다. 하나라도 꼴이 틀리면 묶음 전체를 거부한다(머리 주석).
+  function parseBatch(text) {
+    if (typeof text !== "string" || text.length > BATCH_READ) return { ok: false, error: "묶음이 문자열이 아니거나 " + BATCH_READ + " 글자를 넘는다" };
+    let j;
+    try { j = JSON.parse(text); } catch (e) { return { ok: false, error: "JSON 이 아니다" }; }
+    if (!j || typeof j !== "object" || Array.isArray(j)) return { ok: false, error: "최상위가 객체가 아니다" };
+    if (j.v !== BATCH_V) return { ok: false, error: "v 가 " + BATCH_V + " 가 아니다" };
+    if (!BATCH_KINDS.includes(j.k)) return { ok: false, error: "k 가 reset·''·off 가 아니다" };
+    if (!Array.isArray(j.ops)) return { ok: false, error: "ops 가 배열이 아니다" };
+    const ops = [];
+    for (let n = 0; n < j.ops.length; n++) {
+      const o = j.ops[n], bad = why => ({ ok: false, error: "연산 " + n + ": " + why });
+      if (!Array.isArray(o) || typeof o[0] !== "string") return bad("[이름, …] 꼴이 아니다");
+      const t = o[0];
+      if (t === "h") {
+        if (typeof o[1] !== "string" || Array.from(o[1]).length > NAME_MAX) return bad("이름이 " + NAME_MAX + " 글자 이하 문자열이 아니다");
+        if (typeof o[2] !== "string") return bad("bg 가 문자열이 아니다");
+        ops.push({ op: "h", name: o[1], bg: BGS.includes(o[2]) ? o[2] : "dark" });
+      } else if (t === "s") {
+        if (!safeId(o[1])) return bad("id 가 1 이상 정수가 아니다");
+        if (o[2] !== "pen" && o[2] !== "hl") return bad("도구가 pen·hl 이 아니다");
+        if (!Number.isInteger(o[3]) || o[3] < 0 || o[3] >= COLORS) return bad("색 번호가 0~" + (COLORS - 1) + " 정수가 아니다");
+        if (!fin(o[4]) || o[4] < W_MIN || o[4] > W_MAX) return bad("굵기가 " + W_MIN + "~" + W_MAX + " 의 유한수가 아니다");
+        const pts = batchPts(o[5]);
+        if (!pts) return bad("점이 [x, y, 필압, …] 꼴·좌표 범위가 아니다");
+        ops.push({ op: "s", id: o[1], tool: o[2], color: o[3], w: o[4], pts });
+      } else if (t === "a") {
+        if (!safeId(o[1])) return bad("id 가 1 이상 정수가 아니다");
+        const pts = batchPts(o[2]);
+        if (!pts) return bad("점이 [x, y, 필압, …] 꼴·좌표 범위가 아니다");
+        ops.push({ op: "a", id: o[1], pts });
+      } else if (t === "d" || t === "x") {
+        const ids = batchIds(o[1]);
+        if (!ids) return bad("id 목록이 1 이상 정수의 배열이 아니다");
+        ops.push({ op: t, ids });
+      } else if (t === "i" || t === "g") {
+        if (!safeId(o[1])) return bad("id 가 1 이상 정수가 아니다");
+        if (!imgGeomOk(o[2], o[3], o[4], o[5])) return bad("x·y·w·h 가 그림 범위가 아니다");
+        const g = { op: t, id: o[1], x: o[2], y: o[3], w: o[4], h: o[5] };
+        if (t === "i") {
+          if (!MIMES.includes(o[6])) return bad("mime 이 " + MIMES.join("·") + " 가 아니다");
+          if (typeof o[7] !== "string" || !HASH_RE.test(o[7])) return bad("해시가 sha-256 소문자 hex 가 아니다");
+          g.mime = o[6]; g.hash = o[7];
+        }
+        ops.push(g);
+      } else if (t === "v") {
+        const [, x, y, z, W, H] = o;
+        if (![x, y, z, W, H].every(fin) || z <= 0 || W < 1 || H < 1 || W > VIEW_PX || H > VIEW_PX) return bad("보기가 유한한 x·y·z(>0)·W·H(1~" + VIEW_PX + ") 가 아니다");
+        ops.push({ op: "v", x: clamp(x, -COORD_MAX, COORD_MAX), y: clamp(y, -COORD_MAX, COORD_MAX), z: clamp(z, ZMIN, ZMAX), W, H });
+      } // 모르는 이름은 건너뛴다(머리 주석)
+    }
+    if (j.k === "off" && ops.length) return { ok: false, error: "off 묶음에 연산이 있다" };
+    return { ok: true, k: j.k, ops };
+  }
+
+  // ---- sha-256(중계의 그림 해시 — FIPS 180-4). bytes 는 Uint8Array, 돌려주는 값은 소문자 hex 64 글자다. 브라우저 crypto.subtle 은 보안 문맥에서만 있어 직접 센다.
+  const K256 = new Uint32Array([
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2]);
+  function sha256Hex(bytes) {
+    const n = bytes.length, total = Math.ceil((n + 9) / 64) * 64, buf = new Uint8Array(total);
+    buf.set(bytes); buf[n] = 0x80;
+    const dv = new DataView(buf.buffer), bits = n * 8;
+    dv.setUint32(total - 8, Math.floor(bits / 4294967296)); dv.setUint32(total - 4, bits >>> 0);
+    const h = new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]), w = new Uint32Array(64);
+    const ror = (x, k) => (x >>> k) | (x << (32 - k));
+    for (let off = 0; off < total; off += 64) {
+      for (let i = 0; i < 16; i++) w[i] = dv.getUint32(off + i * 4);
+      for (let i = 16; i < 64; i++) {
+        const a = w[i - 15], b = w[i - 2];
+        w[i] = w[i - 16] + (ror(a, 7) ^ ror(a, 18) ^ (a >>> 3)) + w[i - 7] + (ror(b, 17) ^ ror(b, 19) ^ (b >>> 10));
+      }
+      let a = h[0], b = h[1], c = h[2], d = h[3], e = h[4], f = h[5], g = h[6], k = h[7];
+      for (let i = 0; i < 64; i++) {
+        const t1 = (k + (ror(e, 6) ^ ror(e, 11) ^ ror(e, 25)) + ((e & f) ^ (~e & g)) + K256[i] + w[i]) | 0;
+        const t2 = ((ror(a, 2) ^ ror(a, 13) ^ ror(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+        k = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
+    }
+    let out = "";
+    for (let i = 0; i < 8; i++) out += (h[i] >>> 0).toString(16).padStart(8, "0");
+    return out;
+  }
+
   return {
+    BATCH_V, BATCH_MAX, BATCH_READ, NAME_MAX, VIEW_PX, wireName, wireHead, wireStroke, wireImage, wireGeom, wireView, batchText, utf8Len, parseBatch, sha256Hex,
     ZMIN, ZMAX, COORD_MAX, W_MIN, W_MAX, clamp, toWorld, toScreen, anchor, zoomAt, panBy, boundView, inRange, snap,
     penRadius, speedPressure, outline, curve, strokeBox, boxHit, segDist, strokeRadius, hitStroke,
     Grid, tileWorld, tileBox, tilesFor,

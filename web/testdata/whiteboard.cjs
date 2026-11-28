@@ -2600,5 +2600,530 @@ function boardText(C, n, o) {
     }
   }
 
+  // ---- 14. 중계 출구·보기 전용 화면(itda-hyve#699 ④-3a): 묶음 형식(sha-256·검증·반올림), 출구(off·reset·증분·긋는 중 안 보냄·보기 합치기·
+  // send 차례·full·실패 뒤 다음 변화에 reset·image 먼저·같은 해시 한 번·큰 판 조각 reset·긴 획 조각·닫힘·판 전환·이름·저장과 무관),
+  // 왕복(보내는 쪽 board() 와 뷰어의 판이 같다 — 획 차례·점·그림 자리·배경), 뷰어(검증·resync·상한·이름 textContent·따라가기·함께 열지 않음).
+  // 보내는 쪽과 뷰어는 서로 다른 world 다(한 페이지에 함께 뜨지 않는다 — whiteboard.js 머리 주석).
+  {
+    const nodeCrypto = require("crypto");
+    const sha = b => nodeCrypto.createHash("sha256").update(b).digest("hex");
+    const imgFile = (wd, ht, alpha) => ({ type: alpha ? "image/png" : "image/jpeg", _img: { w: wd, h: ht, alpha: !!alpha } });
+    const paste = (w, list) => dispatch(w, focused(w), "paste", { clipboardData: { items: list.map(f => ({ kind: "file", type: f.type, getAsFile: () => f })), files: [] } });
+    const mouse = (w, t, type, x, y) => ptr(w, t, type, { pointerId: 1, pointerType: "mouse", clientX: x, clientY: y });
+    const drag = (w, t, from, to) => { mouse(w, t, "pointerdown", from[0], from[1]); w.clock += 4; mouse(w, t, "pointermove", (from[0] + to[0]) / 2, (from[1] + to[1]) / 2); w.clock += 4; mouse(w, t, "pointermove", to[0], to[1]); mouse(w, t, "pointerup", to[0], to[1]); frames(w, 1); };
+    const undoKey = w => key(w, null, "z", "KeyZ", { metaKey: true }), redoKey = w => key(w, null, "z", "KeyZ", { metaKey: true, shiftKey: true });
+    // pumpR 는 출구의 타이머(100ms)와 약속을 번갈아 돌려 낼 묶음이 다 나가게 한다
+    const pumpR = async (w, n) => { for (let i = 0; i < (n || 8); i++) { advance(w, 120); await settle(4); } };
+    const kinds = list => list.map(t => JSON.parse(t).k);
+    const opsOf = list => list.flatMap(t => JSON.parse(t).ops);
+    // hub 는 출구와 뷰어 사이다 — got 보낸 묶음 · imgs 넘긴 그림(해시 → 바이트) · log image·send 차례. o.send 가 있으면 그것이 send 의 값을 정한다(뷰어에 넘기지 않는다).
+    function hub(w, o) {
+      o = o || {};
+      const H = { got: [], imgs: new Map(), log: [], applied: [], viewer: null, busy: 0, maxBusy: 0 };
+      H.h = w.W.relay({
+        send: t => {
+          H.got.push(t); H.log.push("send:" + JSON.parse(t).k);
+          if (o.send) return o.send(t, H);
+          if (H.viewer) H.applied.push(H.viewer.apply(t));
+          return "";
+        },
+        image: (hash, bytes, mime) => { H.log.push("image:" + hash); H.imgs.set(hash, { bytes: Buffer.from(bytes), mime }); return o.image ? o.image(hash) : undefined; },
+      });
+      return H;
+    }
+    // viewerOf 는 다른 world(vw)에 뷰어를 연다 — 그림은 hub 가 받은 바이트를 Blob 으로 준다
+    function viewerOf(vw, H, o) {
+      const m = vw.doc.createElement("div");
+      vw.body.appendChild(m);
+      const v = vw.W.viewer(Object.assign({ mount: m, image: hash => { const g = H && H.imgs.get(hash); return g ? new Blob([g.bytes], { type: g.mime }) : null; } }, o));
+      if (H) H.viewer = v;
+      return v;
+    }
+    // same 은 보내는 쪽 판(파일로 쓴 꼴 — 반올림)과 뷰어의 판이 같은가다: 획(차례·도구·색·굵기·점), 그림(차례·자리·mime·바이트 sha-256), 배경
+    function same(w, D, V) {
+      const C = w.C, exp = C.parse(C.serialize(Object.assign(D.engine.board(), { name: "" }))).board, got = V.debug().board();
+      const es = JSON.stringify(exp.strokes.map(s => [s.tool, s.color, s.w, s.pts])), gs = JSON.stringify(got.strokes.map(s => [s.tool, s.color, s.w, s.pts]));
+      const ei = JSON.stringify(exp.images.map(i => [i.x, i.y, i.w, i.h, i.mime, sha(Buffer.from(i.data, "base64"))]));
+      const gi = JSON.stringify(got.images.map(i => [i.x, i.y, i.w, i.h, i.mime, i.hash]));
+      return { ok: es === gs && ei === gi && exp.bg === got.bg, n: [exp.strokes.length, got.strokes.length, exp.images.length, got.images.length], bg: [exp.bg, got.bg], es: es.slice(0, 200), gs: gs.slice(0, 200), ei, gi };
+    }
+    const sameOk = (name, w, D, V) => { const r = same(w, D, V); ok(name, r.ok, r); return r.ok; };
+
+    // 형식 — sha-256 은 node crypto 와 같다(길이 경계 포함)
+    {
+      const { C } = world();
+      const good = [0, 1, 3, 55, 56, 57, 63, 64, 65, 119, 120, 1000, 70000].every(n => { const b = nodeCrypto.randomBytes(n); return C.sha256Hex(new Uint8Array(b)) === sha(b); });
+      ok("중계 형식: sha256Hex 가 node crypto 와 같다(빈 것·블록 경계·큰 것)", good && C.sha256Hex(new Uint8Array(0)) === "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+      const s = { tool: "pen", color: 2, w: 3.14159, pts: [1.234567, -2.345678, 0.55555, 10.005, 20.004, 1] };
+      const im = { x: 1.234, y: -5, w: 320, h: 160.005, mime: "image/png", data: "AAAA" };
+      const file = JSON.parse(C.serialize({ name: "", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [s], images: [im] }));
+      const ws = C.wireStroke(7, s), wi = C.wireImage(3, im, "a".repeat(64));
+      ok("중계 형식: 획·그림의 수 반올림이 파일 형식과 같다", JSON.stringify(ws.slice(2)) === JSON.stringify([file.strokes[0].t, file.strokes[0].c, file.strokes[0].w, file.strokes[0].p])
+        && JSON.stringify(wi.slice(2, 6)) === JSON.stringify([file.images[0].x, file.images[0].y, file.images[0].w, file.images[0].h]), [ws, wi, file]);
+      const text = C.batchText("reset", [C.wireHead("판", "grid"), ws, ["a", 7, [1, 2, 0.5]], ["d", [1, 2]], wi, C.wireGeom(3, im), ["x", [3]], C.wireView({ x: 1, y: 2, z: 1.5 }, 800, 600), ["zz", 1]].map(o => JSON.stringify(o)));
+      const p = C.parseBatch(text);
+      ok("중계 형식: batchText 는 JSON.stringify({v,k,ops}) 와 같은 글자, parseBatch 는 모든 연산을 읽고 모르는 연산은 건너뛴다",
+        text === JSON.stringify({ v: 1, k: "reset", ops: JSON.parse(text).ops }) && p.ok && p.k === "reset" && p.ops.map(o => o.op).join() === "h,s,a,d,i,g,x,v" && p.ops[1].pts[5] === 1, p);
+      const bad = (name, ops, k, v) => { const r = C.parseBatch(JSON.stringify({ v: v == null ? 1 : v, k: k == null ? "" : k, ops })); ok("중계 검증: " + name, !r.ok, r); };
+      bad("ops 가 배열이 아니면 거부", null);
+      ok("중계 검증: JSON 이 아니거나 문자열이 아니면 거부", !C.parseBatch("{").ok && !C.parseBatch(5).ok && !C.parseBatch("x".repeat(C.BATCH_READ + 1)).ok);
+      bad("v 가 1 이 아니면 거부", [], "", 2);
+      bad("k 를 모르면 거부", [], "clear");
+      bad("off 에 연산이 있으면 거부", [["d", [1]]], "off");
+      bad("획 색 번호가 범위 밖이면 거부", [["s", 1, "pen", 8, 4, [0, 0, 0.5]]]);
+      bad("획 굵기가 범위 밖이면 거부", [["s", 1, "pen", 0, 0, [0, 0, 0.5]]]);
+      bad("획 점 좌표가 범위 밖이면 거부", [["s", 1, "pen", 0, 4, [2e9, 0, 0.5]]]);
+      bad("획 점이 3 의 배수가 아니면 거부", [["s", 1, "pen", 0, 4, [0, 0]]]);
+      bad("id 가 0·소수·문자열이면 거부", [["s", 0, "pen", 0, 4, [0, 0, 0.5]]]);
+      bad("잇기 점이 유한하지 않으면 거부", [["a", 1, [0, "1", 0.5]]]);
+      bad("빼기 목록이 정수 배열이 아니면 거부", [["d", [1.5]]]);
+      bad("그림 해시가 sha-256 hex 가 아니면 거부", [["i", 1, 0, 0, 10, 10, "image/png", "ABC"]]);
+      bad("그림 mime 이 png·jpeg 가 아니면 거부", [["i", 1, 0, 0, 10, 10, "image/svg+xml", "a".repeat(64)]]);
+      bad("그림 w 가 0 이면 거부", [["g", 1, 0, 0, 0, 10]]);
+      bad("보기 z 가 0 이면 거부", [["v", 0, 0, 0, 800, 600]]);
+      bad("이름이 200 글자를 넘으면 거부", [["h", "가".repeat(201), "dark"]]);
+      bad("연산이 배열이 아니면 거부", [{ op: "s" }]);
+    }
+
+    // 출구 — 닫힌 채 걸면 off, 열면 reset(머리·보기), 긋는 중은 보내지 않고 뗀 뒤 확정된 획만, 보기는 합친다
+    {
+      const w = world(), store = w.W.memoryStore();
+      const H = hub(w);
+      await pumpR(w);
+      ok("출구: 표면이 닫힌 채 걸면 off 하나", kinds(H.got).join() === "off" && JSON.parse(H.got[0]).ops.length === 0, H.got);
+      const vw = world(), states = [], V = viewerOf(vw, H, { onState: s => states.push(s) });
+      const { root, stage, D } = await openWb(w, store);
+      await pumpR(w);
+      const first = JSON.parse(H.got[1]);
+      ok("출구: 판이 보이면 reset — 머리(이름·배경)가 먼저, 보기(x·y·z·화면 크기)가 끝", H.got.length === 2 && first.k === "reset" && JSON.stringify(first.ops[0]) === JSON.stringify(["h", "화이트보드 1", "dark"])
+        && JSON.stringify(first.ops[first.ops.length - 1]) === JSON.stringify(["v", 0, 0, 1, 1280, 720]), H.got);
+      ok("뷰어: reset 을 받으면 켜지고 판 이름표를 보인다(onState)", V.debug().on() && states.length === 1 && states[0].on && states[0].name === "화이트보드 1"
+        && !V.debug().root.querySelector(".itda-wb-title").hidden && V.debug().root.querySelector(".itda-wb-title").textContent === "화이트보드 1", states);
+      // 긋는 중에는 아무것도 나가지 않는다
+      const a = { pointerId: 7, pointerType: "pen" };
+      ptr(w, stage, "pointerdown", { ...a, clientX: 100, clientY: 300, pressure: 0.5 });
+      for (let i = 1; i <= 6; i++) { w.clock += 4; ptr(w, stage, "pointermove", { ...a, clientX: 100 + i * 20, clientY: 300 + i * 3, pressure: 0.5 }); }
+      const n0 = H.got.length;
+      await pumpR(w);
+      ok("출구: 긋는 중의 점은 보내지 않는다", H.got.length === n0, H.got.slice(n0));
+      ptr(w, stage, "pointerup", { ...a, clientX: 220, clientY: 318, pressure: 0 }); frames(w, 1);
+      await pumpR(w);
+      const inc = H.got.slice(n0).map(t => JSON.parse(t));
+      ok("출구: 손을 떼면 그 획 하나가 증분 묶음의 s 로 나간다", inc.length === 1 && inc[0].k === "" && inc[0].ops.length === 1 && inc[0].ops[0][0] === "s" && inc[0].ops[0][1] === lastStroke(D.engine).id, inc);
+      sameOk("왕복: 획 하나", w, D, V);
+      // 보기는 합친다 — 잦은 이동은 마지막 값 하나
+      const n1 = H.got.length;
+      for (let i = 0; i < 6; i++) { dispatch(w, stage, "wheel", { deltaX: 0, deltaY: 10, deltaMode: 0, clientX: 600, clientY: 300 }); w.clock += 5; }
+      await pumpR(w);
+      const vb = H.got.slice(n1).map(t => JSON.parse(t)), ev = D.engine.view;
+      ok("출구: 잦은 보기 이동은 묶음 하나·보기 연산 하나(마지막 값)", vb.length === 1 && vb[0].ops.length === 1 && JSON.stringify(vb[0].ops[0]) === JSON.stringify(w.C.wireView(ev, 1280, 720)), vb);
+      ok("뷰어: 처음엔 따라간다 — 화면 크기가 같으면 강사의 보기와 같다", V.following() && near(V.debug().engine.view.y, ev.y, 0.01) && near(V.debug().engine.view.z, ev.z, 1e-6), [V.debug().engine.view, ev]);
+      // 획 여러 개·지우개·되돌리기·다시 하기 — 겹침 차례
+      stroke(w, stage, line(100, 400, 300, 400, 6));
+      stroke(w, stage, line(100, 450, 300, 450, 6));
+      stroke(w, stage, line(100, 500, 300, 500, 6));
+      await pumpR(w);
+      const ids0 = V.debug().board().strokes.length;
+      sameOk("왕복: 획 여러 개", w, D, V);
+      key(w, null, "e", "KeyE");
+      stroke(w, stage, line(200, 430, 200, 470, 4)); // 가운데 획(450)만 지운다
+      key(w, null, "p", "KeyP");
+      await pumpR(w);
+      ok("왕복: 지우개 — 빼기(d)로 나가고 뷰어에서도 빠진다", D.engine.strokes.size === ids0 - 1 && opsOf(H.got.slice(-1)).some(o => o[0] === "d") && same(w, D, V).ok, same(w, D, V));
+      stroke(w, stage, line(100, 550, 300, 550, 6));
+      await pumpR(w);
+      undoKey(w); await pumpR(w); // 마지막 획 되돌리기
+      undoKey(w); await pumpR(w); // 지우기 되돌리기 — 가운데 획이 원래 차례로
+      const order = V.debug().board().strokes.map(s => s.pts[1]), dy = Math.round(D.engine.view.y); // 화면 y + 보기 y = 판 y
+      ok("왕복: 되돌리기로 돌아온 지운 획이 원래 겹침 차례(id 차례)에 든다", same(w, D, V).ok && JSON.stringify(order.slice(-3).map(Math.round)) === JSON.stringify([400 + dy, 450 + dy, 500 + dy]), [order, dy, same(w, D, V)]);
+      redoKey(w); await pumpR(w);
+      sameOk("왕복: 다시 하기(지우기)", w, D, V);
+      redoKey(w); await pumpR(w);
+      sameOk("왕복: 다시 하기(획)", w, D, V);
+      undoKey(w); undoKey(w); redoKey(w); await pumpR(w); // 한 묶음 안에 섞인 되돌리기·다시 하기
+      sameOk("왕복: 한 묶음 안에 섞인 되돌리기·다시 하기", w, D, V);
+      // 배경
+      click(w, btn(root, "bg", { bg: "light" }));
+      await pumpR(w);
+      ok("왕복: 배경 — 머리 연산(h)으로 나간다", opsOf(H.got.slice(-1)).some(o => o[0] === "h" && o[2] === "light") && same(w, D, V).ok && V.debug().engine.bg() === "light", same(w, D, V));
+      // 그림 — 넣기·옮기기·크기·지우기·되돌리기
+      paste(w, [imgFile(1000, 500, false)]);
+      await settle(30); frames(w, 2);
+      const nl = H.log.length;
+      await pumpR(w);
+      const im = [...D.engine.images.values()][0], hash = sha(Buffer.from(im.data, "base64"));
+      const seq = H.log.slice(nl);
+      ok("출구: 그림 바이트(image)는 그 그림을 가리키는 묶음보다 먼저 한 번 넘긴다", seq[0] === "image:" + hash && seq[1] === "send:" && H.imgs.get(hash).bytes.equals(Buffer.from(im.data, "base64")) && H.imgs.get(hash).mime === "image/jpeg", seq);
+      const iop = opsOf(H.got.slice(-1)).find(o => o[0] === "i");
+      ok("출구: 그림 연산은 자리·mime·해시만 싣는다(바이트 없음)", iop && iop.length === 8 && iop[7] === hash && !H.got[H.got.length - 1].includes(im.data.slice(0, 40)), iop);
+      await settle(20);
+      const vim = [...V.debug().engine.images.values()][0];
+      ok("왕복: 그림 넣기 — 뷰어는 호스트의 바이트로 디코드한다", same(w, D, V).ok && vim && vim.state === "ok" && vim.bmp, [same(w, D, V), vim && vim.state]);
+      drag(w, stage, [640, 380], [704, 412]); // 몸통 끌기 = 옮기기
+      await pumpR(w);
+      ok("왕복: 그림 옮기기 — g 연산", opsOf(H.got.slice(-1)).some(o => o[0] === "g") && same(w, D, V).ok, same(w, D, V));
+      const g = [...D.engine.images.values()][0], corner = w.C.toScreen(D.engine.view, g.x + g.w, g.y + g.h);
+      drag(w, stage, [corner.x, corner.y], [corner.x + 64, corner.y + 32]); // 오른쪽 아래 귀 = 크기
+      await pumpR(w);
+      ok("왕복: 그림 크기", g.w > 480 && same(w, D, V).ok, [g.w, same(w, D, V)]);
+      key(w, null, "Delete", "Delete");
+      await pumpR(w);
+      ok("왕복: 그림 지우기 — x 연산", D.engine.images.size === 0 && opsOf(H.got.slice(-1)).some(o => o[0] === "x") && same(w, D, V).ok, same(w, D, V));
+      undoKey(w); await pumpR(w);
+      sameOk("왕복: 그림 지우기 되돌리기", w, D, V);
+      undoKey(w); await pumpR(w);
+      sameOk("왕복: 그림 크기 되돌리기", w, D, V);
+      const imgCalls = H.log.filter(x => x.startsWith("image:")).length;
+      paste(w, [imgFile(1000, 500, false)]);
+      await settle(30); frames(w, 2);
+      await pumpR(w); await settle(20);
+      const both = [...D.engine.images.values()];
+      ok("출구: 같은 해시의 그림은 바이트를 다시 넘기지 않는다", both.length === 2 && both[0].data === both[1].data && H.log.filter(x => x.startsWith("image:")).length === imgCalls && same(w, D, V).ok, H.log.slice(-4));
+      ok("뷰어: 받은 묶음은 모두 적용됐다(true)", H.applied.every(x => x === true), H.applied);
+      // 이름 바꾸기(지금 판) — 머리 연산
+      click(w, btn(root, "list")); await settle();
+      const row = root.querySelectorAll(".itda-wb-item").find(r => r.dataset.id === D.state.id);
+      click(w, row.querySelectorAll("button").find(b => b.dataset.act === "rename"));
+      const inp = row.querySelector(".itda-wb-rename") || root.querySelector(".itda-wb-rename");
+      inp.value = "수업 판";
+      key(w, inp, "Enter", "Enter"); await settle(12);
+      await pumpR(w);
+      ok("출구: 이름 바꾸기는 머리 연산 — 뷰어의 이름표가 바뀐다", opsOf(H.got.slice(-2)).some(o => o[0] === "h" && o[1] === "수업 판") && V.debug().name() === "수업 판", opsOf(H.got.slice(-2)));
+      dispatch(w, focused(w), "keydown", { key: "Escape", code: "Escape" }); // 목록 닫기
+      // 판 전환 — 새 판·되돌아가기
+      const firstId = D.state.id, beforeNew = H.got.length;
+      click(w, btn(root, "list")); await settle();
+      click(w, btn(root, "new")); await settle(20); frames(w, 2);
+      await pumpR(w);
+      const afterNew = H.got.slice(beforeNew).map(t => JSON.parse(t));
+      ok("출구: 새 판을 열면 reset(빈 판·새 이름)", D.state.id !== firstId && afterNew.some(b => b.k === "reset" && b.ops[0][0] === "h" && b.ops[0][1] === D.state.name) && same(w, D, V).ok && V.debug().board().strokes.length === 0,
+        [afterNew.map(b => b.k), D.state.name, same(w, D, V)]);
+      stroke(w, stage, line(400, 200, 500, 260, 5));
+      await pumpR(w);
+      sameOk("왕복: 새 판에 그은 획", w, D, V);
+      click(w, btn(root, "listclose"));
+      key(w, null, "[", "BracketLeft"); await settle(20); frames(w, 2);
+      await pumpR(w);
+      ok("출구: 판을 바꾸면 reset — 뷰어는 바꾼 판과 같다", D.state.id === firstId && kinds(H.got.slice(-2)).includes("reset") && same(w, D, V).ok, same(w, D, V));
+      // 중간에 붙는 뷰어 — 호스트가 reset() 을 부른다
+      const vw2 = world(), V2 = viewerOf(vw2, null);
+      H.viewer = V2;
+      H.h.reset();
+      await pumpR(w); await settle(20);
+      ok("출구: reset() — 중간에 붙은 뷰어도 판 전체를 받는다", kinds(H.got.slice(-1))[0] === "reset" && same(w, D, V2).ok, same(w, D, V2));
+      // 저장은 그대로
+      advance(w, 2100); await settle();
+      ok("출구: 걸려 있어도 저장 기록기는 그대로(미저장 없음)", w.W.unsaved(store).length === 0, w.W.unsaved(store));
+      // 닫기 — off
+      await w.W.close(); await settle();
+      await pumpR(w);
+      ok("출구: 표면이 닫히면 off — 뷰어는 꺼지고 판을 비운다", kinds(H.got.slice(-1))[0] === "off" && !V2.debug().on() && V2.debug().board().strokes.length === 0
+        && V2.debug().root.classList.contains("off"), kinds(H.got.slice(-2)));
+      const nOff = H.got.length;
+      await pumpR(w);
+      ok("출구: off 는 한 번만", H.got.length === nOff);
+      H.viewer = V;
+      await openWb(w, store); await pumpR(w); await settle(20);
+      const D2 = w.W.debug();
+      ok("출구: 다시 열면 reset", kinds(H.got.slice(nOff))[0] === "reset" && same(w, D2, V).ok, same(w, D2, V));
+      // stop — 더 내지 않는다
+      H.h.stop();
+      const nStop = H.got.length;
+      stroke(w, surfaceOf(w).querySelector(".itda-wb-stage"), line(100, 100, 300, 120, 4));
+      await pumpR(w);
+      ok("출구: stop() 뒤에는 보내지 않는다", H.got.length === nStop);
+      await w.W.close(); await settle();
+    }
+
+    // 출구 — send 차례(앞 호출이 끝나야 다음, 기다리는 동안의 연산은 합친다)·full·실패·던짐·image 실패. 그리기·저장은 막히지 않는다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      const { stage, D } = await openWb(w, store);
+      const vw = world();
+      let mode = "", held = [], busy = 0, maxBusy = 0;
+      const H = hub(w, { send: (t, H) => {
+        if (mode === "full") { mode = ""; return "full"; }
+        if (mode === "reject") return Promise.reject(new Error("끊김"));
+        if (mode === "throw") throw new Error("끊김");
+        if (H.viewer) H.applied.push(H.viewer.apply(t));
+        if (mode === "hold") { busy++; maxBusy = Math.max(maxBusy, busy); return new Promise(r => held.push(() => { busy--; r(""); })); }
+        return "";
+      } });
+      const V = viewerOf(vw, H);
+      await pumpR(w);
+      mode = "hold";
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      await pumpR(w);
+      const n0 = H.got.length;
+      stroke(w, stage, line(100, 150, 200, 150, 4));
+      stroke(w, stage, line(100, 200, 200, 200, 4));
+      stroke(w, stage, line(100, 250, 200, 250, 4));
+      await pumpR(w);
+      ok("출구: 앞 send 가 끝나기 전에는 다음을 부르지 않는다", H.got.length === n0 && maxBusy === 1, [H.got.length, n0, maxBusy]);
+      mode = ""; held.splice(0).forEach(f => f());
+      await pumpR(w);
+      const merged = H.got.slice(n0).map(t => JSON.parse(t));
+      ok("출구: 기다리는 동안의 연산은 다음 묶음 하나로 합친다", merged.length === 1 && merged[0].ops.filter(o => o[0] === "s").length === 3 && same(w, D, V).ok, merged.map(b => b.ops.map(o => o[0])));
+      // full — 다음에 reset
+      mode = "full";
+      stroke(w, stage, line(100, 300, 200, 300, 4));
+      await pumpR(w);
+      ok("출구: send 가 full 이면 다음 묶음은 reset", kinds(H.got.slice(-2)).join() === ",reset" && same(w, D, V).ok, [kinds(H.got.slice(-3)), same(w, D, V)]);
+      // 거부 — 삼키고, 조용하면 다시 보내지 않으며, 다음 변화 때 reset 부터
+      for (const m of ["reject", "throw"]) {
+        mode = m;
+        stroke(w, stage, line(300, 100, 400, 100 + (m === "throw" ? 40 : 0), 4));
+        await pumpR(w);
+        const nf = H.got.length;
+        mode = "";
+        await pumpR(w, 12);
+        ok("출구: send " + (m === "reject" ? "거부" : "던짐") + " — 삼키고 조용한 동안 다시 보내지 않는다", H.got.length === nf, H.got.length - nf);
+        stroke(w, stage, line(300, 200, 400, 220, 4));
+        await pumpR(w);
+        ok("출구: send " + (m === "reject" ? "거부" : "던짐") + " 뒤 다음 변화 때 reset 부터 — 뷰어가 다시 같다", kinds(H.got.slice(nf))[0] === "reset" && same(w, D, V).ok, [kinds(H.got.slice(nf)), same(w, D, V)]);
+      }
+      // 중계가 줄곧 실패해도 그리기·저장은 그대로
+      mode = "reject";
+      stroke(w, stage, line(500, 100, 600, 160, 4));
+      advance(w, 2100); await settle();
+      const nNow = D.engine.strokes.size;
+      ok("출구: 중계가 실패해도 그리기·자동 저장은 그대로", nNow === 10 && w.C.parse(ctl.lastSave).board.strokes.length === nNow && w.W.unsaved(store).length === 0, [nNow, w.W.unsaved(store)]);
+      mode = "";
+      ok("출구: 닫기도 그대로(true)", await w.W.close() === true);
+    }
+    // image 실패 — 그 묶음을 보내지 않고, 다음 변화 때 reset 과 함께 바이트를 다시 넘긴다
+    {
+      const w = world(), store = w.W.memoryStore();
+      const { stage, D } = await openWb(w, store);
+      let fail = true;
+      const vw = world(), H = hub(w, { image: () => (fail ? Promise.reject(new Error("못 받음")) : undefined) });
+      const V = viewerOf(vw, H);
+      await pumpR(w);
+      paste(w, [imgFile(300, 300, false)]); await settle(30); frames(w, 2);
+      const n0 = H.got.length;
+      await pumpR(w);
+      ok("출구: image 가 실패하면 그 묶음을 보내지 않는다", H.got.length === n0 && H.log.filter(x => x.startsWith("image:")).length === 1, H.log);
+      fail = false;
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      await pumpR(w); await settle(20);
+      ok("출구: image 실패 뒤 다음 변화 때 reset 과 함께 바이트를 다시 넘긴다", kinds(H.got.slice(n0))[0] === "reset" && H.log.filter(x => x.startsWith("image:")).length === 2 && same(w, D, V).ok
+        && [...V.debug().engine.images.values()][0].state === "ok", [H.log, same(w, D, V)]);
+      await w.W.close();
+    }
+
+    // 큰 판 — reset 을 조각으로(첫 조각만 reset), 묶음마다 192KB 안. 긴 획 하나는 s 와 a 로 나뉜다
+    {
+      const w = world(), store = w.W.memoryStore(), C = w.C;
+      const big = await store.create("큰 판");
+      await store.save(big.id, boardText(C, 30000));
+      const n = 20000, pts = [];
+      for (let i = 0; i < n; i++) pts.push(100000 + i * 1.37, -100000 - i * 1.11, 0.123);
+      const long = await store.create("긴 획");
+      await store.save(long.id, C.serialize({ name: "긴 획", bg: "grid", view: { x: 100000, y: -100100, z: 1 }, strokes: [{ tool: "hl", color: 3, w: 12.5, pts }] }));
+      const { D } = await openWb(w, store, { id: big.id });
+      const vw = world(), H = hub(w), V = viewerOf(vw, H);
+      await pumpR(w, 30);
+      const sizes = H.got.map(t => Buffer.byteLength(t, "utf8"));
+      ok("출구: 큰 판의 reset 은 여러 묶음 — 첫 묶음만 reset, 나머지는 증분", H.got.length >= 5 && kinds(H.got)[0] === "reset" && kinds(H.got).slice(1).every(k => k === ""), [kinds(H.got), sizes]);
+      ok("출구: 묶음마다 192KB 안", sizes.every(s => s <= 192 * 1024), sizes);
+      ok("왕복: 조각난 reset 을 이어 받은 뷰어가 판 전체와 같다(획 30000)", same(w, D, V).ok && V.debug().board().strokes.length === 30000, same(w, D, V).n);
+      const n1 = H.got.length;
+      key(w, null, "]", "BracketRight"); await settle(20); frames(w, 2);
+      await pumpR(w, 30);
+      const parts = H.got.slice(n1), ps = parts.map(t => Buffer.byteLength(t, "utf8")), lo = opsOf(parts);
+      ok("출구: 한 묶음에 들지 않는 긴 획은 s 와 a 여럿으로 나뉘고 묶음마다 192KB 안", D.state.id === long.id && parts.length >= 3 && ps.every(s => s <= 192 * 1024)
+        && lo.filter(o => o[0] === "s").length === 1 && lo.filter(o => o[0] === "a").length >= 2, [kinds(parts), ps, lo.map(o => o[0])]);
+      ok("왕복: 나뉜 긴 획을 이어 받은 뷰어가 같다(점 20000)", same(w, D, V).ok && V.debug().board().strokes[0].pts.length === n * 3, same(w, D, V).n);
+      await w.W.close();
+    }
+
+    // 읽기 전용으로 열린 판도 보이는 그대로 — 못 읽은 판은 빈 판, 새 판 형식(v2)은 획을 그대로
+    {
+      const w = world(), store = w.W.memoryStore(), C = w.C;
+      const a = await store.create("깨진 판"); await store.save(a.id, "{not json");
+      const b = await store.create("새 형식"); const t = JSON.parse(boardText(C, 3)); t.v = 2; await store.save(b.id, JSON.stringify(t));
+      const { D } = await openWb(w, store, { id: a.id });
+      const vw = world(), H = hub(w), V = viewerOf(vw, H);
+      await pumpR(w);
+      ok("출구: 본문을 못 읽어 읽기 전용으로 연 판은 빈 판으로 나간다", D.engine.readOnly() && kinds(H.got).join() === "reset" && V.debug().on() && V.debug().board().strokes.length === 0, H.got);
+      key(w, null, "]", "BracketRight"); await settle(20); frames(w, 2);
+      await pumpR(w);
+      ok("출구: 새 판 형식(읽기 전용)도 보이는 그대로 나간다", D.engine.readOnly() && D.state.id === b.id && same(w, D, V).ok && V.debug().board().strokes.length === 3, same(w, D, V));
+      await w.W.close();
+    }
+
+    // 뷰어 — 받은 값을 믿지 않는다
+    {
+      const w = world(), C = w.C, V = viewerOf(w, null);
+      const B = (k, ops) => JSON.stringify({ v: 1, k, ops });
+      const s1 = ["s", 1, "pen", 0, 4, [0, 0, 0.5, 10, 10, 0.5]], s2 = ["s", 2, "hl", 3, 20, [5, 5, 0.5]];
+      ok("뷰어: reset 전의 증분은 resync", V.apply(B("", [s1])) === "resync" && V.debug().board().strokes.length === 0);
+      ok("뷰어: reset 을 받으면 적용(true)", V.apply(B("reset", [["h", "판", "grid"], s1, s2])) === true && V.debug().board().strokes.length === 2 && V.debug().engine.bg() === "grid");
+      const snap = JSON.stringify(V.debug().board());
+      ok("뷰어: JSON 이 아닌 묶음은 false, 판은 그대로, 예외를 던지지 않는다", V.apply("{oops") === false && JSON.stringify(V.debug().board()) === snap);
+      ok("뷰어: 꼴이 틀린 묶음 뒤의 증분은 reset 까지 resync", V.apply(B("", [["d", [1]]])) === "resync" && JSON.stringify(V.debug().board()) === snap);
+      V.apply(B("reset", [["h", "판", "grid"], s1, s2]));
+      ok("뷰어: 범위 밖 좌표가 하나라도 있으면 그 묶음 전체를 버린다(false)", V.apply(B("", [["d", [2]], ["s", 3, "pen", 0, 4, [0, 0, 0.5, 2e9, 0, 0.5]]])) === false
+        && V.debug().board().strokes.length === 2, V.debug().board().strokes.length);
+      V.apply(B("reset", [["h", "판", "dark"], s1]));
+      ok("뷰어: 없는 획에 잇기는 resync", V.apply(B("", [["a", 9, [1, 1, 0.5]]])) === "resync");
+      V.apply(B("reset", [["h", "판", "dark"], s1]));
+      ok("뷰어: 없는 그림 옮기기는 resync", V.apply(B("", [["g", 9, 0, 0, 10, 10]])) === "resync");
+      V.apply(B("reset", [["h", "판", "dark"], s1]));
+      ok("뷰어: 없는 id 빼기는 건너뛴다(true)", V.apply(B("", [["d", [42]], ["x", [42]]])) === true && V.debug().board().strokes.length === 1);
+      // 그림 상한 — 넘는 넣기는 버린다
+      const imgs = Array.from({ length: C.LIMIT.images + 1 }, (_, i) => ["i", i + 1, i * 10, 0, 8, 8, "image/png", "b".repeat(64)]);
+      const r = V.apply(B("reset", [["h", "판", "dark"], ...imgs]));
+      await settle(10);
+      const vi = V.debug().board().images;
+      ok("뷰어: 판 상한(그림 " + C.LIMIT.images + ")을 넘는 넣기는 버린다", r === true && vi.length === C.LIMIT.images && !vi.some(i => i.id === C.LIMIT.images + 1), vi.length);
+      ok("뷰어: 호스트가 그림을 주지 않으면(null) 자리 표시(디코드 실패)", [...V.debug().engine.images.values()].every(im => im.state === "bad" && !im.bmp));
+      // 이름은 textContent 로만
+      V.apply(B("reset", [["h", "<img src=x onerror=alert(1)>", "dark"]]));
+      const title = V.debug().root.querySelector(".itda-wb-title");
+      ok("뷰어: 판 이름은 textContent 로만 넣는다", title.textContent === "<img src=x onerror=alert(1)>" && title.children.length === 0);
+      // 따라가기
+      const views = [];
+      const vw = world(), V3 = viewerOf(vw, null, { onView: f => views.push(f) });
+      const vst = V3.debug().root.querySelector(".itda-wb-stage");
+      vst.clientWidth = 640; vst.clientHeight = 720; dispatch(vw, vw.win, "resize", {});
+      V3.apply(B("reset", [["h", "판", "dark"], ["v", 100, 50, 2, 1280, 720]]));
+      const v3 = V3.debug().engine.view, sz = V3.debug().engine.size;
+      const r0 = [v3.x, v3.y, v3.x + sz.W / v3.z, v3.y + sz.H / v3.z], want = [100, 50, 100 + 640, 50 + 360];
+      ok("뷰어: 따라가기 — 화면 비율이 달라도 강사가 보는 영역이 다 들어온다(잘리지 않는다)", V3.following() && sz.W === 640 && r0[0] <= want[0] + 1e-6 && r0[1] <= want[1] + 1e-6 && r0[2] >= want[2] - 1e-6 && r0[3] >= want[3] - 1e-6
+        && near(v3.z, 1, 1e-9), [v3, sz]);
+      dispatch(vw, vst, "wheel", { deltaX: 30, deltaY: 0, deltaMode: 0, clientX: 100, clientY: 100 });
+      const moved = { ...V3.debug().engine.view };
+      V3.apply(B("", [["v", 500, 500, 1, 1280, 720]]));
+      ok("뷰어: 내가 옮기면 따라가기가 풀리고(onView false) 강사 보기가 와도 움직이지 않는다", !V3.following() && views.join() === "false" && V3.debug().engine.view.x === moved.x && V3.debug().engine.view.y === moved.y, [views, moved, V3.debug().engine.view]);
+      V3.setFollow(true);
+      const v4 = V3.debug().engine.view;
+      ok("뷰어: setFollow(true) 는 곧바로 강사 보기에 맞춘다(onView true)", V3.following() && views.join() === "false,true" && v4.x <= 500 + 1e-6 && v4.x + 640 / v4.z >= 500 + 1280 - 1e-6, [views, v4]);
+      // 표면과 함께 열지 않는다
+      let threw = null;
+      try { vw.W.viewer({ mount: vw.body }); } catch (e) { threw = e; }
+      vw.win.ItdaWhiteboardHost = { store: vw.W.memoryStore() };
+      const rej = await vw.W.open().then(() => "열림", () => "거부");
+      ok("뷰어: 뷰어가 열린 동안 표면 open 은 거부한다", rej === "거부" && !vw.W.isOpen() && threw === null, [rej, threw && threw.message]);
+      V3.close();
+      ok("뷰어: close 뒤에는 떼어지고 apply 는 false", !vw.body.contains(V3.debug().root) && V3.apply(B("reset", [])) === false);
+      const w2 = world();
+      await openWb(w2, w2.W.memoryStore());
+      let threw2 = null;
+      try { w2.W.viewer({ mount: w2.body }); } catch (e) { threw2 = e; }
+      ok("뷰어: 표면이 열린 동안 viewer() 는 던진다", !!threw2 && /표면/.test(threw2.message), threw2 && threw2.message);
+      await w2.W.close();
+    }
+
+    // ---- 중계 리뷰 1회차 반영
+    // [1] 중계를 걸지 않은 처음 열기(미저장 기록 없음)에서 list 가 거부돼도 표면은 열린 채 읽기 전용 빈 판과 안내를 보인다
+    {
+      const w = world(), ctl = {}, store = logged(w.W.memoryStore(), ctl);
+      ctl.fail.list = true;
+      w.win.ItdaWhiteboardHost = { store };
+      const res = await w.W.open().then(() => "열림", e => "거부:" + e.message);
+      await settle(); frames(w, 2);
+      const root = surfaceOf(w), D = w.W.debug(), note = root && root.querySelector(".itda-wb-note");
+      ok("처음 열기: list 거부 — 표면이 열린 채 읽기 전용 빈 판과 안내(중계 없음)", w.W.isOpen() && !!D && D.engine.readOnly() && D.engine.strokes.size === 0
+        && !!note && !note.hidden && /판 목록을 읽지 못했습니다/.test(note.textContent), [res, w.W.isOpen(), note && note.textContent]);
+      await w.W.close();
+    }
+    // [2] 상한에 찬 판에서 한 구간(100ms) 안에 지우고 넣기·되돌리기 — 빼기가 넣기보다 먼저 나가 뷰어가 보내는 쪽과 같다(양쪽 상한을 같게 줄인다)
+    {
+      const limited = async (name, lim, make, drive) => {
+        const w = world(), vw = world();
+        Object.assign(w.C.LIMIT, lim); Object.assign(vw.C.LIMIT, lim);
+        const store = w.W.memoryStore(), b = await store.create("상한");
+        await store.save(b.id, make(w.C));
+        const { stage, D } = await openWb(w, store, { id: b.id });
+        const H = hub(w), V = viewerOf(vw, H);
+        await pumpR(w);
+        const n0 = H.got.length, okSame0 = same(w, D, V).ok;
+        await drive(w, stage, D, H);
+        await pumpR(w);
+        const inc = H.got.slice(n0), r = same(w, D, V);
+        const order = inc.map(t => JSON.parse(t).ops.map(o => o[0]));
+        const delFirst = order.every(names => { const firstIns = names.findIndex(x => x === "s" || x === "i"); return firstIns < 0 || Math.max(names.lastIndexOf("d"), names.lastIndexOf("x")) < firstIns; });
+        ok("중계 상한: " + name + " — 묶음마다 빼기가 넣기보다 먼저, 뷰어가 보내는 쪽과 같다", okSame0 && r.ok && H.applied.every(a => a === true) && delFirst, [order, r.n, H.applied]);
+        await w.W.close();
+      };
+      const eraseAll = (w, stage, pts) => { key(w, null, "e", "KeyE"); stroke(w, stage, pts); key(w, null, "p", "KeyP"); };
+      // 획 수 상한: 획 2(상한 2)를 다 지우고 같은 구간에 새 획
+      await limited("획 수 — 지우기→넣기", { strokes: 2 }, C => boardText(C, 2), async (w, stage, D) => {
+        eraseAll(w, stage, line(0, 0, 20, 5, 4)); stroke(w, stage, line(300, 300, 400, 300, 4));
+        ok("중계 상한: 획 수 — 보내는 쪽은 새 획 하나", D.engine.strokes.size === 1, D.engine.strokes.size);
+      });
+      // 되돌리기 조합: 지우기·새 획을 보낸 뒤, 한 구간 안에 새 획 되돌리기 → 지우기 되돌리기(옛 획 둘이 같은 id 로 돌아온다), 다시 한 구간 안에 다시 하기 둘
+      await limited("획 수 — 되돌리기·다시 하기", { strokes: 2 }, C => boardText(C, 2), async (w, stage, D, H) => {
+        eraseAll(w, stage, line(0, 0, 20, 5, 4)); stroke(w, stage, line(300, 300, 400, 300, 4));
+        await pumpR(w);
+        const V = H.viewer;
+        undoKey(w); undoKey(w); await pumpR(w);
+        ok("중계 상한: 획 수 — 되돌리기 둘(새 획 빼기 → 옛 획 둘)", D.engine.strokes.size === 2 && same(w, D, V).ok, same(w, D, V).n);
+        redoKey(w); redoKey(w);
+      });
+      // 점 수 상한: 점 200 개짜리 획(상한 210)을 지우고 같은 구간에 짧은 획(점 11 개 이상)
+      const bigStroke = C => C.serialize({ name: "판", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: [{ tool: "pen", color: 0, w: 4, pts: Array.from({ length: 200 }, (_, i) => [i, 10, 0.5]).flat() }] });
+      await limited("점 수 — 지우기→넣기", { points: 210 }, bigStroke, async (w, stage, D) => {
+        eraseAll(w, stage, line(50, 0, 50, 20, 4)); stroke(w, stage, line(300, 300, 500, 360, 20));
+        const s = lastStroke(D.engine);
+        ok("중계 상한: 점 수 — 보내는 쪽은 새 획(점 11 개 이상) 하나", D.engine.strokes.size === 1 && s.pts.length / 3 > 10, [D.engine.strokes.size, s && s.pts.length / 3]);
+      });
+      await limited("점 수 — 되돌리기·다시 하기", { points: 210 }, bigStroke, async (w, stage, D, H) => {
+        eraseAll(w, stage, line(50, 0, 50, 20, 4)); stroke(w, stage, line(300, 300, 500, 360, 20));
+        await pumpR(w);
+        undoKey(w); undoKey(w); await pumpR(w);
+        ok("중계 상한: 점 수 — 되돌리기 둘(새 획 빼기 → 큰 획)", D.engine.strokes.size === 1 && lastStroke(D.engine).pts.length === 600 && same(w, D, H.viewer).ok, same(w, D, H.viewer).n);
+        redoKey(w); redoKey(w);
+      });
+      // 그림 수 상한: 그림 1(상한 1)을 지우고 같은 구간에 새 그림, 그다음 되돌리기 둘을 한 구간에
+      await limited("그림 수 — 지우기→넣기·되돌리기", { images: 1 }, C => boardText(C, 0), async (w, stage, D, H) => {
+        paste(w, [imgFile(400, 300, false)]); await settle(30); frames(w, 2);
+        await pumpR(w);
+        key(w, null, "Delete", "Delete");
+        paste(w, [imgFile(200, 600, true)]); await settle(30); frames(w, 2);
+        ok("중계 상한: 그림 수 — 보내는 쪽은 새 그림 하나", D.engine.images.size === 1 && [...D.engine.images.values()][0].mime === "image/png", D.engine.images.size);
+        await pumpR(w); await settle(20);
+        ok("중계 상한: 그림 수 — 지우기→넣기 뒤 뷰어도 새 그림 하나", same(w, D, H.viewer).ok, same(w, D, H.viewer));
+        undoKey(w); undoKey(w);
+      });
+    }
+    // [3] 5만 획(기본 상한) 일괄 지우기 — d 가 여러 연산·여러 묶음으로 나뉘고 묶음마다 192KB 안, 뷰어는 빈 판
+    {
+      const w = world(), store = w.W.memoryStore(), C = w.C;
+      const b = await store.create("큰 판");
+      await store.save(b.id, C.serialize({ name: "큰 판", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: Array.from({ length: C.LIMIT.strokes }, () => ({ tool: "pen", color: 0, w: 4, pts: [100, 100, 0.5] })) }));
+      const { stage, D } = await openWb(w, store, { id: b.id });
+      const vw = world(), H = hub(w), V = viewerOf(vw, H);
+      await pumpR(w, 40);
+      const n0 = H.got.length, all0 = H.got.map(t => Buffer.byteLength(t, "utf8"));
+      ok("중계 대량: 5만 획 판의 reset 이 묶음마다 192KB 안·뷰어가 같다", C.LIMIT.strokes === 50000 && all0.every(s => s <= C.BATCH_MAX) && V.debug().board().strokes.length === 50000, [all0.length, Math.max(...all0)]);
+      key(w, null, "e", "KeyE"); stroke(w, stage, [[100, 100], [100, 101]]);
+      await pumpR(w, 20);
+      const parts = H.got.slice(n0), sizes = parts.map(t => Buffer.byteLength(t, "utf8")), ds = opsOf(parts).filter(o => o[0] === "d");
+      ok("중계 대량: 5만 획 일괄 지우기 — d 가 여럿으로 나뉘고 묶음마다 192KB 안", D.engine.strokes.size === 0 && parts.length >= 2 && sizes.every(s => s <= C.BATCH_MAX)
+        && ds.length >= 2 && ds.reduce((n, o) => n + o[1].length, 0) === 50000 && kinds(parts).every(k => k === ""), [sizes, ds.length]);
+      ok("중계 대량: 뷰어도 빈 판(왕복)", same(w, D, V).ok && V.debug().board().strokes.length === 0 && H.applied.every(a => a === true), same(w, D, V).n);
+      await w.W.close();
+    }
+    // 크기 단언 — 묶음이 BATCH_MAX 를 넘는다고 재면 아무것도 내지 않고, 다음 바뀜 때 reset 부터 다시 한다
+    {
+      const w = world(), store = w.W.memoryStore(), C = w.C;
+      const { stage, D } = await openWb(w, store);
+      const vw = world(), H = hub(w), V = viewerOf(vw, H);
+      await pumpR(w);
+      const real = C.utf8Len, n0 = H.got.length;
+      C.utf8Len = s => (s.startsWith('{"v":') ? C.BATCH_MAX + 1 : real(s)); // 완성된 묶음만 넘는다고 잰다
+      stroke(w, stage, line(100, 100, 200, 100, 4));
+      await pumpR(w);
+      ok("중계 크기 단언: 넘는다고 잰 묶음은 내지 않는다", H.got.length === n0, H.got.length - n0);
+      C.utf8Len = real;
+      stroke(w, stage, line(100, 200, 200, 200, 4));
+      await pumpR(w);
+      ok("중계 크기 단언: 다음 바뀜 때 reset 부터 — 뷰어가 다시 같다", kinds(H.got.slice(n0))[0] === "reset" && same(w, D, V).ok && V.debug().board().strokes.length === 2, [kinds(H.got.slice(n0)), same(w, D, V).n]);
+      await w.W.close();
+    }
+  }
+
   console.log("WHITEBOARD DONE cases=" + cases + " failed=" + failed);
 })().catch(e => { console.log("예외 " + (e && e.stack || e)); console.log("WHITEBOARD DONE cases=" + cases + " failed=" + (failed + 1)); });
