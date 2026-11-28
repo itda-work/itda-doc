@@ -21,7 +21,8 @@
 //       「디스크에 없음」 이 아니라 「이 store 의 save 성공을 확인하지 못함」 이다. 엔진에만 있는 변경(아직 기록기에 넣지 않은 획 — 자동 저장을 기다리거나
 //       본문을 만들지 못한 것)은 들지 않는다 — 열린 표면의 마지막 획까지 지키려면 close() 가 true 인 것을 먼저 확인한다. 이 페이지에서 쓴 적 없는
 //       store 는 빈 배열이고, store 가 객체(함수 포함)가 아니면 TypeError 를 던진다.
-//   ItdaWhiteboard.relay({ send, image? }) → { stop(), reset() }  중계 출구(아래 「중계」). 다시 부르면 앞 출구를 멈추고 바꾼다. send 가 함수가 아니면 TypeError.
+//   ItdaWhiteboard.relay({ send, image?, max? }) → { stop(), reset() }  중계 출구(아래 「중계」). 다시 부르면 앞 출구를 멈추고 바꾼다. send 가 함수가 아니거나
+//       max 를 주었는데 유한한 수가 아니면 TypeError 다(앞 출구는 멈추지 않는다).
 //   ItdaWhiteboard.viewer({ mount?, image?, onView?, onState? }) → { apply(batchText), setFollow(bool), following(), close() }  보기 전용 화면(아래 「보기 전용 화면」).
 //       표면이 열려 있으면 던지고, 뷰어가 열려 있는 동안 open 은 거부한다 — 한 페이지에 표면과 뷰어를 함께 띄우지 않는다고 가정한다(도구·색 prefs 를 같이 쓴다).
 //   ItdaWhiteboard.memoryStore()  메모리 저장소(아래 store 계약을 그대로 따른다 — 시험·데모용, 페이지를 닫으면 사라진다).
@@ -134,8 +135,13 @@
 //   · image(hash, bytes, mime) 는 그림 파일 바이트(Uint8Array)를 그 그림을 처음 가리키는 묶음의 send 보다 먼저 한 번 넘긴다(같은 해시는 이 출구에서 다시 넘기지 않는다).
 //     Promise 면 끝난 뒤 send 한다. 실패하면 send 와 같이 멈추고, 다음 바뀜 때 reset 과 함께 다시 넘긴다. image 가 없으면 연산(해시)만 나간다.
 //     해시는 sha-256(wbcore sha256Hex)이고 그림 객체마다 한 번 센다(그림 하나 1.5MB 에 수십 ms — 판을 열 때 그림이 많으면 첫 reset 이 그만큼 늦다).
-//   · 묶음 하나는 BATCH_MAX(192KB) 안이다 — 큰 판의 reset 은 여러 묶음(첫 묶음만 reset), 한 묶음에 들지 않는 획은 s 와 a 여럿으로, 긴 빼기 목록은
-//     d·x 여럿으로 나뉜다. 내기 전에 묶음마다 크기를 재고, 넘으면 내지 않는다(다음 바뀜 때 reset 부터 — 위 「거부·던짐」 과 같다).
+//   · 묶음 하나는 출구의 상한(UTF-8 바이트 — 아래 max) 안이다 — 큰 판의 reset 은 여러 묶음(첫 묶음만 reset), 한 묶음에 들지 않는 획은 s 와 a 여럿으로,
+//     긴 빼기 목록은 d·x 여럿으로 나뉜다. 내기 전에 묶음마다 크기를 재고, 넘으면 내지 않는다(다음 바뀜 때 reset 부터 — 위 「거부·던짐」 과 같다).
+//   · max 는 출구마다의 묶음 상한이다(프레임이 작은 전송로용). 주지 않으면(undefined) BATCH_MAX(192KB)다. 준 값이 유한한 수가 아니면(문자열·null·NaN·
+//     Infinity) TypeError 를 던진다 — 앞 출구를 멈추기 전에 검사하므로 던져도 앞 출구는 그대로 돈다(전송로 상한을 조용히 192KB 로 넘기지 않는다).
+//     유한한 수는 정수로 내리고 RELAY_MIN(8KB)~BATCH_MAX 로 눌러 쓴다(8KB 보다 작으면 8KB, 192KB 보다 크면 192KB). 하한 8KB 는 가장 긴 나누지 않는
+//     연산 하나(이름 NAME_MAX 글자를 실은 h)와 봉투가 들고, 획의 점 하나·id 하나가 조각(max − RELAY_ROOM)에 드는 크기다.
+//   · image 는 없어도 된다 — 그때는 그림 바이트를 넘기지 않고 자리 연산(i·g·x)만 낸다.
 //   · 증분 안의 차례는 빼기(d·x) → 그림 자리(g) → 넣기(i·s·a) → 머리(h) → 보기(v)다 — 받는 쪽이 쥔 것은 빼는 동안은 앞 판의 부분집합, 넣는 동안은 최종 판의 부분집합이라 두 판이 상한 안이면 중간도 상한 안이다
 //     (상한에 찬 판에서 지우고 곧바로 그어도 받는 쪽이 새 획을 버리지 않는다). reset 은 머리 → 그림 → 획 → 보기다.
 //   · reset() 은 다음 묶음을 reset 으로 한다(중간에 붙은 받는 쪽 — 호스트가 부른다). stop() 은 그 뒤로 아무것도 내지 않는다(도는 send 는 끝까지 둔다).
@@ -2117,7 +2123,15 @@
   // 「보낸 것」(sent — 이 reset 뒤로 받는 쪽에 있다고 아는 획·그림·머리·보기)과 지금 엔진을 그 획·그림에 한해 견주어 연산을 만든다(합친 결과만 나간다 —
   // 넣었다 뺀 획은 나가지 않는다). 판을 다시 열면(show — 엔진 load) reset 이다. 보내는 일은 판 그리기·저장과 묶이지 않는다(타이머 뒤 — 실패는 삼킨다).
   const RELAY_MS = 100;          // 바뀐 뒤 이만큼(ms) 모아 한 번에 낸다(보기는 그사이 마지막 값만)
-  const RELAY_CHUNK = C ? C.BATCH_MAX - 1024 : 0; // 연산 하나(획 조각)의 상한 — 묶음 머리·쉼표 여유를 뺀다
+  const RELAY_MIN = 8 * 1024;    // 출구 묶음 상한 max 의 하한(머리 주석 「중계」)
+  const RELAY_ROOM = 1024;       // 연산 하나(획·빼기 조각)의 상한은 묶음 상한에서 이만큼(묶음 머리·쉼표 여유)을 뺀 것이다
+  // relayMax 는 relay 의 max 를 묶음 상한(바이트)으로 바꾼다 — 없으면(undefined) BATCH_MAX, 유한한 수면 정수로 내려 RELAY_MIN~BATCH_MAX 로 누른다.
+  // 그 밖의 값(문자열·null·NaN·Infinity)은 TypeError 를 던진다.
+  function relayMax(v) {
+    if (v === undefined) return C.BATCH_MAX;
+    if (typeof v !== "number" || !Number.isFinite(v)) throw new TypeError("ItdaWhiteboard.relay: max 는 유한한 수여야 합니다");
+    return Math.min(C.BATCH_MAX, Math.max(RELAY_MIN, Math.floor(v)));
+  }
   let R = null;
   const imgHash = new WeakMap(); // 그림 객체 → sha-256 hex(한 번만 센다 — 되돌리기로 돌아온 그림은 같은 객체다)
   function hashOf(im) {
@@ -2128,8 +2142,9 @@
   function relay(o) {
     if (!o || typeof o.send !== "function") throw new TypeError("ItdaWhiteboard.relay: send 함수가 필요합니다");
     if (!C) throw new Error("wbcore.js(window.ItdaWbCore)가 먼저 실려야 한다");
+    const max = relayMax(o.max); // 앞 출구를 멈추기 전에 검사한다(던져도 앞 출구는 그대로 돈다)
     if (R) stopRelay(R);
-    const r = R = { send: o.send, image: typeof o.image === "function" ? o.image : null, stale: true, halted: false, busy: false, timer: 0, stopped: false,
+    const r = R = { send: o.send, image: typeof o.image === "function" ? o.image : null, max, stale: true, halted: false, busy: false, timer: 0, stopped: false,
       ts: new Set(), ti: new Set(), sent: null, given: new Set() };
     relayWake();
     return { stop: () => stopRelay(r), reset: () => { if (R !== r) return; r.stale = true; relayKick(); } };
@@ -2235,56 +2250,57 @@
     const { W, H } = eng.size, vk = JSON.stringify(C.wireView(eng.view, W, H));
     if (vk !== sent.view) { ops.push({ op: JSON.parse(vk) }); sent.view = vk; }
     if (!ops.length) return [];
-    return relaySplit(k, ops);
+    return relaySplit(k, ops, r.max);
   }
-  // relaySplit 은 연산들을 BATCH_MAX 안의 묶음들로 나눈다 — 첫 묶음만 k(reset 이면 나머지는 증분 ""). 한 묶음에 들지 않는 획은 s 와 a 여럿으로,
+  // relaySplit 은 연산들을 max(출구의 묶음 상한 — relayMax) 안의 묶음들로 나눈다 — 첫 묶음만 k(reset 이면 나머지는 증분 ""). 한 묶음에 들지 않는 획은 s 와 a 여럿으로,
   // 긴 빼기 목록(d·x)은 같은 이름의 연산 여럿으로 나눈다(차례는 그대로 — 빼기 조각이 모두 나간 뒤에 넣기가 나간다).
-  // 내기 전에 모든 묶음의 UTF-8 바이트를 다시 재고, 하나라도 BATCH_MAX 를 넘으면 아무것도 내지 않고 던진다(relayFlush 가 받아 다음 바뀜 때 reset).
-  function relaySplit(k, ops) {
-    const out = [], head = C.utf8Len(C.batchText("reset", [])) + 16;
+  // 획·빼기 조각은 chunk(max − RELAY_ROOM) 글자 안이다.
+  // 내기 전에 모든 묶음의 UTF-8 바이트를 다시 재고, 하나라도 max 를 넘으면 아무것도 내지 않고 던진다(relayFlush 가 받아 다음 바뀜 때 reset).
+  function relaySplit(k, ops, max) {
+    const out = [], head = C.utf8Len(C.batchText("reset", [])) + 16, chunk = max - RELAY_ROOM;
     let cur = [], imgs = [], size = head;
     const close = () => {
       const text = C.batchText(out.length ? "" : k, cur);
-      if (C.utf8Len(text) > C.BATCH_MAX) throw new RangeError("중계 묶음이 BATCH_MAX 를 넘는다");
+      if (C.utf8Len(text) > max) throw new RangeError("중계 묶음이 상한을 넘는다");
       out.push({ text, imgs }); cur = []; imgs = []; size = head;
     };
     const add = (str, img) => {
       const n = C.utf8Len(str) + 1;
-      if (cur.length && size + n > C.BATCH_MAX) close();
+      if (cur.length && size + n > max) close();
       cur.push(str); size += n;
       if (img) imgs.push(img);
     };
-    const parts = op => (op[0] === "s" ? strokeParts(op) : op[0] === "d" || op[0] === "x" ? idParts(op) : [JSON.stringify(op)]);
+    const parts = op => (op[0] === "s" ? strokeParts(op, chunk) : op[0] === "d" || op[0] === "x" ? idParts(op, chunk) : [JSON.stringify(op)]);
     for (const { op, img } of ops) for (const str of parts(op)) add(str, img);
     if (cur.length || !out.length) close();
     return out;
   }
-  // idParts 는 빼기 연산 [이름, [id, …]] 하나를 RELAY_CHUNK 안의 조각들로 나눈다(id 는 안전한 정수라 글자는 ASCII 다).
-  function idParts(op) {
+  // idParts 는 빼기 연산 [이름, [id, …]] 하나를 chunk 글자 안의 조각들로 나눈다(id 는 안전한 정수라 글자는 ASCII 다).
+  function idParts(op, chunk) {
     const whole = JSON.stringify(op);
-    if (whole.length <= RELAY_CHUNK) return [whole];
+    if (whole.length <= chunk) return [whole];
     const out = [], base = JSON.stringify([op[0], []]).length;
     let ids = [], len = base;
     for (const id of op[1]) {
       const n = String(id).length + (ids.length ? 1 : 0);
-      if (ids.length && len + n > RELAY_CHUNK) { out.push(JSON.stringify([op[0], ids])); ids = []; len = base; }
+      if (ids.length && len + n > chunk) { out.push(JSON.stringify([op[0], ids])); ids = []; len = base; }
       len += String(id).length + (ids.length ? 1 : 0);
       ids.push(id);
     }
     if (ids.length) out.push(JSON.stringify([op[0], ids]));
     return out;
   }
-  // strokeParts 는 획 연산 하나를 RELAY_CHUNK 안의 조각들(["s", …, 앞 점] 과 ["a", id, 다음 점] 여럿)로 나눈다(점은 3 개씩 끊는다 — 글자는 ASCII 다).
-  function strokeParts(op) {
+  // strokeParts 는 획 연산 하나를 chunk 글자 안의 조각들(["s", …, 앞 점] 과 ["a", id, 다음 점] 여럿)로 나눈다(점은 3 개씩 끊는다 — 글자는 ASCII 다).
+  function strokeParts(op, chunk) {
     const whole = JSON.stringify(op);
-    if (whole.length <= RELAY_CHUNK) return [whole];
+    if (whole.length <= chunk) return [whole];
     const p = op[5], n = p.length / 3;
-    for (let parts = Math.ceil(whole.length / RELAY_CHUNK) + 1; ; parts++) {
+    for (let parts = Math.ceil(whole.length / chunk) + 1; ; parts++) {
       const per = Math.ceil(n / parts) * 3, strs = [];
       let fits = true;
       for (let i = 0; i < p.length && fits; i += per) {
         const seg = p.slice(i, i + per), str = JSON.stringify(i === 0 ? ["s", op[1], op[2], op[3], op[4], seg] : ["a", op[1], seg]);
-        if (str.length > RELAY_CHUNK) fits = false; else strs.push(str);
+        if (str.length > chunk) fits = false; else strs.push(str);
       }
       if (fits) return strs;
     }

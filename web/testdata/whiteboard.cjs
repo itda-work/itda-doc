@@ -2617,18 +2617,21 @@ function boardText(C, n, o) {
     const kinds = list => list.map(t => JSON.parse(t).k);
     const opsOf = list => list.flatMap(t => JSON.parse(t).ops);
     // hub 는 출구와 뷰어 사이다 — got 보낸 묶음 · imgs 넘긴 그림(해시 → 바이트) · log image·send 차례. o.send 가 있으면 그것이 send 의 값을 정한다(뷰어에 넘기지 않는다).
+    // o.max 가 있으면 relay 의 max 로 넘기고, o.noImage 면 image 를 주지 않는다.
     function hub(w, o) {
       o = o || {};
       const H = { got: [], imgs: new Map(), log: [], applied: [], viewer: null, busy: 0, maxBusy: 0 };
-      H.h = w.W.relay({
+      const ro = {
         send: t => {
           H.got.push(t); H.log.push("send:" + JSON.parse(t).k);
           if (o.send) return o.send(t, H);
           if (H.viewer) H.applied.push(H.viewer.apply(t));
           return "";
         },
-        image: (hash, bytes, mime) => { H.log.push("image:" + hash); H.imgs.set(hash, { bytes: Buffer.from(bytes), mime }); return o.image ? o.image(hash) : undefined; },
-      });
+      };
+      if (!o.noImage) ro.image = (hash, bytes, mime) => { H.log.push("image:" + hash); H.imgs.set(hash, { bytes: Buffer.from(bytes), mime }); return o.image ? o.image(hash) : undefined; };
+      if ("max" in o) ro.max = o.max;
+      H.h = w.W.relay(ro);
       return H;
     }
     // viewerOf 는 다른 world(vw)에 뷰어를 연다 — 그림은 hub 가 받은 바이트를 Blob 으로 준다
@@ -3104,6 +3107,155 @@ function boardText(C, n, o) {
       ok("중계 대량: 5만 획 일괄 지우기 — d 가 여럿으로 나뉘고 묶음마다 192KB 안", D.engine.strokes.size === 0 && parts.length >= 2 && sizes.every(s => s <= C.BATCH_MAX)
         && ds.length >= 2 && ds.reduce((n, o) => n + o[1].length, 0) === 50000 && kinds(parts).every(k => k === ""), [sizes, ds.length]);
       ok("중계 대량: 뷰어도 빈 판(왕복)", same(w, D, V).ok && V.debug().board().strokes.length === 0 && H.applied.every(a => a === true), same(w, D, V).n);
+      await w.W.close();
+    }
+    // [4] 출구마다의 상한 max(itda-hyve#699 ④-3 2a) — 48KB 로 걸면 큰 판 reset·긴 획·큰 빼기 목록·증분의 모든 묶음이 48KB 안이고 뷰어가 같다
+    {
+      const w = world(), store = w.W.memoryStore(), C = w.C, MAX = 48 * 1024;
+      const big = await store.create("큰 판");
+      await store.save(big.id, boardText(C, 30000));
+      const n = 20000, pts = [];
+      for (let i = 0; i < n; i++) pts.push(100000 + i * 1.37, -100000 - i * 1.11, 0.123);
+      const long = await store.create("긴 획");
+      await store.save(long.id, C.serialize({ name: "긴 획", bg: "grid", view: { x: 100000, y: -100100, z: 1 }, strokes: [{ tool: "hl", color: 3, w: 12.5, pts }] }));
+      const pile = await store.create("겹친 판");
+      await store.save(pile.id, C.serialize({ name: "겹친 판", bg: "dark", view: { x: 0, y: 0, z: 1 }, strokes: Array.from({ length: 20000 }, () => ({ tool: "pen", color: 0, w: 4, pts: [100, 100, 0.5] })) }));
+      const { stage, D } = await openWb(w, store, { id: big.id });
+      const vw = world(), H = hub(w, { max: MAX }), V = viewerOf(vw, H);
+      const sizesOf = list => list.map(t => Buffer.byteLength(t, "utf8"));
+      await pumpR(w, 60);
+      const s0 = sizesOf(H.got);
+      ok("중계 max 48KB: 큰 판(획 30000) reset — 묶음마다 48KB 안·첫 묶음만 reset·뷰어가 같다", s0.length >= 12 && s0.every(s => s <= MAX) && kinds(H.got)[0] === "reset"
+        && kinds(H.got).slice(1).every(k => k === "") && same(w, D, V).ok && V.debug().board().strokes.length === 30000, [s0.length, Math.max(...s0), same(w, D, V).n]);
+      // goTo 는 그 판이 보일 때까지 ] 를 누른다(목록 차례에 기대지 않는다 — 사이에 중계 타이머를 돌리지 않아 마지막 판의 reset 만 나간다)
+      const goTo = async id => { for (let i = 0; i < 3 && D.state.id !== id; i++) { key(w, null, "]", "BracketRight"); await settle(20); frames(w, 2); } };
+      let n1 = H.got.length;
+      await goTo(long.id);
+      await pumpR(w, 60);
+      let parts = H.got.slice(n1), lo = opsOf(parts);
+      ok("중계 max 48KB: 긴 획(점 20000)은 s 하나와 a 여럿 — 묶음마다 48KB 안·뷰어가 같다", D.state.id === long.id && parts.length >= 8 && sizesOf(parts).every(s => s <= MAX)
+        && lo.filter(o => o[0] === "s").length === 1 && lo.filter(o => o[0] === "a").length >= 7 && same(w, D, V).ok, [parts.length, Math.max(...sizesOf(parts)), same(w, D, V).n]);
+      n1 = H.got.length;
+      await goTo(pile.id);
+      await pumpR(w, 60);
+      ok("중계 max 48KB: 겹친 판(획 20000) reset — 뷰어가 같다", D.state.id === pile.id && sizesOf(H.got.slice(n1)).every(s => s <= MAX) && same(w, D, V).ok, same(w, D, V).n);
+      n1 = H.got.length;
+      key(w, null, "e", "KeyE"); stroke(w, stage, [[100, 100], [100, 101]]); key(w, null, "p", "KeyP");
+      await pumpR(w, 40);
+      parts = H.got.slice(n1);
+      const ds = opsOf(parts).filter(o => o[0] === "d");
+      ok("중계 max 48KB: 획 20000 일괄 지우기 — d 여럿·묶음마다 48KB 안·증분만·뷰어도 빈 판", D.engine.strokes.size === 0 && parts.length >= 3 && sizesOf(parts).every(s => s <= MAX)
+        && ds.length >= 3 && ds.reduce((m, o) => m + o[1].length, 0) === 20000 && kinds(parts).every(k => k === "") && same(w, D, V).ok, [sizesOf(parts), ds.length]);
+      n1 = H.got.length;
+      for (let i = 0; i < 5; i++) stroke(w, stage, line(100, 100 + i * 20, 400, 100 + i * 20, 30));
+      await pumpR(w);
+      parts = H.got.slice(n1);
+      ok("중계 max 48KB: 증분(새 획 5)도 48KB 안·뷰어가 같다", parts.length >= 1 && kinds(parts).every(k => k === "") && sizesOf(parts).every(s => s <= MAX)
+        && same(w, D, V).ok && V.debug().board().strokes.length === 5, [sizesOf(parts), same(w, D, V).n]);
+      ok("중계 max 48KB: 낸 묶음 전체가 48KB 안·뷰어가 모두 받았다", sizesOf(H.got).every(s => s <= MAX) && H.applied.length === H.got.length && H.applied.every(a => a === true), [H.got.length, H.applied.filter(a => a !== true)]);
+      await w.W.close();
+    }
+    // [5] max 를 주지 않음·눌러 쓰기 — 같은 판에서 낸 묶음들(글자 그대로)을 견준다. 없음은 기준(8acdeee — max 옵션 전)과 해시까지 같고, undefined·BATCH_MAX 이상은
+    // 없음과 같다. 하한보다 작은 수(1·0·음수·소수)는 8KB 로 눌러 쓴다(8KB 를 준 것과 같다). 이름이 NAME_MAX 글자(한 글자 3 바이트)여도 8KB 묶음에 든다.
+    {
+      const LONG = "가".repeat(world().C.NAME_MAX);
+      // runMax 는 판을 열고 출구를 건다. opt.incr 면 reset 이 다 나간 뒤 새 획 3 개를 긋고 그 증분을 따로 돌려준다.
+      const runMax = async (opt, text, name) => {
+        const w = world(), store = w.W.memoryStore(), C = w.C;
+        const b = await store.create(name || LONG);
+        await store.save(b.id, text(C));
+        const { stage } = await openWb(w, store, { id: b.id });
+        const got = [];
+        const ro = { send: t => { got.push(t); return ""; } };
+        if (opt.has) ro.max = opt.max;
+        w.W.relay(ro);
+        await pumpR(w, 40);
+        let incr = [];
+        if (opt.incr) {
+          const n0 = got.length;
+          for (let i = 0; i < 3; i++) stroke(w, stage, line(100, 100 + i * 20, 400, 100 + i * 20, 30));
+          await pumpR(w);
+          incr = got.slice(n0);
+        }
+        return { got, incr, C };
+      };
+      const text = C => boardText(C, 12000, { name: LONG });
+      const base = await runMax({ has: false, incr: true }, text), sz = base.got.map(t => Buffer.byteLength(t, "utf8")), BM = base.C.BATCH_MAX;
+      ok("중계 max 없음: 묶음 상한이 BATCH_MAX(192KB)이고 48KB 를 넘는 묶음이 있다", sz.every(s => s <= BM) && sz.some(s => s > 48 * 1024) && kinds(base.got)[0] === "reset", sz);
+      // 기대 해시는 기준 커밋(8acdeee)의 whiteboard.js 로 낸 출력이다(같은 시험을 그 파일에 얹어 같은 값을 얻었다 — 보고서 report-wb-site-2a-fix1)
+      const resetPart = base.got.slice(0, base.got.length - base.incr.length);
+      ok("중계 max 없음: 대표 reset 출력(획 12000·긴 이름)이 기준과 해시까지 같다", sha(JSON.stringify(resetPart)) === "abcfc78e4139712995dc92ee1f49644547178705cdcffdc7a35e08d6d7ce636f", [resetPart.length, sha(JSON.stringify(resetPart))]);
+      ok("중계 max 없음: 대표 증분 출력(새 획 3)이 기준과 해시까지 같다", base.incr.length >= 1 && kinds(base.incr).every(k => k === "") && sha(JSON.stringify(base.incr)) === "0cd9e1070223dcbd2520c7909255193aff0ecaf2d3436593a782f9c08d5df3ae",
+        [base.incr.length, sha(JSON.stringify(base.incr))]);
+      for (const [label, v] of [["BATCH_MAX", BM], ["BATCH_MAX 보다 큼", BM * 4], ["undefined", undefined]]) {
+        const r = await runMax({ has: true, max: v, incr: true }, text);
+        ok("중계 max " + label + ": max 없음과 같은 묶음(reset·증분)", JSON.stringify(r.got) === JSON.stringify(base.got), [r.got.length, base.got.length]);
+      }
+      const at8 = await runMax({ has: true, max: 8 * 1024 }, text), s8 = at8.got.map(t => Buffer.byteLength(t, "utf8"));
+      const vw = world(), V = viewerOf(vw, null), ap = at8.got.map(t => V.apply(t));
+      ok("중계 max 8KB: 묶음마다 8KB 안·긴 이름의 머리도 들고 뷰어가 모두 받는다", s8.every(s => s <= 8192) && s8.some(s => s > 4096) && ap.every(a => a === true)
+        && V.debug().board().strokes.length === 12000 && LONG.length === 200 && opsOf(at8.got).some(o => o[0] === "h" && o[1] === LONG), [s8.length, Math.max(...s8), ap.filter(a => a !== true), opsOf(at8.got).filter(o => o[0] === "h")]);
+      for (const [label, v] of [["1", 1], ["0", 0], ["음수", -5], ["8KB 보다 작은 수", 4000], ["8KB 위 소수(내림)", 8192.9]]) {
+        const r = await runMax({ has: true, max: v }, text);
+        ok("중계 max " + label + ": 8KB 로 눌러 쓴다(8KB 를 준 것과 같은 묶음)", JSON.stringify(r.got) === JSON.stringify(at8.got), [r.got.length, at8.got.length]);
+      }
+      const r50 = await runMax({ has: true, max: 50000.7 }, text), s50 = r50.got.map(t => Buffer.byteLength(t, "utf8"));
+      ok("중계 max 50000.7: 정수로 내려 50000 바이트 안", s50.every(s => s <= 50000) && s50.some(s => s > 40000), [s50.length, Math.max(...s50)]);
+      // 8KB 하한의 최악 — 이름이 제어 문자 NAME_MAX 글자(JSON 에서 글자마다 \u0001 의 6 바이트)이고 점 20000 개짜리 긴 획이 있다
+      const CTRL = "\u0001".repeat(200);
+      const worst = C => {
+        const pts = [];
+        for (let i = 0; i < 20000; i++) pts.push(100000 + i * 1.37, -100000 - i * 1.11, 0.123);
+        const strokes = [{ tool: "hl", color: 3, w: 12.5, pts }].concat(Array.from({ length: 50 }, (_, i) => ({ tool: "pen", color: 0, w: 4, pts: [i * 10, 0, 0.5, i * 10 + 5, 5, 0.5] })));
+        return C.serialize({ name: CTRL, bg: "grid", view: { x: 0, y: 0, z: 1 }, strokes });
+      };
+      const wr = await runMax({ has: true, max: 8 * 1024 }, worst, CTRL), sw = wr.got.map(t => Buffer.byteLength(t, "utf8")), wo = opsOf(wr.got);
+      const ww = world(), WV = viewerOf(ww, null), wap = wr.got.map(t => WV.apply(t)), wb = WV.debug().board();
+      const hOp = wo.find(o => o[0] === "h"), C_len = o => Buffer.byteLength(JSON.stringify(o), "utf8");
+      ok("중계 max 8KB 최악: 제어 문자 200자 이름의 머리와 긴 획(점 20000)이 묶음마다 8KB 안·뷰어가 모두 받는다", sw.every(s => s <= 8192) && wap.every(a => a === true)
+        && hOp && hOp[1] === CTRL && C_len(hOp) > 1200 && wo.filter(o => o[0] === "s").length === 51 && wo.filter(o => o[0] === "a").length >= 30
+        && wb.strokes.length === 51 && wb.strokes.some(s => s.pts.length === 60000), [sw.length, Math.max(...sw), wap.filter(a => a !== true), hOp && C_len(hOp)]);
+    }
+    // [5b] 틀린 max — 문자열·null·NaN·±Infinity·객체는 동기 TypeError 다. 앞 출구를 멈추기 전에 검사하므로 앞 출구는 그대로 증분을 낸다(reset 하지 않는다)
+    {
+      const w = world(), store = w.W.memoryStore();
+      const { stage } = await openWb(w, store);
+      const got = [], stray = [];
+      w.W.relay({ send: t => { got.push(t); return ""; }, max: 48 * 1024 });
+      await pumpR(w);
+      let y = 100;
+      for (const [label, v] of [["문자열", "49152"], ["null", null], ["NaN", NaN], ["Infinity", Infinity], ["-Infinity", -Infinity], ["객체", {}]]) {
+        let err = null;
+        try { w.W.relay({ send: t => { stray.push(t); return ""; }, max: v }); } catch (e) { err = e; }
+        const n0 = got.length;
+        stroke(w, stage, line(100, y, 400, y, 20)); y += 20;
+        await pumpR(w);
+        const after = got.slice(n0);
+        ok("중계 max " + label + ": TypeError 를 던지고 앞 출구는 그대로 돈다", !!err && err.name === "TypeError" && /max/.test(err.message) && after.length >= 1
+          && kinds(after).every(k => k === "") && opsOf(after).some(o => o[0] === "s") && stray.length === 0, [err && err.name, kinds(after), stray.length]);
+      }
+      await w.W.close();
+    }
+    // [6] image 없는 relay — 그림 바이트는 넘기지 않고 자리 연산(i·g·x)만 낸다. 뷰어는 해시로 자리를 그린다(바이트가 없으면 자리 표시)
+    {
+      const w = world(), store = w.W.memoryStore();
+      const { stage, D } = await openWb(w, store);
+      const vw = world(), H = hub(w, { noImage: true, max: 48 * 1024 }), V = viewerOf(vw, H);
+      await pumpR(w);
+      paste(w, [imgFile(1000, 500, false)]); await settle(30); frames(w, 2);
+      await pumpR(w); await settle(20);
+      const ins = opsOf(H.got).filter(o => o[0] === "i");
+      ok("중계 image 없음: 그림 넣기는 i 연산(해시)만 나가고 뷰어 판이 같다", ins.length === 1 && /^[0-9a-f]{64}$/.test(ins[0][7]) && H.imgs.size === 0 && same(w, D, V).ok
+        && H.applied.every(a => a === true), [ins, same(w, D, V)]);
+      const ng = H.got.length;
+      drag(w, stage, [640, 380], [704, 412]); // 몸통 끌기 = 옮기기
+      await pumpR(w);
+      ok("중계 image 없음: 그림 옮기기는 g 로 나가고 뷰어가 같다", opsOf(H.got.slice(ng)).some(o => o[0] === "g") && same(w, D, V).ok, [opsOf(H.got.slice(ng)), same(w, D, V).n]);
+      const n0 = H.got.length;
+      key(w, null, "Delete", "Delete");
+      await pumpR(w);
+      ok("중계 image 없음: 그림 빼기는 x 로 나가고 뷰어도 빈 판", D.engine.images.size === 0 && opsOf(H.got.slice(n0)).some(o => o[0] === "x") && same(w, D, V).ok
+        && !H.log.some(x => x.startsWith("image:")), [opsOf(H.got.slice(n0)), same(w, D, V).n]);
       await w.W.close();
     }
     // 크기 단언 — 묶음이 BATCH_MAX 를 넘는다고 재면 아무것도 내지 않고, 다음 바뀜 때 reset 부터 다시 한다
